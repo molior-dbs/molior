@@ -1,0 +1,11 @@
+[Unit]
+Description=Create SSH keys on first start
+Before=ssh.service
+
+[Service]
+ExecStart=/usr/sbin/ssh-create-keys
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+

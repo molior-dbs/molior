@@ -1,0 +1,50 @@
+*.pyc
+.coverage
+*.swp
+
+molior/version.py
+
+# Debian
+debian/files
+debian/tmp
+test
+debian/molior-server
+debian/molior-devel/
+debian/molior-os-config/
+debian/molior-doc/
+debian/molior-client-http/
+debian/molior-backend-http/
+debian/molior-node-devel/
+.pybuild/
+molior.egg-info
+debian/debhelper-build-stamp
+
+# Vagrant
+!Vagrantfile
+.vagrant
+.cache
+vagrant/sshkeys/
+
+# Doc build
+userdoc/_build
+/doc/_build
+doc/build
+doc/source/molior
+csv/build
+
+# Validation docs
+doc/validation/strategy.md
+doc/validation/report.md
+doc/validation/report.pdf
+
+*.debhelper
+*.debhelper.*
+*.substvars
+
+# Editor
+.vscode
+
+
+**_minted-input
+*_minted-report
+test2pdf-*

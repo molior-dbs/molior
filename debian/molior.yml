@@ -1,0 +1,4 @@
+config_version: '1'
+targets:
+  molior:
+  - 1.3

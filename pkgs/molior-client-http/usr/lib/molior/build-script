@@ -1,0 +1,213 @@
+#!/bin/sh
+
+: ${BUILD_ID?"set BUILD_ID before running this script"}
+: ${BUILD_TOKEN?"set BUILD_TOKEN before running this script"}
+: ${PLATFORM?"set PLATFORM before running this script"}
+: ${PLATFORM_VERSION?"set PLATFORM_VERSION before running this script"}
+: ${ARCH?"set ARCH before running this script"}
+: ${ARCH_ANY_ONLY?"set ARCH_ANY_ONLY before running this script"}
+: ${REPO_NAME?"set REPO_NAME before running this script"}
+: ${VERSION?"set VERSION before running this script"}
+: ${PROJECT_DIST?"set PROJECT_DIST before running this script"}
+: ${PROJECT?"set PROJECT before running this script"}
+: ${PROJECTVERSION?"set PROJECTVERSION before running this script"}
+: ${APT_SERVER?"set APT_SERVER before running this script"}
+
+if [ -f /etc/default/molior-client ]; then
+  . /etc/default/molior-client
+fi
+
+if [ -z "$MOLIOR_SERVER" ]; then
+  MOLIOR_SERVER=172.16.0.254
+fi
+
+log_title ()
+{
+    message=$1
+    shift
+    if ! echo $@ | grep -q "no-header-newline"; then
+      /bin/echo
+    fi
+    color=36
+    if echo $@ | grep -q "error"; then
+      color=31
+    fi
+    /bin/echo -e "\e[${color}m\e[1m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+    /bin/echo -en "\e[${color}m\e[1m"
+    printf "| %-44s %s |" "molior: $message" "`date -R`"
+    /bin/echo -e "\e[0m"
+    /bin/echo -e "\e[${color}m\e[1m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+    if ! echo $@ | grep -q "no-footer-newline"; then
+      /bin/echo
+    fi
+}
+
+log ()
+{
+    message="$@"
+    /bin/echo -e "$message"
+}
+
+log_error ()
+{
+    message="$@"
+    /bin/echo -e "\e[31m\e[1m$message\e[0m"
+}
+
+unmount ()
+{
+    mpoint="$1"
+    if [ -z "$mpoint" ]; then
+        log_error "unmount(): no mountpoint specified"
+        return
+    fi
+    shift
+
+    log "* Unmounting $mpoint ($@)"
+    if ! mountpoint -q "$mpoint"; then
+        return
+    fi
+    for i in `seq 30`; do
+        sudo umount "$mpoint"
+        ret=$?
+        if [ "$ret" -eq 0 ]; then
+            return
+        fi
+        sleep 10
+    done
+    log_error "Could not unmount $mpoint"
+    fuser -muv $mpoint
+    return 1
+}
+
+finish ()
+{
+    RET=$?  # must be first
+    set +e
+    log "\nCleanup:"
+    cd / # step out of mounted directories
+    log " * Deleting schroot session"
+    schroot --all-sessions -e
+    log " * Cleaning up /var/lib/sbuild/build"
+    sudo su -c "rm -rf /var/lib/sbuild/build/*"
+    log " * Cleaning up /var/lib/schroot/chroots"
+    sudo rm -rf /var/lib/schroot/chroots/*
+
+    rm -f ~/build/*
+
+    if [ $RET -ne 0 ]; then
+      log_title "Building failed" no-footer-newline error
+    fi
+    exit $RET
+}
+trap finish EXIT
+
+log_title "Building" no-header-newline
+
+log "Building: $REPO_NAME $VERSION"
+log "Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
+log "Build ID: $BUILD_ID"
+log "Builder : `hostname`"
+echo
+
+log "Apt Repository Dependencies:"
+log "$APT_URLS_PLAIN"
+
+cd # why are we not in $HOME ?
+
+mkdir -p build
+cd build
+
+log_title "Downloading source"
+
+sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
+log "Downloading $sources_url"
+# FIXME: use curl, remove wget
+pkgdir=`wget -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
+if [ -z "$pkgdir" ]; then
+  echo "Directory for source package $REPO_NAME $VERSION not found"
+  exit 1
+fi
+
+dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
+log "Downloading $dsc_url"
+wget -q $dsc_url
+if [ "$?" -ne 0 ]; then
+  echo "Error downloading source package $dsc_url"
+  exit 1
+fi
+
+for srcfile in `/usr/lib/molior/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
+do
+  src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
+  log "Downloading $src_url"
+  wget -q $src_url
+done
+
+dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc
+if [ "$?" -ne 0 ]; then
+  echo "Error: invalid source signature"
+  exit 1
+fi
+
+log_title "Downloading sbuild schroot"
+SCHROOT_URL=http://$MOLIOR_SERVER/schroots/
+log "Downloading $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
+wget -q $SCHROOT_URL/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
+wget -q $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
+
+#FIXME: move to separate installschroot.sh, allow sudo only for this script
+sudo mkdir -p /var/lib/schroot/chroots/chroot.d/
+sudo mv sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
+sudo rm -rf /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
+sudo mkdir -p /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
+cd /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH/
+log "Extracting $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
+sudo tar -I pxz -xf ~molior/build/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
+cd - >/dev/null
+sudo chown root:root /etc/schroot/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
+rm -f $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
+
+log_title "Running sbuild"
+
+if [ "$ARCH_ANY_ONLY" = "1" ]; then
+    SBUILD_ARCH_ARGS="--no-arch-all --arch=$ARCH"
+else
+    SBUILD_ARCH_ARGS="--arch-all --arch=$ARCH"
+fi
+
+# FIXME: signature verification inside sbuild schroot
+
+eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --no-apt-upgrade --no-apt-distupgrade --log-external-command-output --log-external-command-error --build-dep-resolver=aptitude $SBUILD_ARCH_ARGS $APT_URLS ${REPO_NAME}_$VERSION.dsc
+RET=$?
+
+log_title "Uploading"
+
+# FIXME: sbuild can fail (i.e. unpack source) and still return 0
+if [ "$RET" -ne 0 ]; then
+  log_error "Error: sbuild command failed"
+  exit $RET
+fi
+
+if [ ! -f "${REPO_NAME}_${VERSION}_$ARCH.changes" ]; then
+    log_error "Error: debian changes file not found: ${REPO_NAME}_${VERSION}_$ARCH.changes"
+    exit 101
+fi
+
+# FIXME: parse changes files
+
+rm -f ${REPO_NAME}_${VERSION}_$ARCH.build
+OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.build" -o -name "*_$ARCH.buildinfo" -o -name "*_$ARCH.changes"`
+
+log "Uploading output files: "
+for f in $OUTPUT_FILES
+do
+  log " * $f"
+  curl -fs -F "file=@$f" http://$MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
+  if [ $? -ne 0 ]; then
+    log_error "Error uploading output files"
+    exit 2
+  fi
+done
+
+

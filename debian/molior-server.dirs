@@ -1,0 +1,5 @@
+var/lib/molior/buildout
+var/lib/molior/repositories
+var/lib/molior/upload
+var/lib/molior/debootstrap
+etc/molior/mirror-hooks.d

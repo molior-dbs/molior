@@ -1,0 +1,13 @@
+Hello {receiver_name}
+
+{message}
+
+Source:         {package_name}
+Version:        {build_version}
+Buildvariant:   {distrelease}-{distrelease_version}/{arch}
+
+Please find the build logs attached, or see them online: {build_log_link}
+
+Yours faithfully,
+
+  molior

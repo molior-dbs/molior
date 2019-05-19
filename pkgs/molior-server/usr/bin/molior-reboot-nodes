@@ -1,0 +1,15 @@
+#!/bin/sh
+
+echo "Reboot molior build nodes ?"
+echo -n "Press Ctrl-C to abort, Enter to continue. "
+read x
+
+MOLIOR_SERVER=$1
+if [ -z "$MOLIOR_SERVER" ]; then
+  MOLIOR_SERVER=http://localhost
+fi
+
+for i in `wget -O- -q $MOLIOR_SERVER/api/nodes-info | jq 'keys[]' | tr -d '"'`
+do
+  sudo -u molior ssh $i sudo reboot
+done

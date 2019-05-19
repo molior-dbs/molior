@@ -1,0 +1,15 @@
+[Unit]
+Description=Molior build node daemon.
+After=network.target
+
+[Service]
+User=molior
+EnvironmentFile=-/etc/default/molior-client
+ExecStart=/usr/lib/molior/molior-client
+Type=simple
+KillSignal=SIGQUIT
+KillMode=process
+TimeoutStopSec=15s
+
+[Install]
+WantedBy=multi-user.target
