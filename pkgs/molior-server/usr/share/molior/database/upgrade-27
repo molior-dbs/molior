@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE EXTENSION pgcrypto;
+ALTER TABLE molioruser ADD COLUMN password text;
+
+EOF

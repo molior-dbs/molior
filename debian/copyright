@@ -1,0 +1,15 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Molior
+Upstream-Contact: André Roth <neolynx@gmail.com>
+Source: http://www.github.com/FIXME
+
+Files: *
+Copyright: 2002-2014 The Apache Software Foundation
+License: Apache-2.0
+Comment:
+ Upstream authors: André Roth <neolynx@gmail.com>,
+                   Benjamin Fassbind <randombenj@gmail.com>
+
+License: Apache-2.0
+ On Debian systems the full text of the Apache License can be found
+ in `/usr/share/common-licenses/Apache-2.0'.

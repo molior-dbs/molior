@@ -1,0 +1,18 @@
+[Unit]
+Wants=postgresql.service
+Description=Molior server daemon.
+After=network.target postgresql.service
+
+[Service]
+User=molior
+PermissionsStartOnly=true
+ExecStartPre=/usr/lib/molior/db-upgrade.sh
+Environment="LANG=C.UTF-8"
+ExecStart=/usr/bin/python3 -m molior.molior.server --host=localhost --port=8888
+Type=simple
+KillSignal=SIGTERM
+KillMode=process
+TimeoutStopSec=60s
+
+[Install]
+WantedBy=multi-user.target

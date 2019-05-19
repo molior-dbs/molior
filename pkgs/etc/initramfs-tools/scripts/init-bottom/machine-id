@@ -1,0 +1,24 @@
+#!/bin/sh
+
+PREREQ=""
+
+# Output pre-requisites
+prereqs()
+{       
+        echo "$PREREQ"
+}
+
+case "$1" in
+    prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+if [ ! -f /root/etc/machine-id ]; then
+  mount -o remount,rw /root
+  chroot /root systemd-machine-id-setup
+  mount -o remount,ro /root
+fi
+
+

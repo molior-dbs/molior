@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -e
+
+GPG_REALNAME=$1
+GPG_EMAIL=$2
+
+if [ -z "$GPG_REALNAME" -o -z "$GPG_EMAIL" ]; then
+  echo "Usage: $0 GPG_REALNAME GPG_EMAIL"
+  exit 1
+fi
+
+MOLIOR_USER=molior
+HOME_DIR=/var/lib/molior
+GPG_BINARY=gpg1
+export GPG_TTY=`tty`
+
+if ! su - $MOLIOR_USER -c "$GPG_BINARY -K | grep -q $GPG_EMAIL"; then
+  echo 'Generating GPG keys ...'
+  su - $MOLIOR_USER -c "$GPG_BINARY --no-tty --batch --gen-key" <<EOF
+Key-Type: RSA
+Key-Length: 2048
+Key-Usage: encrypt, sign
+Subkey-Type: RSA
+Subkey-Length: 2048
+Subkey-Usage: encrypt, sign
+Name-Real: $GPG_REALNAME
+Name-Comment: none
+Name-Email: $GPG_EMAIL
+Expire-Date: 0
+%pubring $HOME_DIR/.gnupg/pubring.gpg
+%secring $HOME_DIR/.gnupg/secring.gpg
+%commit
+EOF
+else
+  echo 'gpg key for molior already exists'
+fi
+
+# create ssh key
+if [ ! -e "$HOME_DIR/.ssh/id_rsa.pub" ]; then
+  echo 'Generating SSH keys ...'
+  su molior -c 'ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa'
+else
+  echo 'ssh key for molior already exists'
+fi
+

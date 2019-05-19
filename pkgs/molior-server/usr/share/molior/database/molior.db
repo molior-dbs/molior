@@ -1,0 +1,1507 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 9.6.12
+-- Dumped by pg_dump version 9.6.12
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'SQL_ASCII';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: molior; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE molior WITH TEMPLATE = template0 ENCODING = 'SQL_ASCII' LC_COLLATE = 'C' LC_CTYPE = 'C';
+
+
+ALTER DATABASE molior OWNER TO postgres;
+
+\connect molior
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'SQL_ASCII';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+--
+
+CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
+
+
+--
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+
+
+--
+-- Name: architecture_enum; Type: TYPE; Schema: public; Owner: molior
+--
+
+CREATE TYPE public.architecture_enum AS ENUM (
+    'amd64',
+    'i386',
+    'armhf',
+    'arm64'
+);
+
+
+ALTER TYPE public.architecture_enum OWNER TO molior;
+
+--
+-- Name: buildstate_enum; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.buildstate_enum AS ENUM (
+    'successful',
+    'needs_build',
+    'scheduled',
+    'building',
+    'build_failed',
+    'needs_publish',
+    'publishing',
+    'publish_failed',
+    'new'
+);
+
+
+ALTER TYPE public.buildstate_enum OWNER TO postgres;
+
+--
+-- Name: buildtype_enum; Type: TYPE; Schema: public; Owner: molior
+--
+
+CREATE TYPE public.buildtype_enum AS ENUM (
+    'source',
+    'deb',
+    'chroot',
+    'mirror',
+    'build',
+    'debootstrap'
+);
+
+
+ALTER TYPE public.buildtype_enum OWNER TO molior;
+
+--
+-- Name: http_method_enum; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.http_method_enum AS ENUM (
+    'post',
+    'put',
+    'get'
+);
+
+
+ALTER TYPE public.http_method_enum OWNER TO postgres;
+
+--
+-- Name: mirror_stateenum; Type: TYPE; Schema: public; Owner: molior
+--
+
+CREATE TYPE public.mirror_stateenum AS ENUM (
+    'undefined',
+    'created',
+    'updating',
+    'error',
+    'ready',
+    'publishing'
+);
+
+
+ALTER TYPE public.mirror_stateenum OWNER TO molior;
+
+--
+-- Name: role_enum; Type: TYPE; Schema: public; Owner: molior
+--
+
+CREATE TYPE public.role_enum AS ENUM (
+    'member',
+    'manager',
+    'owner'
+);
+
+
+ALTER TYPE public.role_enum OWNER TO molior;
+
+--
+-- Name: sourcerepositorystate_enum; Type: TYPE; Schema: public; Owner: molior
+--
+
+CREATE TYPE public.sourcerepositorystate_enum AS ENUM (
+    'new',
+    'cloning',
+    'ready',
+    'error',
+    'busy'
+);
+
+
+ALTER TYPE public.sourcerepositorystate_enum OWNER TO molior;
+
+SET default_tablespace = '';
+
+SET default_with_oids = false;
+
+--
+-- Name: architecture; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.architecture (
+    id integer NOT NULL,
+    name character varying
+);
+
+
+ALTER TABLE public.architecture OWNER TO molior;
+
+--
+-- Name: architecture_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.architecture_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.architecture_id_seq OWNER TO molior;
+
+--
+-- Name: architecture_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.architecture_id_seq OWNED BY public.architecture.id;
+
+
+--
+-- Name: build; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.build (
+    id integer NOT NULL,
+    startstamp timestamp with time zone,
+    endstamp timestamp with time zone,
+    versiontimestamp timestamp with time zone,
+    version character varying,
+    buildconfiguration_id integer,
+    maintainer_id integer,
+    buildstate public.buildstate_enum,
+    sourcename character varying,
+    git_ref character varying,
+    ci_branch character varying,
+    is_ci boolean,
+    buildtype public.buildtype_enum,
+    sourcerepository_id integer,
+    parent_id integer,
+    createdstamp timestamp with time zone DEFAULT now(),
+    buildendstamp timestamp with time zone,
+    projectversion_id integer
+);
+
+
+ALTER TABLE public.build OWNER TO molior;
+
+--
+-- Name: build_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.build_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.build_id_seq OWNER TO molior;
+
+--
+-- Name: build_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.build_id_seq OWNED BY public.build.id;
+
+
+--
+-- Name: buildconfiguration; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.buildconfiguration (
+    id integer NOT NULL,
+    sourcerepositoryprojectversion_id integer,
+    buildvariant_id integer
+);
+
+
+ALTER TABLE public.buildconfiguration OWNER TO molior;
+
+--
+-- Name: buildconfiguration_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.buildconfiguration_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.buildconfiguration_id_seq OWNER TO molior;
+
+--
+-- Name: buildconfiguration_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.buildconfiguration_id_seq OWNED BY public.buildconfiguration.id;
+
+
+--
+-- Name: buildorder; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.buildorder (
+    sourcerepository integer,
+    dependency integer,
+    build_id integer
+);
+
+
+ALTER TABLE public.buildorder OWNER TO molior;
+
+--
+-- Name: buildtask; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.buildtask (
+    id integer NOT NULL,
+    build_id integer,
+    task_id character varying
+);
+
+
+ALTER TABLE public.buildtask OWNER TO molior;
+
+--
+-- Name: buildtask_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.buildtask_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.buildtask_id_seq OWNER TO molior;
+
+--
+-- Name: buildtask_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.buildtask_id_seq OWNED BY public.buildtask.id;
+
+
+--
+-- Name: buildvariant; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.buildvariant (
+    id integer NOT NULL,
+    architecture_id integer,
+    base_mirror_id integer
+);
+
+
+ALTER TABLE public.buildvariant OWNER TO molior;
+
+--
+-- Name: buildvariant_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.buildvariant_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.buildvariant_id_seq OWNER TO molior;
+
+--
+-- Name: buildvariant_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.buildvariant_id_seq OWNED BY public.buildvariant.id;
+
+
+--
+-- Name: chroot; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.chroot (
+    id integer NOT NULL,
+    buildvariant_id integer,
+    ready boolean
+);
+
+
+ALTER TABLE public.chroot OWNER TO molior;
+
+--
+-- Name: chroot_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.chroot_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.chroot_id_seq OWNER TO molior;
+
+--
+-- Name: chroot_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.chroot_id_seq OWNED BY public.chroot.id;
+
+
+--
+-- Name: hook_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.hook_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.hook_id_seq OWNER TO molior;
+
+--
+-- Name: hook; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.hook (
+    id integer DEFAULT nextval('public.hook_id_seq'::regclass) NOT NULL,
+    method public.http_method_enum,
+    body character varying,
+    url character varying,
+    skip_ssl boolean DEFAULT false,
+    enabled boolean DEFAULT true,
+    notify_src boolean DEFAULT false,
+    notify_deb boolean DEFAULT true,
+    notify_overall boolean DEFAULT false
+);
+
+
+ALTER TABLE public.hook OWNER TO molior;
+
+--
+-- Name: maintainer; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.maintainer (
+    id integer NOT NULL,
+    firstname character varying,
+    surname character varying,
+    email character varying
+);
+
+
+ALTER TABLE public.maintainer OWNER TO molior;
+
+--
+-- Name: maintainer_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.maintainer_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.maintainer_id_seq OWNER TO molior;
+
+--
+-- Name: maintainer_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.maintainer_id_seq OWNED BY public.maintainer.id;
+
+
+--
+-- Name: metadata; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.metadata (
+    id integer NOT NULL,
+    name character varying,
+    value character varying
+);
+
+
+ALTER TABLE public.metadata OWNER TO molior;
+
+--
+-- Name: metadata_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.metadata_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.metadata_id_seq OWNER TO molior;
+
+--
+-- Name: metadata_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.metadata_id_seq OWNED BY public.metadata.id;
+
+
+--
+-- Name: molioruser; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.molioruser (
+    id integer NOT NULL,
+    username character varying NOT NULL,
+    is_admin boolean
+);
+
+
+ALTER TABLE public.molioruser OWNER TO molior;
+
+--
+-- Name: project; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.project (
+    id integer NOT NULL,
+    name character varying NOT NULL,
+    is_mirror boolean,
+    is_basemirror boolean,
+    description character varying
+);
+
+
+ALTER TABLE public.project OWNER TO molior;
+
+--
+-- Name: project_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.project_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.project_id_seq OWNER TO molior;
+
+--
+-- Name: project_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.project_id_seq OWNED BY public.project.id;
+
+
+--
+-- Name: projectversion; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.projectversion (
+    id integer NOT NULL,
+    project_id integer,
+    name character varying NOT NULL,
+    mirror_url character varying,
+    mirror_distribution character varying,
+    mirror_components character varying,
+    mirror_state public.mirror_stateenum,
+    is_locked boolean DEFAULT false,
+    mirror_architectures public.architecture_enum[],
+    ci_builds_enabled boolean DEFAULT false,
+    is_deleted boolean DEFAULT false,
+    mirror_with_sources boolean DEFAULT false,
+    mirror_with_installer boolean DEFAULT false
+);
+
+
+ALTER TABLE public.projectversion OWNER TO molior;
+
+--
+-- Name: projectversion_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.projectversion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.projectversion_id_seq OWNER TO molior;
+
+--
+-- Name: projectversion_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.projectversion_id_seq OWNED BY public.projectversion.id;
+
+
+--
+-- Name: projectversionbuildvariant; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.projectversionbuildvariant (
+    buildvariant_id integer,
+    projectversion_id integer
+);
+
+
+ALTER TABLE public.projectversionbuildvariant OWNER TO molior;
+
+--
+-- Name: projectversiondependency; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.projectversiondependency (
+    projectversion_id integer,
+    dependency_id integer
+);
+
+
+ALTER TABLE public.projectversiondependency OWNER TO molior;
+
+--
+-- Name: sourcerepository; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.sourcerepository (
+    id integer NOT NULL,
+    url character varying,
+    state public.sourcerepositorystate_enum DEFAULT 'ready'::public.sourcerepositorystate_enum
+);
+
+
+ALTER TABLE public.sourcerepository OWNER TO molior;
+
+--
+-- Name: sourcerepository_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.sourcerepository_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.sourcerepository_id_seq OWNER TO molior;
+
+--
+-- Name: sourcerepository_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.sourcerepository_id_seq OWNED BY public.sourcerepository.id;
+
+
+--
+-- Name: sourcerepositoryhook_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.sourcerepositoryhook_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.sourcerepositoryhook_id_seq OWNER TO molior;
+
+--
+-- Name: sourcerepositoryhook; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.sourcerepositoryhook (
+    id integer DEFAULT nextval('public.sourcerepositoryhook_id_seq'::regclass) NOT NULL,
+    sourcerepository_id integer,
+    hook_id integer
+);
+
+
+ALTER TABLE public.sourcerepositoryhook OWNER TO molior;
+
+--
+-- Name: sourcerepositoryprojectversion; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.sourcerepositoryprojectversion (
+    id integer NOT NULL,
+    sourcerepository_id integer,
+    projectversion_id integer
+);
+
+
+ALTER TABLE public.sourcerepositoryprojectversion OWNER TO molior;
+
+--
+-- Name: sourcerepositoryprojectversion_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.sourcerepositoryprojectversion_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.sourcerepositoryprojectversion_id_seq OWNER TO molior;
+
+--
+-- Name: sourcerepositoryprojectversion_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.sourcerepositoryprojectversion_id_seq OWNED BY public.sourcerepositoryprojectversion.id;
+
+
+--
+-- Name: user_id_seq; Type: SEQUENCE; Schema: public; Owner: molior
+--
+
+CREATE SEQUENCE public.user_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.user_id_seq OWNER TO molior;
+
+--
+-- Name: user_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: molior
+--
+
+ALTER SEQUENCE public.user_id_seq OWNED BY public.molioruser.id;
+
+
+--
+-- Name: userrole; Type: TABLE; Schema: public; Owner: molior
+--
+
+CREATE TABLE public.userrole (
+    user_id integer NOT NULL,
+    project_id integer NOT NULL,
+    role public.role_enum
+);
+
+
+ALTER TABLE public.userrole OWNER TO molior;
+
+--
+-- Name: architecture id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.architecture ALTER COLUMN id SET DEFAULT nextval('public.architecture_id_seq'::regclass);
+
+
+--
+-- Name: build id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build ALTER COLUMN id SET DEFAULT nextval('public.build_id_seq'::regclass);
+
+
+--
+-- Name: buildconfiguration id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildconfiguration ALTER COLUMN id SET DEFAULT nextval('public.buildconfiguration_id_seq'::regclass);
+
+
+--
+-- Name: buildtask id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildtask ALTER COLUMN id SET DEFAULT nextval('public.buildtask_id_seq'::regclass);
+
+
+--
+-- Name: buildvariant id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildvariant ALTER COLUMN id SET DEFAULT nextval('public.buildvariant_id_seq'::regclass);
+
+
+--
+-- Name: chroot id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.chroot ALTER COLUMN id SET DEFAULT nextval('public.chroot_id_seq'::regclass);
+
+
+--
+-- Name: maintainer id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.maintainer ALTER COLUMN id SET DEFAULT nextval('public.maintainer_id_seq'::regclass);
+
+
+--
+-- Name: metadata id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.metadata ALTER COLUMN id SET DEFAULT nextval('public.metadata_id_seq'::regclass);
+
+
+--
+-- Name: molioruser id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.molioruser ALTER COLUMN id SET DEFAULT nextval('public.user_id_seq'::regclass);
+
+
+--
+-- Name: project id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.project ALTER COLUMN id SET DEFAULT nextval('public.project_id_seq'::regclass);
+
+
+--
+-- Name: projectversion id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversion ALTER COLUMN id SET DEFAULT nextval('public.projectversion_id_seq'::regclass);
+
+
+--
+-- Name: sourcerepository id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepository ALTER COLUMN id SET DEFAULT nextval('public.sourcerepository_id_seq'::regclass);
+
+
+--
+-- Name: sourcerepositoryprojectversion id; Type: DEFAULT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryprojectversion ALTER COLUMN id SET DEFAULT nextval('public.sourcerepositoryprojectversion_id_seq'::regclass);
+
+
+--
+-- Data for Name: architecture; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.architecture (id, name) FROM stdin;
+1	amd64
+2	i386
+3	armhf
+4	arm64
+\.
+
+
+--
+-- Name: architecture_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.architecture_id_seq', 4, true);
+
+
+--
+-- Data for Name: build; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.build (id, startstamp, endstamp, versiontimestamp, version, buildconfiguration_id, maintainer_id, buildstate, sourcename, git_ref, ci_branch, is_ci, buildtype, sourcerepository_id, parent_id, createdstamp, buildendstamp, projectversion_id) FROM stdin;
+\.
+
+
+--
+-- Name: build_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.build_id_seq', 1, false);
+
+
+--
+-- Data for Name: buildconfiguration; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.buildconfiguration (id, sourcerepositoryprojectversion_id, buildvariant_id) FROM stdin;
+\.
+
+
+--
+-- Name: buildconfiguration_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.buildconfiguration_id_seq', 1, false);
+
+
+--
+-- Data for Name: buildorder; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.buildorder (sourcerepository, dependency, build_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: buildtask; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.buildtask (id, build_id, task_id) FROM stdin;
+\.
+
+
+--
+-- Name: buildtask_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.buildtask_id_seq', 1, false);
+
+
+--
+-- Data for Name: buildvariant; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.buildvariant (id, architecture_id, base_mirror_id) FROM stdin;
+\.
+
+
+--
+-- Name: buildvariant_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.buildvariant_id_seq', 28, true);
+
+
+--
+-- Data for Name: chroot; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.chroot (id, buildvariant_id, ready) FROM stdin;
+\.
+
+
+--
+-- Name: chroot_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.chroot_id_seq', 1, false);
+
+
+--
+-- Data for Name: hook; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.hook (id, method, body, url, skip_ssl, enabled, notify_src, notify_deb, notify_overall) FROM stdin;
+\.
+
+
+--
+-- Name: hook_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.hook_id_seq', 1, false);
+
+
+--
+-- Data for Name: maintainer; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.maintainer (id, firstname, surname, email) FROM stdin;
+\.
+
+
+--
+-- Name: maintainer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.maintainer_id_seq', 1, false);
+
+
+--
+-- Data for Name: metadata; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.metadata (id, name, value) FROM stdin;
+2	maintenance_mode	false
+3	maintenance_message	
+1	db_version	27
+\.
+
+
+--
+-- Name: metadata_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.metadata_id_seq', 3, true);
+
+
+--
+-- Data for Name: molioruser; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.molioruser (id, username, is_admin) FROM stdin;
+1	admin	t
+\.
+
+
+--
+-- Data for Name: project; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.project (id, name, is_mirror, is_basemirror, description) FROM stdin;
+\.
+
+
+--
+-- Name: project_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.project_id_seq', 1, false);
+
+
+--
+-- Data for Name: projectversion; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.projectversion (id, project_id, name, mirror_url, mirror_distribution, mirror_components, mirror_state, is_locked, mirror_architectures, ci_builds_enabled, is_deleted, mirror_with_sources, mirror_with_installer) FROM stdin;
+\.
+
+
+--
+-- Name: projectversion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.projectversion_id_seq', 1, false);
+
+
+--
+-- Data for Name: projectversionbuildvariant; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.projectversionbuildvariant (buildvariant_id, projectversion_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: projectversiondependency; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.projectversiondependency (projectversion_id, dependency_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: sourcerepository; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.sourcerepository (id, url, state) FROM stdin;
+\.
+
+
+--
+-- Name: sourcerepository_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.sourcerepository_id_seq', 1, false);
+
+
+--
+-- Data for Name: sourcerepositoryhook; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.sourcerepositoryhook (id, sourcerepository_id, hook_id) FROM stdin;
+\.
+
+
+--
+-- Name: sourcerepositoryhook_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.sourcerepositoryhook_id_seq', 1, false);
+
+
+--
+-- Data for Name: sourcerepositoryprojectversion; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.sourcerepositoryprojectversion (id, sourcerepository_id, projectversion_id) FROM stdin;
+\.
+
+
+--
+-- Name: sourcerepositoryprojectversion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.sourcerepositoryprojectversion_id_seq', 1, false);
+
+
+--
+-- Name: user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: molior
+--
+
+SELECT pg_catalog.setval('public.user_id_seq', 1, true);
+
+
+--
+-- Data for Name: userrole; Type: TABLE DATA; Schema: public; Owner: molior
+--
+
+COPY public.userrole (user_id, project_id, role) FROM stdin;
+\.
+
+
+--
+-- Name: architecture architecture_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.architecture
+    ADD CONSTRAINT architecture_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: build build_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT build_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: buildconfiguration buildconfiguration_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildconfiguration
+    ADD CONSTRAINT buildconfiguration_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: buildtask buildtask_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildtask
+    ADD CONSTRAINT buildtask_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: buildvariant buildvariant_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildvariant
+    ADD CONSTRAINT buildvariant_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: chroot chroot_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.chroot
+    ADD CONSTRAINT chroot_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hook hook_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.hook
+    ADD CONSTRAINT hook_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: maintainer maintainer_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.maintainer
+    ADD CONSTRAINT maintainer_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: metadata metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.metadata
+    ADD CONSTRAINT metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project project_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.project
+    ADD CONSTRAINT project_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: projectversion projectversion_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversion
+    ADD CONSTRAINT projectversion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sourcerepository sourcerepository_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepository
+    ADD CONSTRAINT sourcerepository_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sourcerepositoryhook sourcerepositoryhook_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryhook
+    ADD CONSTRAINT sourcerepositoryhook_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sourcerepositoryprojectversion sourcerepositoryprojectversion_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryprojectversion
+    ADD CONSTRAINT sourcerepositoryprojectversion_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: buildconfiguration unique_buildconfiguration; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildconfiguration
+    ADD CONSTRAINT unique_buildconfiguration UNIQUE (sourcerepositoryprojectversion_id, buildvariant_id);
+
+
+--
+-- Name: buildorder unique_buildorder; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildorder
+    ADD CONSTRAINT unique_buildorder UNIQUE (sourcerepository, dependency);
+
+
+--
+-- Name: projectversionbuildvariant unique_buildvariantprojectversion; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversionbuildvariant
+    ADD CONSTRAINT unique_buildvariantprojectversion UNIQUE (buildvariant_id, projectversion_id);
+
+
+--
+-- Name: projectversion unique_projectversion; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversion
+    ADD CONSTRAINT unique_projectversion UNIQUE (project_id, name);
+
+
+--
+-- Name: projectversiondependency unique_projectversiondepedency; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversiondependency
+    ADD CONSTRAINT unique_projectversiondepedency UNIQUE (projectversion_id, dependency_id);
+
+
+--
+-- Name: sourcerepositoryhook unique_sourcerepositoryhook; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryhook
+    ADD CONSTRAINT unique_sourcerepositoryhook UNIQUE (sourcerepository_id, hook_id);
+
+
+--
+-- Name: sourcerepositoryprojectversion unique_sourcerepositoryprojectversion; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryprojectversion
+    ADD CONSTRAINT unique_sourcerepositoryprojectversion UNIQUE (sourcerepository_id, projectversion_id);
+
+
+--
+-- Name: molioruser user_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.molioruser
+    ADD CONSTRAINT user_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: molioruser user_username_key; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.molioruser
+    ADD CONSTRAINT user_username_key UNIQUE (username);
+
+
+--
+-- Name: userrole userrole_pkey; Type: CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.userrole
+    ADD CONSTRAINT userrole_pkey PRIMARY KEY (user_id, project_id);
+
+
+--
+-- Name: ix_project_name; Type: INDEX; Schema: public; Owner: molior
+--
+
+CREATE UNIQUE INDEX ix_project_name ON public.project USING btree (name);
+
+
+--
+-- Name: ix_projectversion_name; Type: INDEX; Schema: public; Owner: molior
+--
+
+CREATE INDEX ix_projectversion_name ON public.projectversion USING btree (name);
+
+
+--
+-- Name: build build_buildconfiguration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT build_buildconfiguration_id_fkey FOREIGN KEY (buildconfiguration_id) REFERENCES public.buildconfiguration(id);
+
+
+--
+-- Name: buildorder build_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildorder
+    ADD CONSTRAINT build_id_fkey FOREIGN KEY (build_id) REFERENCES public.build(id);
+
+
+--
+-- Name: build build_maintainer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT build_maintainer_id_fkey FOREIGN KEY (maintainer_id) REFERENCES public.maintainer(id);
+
+
+--
+-- Name: build build_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT build_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.build(id);
+
+
+--
+-- Name: build build_srcrepo_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT build_srcrepo_id_fkey FOREIGN KEY (sourcerepository_id) REFERENCES public.sourcerepository(id);
+
+
+--
+-- Name: buildconfiguration buildconfiguration_buildvariant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildconfiguration
+    ADD CONSTRAINT buildconfiguration_buildvariant_id_fkey FOREIGN KEY (buildvariant_id) REFERENCES public.buildvariant(id);
+
+
+--
+-- Name: buildconfiguration buildconfiguration_sourcerepositoryprojectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildconfiguration
+    ADD CONSTRAINT buildconfiguration_sourcerepositoryprojectversion_id_fkey FOREIGN KEY (sourcerepositoryprojectversion_id) REFERENCES public.sourcerepositoryprojectversion(id);
+
+
+--
+-- Name: buildorder buildorder_dependency_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildorder
+    ADD CONSTRAINT buildorder_dependency_fkey FOREIGN KEY (dependency) REFERENCES public.sourcerepository(id);
+
+
+--
+-- Name: buildorder buildorder_sourcerepository_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildorder
+    ADD CONSTRAINT buildorder_sourcerepository_fkey FOREIGN KEY (sourcerepository) REFERENCES public.sourcerepository(id);
+
+
+--
+-- Name: buildtask buildtask_build_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildtask
+    ADD CONSTRAINT buildtask_build_id_fkey FOREIGN KEY (build_id) REFERENCES public.build(id);
+
+
+--
+-- Name: buildvariant buildvariant_architecture_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildvariant
+    ADD CONSTRAINT buildvariant_architecture_id_fkey FOREIGN KEY (architecture_id) REFERENCES public.architecture(id);
+
+
+--
+-- Name: buildvariant buildvariant_projectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.buildvariant
+    ADD CONSTRAINT buildvariant_projectversion_id_fkey FOREIGN KEY (base_mirror_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: chroot chroot_buildvariant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.chroot
+    ADD CONSTRAINT chroot_buildvariant_id_fkey FOREIGN KEY (buildvariant_id) REFERENCES public.buildvariant(id);
+
+
+--
+-- Name: build projectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.build
+    ADD CONSTRAINT projectversion_id_fkey FOREIGN KEY (projectversion_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: projectversion projectversion_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversion
+    ADD CONSTRAINT projectversion_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.project(id);
+
+
+--
+-- Name: projectversionbuildvariant projectversionbuildvariant_buildvariant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversionbuildvariant
+    ADD CONSTRAINT projectversionbuildvariant_buildvariant_id_fkey FOREIGN KEY (buildvariant_id) REFERENCES public.buildvariant(id);
+
+
+--
+-- Name: projectversionbuildvariant projectversionbuildvariant_projectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversionbuildvariant
+    ADD CONSTRAINT projectversionbuildvariant_projectversion_id_fkey FOREIGN KEY (projectversion_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: projectversiondependency projectversiondependency_dependency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversiondependency
+    ADD CONSTRAINT projectversiondependency_dependency_id_fkey FOREIGN KEY (dependency_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: projectversiondependency projectversiondependency_projectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.projectversiondependency
+    ADD CONSTRAINT projectversiondependency_projectversion_id_fkey FOREIGN KEY (projectversion_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: sourcerepositoryhook sourcerepositoryhook_hook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryhook
+    ADD CONSTRAINT sourcerepositoryhook_hook_id_fkey FOREIGN KEY (hook_id) REFERENCES public.hook(id);
+
+
+--
+-- Name: sourcerepositoryhook sourcerepositoryhook_sourcerepository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryhook
+    ADD CONSTRAINT sourcerepositoryhook_sourcerepository_id_fkey FOREIGN KEY (sourcerepository_id) REFERENCES public.sourcerepository(id);
+
+
+--
+-- Name: sourcerepositoryprojectversion sourcerepositoryprojectversion_projectversion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryprojectversion
+    ADD CONSTRAINT sourcerepositoryprojectversion_projectversion_id_fkey FOREIGN KEY (projectversion_id) REFERENCES public.projectversion(id);
+
+
+--
+-- Name: sourcerepositoryprojectversion sourcerepositoryprojectversion_sourcerepository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.sourcerepositoryprojectversion
+    ADD CONSTRAINT sourcerepositoryprojectversion_sourcerepository_id_fkey FOREIGN KEY (sourcerepository_id) REFERENCES public.sourcerepository(id);
+
+
+--
+-- Name: userrole userrole_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.userrole
+    ADD CONSTRAINT userrole_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.project(id);
+
+
+--
+-- Name: userrole userrole_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: molior
+--
+
+ALTER TABLE ONLY public.userrole
+    ADD CONSTRAINT userrole_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.molioruser(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+

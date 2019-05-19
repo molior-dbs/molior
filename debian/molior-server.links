@@ -1,0 +1,2 @@
+usr/lib/molior/create-chroot.sh etc/molior/mirror-hooks.d/01-create-chroot
+usr/lib/molior/create-debootstrap.sh etc/molior/mirror-hooks.d/02-create-debootstrap

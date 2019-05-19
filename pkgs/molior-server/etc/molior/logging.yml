@@ -1,0 +1,52 @@
+version: 1
+disable_existing_loggers: False
+
+formatters:
+    syslog:
+        format: '%(name)s[%(process)d]: %(message)s'
+
+handlers:
+    syslog:
+        level: DEBUG
+        class: logging.handlers.SysLogHandler
+        formatter: syslog
+        address: /dev/log
+
+loggers:
+    '':
+        handlers: [syslog]
+        level: DEBUG
+        propagate: false
+
+    molior:
+        level: INFO
+        propagate: true
+
+    molior-web:
+        level: INFO
+        propagate: true
+
+    git.cmd:
+        level: WARNING
+        propagate: true
+
+    asyncio:
+        level: WARNING
+        propagate: true
+
+    aiohttp_session:
+        level: ERROR
+        propagate: true
+
+    ldap3:
+        level: WARNING
+        propagate: true
+
+    cirrina.server:
+        level: WARNING
+        propagate: true
+
+    aiohttp_session:
+        level: ERROR
+        propagate: true
+

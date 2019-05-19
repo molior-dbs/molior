@@ -1,0 +1,43 @@
+#!/bin/sh
+
+set -e
+
+case "${1}" in
+    install)
+
+        debconf-set-selections <<EOF
+locales locales/locales_to_be_generated multiselect de_CH.UTF-8 UTF-8, en_US.UTF-8 UTF-8
+locales locales/default_environment_locale select en_US.UTF-8
+
+keyboard-configuration keyboard-configuration/altgr select The default for the keyboard layout
+keyboard-configuration keyboard-configuration/modelcode string pc105
+keyboard-configuration keyboard-configuration/unsupported_config_layout boolean true
+keyboard-configuration keyboard-configuration/switch select No temporary switch
+keyboard-configuration keyboard-configuration/model select Generic 105-key (Intl) PC
+keyboard-configuration keyboard-configuration/store_defaults_in_debconf_db boolean true
+keyboard-configuration keyboard-configuration/variant select English (US) - English (US, international with dead keys)
+keyboard-configuration keyboard-configuration/unsupported_config_options boolean true
+keyboard-configuration keyboard-configuration/variantcode string altgr-intl
+keyboard-configuration keyboard-configuration/optionscode string nodeadkeys
+keyboard-configuration keyboard-configuration/compose select No compose key
+keyboard-configuration keyboard-configuration/unsupported_options boolean true
+keyboard-configuration keyboard-configuration/ctrl_alt_bksp boolean false
+keyboard-configuration keyboard-configuration/layoutcode string us
+keyboard-configuration keyboard-configuration/toggle select No toggling
+keyboard-configuration keyboard-configuration/xkb-keymap string us(euro)
+keyboard-configuration keyboard-configuration/unsupported_layout boolean true
+EOF
+        ;;
+
+    upgrade)
+        ;;
+
+    abort-upgrade)
+        ;;
+    *)
+        echo "preinst called with unknown argument (${1})"
+        exit 1
+        ;;
+esac
+
+exit 0
