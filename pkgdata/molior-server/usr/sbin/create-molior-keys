@@ -43,4 +43,3 @@ if [ ! -e "$HOME_DIR/.ssh/id_rsa.pub" ]; then
 else
   echo 'ssh key for molior already exists'
 fi
-
