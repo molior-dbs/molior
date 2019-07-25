@@ -118,10 +118,10 @@ This will provide tools like:
 Molior is available as ISO installer for test and development purposes.
 
 Download molior and aptly server installer:
-- http://molior.info/installers/molior_1.3_1.3.2~rc67_installer-dev.iso
+- http://molior.info/installers/molior_1.3_1.3.2_installer-dev.iso
 
 Download amd64 build node installer:
-- http://molior.info/installers/molior_1.3_1.3.2~rc67_installer-node-amd64.iso
+- http://molior.info/installers/molior_1.3_1.3.2_installer-node-amd64.iso
 
 Install molior server and build node on VMs or bare metal and follow the Configuration chapter below.
 
