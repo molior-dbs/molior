@@ -120,8 +120,12 @@ Molior is available as ISO installer for test and development purposes.
 Download molior and aptly server installer:
 - http://molior.info/installers/molior_1.3_1.3.2_installer-dev.iso
 
+Download molior and aptly server as VirtualBox Appliance:
+- http://molior.info/installers/molior_1.3_1.3.2_vbox-dev.ova
+
 Download amd64 build node installer:
 - http://molior.info/installers/molior_1.3_1.3.2_installer-node-amd64.iso
+
 
 Install molior server and build node on VMs or bare metal and follow the Configuration chapter below.
 
