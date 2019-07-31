@@ -114,7 +114,7 @@ async def get_latest_tag(path, build_id):
     Returns:
         tag (Git.tag): The latest git tag
     """
-    ret = await run_git("git fetch --tags", str(path), build_id)
+    ret = await run_git("git fetch --tags --force", str(path), build_id)
     if ret != 0:
         logger.error("error running git fetch: %s", str(path))
         return None
