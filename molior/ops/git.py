@@ -84,7 +84,7 @@ async def GitClone(build_id, repo_id, task_queue):
 
 async def GitCheckout(src_repo_path, git_ref, build_id):
 
-    git_commands = ["git fetch --tags",
+    git_commands = ["git fetch --tags --force",
                     "git reset --hard",
                     "git clean -dffx",
                     "git checkout --force {}".format(git_ref),
