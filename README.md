@@ -3,7 +3,7 @@
 # Purpose
 
 The purpose of molior is to build Debian packages out of git repositories based on a mirror of a specific Debian version
-and with that paving the way for reproducible builds. Build environments are structured into projects and versions,
+and therefore creating repeatable builds. Build environments are structured into projects and versions,
 which may include mirrors and versions of other projects.
 
 Molior performs the following tasks:

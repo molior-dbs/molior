@@ -11,7 +11,7 @@ Project Version
 A project version provides a set of software components which are developed and released together. For production release
 project versions can be freezed so no further changes to it will be allowed by molior.
 
-Project versions are always based on a specific base mirror to ensure reproducibility.
+Project versions are always based on a specific base mirror to ensure repeatable builds.
 Therefore you'll have to first select a base mirror when creating a project version. Furthermore you can define which
 architectures should be allowed for this project version. When adding source repositories later on you will only be able to choose
 architectures out of this selection.

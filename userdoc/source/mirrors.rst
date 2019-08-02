@@ -1,7 +1,7 @@
 Mirrors
 =======
 
-To provide a fully reproducible build environment and independence from internet resources molior allows mirroring of external debian repositories. The two different types of mirrors are described below.
+To provide a fully repeatable build environment and independence from internet resources molior allows mirroring of external debian repositories. The two different types of mirrors are described below.
 
 Base Mirrors
 ------------
