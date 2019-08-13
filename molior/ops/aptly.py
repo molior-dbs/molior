@@ -15,15 +15,17 @@ from ..molior.logger import get_logger
 from ..molior.configuration import Configuration
 from ..molior.notifier import send_mail_notification
 from ..molior.buildlogger import write_log, write_log_title
+from ..molior.utils import strip_epoch_version
 
 logger = get_logger()
 
 
 def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
-    filename = "{}/{}_{}_{}.changes".format(sourcepath, sourcename, version, arch)
+    v = strip_epoch_version(version)
+    changes_file = "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
     files = []
     try:
-        with open(filename, "r") as f:
+        with open(changes_file, "r") as f:
             file_tag = False
             for line in f.readlines():
                 line = line.rstrip()
@@ -98,7 +100,9 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
         write_log(build.id, "\n")
 
         files2delete = publish_files
-        files2delete.append("{}/{}_{}_{}.changes".format(sourcepath, build.sourcename, build.version, "source"))
+        v = strip_epoch_version(build.version)
+        changes_file = "{}_{}_{}.changes".format(build.sourcename, v, "source")
+        files2delete.append("{}/{}".format(sourcepath, changes_file))
         for f in files2delete:
             logger.info("publisher: removing %s", f)
             try:
@@ -150,7 +154,10 @@ async def publish_packages(build, out_path):
     async def outh(line):
         write_log(build.id, "%s\n" % line)
 
-    cmd = "debsign -pgpg1 -k{} {}_{}_{}.changes".format(key, build.sourcename, build.version, arch)
+    v = strip_epoch_version(build.version)
+    changes_file = "{}_{}_{}.changes".format(build.sourcename, v, arch)
+
+    cmd = "debsign -pgpg1 -k{} {}".format(key, changes_file)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(out_path))
     await process.launch()
     ret = await process.wait()
@@ -171,7 +178,7 @@ async def publish_packages(build, out_path):
     await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
 
     files2delete = files2upload
-    files2delete.append("{}/{}_{}_{}.changes".format(out_path, build.sourcename, build.version, arch))
+    files2delete.append("{}/{}".format(out_path, changes_file))
     for f in files2delete:
         logger.info("publisher: removing %s", f)
         os.remove(f)

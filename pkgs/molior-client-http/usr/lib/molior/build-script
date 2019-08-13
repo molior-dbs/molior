@@ -129,6 +129,9 @@ if [ -z "$pkgdir" ]; then
   exit 1
 fi
 
+# strip epoch version
+VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
+
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
 log "Downloading $dsc_url"
 wget -q $dsc_url

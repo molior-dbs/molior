@@ -21,7 +21,7 @@ from molior.model.buildvariant import BuildVariant
 from molior.model.architecture import Architecture
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
 from molior.molior.logger import get_logger
-from molior.molior.utils import get_changelog_attr
+from molior.molior.utils import get_changelog_attr, strip_epoch_version
 
 from molior.molior.core import (
     get_target_arch,
@@ -162,7 +162,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         if ret != 0:
             logger.error("error running git describe")
         else:
-            if not re.match("^v?{}$".format(info.version.replace("~", "-")), gittag):
+            v = strip_epoch_version(info.version)
+            if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
                 is_ci = True
 
         ci_cfg = Configuration().ci_builds
