@@ -21,6 +21,14 @@ if [ -z "$MOLIOR_SERVER" ]; then
   MOLIOR_SERVER=172.16.0.254
 fi
 
+# Workaround obsolete pxz package on buster
+xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
+if dpkg --compare-versions "$xzversion" lt 5.2.4-1; then
+  TAR_PXZ="-Ipxz"
+else
+  TAR_PXZ=""
+fi
+
 log_title ()
 {
     message=$1
@@ -166,7 +174,7 @@ sudo rm -rf /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 sudo mkdir -p /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 cd /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH/
 log "Extracting $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
-sudo tar -I pxz -xf ~molior/build/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
+sudo tar $TAR_PXZ -xf ~molior/build/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
 cd - >/dev/null
 sudo chown root:root /etc/schroot/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
 rm -f $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
