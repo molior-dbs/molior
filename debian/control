@@ -10,26 +10,18 @@ Maintainer: André Roth <neolynx@gmail.com>
 
 Package: molior-server
 Architecture: all
-Pre-Depends: molior-backend
 Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf, git, git-lfs,
     postgresql, postgresql-contrib, python3-psycopg2, sudo, expect, tcl, sbuild, schroot,
     binfmt-support, qemu-user-static, python3-sqlalchemy, python3-yaml, python3-tz,
     python3-jinja2, python3-cirrina, python3-click, devscripts,
     bc, pxz, python3-launchy, python3-dateutil, debootstrap (>= 1.0.110~bpo9+1)
-Conflicts: molior-loghandler, molior-publisher, molior-srcpackager
+Conflicts: molior-backend-http
 Description: debian package auto builder
  Debian Build System based on sbuild, schroot and aptly
  .
  Molior checks git repositories for release tags and
  runs sbuild when needed. The resulting packages are
  pushed to an aptly repository.
-
-Package: molior-backend-http
-Architecture: all
-Provides: molior-backend
-Depends: ${python3:Depends}, ${misc:Depends}, python3-launchy
-Description: molior backend for HTTP clients
- Simple HTTP based Debian Build System backend
 
 Package: molior-client-http
 Architecture: all

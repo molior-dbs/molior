@@ -28,7 +28,7 @@ apt-get --yes dist-upgrade
 apt-get install --yes --no-install-recommends locales-all gdebi-core \
                       build-essential debhelper devscripts ipython3 \
                       net-tools fakeroot \
-                      vim-nox libpython3.5-dev exuberant-ctags fonts-hack-ttf \
+                      vim-nox libpython3-dev exuberant-ctags fonts-hack-ttf \
                       python3-flake8 flake8 cmake python3-pytest python3-pytest-cov \
                       python3-setuptools python-setuptools python-all python-all-dev python3-all \
                       htop git psmisc \

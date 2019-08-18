@@ -1,12 +1,12 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 #
-#export PYBUILD_NAME=molior-server
-#export PYBUILD_DESTDIR_python3=debian/molior-server
-
+#
 include /usr/share/dpkg/pkg-info.mk
 
 export IS_SPHINX=1
+export PYBUILD_NAME=molior-server
+export PYBUILD_DESTDIR_python3=debian/molior-server
 
 
 %:
