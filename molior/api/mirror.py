@@ -356,6 +356,7 @@ async def delete_mirror(request):
     except Exception as exc:
         # mirror did not exist
         # FIXME: handle mirror has snapshots and cannot be deleted?
+        logger.exception(exc)
         pass
 
     project = entry.project
