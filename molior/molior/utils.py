@@ -85,3 +85,10 @@ async def get_changelog_attr(name, path):
         raise Exception("error running dpkg-parsechangelog")
 
     return attr.strip()
+
+
+def strip_epoch_version(version):
+    m = re.match("(?:\d+:)?(\d.+)", version)
+    if m:
+        version = m.groups()[0]
+    return version
