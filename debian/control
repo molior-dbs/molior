@@ -64,12 +64,49 @@ Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
 Description: molior ISO installer for testing
  Testing setup for molior
 
-Package: molior-node-devel
+Package: molior-node-amd64
 Architecture: all
 Pre-Depends: molior-os-config
 Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server, linux-image-amd64,
-  grub-pc, rsyslog, acpi-support-base, acpid, sudo, locales, apt-transport-https,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-amd64, grub-pc,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
+  libpam-systemd,
+# editors
+  vim-nox,
+# add some tools:
+  tree, bzip2, wget, telnet, man, psmisc,
+# molior:
+  molior-client-http
+Description: molior build node ISO installer for testing
+ Testing setup for molior
+
+Package: molior-node-amd64-efi
+Architecture: all
+Pre-Depends: molior-os-config
+Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-amd64, grub-efi-amd64,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
+  libpam-systemd,
+# editors
+  vim-nox,
+# add some tools:
+  tree, bzip2, wget, telnet, man, psmisc,
+# molior:
+  molior-client-http
+Description: molior build node ISO installer for testing
+ Testing setup for molior
+
+Package: molior-node-arm64-efi
+Architecture: all
+Pre-Depends: molior-os-config
+Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-arm64, grub-efi-arm64,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors
