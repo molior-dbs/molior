@@ -110,7 +110,7 @@ def mainloop(host, port, debug):
     Starts the molior-web app.
     """
     moliorapi.set_context_functions(create_cirrina_context, destroy_cirrina_context)
-    moliorapi.run(host, port, debug=debug)
+    moliorapi.run(host, port, logger=logger, debug=debug)
 
 
 if __name__ == "__main__":
