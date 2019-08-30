@@ -13,7 +13,7 @@ Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf, git, git-lfs,
     postgresql, postgresql-contrib, python3-psycopg2, sudo, expect, tcl, sbuild, schroot,
     binfmt-support, qemu-user-static, python3-sqlalchemy, python3-yaml, python3-tz,
-    python3-jinja2, python3-cirrina, python3-click, devscripts,
+    python3-jinja2, python3-cirrina, python3-click, devscripts, sensible-utils,
     bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, debootstrap (>= 1.0.110~bpo9+1)
 Conflicts: molior-backend-http
 Description: debian package auto builder
@@ -27,9 +27,10 @@ Package: molior-client-http
 Architecture: all
 Section: misc
 Depends: ${misc:Depends}, ${perl:Depends}, dpkg-dev, lsb-base (>= 3.0-6), adduser, lsb-release, fakeroot,
-  haveged, gcc, debhelper, tcl, expect, dh-systemd, sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
+  haveged, gcc, debhelper, tcl, expect, dh-systemd | debhelper (>= 9.20160709), sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
   python3-yaml, python3-aiohttp, python3-websocket, schroot, gnupg1, devscripts, pxz | xz-utils (>= 5.2.4-1), python3-launchy
-Description: Molior build slave client.
+Description: Molior build node client
+ Build node client for molior-server nodes (amd64 or arm64)
 
 Package: molior-doc
 Architecture: all
