@@ -119,6 +119,7 @@ async def main():
                         except Exception as exc:
                             logger.error("invalid request: %s", msg.data)
                             logger.exception(exc)
+                            await asyncio.sleep(1)
                             continue
 
                         if "task" in req:

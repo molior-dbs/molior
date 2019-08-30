@@ -80,13 +80,12 @@ async def websocket_connected(websocket):
     Sends a `success` message to the websocket client
     on connect.
     """
-    websocket.send_str(
-        json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value})
-    )
-    logger.info(
-        "new authenticated connection, user: %s",
-        websocket.cirrina.web_session.get("username"),
-    )
+    if asyncio.iscoroutinefunction(websocket.send_str):
+        await websocket.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
+    else:
+        websocket.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
+
+    logger.info("new authenticated connection, user: %s", websocket.cirrina.web_session.get("username"))
 
 
 @app.websocket_message("/api/websocket")
@@ -94,9 +93,7 @@ async def websocket_message(websocket, msg):
     """
     On websocket message handler.
     """
-    logger.debug(
-        "message received from user '%s'", websocket.cirrina.web_session.get("username")
-    )
+    logger.debug("message received from user '%s'", websocket.cirrina.web_session.get("username"))
     try:
         data = json.loads(msg)
         logger.debug("received data %s", str(data))
