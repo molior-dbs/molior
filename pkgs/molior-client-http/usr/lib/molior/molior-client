@@ -114,7 +114,6 @@ async def main():
             async with session.ws_connect("ws://{}/internal/registry/{}/{}".format(molior_server, arch, node)) as ws:
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
-                        logger.info("got message: %s", msg.data)
                         try:
                             req = json.loads(msg.data)
                         except Exception as exc:
