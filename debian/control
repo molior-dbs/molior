@@ -51,11 +51,11 @@ Description: Molior base OS configuration
 Package: molior-devel
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server, linux-image-amd64,
-  grub-pc, rsyslog, acpi-support-base, acpid, sudo, locales, lvm2, apt-transport-https,
-  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion, haveged,
-  libpam-systemd,
+Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
+  systemd-sysv, libpam-systemd,
+  net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
+  openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, bash-completion, haveged,
 # editors
   vim-nox,
 # add some tools:
@@ -68,11 +68,11 @@ Description: molior ISO installer for testing
 Package: molior-vbox
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server, linux-image-amd64,
-  grub-pc, rsyslog, acpi-support-base, acpid, sudo, locales, lvm2, apt-transport-https,
-  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion, haveged,
-  libpam-systemd,
+Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
+  systemd-sysv, libpam-systemd,
+  net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
+  openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, bash-completion, haveged,
 # editors
   vim-nox,
 # add some tools:
@@ -84,7 +84,8 @@ Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
   xserver-xorg-video-modesetting, xserver-xorg, lightdm, lxde, policykit-1,
   lxterminal,
 # molior:
-  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7)
+  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7),
+  molior-tools
 Description: molior ISO installer for testing
  Testing setup for molior
 
