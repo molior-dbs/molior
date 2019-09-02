@@ -65,6 +65,29 @@ Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
 Description: molior ISO installer for testing
  Testing setup for molior
 
+Package: molior-vbox
+Architecture: all
+Pre-Depends: molior-os-config
+Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
+  iputils-ping, bash-completion, vim, openssh-server, linux-image-amd64,
+  grub-pc, rsyslog, acpi-support-base, acpid, sudo, locales, lvm2, apt-transport-https,
+  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion, haveged,
+  libpam-systemd,
+# editors
+  vim-nox,
+# add some tools:
+  tree, bzip2, wget, telnet, man, psmisc,
+# VirtualBox need kernel headers for guest additions
+  linux-headers-amd64,
+# add desktop dependencies
+  xserver-xorg-video-vesa, xserver-xorg-input-evdev, libgl1-mesa-dri,
+  xserver-xorg-video-modesetting, xserver-xorg, lightdm, lxde, policykit-1,
+  lxterminal,
+# molior:
+  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7)
+Description: molior ISO installer for testing
+ Testing setup for molior
+
 Package: molior-node-amd64
 Architecture: all
 Pre-Depends: molior-os-config
