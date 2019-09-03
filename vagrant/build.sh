@@ -90,7 +90,6 @@ done
 
 if echo $PACKAGES | sed 's/ /\n/g' | grep -q "^molior$"; then
   log_info "Installing molior-server package"
-  sudo gdebi -n molior-backend-http*_all.deb
   sudo gdebi -n molior-server_*_all.deb
   sudo gdebi -n molior-doc_*_all.deb
 
