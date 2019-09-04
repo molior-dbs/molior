@@ -76,7 +76,10 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc, chromium, chromium-sandbox,
+  tree, bzip2, wget, telnet, man, psmisc,
+# add browser (stretch, buster)
+  chromium-sandbox | chromium (<< 73.0),
+  chromium (<< 73.0) | chromium (>= 73.0),
 # VirtualBox need kernel headers for guest additions
   linux-headers-amd64,
 # add desktop dependencies
