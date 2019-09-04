@@ -118,6 +118,7 @@ async def main():
                             req = json.loads(msg.data)
                         except Exception as exc:
                             logger.error("invalid request: %s", msg.data)
+                            logger.exception(exc)
                             continue
 
                         if "task" in req:

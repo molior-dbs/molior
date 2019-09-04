@@ -1,13 +1,4 @@
 #! /usr/bin/dh-exec
 
-usr/lib/python3.5/dist-packages/molior/api         usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/aptly       usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/__init__.py usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/model       usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/molior      usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/ops         usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/auth        usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/version.py  usr/lib/python3.5/dist-packages/molior/
-usr/lib/python3.5/dist-packages/molior/backends/__init__.py       usr/lib/python3.5/dist-packages/molior/backends/
 pkgs/molior-server/* .
 

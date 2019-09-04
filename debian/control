@@ -10,13 +10,12 @@ Maintainer: André Roth <neolynx@gmail.com>
 
 Package: molior-server
 Architecture: all
-Pre-Depends: molior-backend
 Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf, git, git-lfs,
     postgresql, postgresql-contrib, python3-psycopg2, sudo, expect, tcl, sbuild, schroot,
     binfmt-support, qemu-user-static, python3-sqlalchemy, python3-yaml, python3-tz,
     python3-jinja2, python3-cirrina, python3-click, devscripts,
-    bc, pxz, python3-launchy, python3-dateutil, debootstrap (>= 1.0.110~bpo9+1)
-Conflicts: molior-loghandler, molior-publisher, molior-srcpackager
+    bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, debootstrap (>= 1.0.110~bpo9+1)
+Conflicts: molior-backend-http
 Description: debian package auto builder
  Debian Build System based on sbuild, schroot and aptly
  .
@@ -24,19 +23,12 @@ Description: debian package auto builder
  runs sbuild when needed. The resulting packages are
  pushed to an aptly repository.
 
-Package: molior-backend-http
-Architecture: all
-Provides: molior-backend
-Depends: ${python3:Depends}, ${misc:Depends}, python3-launchy
-Description: molior backend for HTTP clients
- Simple HTTP based Debian Build System backend
-
 Package: molior-client-http
 Architecture: all
 Section: misc
 Depends: ${misc:Depends}, ${perl:Depends}, dpkg-dev, lsb-base (>= 3.0-6), adduser, lsb-release, fakeroot,
   haveged, gcc, debhelper, tcl, expect, dh-systemd, sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
-  python3-yaml, python3-aiohttp, python3-websocket, schroot, gnupg1, devscripts, pxz, python3-launchy
+  python3-yaml, python3-aiohttp, python3-websocket, schroot, gnupg1, devscripts, pxz | xz-utils (>= 5.2.4-1), python3-launchy
 Description: Molior build slave client.
 
 Package: molior-doc
@@ -72,12 +64,49 @@ Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
 Description: molior ISO installer for testing
  Testing setup for molior
 
-Package: molior-node-devel
+Package: molior-node-amd64
 Architecture: all
 Pre-Depends: molior-os-config
 Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server, linux-image-amd64,
-  grub-pc, rsyslog, acpi-support-base, acpid, sudo, locales, apt-transport-https,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-amd64, grub-pc,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
+  libpam-systemd,
+# editors
+  vim-nox,
+# add some tools:
+  tree, bzip2, wget, telnet, man, psmisc,
+# molior:
+  molior-client-http
+Description: molior build node ISO installer for testing
+ Testing setup for molior
+
+Package: molior-node-amd64-efi
+Architecture: all
+Pre-Depends: molior-os-config
+Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-amd64, grub-efi-amd64,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
+  libpam-systemd,
+# editors
+  vim-nox,
+# add some tools:
+  tree, bzip2, wget, telnet, man, psmisc,
+# molior:
+  molior-client-http
+Description: molior build node ISO installer for testing
+ Testing setup for molior
+
+Package: molior-node-arm64-efi
+Architecture: all
+Pre-Depends: molior-os-config
+Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
+  iputils-ping, bash-completion, vim, openssh-server,
+  linux-image-arm64, grub-efi-arm64,
+  rsyslog, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors

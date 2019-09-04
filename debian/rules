@@ -1,12 +1,12 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 #
-#export PYBUILD_NAME=molior-server
-#export PYBUILD_DESTDIR_python3=debian/molior-server
-
+#
 include /usr/share/dpkg/pkg-info.mk
 
 export IS_SPHINX=1
+export PYBUILD_NAME=molior-server
+export PYBUILD_DESTDIR_python3=debian/molior-server
 
 
 %:
@@ -20,13 +20,17 @@ override_dh_auto_test:
 override_dh_systemd_enable:
 	dh_systemd_enable -p molior-server molior-server.service
 	dh_systemd_enable -p molior-devel ssh-create-keys.service
-	dh_systemd_enable -p molior-node-devel ssh-create-keys.service
+	dh_systemd_enable -p molior-node-amd64 ssh-create-keys.service
+	dh_systemd_enable -p molior-node-amd64-efi ssh-create-keys.service
+	dh_systemd_enable -p molior-node-arm64-efi ssh-create-keys.service
 	dh_systemd_enable -p molior-client-http molior-client-http.service
 
 override_dh_systemd_start:
 	dh_systemd_start -p molior-server molior-server.service
 	dh_systemd_start -p molior-devel ssh-create-keys.service
-	dh_systemd_start -p molior-node-devel ssh-create-keys.service
+	dh_systemd_start -p molior-node-amd64 ssh-create-keys.service
+	dh_systemd_start -p molior-node-amd64-efi ssh-create-keys.service
+	dh_systemd_start -p molior-node-arm64-efi ssh-create-keys.service
 	dh_systemd_start -p molior-client-http molior-client-http.service
 
 override_dh_auto_install:

@@ -14,7 +14,8 @@ debian/molior-os-config/
 debian/molior-doc/
 debian/molior-client-http/
 debian/molior-backend-http/
-debian/molior-node-devel/
+debian/molior-node-amd64/
+debian/molior-node-arm64/
 .pybuild/
 molior.egg-info
 debian/debhelper-build-stamp
