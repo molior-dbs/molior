@@ -1,0 +1,315 @@
+#!/bin/sh
+#
+# see: dh_installdeb(1)
+#
+
+set -e
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <postinst> `abort-remove'
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see http://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+# source debconf library
+. /usr/share/debconf/confmodule
+
+PROJECT=Molior
+SYSUSER=admin
+SYSHOME=/home/admin
+PASSWORD=molior-dev
+
+case "$1" in
+    configure)
+
+        # Create user if needed
+        if ! id -u $SYSUSER >/dev/null 2>&1; then
+          useradd -U -m -d $SYSHOME -G sudo -s /bin/bash $SYSUSER
+          echo "$SYSUSER:$PASSWORD" | chpasswd
+        fi
+
+        # Configure VM
+        sed -i "s/^\"syntax on/syntax on/" /etc/vim/vimrc
+        sed -i "s/^\"set background=dark/set background=dark/" /etc/vim/vimrc
+
+        sed -i "s/^#force_color_prompt=yes/force_color_prompt=yes/" $SYSHOME/.bashrc
+        echo "set mouse=" > $SYSHOME/.vimrc
+        echo "set mouse=" > /root/.vimrc
+
+        # Enable lightdm autologin
+        sed -i "s/^#autologin-user=.*/autologin-user=$SYSUSER/" /etc/lightdm/lightdm.conf
+
+        # Disable screensaver
+        cat >$SYSHOME/.xsessionrc <<EOF
+xset s off
+xset s noblank
+xset -dpms
+EOF
+        chown $SYSUSER:$SYSUSER $SYSHOME/.xsessionrc
+
+        # Configure LXDE
+        if [ ! -e $SYSHOME/.config/autostart/lxterminal.desktop ]; then
+          mkdir -p $SYSHOME/.config/autostart
+          ln -s /usr/share/applications/lxterminal.desktop $SYSHOME/.config/autostart/
+        fi
+
+        if [ ! -e $SYSHOME/.config/pcmanfm/LXDE/desktop-items-0.conf ]; then
+          mkdir -p $SYSHOME/.config/pcmanfm/LXDE
+          cat >$SYSHOME/.config/pcmanfm/LXDE/desktop-items-0.conf <<EOF
+[*]
+wallpaper_mode=stretch
+wallpaper_common=1
+wallpaper=/usr/share/pixmaps/background.jpg
+desktop_bg=#000000
+desktop_fg=#ffffff
+desktop_shadow=#000000
+desktop_font=Sans 12
+show_wm_menu=0
+sort=mtime;ascending;
+show_documents=0
+show_trash=1
+show_mounts=0
+EOF
+        fi
+
+        if [ ! -e $SYSHOME/.config/lxterminal/lxterminal.conf ]; then
+          mkdir -p $SYSHOME/.config/lxterminal
+          cat >$SYSHOME/.config/lxterminal/lxterminal.conf <<EOF
+[general]
+fontname=Monospace 10
+selchars=-A-Za-z0-9,./?%&#:_
+scrollback=100000
+bgcolor=#000000000000
+bgalpha=65535
+fgcolor=#aaaaaaaaaaaa
+disallowbold=false
+cursorblinks=false
+cursorunderline=false
+audiblebell=false
+tabpos=top
+hidescrollbar=false
+hidemenubar=true
+hideclosebutton=false
+hidepointer=false
+disablef10=false
+disablealt=false
+
+palette_color_0=#000000000000
+palette_color_1=#aaaa00000000
+palette_color_2=#0000aaaa0000
+palette_color_3=#aaaa55550000
+palette_color_4=#00000000aaaa
+palette_color_5=#aaaa0000aaaa
+palette_color_6=#0000aaaaaaaa
+palette_color_7=#aaaaaaaaaaaa
+palette_color_8=#555555555555
+palette_color_9=#ffff55555555
+palette_color_10=#5555ffff5555
+palette_color_11=#ffffffff5555
+palette_color_12=#55555555ffff
+palette_color_13=#ffff5555ffff
+palette_color_14=#5555ffffffff
+palette_color_15=#ffffffffffff
+color_preset=VGA
+geometry_columns=120
+geometry_rows=24
+disableconfirm=false
+
+[shortcut]
+new_window_accel=<CTRL><SHIFT>N
+new_tab_accel=<CTRL><SHIFT>T
+close_tab_accel=<CTRL><SHIFT>W
+close_window_accel=<CTRL><SHIFT>Q
+copy_accel=<CTRL><SHIFT>C
+paste_accel=<CTRL><SHIFT>V
+name_tab_accel=<CTRL><SHIFT>I
+previous_tab_accel=<CTRL>Page_Up
+next_tab_accel=<CTRL>Page_Down
+move_tab_left_accel=<CTRL><SHIFT>Page_Up
+move_tab_right_accel=<CTRL><SHIFT>Page_Down
+zoom_in_accel=<CTRL>plus
+zoom_out_accel=<CTRL>underscore
+zoom_reset_accel=<CTRL>parenright
+EOF
+        fi
+
+        mkdir -p $SYSHOME/.config/lxpanel/LXDE/panels
+        cat > $SYSHOME/.config/lxpanel/LXDE/panels/panel <<EOF
+# lxpanel <profile> config file. Manually editing is not recommended.
+# Use preference dialog in lxpanel to adjust config when you can.
+
+Global {
+  edge=bottom
+  allign=left
+  margin=0
+  widthtype=percent
+  width=100
+  height=26
+  transparent=0
+  tintcolor=#000000
+  alpha=0
+  setdocktype=1
+  setpartialstrut=1
+  usefontcolor=1
+  fontcolor=#ffffff
+  background=1
+  backgroundfile=/usr/share/lxpanel/images/background.png
+}
+Plugin {
+  type=space
+  Config {
+    Size=2
+  }
+}
+Plugin {
+  type=menu
+  Config {
+    image=/usr/share/lxde/images/lxde-icon.png
+    system {
+    }
+    separator {
+    }
+    item {
+      command=run
+    }
+    separator {
+    }
+    item {
+      image=gnome-logout
+      command=logout
+    }
+  }
+}
+Plugin {
+  type=launchbar
+  Config {
+    Button {
+      id=pcmanfm.desktop
+    }
+    Button {
+      id=lxde-x-www-browser.desktop
+    }
+    Button {
+      id=menu://applications/System/lxterminal.desktop
+    }
+  }
+}
+Plugin {
+  type=space
+  Config {
+    Size=4
+  }
+}
+Plugin {
+  type=pager
+  Config {
+  }
+}
+Plugin {
+  type=space
+  Config {
+    Size=4
+  }
+}
+Plugin {
+  type=taskbar
+  expand=1
+  Config {
+    tooltips=1
+    IconsOnly=0
+    AcceptSkipPager=1
+    ShowIconified=1
+    ShowMapped=1
+    ShowAllDesks=0
+    UseMouseWheel=1
+    UseUrgencyHint=1
+    FlatButton=0
+    MaxTaskWidth=150
+    spacing=1
+  }
+}
+Plugin {
+  type=cpu
+  Config {
+  }
+}
+Plugin {
+  type=tray
+  Config {
+  }
+}
+Plugin {
+  type=dclock
+  Config {
+    ClockFmt=%R
+    TooltipFmt=%A %x
+    BoldFont=0
+    IconOnly=0
+    CenterText=0
+  }
+}
+EOF
+        chown -R $SYSUSER:$SYSUSER $SYSHOME/.config
+
+        if ! grep -q WELCOME_MARKER $SYSHOME/.bashrc; then
+            cat >> $SYSHOME/.bashrc <<EOF
+# WELCOME_MARKER
+echo
+echo -e "\e[36m\e[1mWelcome to the Molior Development VBox\e[0m"
+echo
+echo " * You are logged in as user $SYSUSER, password $PASSWORD"
+echo " * See README.txt for installation and configuration instructions"
+echo
+EOF
+            chown $SYSUSER:$SYSUSER $SYSHOME/.bashrc
+        fi
+
+        cat > $SYSHOME/README.txt <<EOF
+Molior Development VBox
+=======================
+
+This VM runs the following services:
+- molior-server
+- molior-web      (http://localhost, http://localhost:8888 on the host system)
+- aptly      (http://localhost:3142, http://localhost:8889 on the host system)
+- ssh         (user/pass: admin/molior-dev, localhost:8222 on the host system)
+
+Install Virtualbox Guest Additions
+----------------------------------
+
+Insert Guest Additions CD and run the following commands:
+- sudo mount /dev/sr0 /mnt
+- sudo /mnt/VBoxLinuxAdditions.run
+- sudo umount /mnt
+- sudo reboot
+
+Create SSH Key Pair
+-------------------
+
+In order to clone git repos run the following:
+- ssh-keygen
+- Accept all defaults
+- cat ~/.ssh/id_rsa.pub
+- Add the output to your git servers SSH settings
+
+EOF
+
+    ;;
+    abort-upgrade|abort-remove|abort-deconfigure) exit 0;;
+esac
+
+# dh_installdeb will replace this with shell code automatically
+# generated by other debhelper scripts.
+
+#DEBHELPER#
+
+db_stop
+
+exit 0
+

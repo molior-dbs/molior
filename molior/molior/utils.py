@@ -88,7 +88,7 @@ async def get_changelog_attr(name, path):
 
 
 def strip_epoch_version(version):
-    m = re.match("(?:\d+:)?(\d.+)", version)
+    m = re.match(r"(?:\d+:)?(\d.+)", version)
     if m:
         version = m.groups()[0]
     return version

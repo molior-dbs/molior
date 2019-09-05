@@ -33,7 +33,10 @@ async def watchdog(ws_client):
                 await ws_client.close()
                 break
             ws_client.molior_pong_pending = 1
-            ws_client.send_str(json.dumps({"ping": 1}))
+            if asyncio.iscoroutinefunction(ws_client.send_str):
+                await ws_client.send_str(json.dumps({"ping": 1}))
+            else:
+                ws_client.send_str(json.dumps({"ping": 1}))
             await asyncio.sleep(PING_TIMEOUT)
             if ws_client not in registry[arch] and ws_client not in running_nodes[arch]:
                 break
@@ -198,8 +201,10 @@ class HTTPBackend:
                 running_nodes[arch].append(node)
                 logger.info("backend: build_%d assigned to %s/%s ", build_id, arch, node.molior_node_name)
                 node.molior_build_id = build_id
-                node.send_str(json.dumps({"task": task}))
-
+                if asyncio.iscoroutinefunction(node.send_str):
+                    await node.send_str(json.dumps({"task": task}))
+                else:
+                    node.send_str(json.dumps({"task": task}))
                 build_tasks[arch].task_done()
 
             except Exception as exc:

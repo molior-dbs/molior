@@ -2,20 +2,18 @@
 Provides functions to interact with the Project
 database model.
 """
-import logging
 from aiohttp import web
 
 from molior.molior.configuration import Configuration
-
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
+from molior.molior.logger import get_logger
 
 from .projectversion import get_projectversion_deps_manually
-
 from .helper.validator import is_name_valid
 from .app import app
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = get_logger()
 
 
 @app.http_get("/api/projects")
