@@ -9,6 +9,10 @@ import os
 import shlex
 from launchy import Launchy
 
+# allow older aiohttp versions
+if not hasattr(aiohttp, "client_exceptions") and hasattr(aiohttp, "errors"):
+    aiohttp.client_exceptions = aiohttp.errors
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
