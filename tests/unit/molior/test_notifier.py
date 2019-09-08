@@ -47,7 +47,7 @@ def test_build_changed_url_encoding():
     with patch("molior.molior.notifier.Configuration") as cfg, patch(
         "molior.molior.notifier.trigger_hook"
     ) as trigger_hook:
-        cfg.return_value.hostname = "localhorst"
+        cfg.return_value.hostname = "localhost"
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(build_changed(build))
