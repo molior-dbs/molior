@@ -266,7 +266,7 @@ The following will mirror Debian/stretch for amd64 and arm64. It will take appro
 - Source: http://httpredir.debian.org/debian (or use apt-cacher-ng URL)
 - Select: Use Mirror Key
 - Continue
-- Add the three keys (separately): EF0F382A1A7B6500 8B48AD6246925553 7638D0442B90D010
+- Add the keys (separately): EF0F382A1A7B6500 8B48AD6246925553 7638D0442B90D010 04EE7237B7D453EC
 - Key Server: hkp://keyserver.ubuntu.com:80
 - Confirm
 
