@@ -87,7 +87,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   xserver-xorg-video-modesetting, xserver-xorg, lightdm, lxde, policykit-1,
   lxterminal,
 # molior:
-  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7),
+  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
   molior-tools
 Description: molior ISO installer for testing
  Testing setup for molior
