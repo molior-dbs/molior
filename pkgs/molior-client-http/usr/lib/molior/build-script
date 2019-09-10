@@ -173,7 +173,8 @@ if [ ! -e /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$
 
   #FIXME: move to separate installschroot.sh, allow sudo only for this script
   sudo mv sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
-  sudo mv ~molior/build/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz /var/lib/schroot/chroots/
+  sudo mkdir -p /var/lib/schroot/chroots/
+  sudo mv $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz /var/lib/schroot/chroots/
 else
   sudo cp /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
 fi
@@ -200,7 +201,7 @@ fi
 
 # FIXME: signature verification inside sbuild schroot
 
-eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --no-apt-upgrade --no-apt-distupgrade --log-external-command-output --log-external-command-error --build-dep-resolver=aptitude $SBUILD_ARCH_ARGS $APT_URLS ${REPO_NAME}_$VERSION.dsc
+eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --build-dep-resolver=aptitude $SBUILD_ARCH_ARGS $APT_URLS ${REPO_NAME}_$VERSION.dsc
 RET=$?
 
 if [ "$RET" -ne 0 ]; then
