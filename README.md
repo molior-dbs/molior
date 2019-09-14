@@ -12,6 +12,43 @@ Molior performs the following tasks:
 - build packages into project repositories (i386, amd64, armhf, arm64)
 - create deployments of projects (ISO Installer, VirtualBox, images, ...)
 
+# Table of content
+<!-- vim-markdown-toc GFM -->
+
+* [Installation](#installation)
+* [Components](#components)
+* [Usage](#usage)
+    * [Login to the Web UI](#login-to-the-web-ui)
+    * [Creating Mirrors](#creating-mirrors)
+        * [Use apt-cacher-ng (optional)](#use-apt-cacher-ng-optional)
+        * [Debian base mirror](#debian-base-mirror)
+    * [Create a project](#create-a-project)
+    * [Add a source repo](#add-a-source-repo)
+    * [Create a non-base mirror (optional)](#create-a-non-base-mirror-optional)
+    * [Integration](#integration)
+        * [Tigger builds from gitlab](#tigger-builds-from-gitlab)
+        * [Build notification hooks](#build-notification-hooks)
+* [Contributing](#contributing)
+    * [Clone the source repositories](#clone-the-source-repositories)
+    * [Create a development environment](#create-a-development-environment)
+        * [Debian stretch](#debian-stretch)
+        * [Ubuntu 18.04](#ubuntu-1804)
+        * [Ubuntu 19.04 Vagrant fixes](#ubuntu-1904-vagrant-fixes)
+    * [Create the vagrant machines](#create-the-vagrant-machines)
+    * [Login to the molior machine](#login-to-the-molior-machine)
+    * [Login to the Web UI](#login-to-the-web-ui-1)
+    * [Build molior](#build-molior)
+    * [Demo Project](#demo-project)
+    * [Watch the logs](#watch-the-logs)
+    * [Toubleshooting](#toubleshooting)
+* [Authors](#authors)
+
+<!-- vim-markdown-toc -->
+
+# Installation
+
+See [INSTALL.md](INSTALL.md).
+
 # Components
 
 The molior Debian Build System consists of the following components:
@@ -45,192 +82,6 @@ The molior Debian Build System consists of the following components:
   - create deployments
   - automation scripts
 
-
-# Installation
-
-Molior can be installed from APT sources, or with ISO installers.
-
-## Prerequisites
-
-Debian stretch installations with stretch-backports, depending on the setup:
-- molior server machine
-- aptly server machine (might be on the same installation as molior server)
-- build node(s) (amd64 or arm64)
-
-## APT Sources
-
-- Make sure you have stretch-backports configured
-```
-cat >/etc/apt/sources.list.d/stretch-backports.list <<EOF
-deb http://deb.debian.org/debian stretch-backports main
-EOF
-```
-- Add the molior apt source:
-```
-cat >/etc/apt/sources.list.d/molior.list <<EOF
-deb [arch=amd64,arm64] http://molior.info/1.3/stretch stable main
-EOF
-```
-
-- Add repository key
-```
-wget -q -O- http://molior.info/archive-keyring.asc | apt-key add -
-```
-
-- Update APT sources
-```
-apt update
-```
-
-### Install molior
-
-```
-apt install debootstrap/stretch-backports molior-server molior-web
-```
-
-### Install aptly
-
-```
-apt install aptly
-```
-
-### Install build node
-
-On your build machines (amd64 or arm64), install molior-client-http:
-```
-apt install molior-client-http
-```
-
-### Install molior-tools
-
-In your working environment (Debian/Ubuntu) configure the molior APT sources, and install:
-
-```
-apt install molior-tools
-```
-
-This will provide tools like:
-- create-release
-- molior-deploy
-
-## ISO Installers
-
-Molior is available as ISO installer for test and development purposes.
-
-Download molior and aptly server installer:
-- http://molior.info/installers/molior_1.3_1.3.2_installer-dev.iso
-
-Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.3_1.3.2_vbox-dev.ova
-
-Download amd64 build node installer:
-- http://molior.info/installers/molior_1.3_1.3.2_installer-node-amd64.iso
-
-
-Install molior server and build node on VMs or bare metal and follow the Configuration chapter below.
-
-User and Password for these installers is: admin/molior-dev
-
-In order to see the IP address aquired via DHCP, login in the text console and run:
-```
-ip addr show eth0
-```
-
-## Configuration
-
-### Configure molior server
-
-- Login to the molior server via SSH
-- Change password:
-```
-passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
-
-# list postgresql timezones:
-sudo -u postgres psql molior -c "SELECT * FROM pg_timezone_names"
-# set molior database timezone:
-sudo -u postgres psql molior -c "ALTER DATABASE molior SET timezone TO 'Europe/Zurich'"
-sudo service molior-server restart
-```
-- Create SSH and GPG Keys
-  Molior uses 2 GPG key pairs, one for signing the source package (molior user) and one for signing the Debian repositories (aptly user).
-  These keys cannot easily be changes once Molior has created and signed mirrors and packages.
-  If desired, create custom gpg key pairs accoring to what the scripts below perform, or use the provided scripts directly for testing purposes.
-  These scripts also create SSH keys used by molior for accessing the git repositories and the build nodes.
-```
-sudo create-molior-keys "Molior Debsign" debsign@molior.info
-sudo create-aptly-keys "Molior Reposign" reposign@molior.info
-sudo create-aptly-passwd molior molior-dev
-sudo service nginx reload
-```
-- Edit /etc/molior/molior.yml and configure:
-  - hostname: the fqdn of the server or its IP address
-  - debsign_gpg_email: the email provided to create-molior-keys above
-  - admin/pass: set a new password
-  - aptly/apt_url: URL of molior repository server
-  - aptly/api_url: URL of aptly server
-  - aptly API user and passwd
-  - aptly/gpg_key: the email provided to create-aptly-keys above
-- Remember the SSH public key of the molior user:
-```
-sudo -u molior cat ~molior/.ssh/id_rsa.pub
-```
-  This key needs to be added to the ~molior/.ssh/authorized_keys on the build nodes (see below), and the git repositories needs to grant read access to this key.
-
-### Configure aptly server
-
-If you run aptly on a separate machine, you might want to configure it:
-
-- Login on a build node via SSH
-- Change the password
-- Change password:
-```
-passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
-```
-
-### Configure build nodes
-
-- Login on a build node via SSH
-- Change password:
-```
-passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
-```
-- Copy the molior SSH public key from the molior server to the molior user on each build machine
-```
-sudo -u molior mkdir ~molior/.ssh
-sudo chmod 700 ~molior/.ssh
-sudo -u molior sh -c "cat >~molior/.ssh/authorized_keys" <<EOF
-(paste the SSH public key of the molior user from the molior server)
-EOF
-```
-
-- Edit /etc/default/molior-client and set the MOLIOR_SERVER (i.e. hostname of the molior server).
-- Restart the client service on the build node:
-```
-sudo service molior-client-http restart
-```
-- Export source signing public key to the build nodes
-The build nodes need the public key which molior uses to sing the source packages. The build process will verify the signature of source packages.
-
-From the molior server, execute the following for each build machine IP in order to add the gpg public key for source package verification (replace NODE_IPS, separated by blank):
-```
-DEBSIGN_KEY=debsign@molior.info
-for molior_node in NODE_IPS
-do
-  sudo -u molior gpg1 --armor --export $DEBSIGN_KEY | sudo -u molior ssh -o StrictHostKeyChecking=no $molior_node "gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg"
-done
-```
 
 # Usage
 
