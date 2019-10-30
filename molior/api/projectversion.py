@@ -270,6 +270,7 @@ async def create_projectversions(request):
                 architectures:
                     type: array
                     example: ["amd64", "armhf"]
+                    FIXME: only accept existing archs on mirror!
     produces:
         - text/json
     responses:
