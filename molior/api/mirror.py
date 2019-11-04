@@ -345,14 +345,16 @@ async def delete_mirror(request):
         return error(412, "Error deleting mirror {}: still referenced by one or more project versions", mirrorname)
 
     base_mirror = ""
+    base_mirror_version = ""
     if not entry.project.is_basemirror:
         basemirror = entry.buildvariants[0].base_mirror
-        base_mirror = basemirror.project.name + "-" + basemirror.name
+        base_mirror = basemirror.project.name
+        base_mirror_version = basemirror.name
         # FIXME: cleanup chroot table, schroots, debootstrap,
 
     try:
         # FIXME: use altpy queue !
-        await apt.mirror_delete(base_mirror, entry.project.name, entry.name, entry.mirror_distribution)
+        await apt.mirror_delete(base_mirror, base_mirror_version, entry.project.name, entry.name, entry.mirror_distribution)
     except Exception as exc:
         # mirror did not exist
         # FIXME: handle mirror has snapshots and cannot be deleted?
