@@ -110,7 +110,7 @@ async def set_maintenance(request):
     return web.json_response(status)
 
 
-@app.http_get("/api/nodes-info")
+@app.http_get("/api/nodes")
 async def get_nodes_info(request):
     """
     Returns info about the build nodes
@@ -131,4 +131,15 @@ async def get_nodes_info(request):
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
     # uptime_string = str(timedelta(seconds = uptime_seconds))
-    return web.json_response(build_nodes)
+    results = []
+    for name in build_nodes:
+        load = ""
+        for l in build_nodes[name]["load"]:
+            if load:
+                load += ", "
+            load += str(l)
+        build_nodes[name]["load"] = load
+        results.append({**build_nodes[name], **{"name": name}})
+
+    data = {"total_result_count": len(build_nodes), "results": results}
+    return web.json_response(data)
