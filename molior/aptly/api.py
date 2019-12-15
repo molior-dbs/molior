@@ -482,7 +482,8 @@ class AptlyApi:
         name, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
         data = {
-            "Distribution": mirror_distribution,
+            # Workaround for aptly ('/' not supported as mirror dist)
+            "Distribution": mirror_distribution.replace("/", "_-"),
             "SourceKind": "snapshot",
             "Sources": [],
             "Signing": {

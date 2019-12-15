@@ -459,9 +459,6 @@ class AptlyWorker:
             download_installer,
         ) = args
 
-        # Workaround for aptly ('/' not supported as mirror dist)
-        mirror_distribution = mirror_distribution.replace("/", "-")
-
         build = Build(
             version=version,
             git_ref=None,
