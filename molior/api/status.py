@@ -127,12 +127,20 @@ async def get_nodes_info(request):
         "500":
             description: internal server error
     """
+    search = request.GET.getone("q", None)
+    page = int(request.GET.getone("page", 1))
+    page_size = int(request.GET.getone("page_size", 10))
+
     b = Backend()
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
     # uptime_string = str(timedelta(seconds = uptime_seconds))
+
     results = []
-    for name in build_nodes:
+    for name in build_nodes:  # FIXME: sort?
+        if search and search not in name:
+            continue
+
         load = ""
         for l in build_nodes[name]["load"]:
             if load:
@@ -141,5 +149,6 @@ async def get_nodes_info(request):
         build_nodes[name]["load"] = load
         results.append({**build_nodes[name], **{"name": name}})
 
-    data = {"total_result_count": len(build_nodes), "results": results}
+    result_page = results[page_size * (page - 1):page_size*page]
+    data = {"total_result_count": len(results), "results": result_page}
     return web.json_response(data)
