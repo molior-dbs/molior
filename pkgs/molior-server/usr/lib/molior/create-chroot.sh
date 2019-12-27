@@ -25,10 +25,19 @@ APTLY=$aptly__apt_url
 APTLY_KEY=$aptly__key
 DEBSIGN_GPG_EMAIL=$debsign_gpg_email
 
+# Workaround obsolete pxz package on buster
+xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
+if dpkg --compare-versions "$xzversion" lt 5.2.4-1; then
+  TAR_PXZ="-Ipxz"
+else
+  TAR_PXZ=""
+fi
+
 set -e
 
-if [ "$#" -ne 5 ]; then
-  echo "Usage: $0 build|publish <distrelease> <name> <version> <architecture>" 1>&2
+if [ $1 != "info" -a "$#" -ne 5 ]; then
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" 1>&2
+  echo "       $0 info" 1>&2
   exit 1
 fi
 
@@ -58,7 +67,7 @@ build_chroot()
   echo I: Downloading gpg public key: $KEY_URL
   keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
   wget -q $KEY_URL -O $keyfile
-  cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  cat $keyfile | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
 
   rm -rf $target/
   echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO
@@ -142,7 +151,7 @@ publish_chroot()
 
   echo I: Creating schroot tar
   cd $target
-  tar -I pxz -cf ../$CHROOT_NAME.tar.xz .
+  tar $TAR_PXZ -cf ../$CHROOT_NAME.tar.xz .
   cd - > /dev/null
   rm -rf $target
 
@@ -150,11 +159,17 @@ publish_chroot()
 }
 
 case "$ACTION" in
+  info)
+    echo "schroot build environment"
+    ;;
   build)
     build_chroot
     ;;
   publish)
     publish_chroot
+    ;;
+  remove)
+    rm -rf $target $target.tar.xz
     ;;
   *)
     echo "Unknown action $ACTION"

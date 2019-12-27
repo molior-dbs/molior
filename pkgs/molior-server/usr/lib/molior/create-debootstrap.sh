@@ -24,8 +24,9 @@ eval $(parse_yaml $CONFIG_FILE)
 APTLY=$aptly__apt_url
 APTLY_KEY=$aptly__key
 
-if [ "$#" -ne 5 ]; then
-  echo "Usage: $0 build|publish <distrelease> <name> <version> <architecture>" >&2
+if [ $1 != "info" -a "$#" -ne 5 ]; then
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" >&2
+  echo "       $0 info" 1>&2
   exit 1
 fi
 
@@ -35,12 +36,20 @@ DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
 
-DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_${ARCH}"
-DEBOOTSTRAP="/var/lib/molior/debootstrap/${DEBOOTSTRAP_NAME}"
+DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
+DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
+
+# Workaround obsolete pxz package on buster
+xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
+if dpkg --compare-versions "$xzversion" lt 5.2.4-1; then
+  TAR_PXZ="-Ipxz"
+else
+  TAR_PXZ=""
+fi
 
 build_debootstrap()
 {
-  target="/var/lib/molior/debootstrap/${DIST_NAME}_${DIST_VERSION}_$ARCH"
+  target=$DEBOOTSTRAP
   include="gnupg1"
 
   if [ -d $target ]; then
@@ -57,7 +66,7 @@ build_debootstrap()
 
   KEY_URL=`echo $APTLY/$APTLY_KEY | sed 's/ //g'`
   echo I: Downloading gpg public key: $KEY_URL
-  wget -q $KEY_URL -O- | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  wget -q $KEY_URL -O- | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
 
   if echo $ARCH | grep -q arm; then
     debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase --include=$include $DIST_RELEASE $target $MIRROR
@@ -109,7 +118,7 @@ publish_debootstrap()
 
   echo I: Creating debootstrap tar
   cd $DEBOOTSTRAP
-  tar -I pxz -cf ../$DEBOOTSTRAP_NAME.tar.xz .
+  tar $TAR_PXZ -cf ../$DEBOOTSTRAP_NAME.tar.xz .
   cd - > /dev/null
   rm -rf $DEBOOTSTRAP
 
@@ -117,11 +126,17 @@ publish_debootstrap()
 }
 
 case "$ACTION" in
+  info)
+    echo "debootstrap minimal rootfs"
+    ;;
   build)
     build_debootstrap
     ;;
   publish)
     publish_debootstrap
+    ;;
+  remove)
+    rm -rf $DEBOOTSTRAP $DEBOOTSTRAP.tar.xz
     ;;
   *)
     echo "Unknown action $ACTION"
