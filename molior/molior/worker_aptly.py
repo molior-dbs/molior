@@ -88,6 +88,8 @@ async def startup_mirror(task_queue):
                 session.commit()  # pylint: disable=no-member
                 continue
 
+            # FIXME: do not allow db cleanup while mirroring
+
             components = mirror.mirror_components.split(",")
             loop.create_task(
                 finalize_mirror(
@@ -115,6 +117,7 @@ async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, 
     """
 
     apt = get_aptly_connection()
+    # FIXME: do not allow db cleanup while mirroring
     task_id = await apt.mirror_update(base_mirror, base_mirror_version, mirror, version)
 
     logger.info("start update progress: aptly task %s", task_id)
@@ -752,6 +755,11 @@ class AptlyWorker:
 
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
 
+    async def _cleanup(self, args, session):
+        logger.info("aptly worker: running cleanup")
+        apt = get_aptly_connection()
+        await apt.cleanup()
+
     async def run(self):
         """
         Run the worker task.
@@ -804,6 +812,13 @@ class AptlyWorker:
                         if args:
                             handled = True
                             await self._init_repository(args, session)
+
+                    if not handled:
+                        args = task.get("cleanup")
+                        # FIXME: check args is []
+                        # FIXME: postpone if mirroring is active
+                        handled = True
+                        await self._cleanup(args, session)
 
                     if not handled:
                         logger.error("aptly worker got unknown task %s", str(task))

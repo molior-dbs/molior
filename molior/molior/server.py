@@ -6,6 +6,8 @@ import concurrent.futures
 import click
 from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
+from async_cron.job import CronJob
+from async_cron.schedule import Scheduler
 
 from molior.molior.logger import get_logger
 from molior.molior.worker import Worker
@@ -62,6 +64,10 @@ def run_backend_thread(backend):
     logger.info("backend thread terminated")
 
 
+async def cleanup_task(aptly_queue):
+    await aptly_queue.put({"cleanup": []})
+
+
 async def main(backend):
     # OBSOLETE schedule any missed builds
     # logger.info("source repository scan: starting")
@@ -85,7 +91,13 @@ async def main(backend):
             await loop.run_in_executor(pool, run_backend_thread, backend)
         logger.info("asyncio threads terminated")
 
-    # FIXME: await futures
+    # FIXME: await futures ?
+
+    cleanup_sched = Scheduler(locale="en_US")
+    # cleanup_job = CronJob(name='cleanup').every().hour.at(":34").go(cleanup_task, (5), age=99)
+    cleanup_job = CronJob(name='cleanup').every(5).hours.go(cleanup_task, aptly_queue=aptly_queue)
+    cleanup_sched.add_job(cleanup_job)
+    asyncio.ensure_future(cleanup_sched.start())
 
 
 def create_cirrina_context(cirrina):

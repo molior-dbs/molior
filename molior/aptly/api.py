@@ -811,3 +811,20 @@ class AptlyApi:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
+
+    async def cleanup(self):
+        """
+        Aptly DB Cleanup
+
+        Args:
+
+        Returns:
+        """
+        async with aiohttp.ClientSession() as http:
+            async with http.post(
+                self.__api_url + "/db/cleanup",
+                headers=self.headers,
+                auth=self.auth,
+            ) as resp:
+                if not self.__check_status_code(resp.status):
+                    self.__raise_aptly_error(resp)
