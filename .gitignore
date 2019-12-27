@@ -16,6 +16,7 @@ debian/molior-client-http/
 debian/molior-node-amd64/
 debian/molior-node-amd64-efi/
 debian/molior-node-arm64-efi/
+debian/molior-vbox/
 .pybuild/
 molior.egg-info
 debian/debhelper-build-stamp
