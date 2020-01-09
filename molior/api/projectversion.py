@@ -124,6 +124,14 @@ async def get_projectversions(request):
           in: query
           required: false
           type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
         - name: dependant_id
           in: query
           required: false
@@ -136,7 +144,9 @@ async def get_projectversions(request):
         "500":
             description: internal server error
     """
-    project_id = request.GET.getone("exclude_id", None)
+    project_id = request.GET.getone("project_id", None)
+    project_name = request.GET.getone("project_name", None)
+    exclude_id = request.GET.getone("exclude_id", None)
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     dependant_id = request.GET.getone("dependant_id", None)
@@ -147,9 +157,16 @@ async def get_projectversions(request):
         .filter(ProjectVersion.is_deleted == False)  # noqa: E712
     )
 
-    projectversion_id = parse_int(project_id)
-    if projectversion_id:
-        query = query.filter(Project.id != project_id)
+    exclude_id = parse_int(exclude_id)
+    if exclude_id:
+        query = query.filter(Project.id != exclude_id)
+
+    project_id = parse_int(project_id)
+    if project_id:
+        query = query.filter(Project.id == project_id)
+
+    if project_name:
+        query = query.filter(Project.name == project_name)
 
     if basemirror_id:
         query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
@@ -157,6 +174,7 @@ async def get_projectversions(request):
         query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
 
     if dependant_id:
+        logger.info("dependant_id")
         p_version = (
             request.cirrina.db_session.query(
                 ProjectVersion
@@ -181,6 +199,153 @@ async def get_projectversions(request):
         results.append(projectversion_dict)
 
     data = {"total_result_count": nb_projectversions, "results": results}
+
+    return web.json_response(data)
+
+
+@app.http_get("/api2/projectversions")
+@app.authenticated
+async def get_projectversions2(request):
+    """
+    Returns a list of projectversions.
+
+    ---
+    description: Returns a list of projectversions.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: basemirror_id
+          in: query
+          required: false
+          type: integer
+        - name: is_basemirror
+          in: query
+          required: false
+          type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    project_id = request.GET.getone("project_id", None)
+    project_name = request.GET.getone("project_name", None)
+    basemirror_id = request.GET.getone("basemirror_id", None)
+    is_basemirror = request.GET.getone("isbasemirror", False)
+    filter_name = request.GET.getone("q", None)
+    try:
+        page = int(request.GET.getone("page"))
+    except (ValueError, KeyError):
+        page = 1
+
+    try:
+        page_size = int(request.GET.getone("page_size"))
+    except (ValueError, KeyError):
+        page_size = 10
+
+    query = (
+        request.cirrina.db_session.query(ProjectVersion)
+        .join(Project)
+    )
+
+    project_id = parse_int(project_id)
+    if project_id:
+        query = query.filter(Project.id == project_id)
+
+    if project_name:
+        query = query.filter(Project.name == project_name)
+
+    if filter_name:
+        query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
+
+    if basemirror_id:
+        query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
+    elif is_basemirror:
+        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
+
+    query = query.order_by(Project.name, ProjectVersion.name)
+
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    logger.info(query)
+
+    projectversions = query.all()
+    nb_projectversions = query.count()
+
+    results = []
+
+    for projectversion in projectversions:
+        projectversion_dict = projectversion_to_dict(projectversion)
+        results.append(projectversion_dict)
+
+    data = {"total_result_count": nb_projectversions, "results": results}
+
+    return web.json_response(data)
+
+
+@app.http_get("/api2/projects/{project_name}/{project_version}")
+@app.authenticated
+async def get_projectversion_byname(request):
+    """
+    Returns a project with version information.
+
+    ---
+    description: Returns information about a project.
+    tags:
+        - Projects
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: project_version
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "404":
+            description: no entry found
+    """
+
+    project_name = request.match_info["project_name"]
+    project_version = request.match_info["project_version"]
+
+    projectversion = (request.cirrina.db_session.query(ProjectVersion)
+                      .filter_by(name=project_version).join(Project).filter_by(name=project_name).first()
+                      )
+    if not projectversion:
+        return web.Response(status=404, text="Project with name {} could not be found!".format(project_name))
+
+    data = {
+        "id": projectversion.id,
+        "name": projectversion.name,
+        "project_name": projectversion.project.name,
+    }
 
     return web.json_response(data)
 

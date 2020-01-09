@@ -141,14 +141,46 @@ async def get_nodes_info(request):
         if search and search not in name:
             continue
 
-        load = ""
-        for l in build_nodes[name]["load"]:
-            if load:
-                load += ", "
-            load += str(l)
-        build_nodes[name]["load"] = load
+        # load = ""
+        # for l in build_nodes[name]["load"]:
+        #     if load:
+        #         load += ", "
+        #     load += str(l)
+        # build_nodes[name]["load"] = load
         results.append({**build_nodes[name], **{"name": name}})
 
     result_page = results[page_size * (page - 1):page_size*page]
     data = {"total_result_count": len(results), "results": result_page}
     return web.json_response(data)
+
+
+@app.http_get("/api/node/{name}")
+async def get_node(request):
+    """
+    Returns info about the build node
+
+    ---
+    description: Returns info about the build nodes
+    tags:
+        - Status
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    node_name = request.match_info["name"]
+
+    b = Backend()
+    backend = b.get_backend()
+    build_nodes = backend.get_nodes_info()
+
+    if node_name not in build_nodes:
+        return web.Response(text="Node not found", status=404)
+
+    node = build_nodes[node_name]
+    node["name"] = node_name
+
+    return web.json_response(node)

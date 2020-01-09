@@ -5,6 +5,7 @@ database model.
 from datetime import datetime
 from aiohttp import web
 from sqlalchemy.sql import func, or_
+from sqlalchemy.orm import aliased
 import logging
 import uuid
 
@@ -140,7 +141,7 @@ async def get_builds(request):
           in: query
           required: false
           type: integer
-        - name: per_page
+        - name: page_size
           in: query
           required: false
           type: integer
@@ -524,7 +525,19 @@ FROM descendants order by id;
     # Count builds
     nb_builds = builds.count()  # pylint: disable=no-member
 
-    builds = builds.order_by(Build.id.desc())
+    # sort hierarchically
+
+    # select id, parent_id, sourcename, buildtype, (select b2.parent_id from build b2
+    # where b2.id = b. parent_id) as grandparent_id, coalesce(parent_id, id, 7) from
+    # build b order by coalesce((select b2.parent_id from build b2 where b2.id = b.
+    # parent_id), b.parent_id, b.id)desc , b.id;
+
+    parent = aliased(Build)
+    builds = builds.outerjoin(parent, parent.id == Build.parent_id)
+
+    builds = builds.order_by(func.coalesce(parent.parent_id, Build.parent_id, Build.id).desc(), Build.id)
+    logger.info(builds)
+
     # Apply pagination
     if page and per_page:
         builds = builds.offset(page * per_page)

@@ -246,7 +246,7 @@ async def get_mirrors(request):
     nb_results = query.count()
 
     if page is not None and page_size:
-        query = query.offset(page * page_size)
+        query = query.offset((page - 1) * page_size)
         query = query.limit(page_size)
 
     results = query.all()
@@ -282,6 +282,86 @@ async def get_mirrors(request):
         )
 
     return web.json_response(data)
+
+
+@app.http_get("/api/mirror/{name}/{version}")
+@app.authenticated
+async def get_mirror(request):
+    """
+    Returns all mirrors from database.
+
+    ---
+    description: Returns mirrors from database.
+    tags:
+        - Mirrors
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: page
+          in: query
+          required: false
+          type: integer
+          default: 1
+          description: page number
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+          default: 10
+          description: max. mirrors per page
+        - name: q
+          in: query
+          required: false
+          type: string
+          description: filter criteria
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: bad request
+    """
+    mirror_name = request.match_info["name"]
+    mirror_version = request.match_info["version"]
+
+    query = request.cirrina.db_session.query(ProjectVersion)
+    query = query.join(Project, Project.id == ProjectVersion.project_id)
+    query = query.filter(Project.is_mirror == "true",
+                         Project.name == mirror_name,
+                         ProjectVersion.name == mirror_version)
+
+    mirror = query.first()
+
+    if not mirror:
+        return web.Response(text="Mirror not found", status=404)
+
+    apt_url = mirror.get_apt_repo(url_only=True)
+    base_mirror_url = str()
+    if not mirror.project.is_basemirror and mirror.buildvariants:
+        # FIXME: only one buildvariant supported
+        base_mirror = mirror.buildvariants[0].base_mirror
+        base_mirror_url = base_mirror.get_apt_repo(url_only=True)
+
+    result = {
+        "id": mirror.id,
+        "name": mirror.project.name,
+        "version": mirror.name,
+        "url": mirror.mirror_url,
+        "base_mirror": base_mirror_url,
+        "distribution": mirror.mirror_distribution,
+        "components": mirror.mirror_components,
+        "is_basemirror": mirror.project.is_basemirror,
+        "architectures": mirror.mirror_architectures[1:-1],
+        "is_locked": mirror.is_locked,
+        "with_sources": mirror.mirror_with_sources,
+        "with_installer": mirror.mirror_with_installer,
+        "project_id": mirror.project.id,
+        "state": mirror.mirror_state,
+        "apt_url": apt_url,
+    }
+
+    return web.json_response(result)
 
 
 @app.http_delete("/api/mirror/{id}")
