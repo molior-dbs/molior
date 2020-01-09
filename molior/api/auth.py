@@ -25,6 +25,8 @@ async def auth_admin(request, user, passwd):
     Returns:
         bool: True if successfully authenticated, otherwise False.
     """
+    if not user:
+        return False
     user = user.lower()
     if user == "admin":
         config = Configuration()
@@ -50,7 +52,9 @@ async def authenticate(request, user, passwd):
     Returns:
         bool: True if successfully authenticated, otherwise False.
     """
-    user = user.lower()
+    if not user:
+        return False
+    user = user.lower()  # FIXME: move to cirrina
     if user == "admin":
         logger.info("admin account from LDAP not allowed")
         return False
