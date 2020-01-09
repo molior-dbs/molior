@@ -12,7 +12,7 @@ from .messagetypes import Subject, Event, Action
 from .livelogger import LiveLogger
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 async def start_livelogger(websocket, data):

@@ -13,7 +13,7 @@ from .app import app
 from .messagetypes import Subject, Event
 from molior.molior.auth import Auth
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 @app.http_get("/api/users")

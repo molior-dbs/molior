@@ -10,7 +10,7 @@ from molior.model.userrole import UserRole
 
 from .inputparser import parse_int
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 def check_admin(web_session, db_session):

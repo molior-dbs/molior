@@ -13,7 +13,7 @@ from molior.model.buildtask import BuildTask
 
 from .app import app
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 if not os.environ.get("IS_SPHINX", False):
     config = Configuration()

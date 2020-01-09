@@ -8,7 +8,7 @@ from aiohttp import web
 from molior.model.userrole import USER_ROLES
 from .app import app
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 @app.http_get("/api/userroles")

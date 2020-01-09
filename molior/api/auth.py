@@ -10,7 +10,7 @@ from molior.model.user import User
 from molior.molior.auth import Auth
 from .app import app
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 @app.auth_handler

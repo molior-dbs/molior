@@ -14,7 +14,7 @@ from molior.molior.configuration import Configuration
 from .app import app
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("molior-web")
+logger = logging.getLogger("molior")
 
 
 @app.http_post("/api/build/gitlab")

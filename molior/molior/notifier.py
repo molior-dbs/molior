@@ -1,5 +1,5 @@
 """
-Provides functions to send notifications to molior-web clients
+Provides functions to send notifications to molior web clients
 """
 import socket
 from pathlib import Path

@@ -1,5 +1,5 @@
 """
-Provides the molior-web LiveLogger class.
+Provides the molior LiveLogger class.
 """
 import asyncio
 import json
@@ -7,12 +7,12 @@ import logging
 
 from .messagetypes import Subject, Event
 
-logger = logging.getLogger("molior-web")
+logger = logging.getLogger("molior")
 
 
 class LiveLogger:
     """
-    Provides helper functions for livelogging on molior-web.
+    Provides helper functions for livelogging on molior.
     """
 
     def __init__(self, sender, file_path):

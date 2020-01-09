@@ -20,7 +20,7 @@ from .app import app
 from .inputparser import parse_int
 from .helper.hook import get_hook_triggers
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 def get_last_gitref(db_session, repo, projectversion):

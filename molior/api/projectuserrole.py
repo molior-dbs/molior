@@ -14,7 +14,7 @@ from molior.model.userrole import UserRole, USER_ROLES
 from .app import app
 from .messagetypes import Subject, Event
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 @app.http_get("/api/projects/{project_id}/users")

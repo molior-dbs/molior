@@ -119,7 +119,7 @@ def destroy_cirrina_context(cirrina):
 @click.option("--debug", default=False, help="Enable debug")
 def mainloop(host, port, debug):
     """
-    Starts the molior-web app.
+    Starts the molior app.
     """
     moliorapi.set_context_functions(create_cirrina_context, destroy_cirrina_context)
     moliorapi.run(host, port, logger=logger, debug=debug)

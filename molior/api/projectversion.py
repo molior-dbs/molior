@@ -21,7 +21,7 @@ from .inputparser import parse_int
 from .helper.buildvariant import get_buildvariants
 from .helper.validator import is_name_valid
 
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 def get_projectversion_deps_manually(projectversion, to_dict=True):

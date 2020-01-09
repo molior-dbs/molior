@@ -24,7 +24,7 @@ from molior.molior.notifier import build_added
 from .app import app
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("molior-web")
+logger = logging.getLogger("molior")
 
 
 def can_rebuild(build, web_session, db_session):

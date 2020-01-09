@@ -1,11 +1,11 @@
 """
-Provides the molior-web message types.
+Provides the molior message types.
 """
 from enum import Enum
 
 
 class Subject(Enum):
-    """Provides the molior-web subject types"""
+    """Provides the molior subject types"""
 
     websocket = 1
     eventwatch = 2
@@ -18,7 +18,7 @@ class Subject(Enum):
 
 
 class Event(Enum):
-    """Provides the molior-web event types"""
+    """Provides the molior event types"""
 
     added = 1
     changed = 2
@@ -27,7 +27,7 @@ class Event(Enum):
 
 
 class Action(Enum):
-    """Provides the molior-web action types"""
+    """Provides the molior action types"""
 
     add = 1
     change = 2

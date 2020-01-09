@@ -16,7 +16,7 @@ from molior.molior.utils import get_aptly_connection
 
 from .app import app
 
-logger = logging.getLogger("molior-web")
+logger = logging.getLogger("molior")
 
 
 def error(status, msg, *args):

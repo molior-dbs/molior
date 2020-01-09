@@ -22,14 +22,6 @@ loggers:
         level: INFO
         propagate: true
 
-    molior-web:
-        level: INFO
-        propagate: true
-
-    git.cmd:
-        level: WARNING
-        propagate: true
-
     asyncio:
         level: WARNING
         propagate: true
