@@ -6,6 +6,7 @@ from functools import wraps
 import cirrina
 from aiohttp import web
 
+from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 
 from .userrolehelper import check_admin, check_user_role
@@ -91,29 +92,34 @@ class MoliorApp(cirrina.Server):  # pylint: disable=too-few-public-methods
                 project_id = request.match_info.get("project_id")
                 projectversion_id = request.match_info.get("projectversion_id")
 
-                project_id = parse_int(project_id)
-                projectversion_id = parse_int(projectversion_id)
-
                 if not project_id and not projectversion_id:
                     return web.Response(status=403)
 
                 if not project_id and projectversion_id:
-                    pversion = (
-                        request.cirrina.db_session.query(ProjectVersion)
-                        .filter(  # pylint: disable=no-member
-                            ProjectVersion.id == projectversion_id
-                        )
-                        .first()
-                    )
-                    project_id = pversion.project.id
+                    pv = request.cirrina.db_session.query(ProjectVersion).filter(
+                                        ProjectVersion.id == parse_int(projectversion_id)).first()
+                    if pv:
+                        project_id = pv.project.id
+                else:
+                    # try finting project by name
+                    p = request.cirrina.db_session.query(Project).filter(
+                                        Project.name == project_id).first()
+                    if p:
+                        project_id = p.id
+                    else:
+                        # try finting project by id
+                        p = request.cirrina.db_session.query(Project).filter(
+                                            Project.id == parse_int(project_id)).first()
+                        if p:
+                            project_id = p.id
+                        else:
+                            return web.Response(status=403)
 
-                if check_user_role(
-                    request.cirrina.web_session,
-                    request.cirrina.db_session,
-                    project_id,
-                    self.role,
-                    self.allow_admin,
-                ):
+                if check_user_role(request.cirrina.web_session,
+                                   request.cirrina.db_session,
+                                   project_id,
+                                   self.role,
+                                   self.allow_admin):
                     return await func(request)
 
                 return web.Response(status=403)
