@@ -3,8 +3,9 @@ Provides functions to interact with the ProjectVersion
 database model.
 """
 import logging
-from aiohttp import web
 import uuid
+from aiohttp import web
+from sqlalchemy.sql import or_
 
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
 from molior.model.project import Project
@@ -203,7 +204,7 @@ async def get_projectversions(request):
     return web.json_response(data)
 
 
-@app.http_get("/api2/projectversions")
+@app.http_get("/api2/project/{project_id}/versions")
 @app.authenticated
 async def get_projectversions2(request):
     """
@@ -248,8 +249,7 @@ async def get_projectversions2(request):
         "500":
             description: internal server error
     """
-    project_id = request.GET.getone("project_id", None)
-    project_name = request.GET.getone("project_name", None)
+    project_id = request.match_info["project_id"]
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     filter_name = request.GET.getone("q", None)
@@ -268,12 +268,8 @@ async def get_projectversions2(request):
         .join(Project)
     )
 
-    project_id = parse_int(project_id)
     if project_id:
-        query = query.filter(Project.id == project_id)
-
-    if project_name:
-        query = query.filter(Project.name == project_name)
+        query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
 
     if filter_name:
         query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
@@ -286,7 +282,6 @@ async def get_projectversions2(request):
     query = query.order_by(Project.name, ProjectVersion.name)
 
     query = query.offset((page - 1) * page_size).limit(page_size)
-    logger.info(query)
 
     projectversions = query.all()
     nb_projectversions = query.count()
@@ -345,6 +340,7 @@ async def get_projectversion_byname(request):
         "id": projectversion.id,
         "name": projectversion.name,
         "project_name": projectversion.project.name,
+        "apt_url": projectversion.get_apt_repo(url_only=True)
     }
 
     return web.json_response(data)
@@ -416,10 +412,10 @@ async def create_projectversions(request):
     consumes:
         - application/json
     parameters:
-        - name: project_id
+        - name: project
           in: path
           required: true
-          type: integer
+          type: string
         - name: body
           in: body
           required: true
@@ -451,7 +447,7 @@ async def create_projectversions(request):
     name = params.get("name")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
-    project_id = parse_int(request.match_info["project_id"])
+    project_id = request.match_info["project_id"]
 
     if not project_id:
         return web.Response(status=400, text="No valid project id received")
@@ -466,8 +462,10 @@ async def create_projectversions(request):
         return web.Response(status=400, text="Invalid project name!")
 
     basemirror_name, basemirror_version = basemirror.split("/")
-    project = request.cirrina.db_session.query(Project).filter(Project.id == project_id).first()
 
+    # FIXME: verify valid architectures
+
+    project = request.cirrina.db_session.query(Project).filter(Project.name == project_id).first()
     if not project:
         return web.Response(status=400, text="Project with id '{}' could not be found".format(project_id))
 
