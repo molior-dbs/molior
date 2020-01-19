@@ -166,7 +166,7 @@ async def get_project(request):
     return web.json_response(data)
 
 
-@app.http_get("/api2/projects/{project_name}")
+@app.http_get("/api2/project/{project_name}")
 @app.authenticated
 async def get_project_byname(request):
     """
