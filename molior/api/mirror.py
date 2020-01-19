@@ -179,6 +179,7 @@ async def create_mirror(request):
 
 
 @app.http_get("/api/mirror")
+@app.http_get("/api/mirrors")
 @app.authenticated
 async def get_mirrors(request):
     """
@@ -271,7 +272,7 @@ async def get_mirrors(request):
                 "distribution": mirror.mirror_distribution,
                 "components": mirror.mirror_components,
                 "is_basemirror": mirror.project.is_basemirror,
-                "architectures": mirror.mirror_architectures[1:-1],
+                "architectures": mirror.mirror_architectures[1:-1].split(","),
                 "is_locked": mirror.is_locked,
                 "with_sources": mirror.mirror_with_sources,
                 "with_installer": mirror.mirror_with_installer,
