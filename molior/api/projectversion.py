@@ -77,28 +77,21 @@ def projectversion_to_dict(projectversion):
         dict: The dict which can be processed by json_response
 
     """
-    archs = []
-    if projectversion.project.is_mirror and projectversion.mirror_architectures:
-        archs = projectversion.mirror_architectures[1:-1].split(",")
-
-    projectversion_dict = {
+    return {
         "id": projectversion.id,
         "name": projectversion.name,
+        "project_name": projectversion.project.name,
+        "apt_url": projectversion.get_apt_repo(url_only=True),
         "project": {
-            "name": projectversion.project.name,
             "id": projectversion.project.id,
+            "name": projectversion.project.name,
             "description": projectversion.project.description,
-            "is_mirror": projectversion.project.is_mirror,
-            "is_basemirror": projectversion.project.is_basemirror,
         },
-        "apt_url": projectversion.get_apt_repo(),
+        "basemirror": projectversion.buildvariants[0].base_mirror.fullname,
+        "architectures": [b.architecture.name for b in projectversion.buildvariants],
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
-        "mirror_state": projectversion.mirror_state,
-        "mirror_architectures": archs,
     }
-
-    return projectversion_dict
 
 
 @app.http_get("/api/projectversions")
@@ -298,7 +291,7 @@ async def get_projectversions2(request):
     return web.json_response(data)
 
 
-@app.http_get("/api2/projects/{project_name}/{project_version}")
+@app.http_get("/api2/project/{project_name}/{project_version}")
 @app.authenticated
 async def get_projectversion_byname(request):
     """
@@ -331,19 +324,13 @@ async def get_projectversion_byname(request):
     project_name = request.match_info["project_name"]
     project_version = request.match_info["project_version"]
 
-    projectversion = (request.cirrina.db_session.query(ProjectVersion)
-                      .filter_by(name=project_version).join(Project).filter_by(name=project_name).first()
-                      )
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter_by(
+            name=project_version).join(Project).filter_by(
+            name=project_name).first()
     if not projectversion:
         return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
 
-    data = {
-        "id": projectversion.id,
-        "name": projectversion.name,
-        "project_name": projectversion.project.name,
-        "apt_url": projectversion.get_apt_repo(url_only=True)
-    }
-
+    data = projectversion_to_dict(projectversion)
     return web.json_response(data)
 
 
