@@ -245,9 +245,6 @@ async def get_repositories(request):
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-                        "last_gitref": get_last_gitref(
-                            request.cirrina.db_session, repository, projectversion
-                        ),
                         "architectures": get_architectures(
                             request.cirrina.db_session, repository, projectversion
                         ),
@@ -289,9 +286,6 @@ async def get_repositories(request):
                             "id": projectversion.id,
                             "name": projectversion.project.name,
                             "version": projectversion.name,
-                            "last_gitref": get_last_gitref(
-                                request.cirrina.db_session, repository, projectversion
-                            ),
                         }
                         for projectversion in repository.projectversions
                     ],
