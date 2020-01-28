@@ -24,19 +24,7 @@ logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 def get_last_gitref(db_session, repo, projectversion):
-    last_build = (
-        db_session.query(Build)
-        .join(BuildConfiguration)
-        .filter(
-            BuildConfiguration.sourcerepositories.any(SourceRepository.id == repo.id),
-            BuildConfiguration.projectversions.any(
-                ProjectVersion.id == projectversion.id
-            ),
-        )
-        .order_by(Build.id.desc())
-        .first()
-    )
-
+    last_build = db_session.query(Build).filter(Build.sourcerepository_id == repo.id, Build.buildtype == "source").order_by(Build.id.desc()).first()
     if last_build:
         return last_build.git_ref
     return None
@@ -206,92 +194,115 @@ async def get_repositories(request):
 
     data = {"total_result_count": nb_repositories}
 
+    projectversion = None
+    if project_version_id is not None:
+        projectversion = (
+        request.cirrina.db_session.query(ProjectVersion)
+        .filter(ProjectVersion.id == project_version_id)
+        .first()
+        )
+
     if not count_only:
-        if project_version_id is not None:
-            projectversion = (
-                request.cirrina.db_session.query(ProjectVersion)
-                .filter(ProjectVersion.id == project_version_id)
-                .first()
-            )
-            data["results"] = [
-                {
-                    "id": repository.id,
-                    "name": repository.name,
-                    "url": repository.url,
-                    "state": repository.state,
-                    "hooks": [
-                        {
-                            "id": hook.id,
-                            "url": hook.url,
-                            "body": hook.body,
-                            "method": hook.method,
-                            "enabled": hook.enabled,
-                            "triggers": get_hook_triggers(hook),
-                        }
-                        for hook in repository.hooks
-                    ],
-                    "dependencies": [
-                        {
-                            "id": dependency.id,
-                            "name": dependency.name,
-                            "url": dependency.url,
-                            "dependencies": get_dependencies_by_sourcerepository(
-                                request.cirrina.db_session, dependency.id
-                            ),
-                        }
-                        for dependency in repository.dependencies
-                    ],
-                    "projectversion": {
+        data["results"] = []
+        for repository in repositories:
+            repoinfo = {
+                "id": repository.id,
+                "name": repository.name,
+                "url": repository.url,
+                "state": repository.state,
+                "hooks": [
+                    {
+                        "id": hook.id,
+                        "url": hook.url,
+                        "body": hook.body,
+                        "method": hook.method,
+                        "enabled": hook.enabled,
+                        "triggers": get_hook_triggers(hook),
+                    }
+                    for hook in repository.hooks
+                ],
+                "dependencies": [
+                    {
+                        "id": dependency.id,
+                        "name": dependency.name,
+                        "url": dependency.url,
+                        "dependencies": get_dependencies_by_sourcerepository(
+                            request.cirrina.db_session, dependency.id
+                        ),
+                    }
+                    for dependency in repository.dependencies
+                ],
+            }
+            if projectversion:
+                repoinfo.update( {
+                "projectversion": {
+                    "id": projectversion.id,
+                    "name": projectversion.project.name,
+                    "version": projectversion.name,
+                    "last_gitref": get_last_gitref(
+                        request.cirrina.db_session, repository, projectversion
+                    ),
+                    "architectures": get_architectures(
+                        request.cirrina.db_session, repository, projectversion
+                    ),
+                }})
+            else:
+                repoinfo.update( {"projectversions": [
+                    {
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-                        "architectures": get_architectures(
-                            request.cirrina.db_session, repository, projectversion
+#                        "last_gitref": get_last_gitref(
+#                            request.cirrina.db_session, repository, projectversion
+#                        ),
+                    }
+                    for projectversion in repository.projectversions
+               ]})
+            data["results"].append(repoinfo)
+        return web.json_response(data)
+
+        data["results"] = [
+            {
+                "id": repository.id,
+                "name": repository.name,
+                "url": repository.url,
+                "state": repository.state,
+                "hooks": [
+                    {
+                        "id": hook.id,
+                        "url": hook.url,
+                        "body": hook.body,
+                        "method": hook.method,
+                        "enabled": hook.enabled,
+                        "triggers": get_hook_triggers(hook),
+                    }
+                    for hook in repository.hooks
+                ],
+                "dependencies": [
+                    {
+                        "id": dependency.id,
+                        "name": dependency.name,
+                        "url": dependency.url,
+                        "dependencies": get_dependencies_by_sourcerepository(
+                            request.cirrina.db_session, dependency.id
                         ),
-                    },
-                }
-                for repository in repositories
-            ]
-        else:
-            data["results"] = [
-                {
-                    "id": repository.id,
-                    "name": repository.name,
-                    "url": repository.url,
-                    "state": repository.state,
-                    "hooks": [
-                        {
-                            "id": hook.id,
-                            "url": hook.url,
-                            "body": hook.body,
-                            "method": hook.method,
-                            "enabled": hook.enabled,
-                            "triggers": get_hook_triggers(hook),
-                        }
-                        for hook in repository.hooks
-                    ],
-                    "dependencies": [
-                        {
-                            "id": dependency.id,
-                            "name": dependency.name,
-                            "url": dependency.url,
-                            "dependencies": get_dependencies_by_sourcerepository(
-                                request.cirrina.db_session, dependency.id
-                            ),
-                        }
-                        for dependency in repository.dependencies
-                    ],
-                    "projectversions": [
-                        {
-                            "id": projectversion.id,
-                            "name": projectversion.project.name,
-                            "version": projectversion.name,
-                        }
-                        for projectversion in repository.projectversions
-                    ],
-                }
-                for repository in repositories
-            ]
+                    }
+                    for dependency in repository.dependencies
+                ],
+                "projectversions": [
+                    {
+                        "id": projectversion.id,
+                        "name": projectversion.project.name,
+                        "version": projectversion.name,
+#                        "last_gitref": get_last_gitref(
+#                            request.cirrina.db_session, repository, projectversion
+#                        ),
+                    }
+                    for projectversion in repository.projectversions
+                ],
+            }
+            for repository in repositories
+        ]
 
     return web.json_response(data)
 
