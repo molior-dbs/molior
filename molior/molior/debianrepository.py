@@ -222,7 +222,7 @@ class DebianRepository:
         non_ci_packages = [pkg for pkg in pkgs if "+git" not in pkg]
         package_refs = ci_packages if ci_build else non_ci_packages
 
-        ci_packages = await self.__remove_old_packages(ci_packages)
+        # ci_packages = await self.__remove_old_packages(ci_packages)
 
         logger.debug("non-ci packages: %s", str(non_ci_packages))
         logger.debug("ci packages: %s", str(ci_packages))
