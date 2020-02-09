@@ -6,12 +6,15 @@ import json
 import logging
 from aiohttp import web
 import uuid
+import giturlparse
+from sqlalchemy.sql import or_
 
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
 from molior.model.buildvariant import BuildVariant
 from molior.model.buildconfiguration import BuildConfiguration
+from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.sourepprover import SouRepProVer
 from molior.molior.notifier import build_added
@@ -87,10 +90,14 @@ async def get_repositories(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: q
+        - name: name
           in: query
           required: false
-          type: object
+          type: string
+        - name: url
+          in: query
+          required: false
+          type: string
         - name: distinct
           in: query
           required: false
@@ -306,6 +313,162 @@ async def get_repositories(request):
         ]
 
     return web.json_response(data)
+
+
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/repositories")
+@app.authenticated
+async def get_repositories2(request):
+    """
+    Returns source repositories with the given filters applied.
+
+    ---
+    description: Returns a repository.
+    tags:
+        - SourceRepositories
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: name
+          in: query
+          required: false
+          type: string
+        - name: url
+          in: query
+          required: false
+          type: string
+        - name: distinct
+          in: query
+          required: false
+          type: array
+        - name: project_version_id
+          in: query
+          required: false
+          type: integer
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: per_page
+          in: query
+          required: false
+          type: integer
+        - name: count_only
+          in: query
+          required: false
+          type: boolean
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    project_id = request.match_info["project_id"]
+    projectversion_id = request.match_info["projectversion_id"]
+    filter_url = request.GET.getone("filter_url", "")
+
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(
+            ProjectVersion.name == projectversion_id).join(Project).filter(
+            Project.name == project_id).first()
+    if not projectversion:
+        return ErrorResponse(404, "Project with name {} could not be found".format(project_id))
+
+    query = request.cirrina.db_session.query(SourceRepository)
+    query = query.filter(SourceRepository.projectversions.any(id=projectversion.id))
+    if filter_url:
+        query = query.filter(SourceRepository.url.like("%{}%".format(filter_url)))
+
+    count = query.count()
+    query = query.order_by(SourceRepository.name)
+    query = paginate(request, query)
+    results = query.all()
+
+    data = {"total_result_count": count, "results": []}
+    data["results"] = [
+        {
+            "id": item.id,
+            "name": item.name,
+            "url": item.url,
+            "state": item.state,
+            "last_gitref": get_last_gitref(
+                    request.cirrina.db_session, item, projectversion
+            ),
+            "architectures": get_architectures(
+                request.cirrina.db_session, item, projectversion
+            ),
+        }
+        for item in results
+    ]
+    return web.json_response(data)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/repositories")
+@app.req_role(["member", "owner"])
+async def add_repository(request):
+    """
+    Adds given sourcerepositories to the given
+    projectversion.
+
+    ---
+    description: Adds given sourcerepositories to given projectversion.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/json
+    parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: sourcerepository_id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                buildvariants:
+                    type: array
+                    example: [1, 2]
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid data received.
+    """
+#    project_id = request.match_info["project_id"]
+#    projectversion_id = request.match_info["projectversion_id"]
+    params = await request.json()
+    url = params.get("url", "")
+    architectures = params.get("architectures", [])
+
+    if not url:
+        return ErrorResponse(400, "No URL recieved")
+    if not architectures:
+        return ErrorResponse(400, "No architectures recieved")
+
+    repoinfo = giturlparse.parse(url)
+    # repoinfo.resource repoinfo.owner repoinfo.name
+
+    query = request.cirrina.db_session.query(SourceRepository).filter(
+            or_(SourceRepository.url == url,
+                SourceRepository.url.like("%{}%{}%{}%".format(repoinfo.resource, repoinfo.owner, repoinfo.name)))
+            )
+    repositories = query.all()
+    logger.info(repositories)
+
+    # entry = SourceRepository(url=url)
+    # entry.state = "new"
+    # request.cirrina.db_session.add(entry)
+    # request.cirrina.db_session.commit()
+
+    return web.Response(status=200, text="SourceRepository added")
 
 
 @app.http_post("/api/repositories")

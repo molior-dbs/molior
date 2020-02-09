@@ -324,9 +324,9 @@ async def get_projectversion_byname(request):
     project_name = request.match_info["project_name"]
     project_version = request.match_info["project_version"]
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter_by(
-            name=project_version).join(Project).filter_by(
-            name=project_name).first()
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(
+            ProjectVersion.name == project_version).join(Project).filter(
+            Project.name == project_name).first()
     if not projectversion:
         return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
 
