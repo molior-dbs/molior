@@ -19,6 +19,7 @@ from molior.molior.notifier import build_added
 from .app import app
 from .inputparser import parse_int
 from .helper.hook import get_hook_triggers
+from .tools import ErrorResponse, paginate
 
 logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
@@ -349,13 +350,13 @@ async def post_repositories(request):
         .filter(SourceRepository.url == url)
         .first()
     ):
-        return web.Response(status=400, text="SourceRepoistory already exists.")
+        return ErrorResponse(400, "SourceRepoistory already exists.")
 
     db_deps = []
     for dep in dependencies:
         dep_id = parse_int(dep)
         if not dep_id:
-            return web.Response(status=400, text="Invalid data received.")
+            return ErrorResponse(400, "Invalid data received.")
 
         db_dep = (
             request.cirrina.db_session.query(
@@ -424,7 +425,7 @@ async def get_repository(request):
     try:
         repository_id = int(repository_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     repository = (
         request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
@@ -452,7 +453,7 @@ async def get_repository(request):
         versions = repository.projectversions
 
     if not repository:
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
     data = {
         "id": repository.id,
@@ -532,7 +533,7 @@ async def trigger_clone(request):
         repository_id = int(repository_id)
     except (ValueError, TypeError):
         logger.error("trigger_clone error: invalid repository_id received")
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     logger.info("trigger_clone build for repo %d" % repository_id)
 
@@ -543,11 +544,11 @@ async def trigger_clone(request):
     )
     if not repository:
         logger.error("trigger_clone error: repo %d not found" % repository_id)
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
     if repository.state != "error":
         logger.error("trigger_clone error: repo %d not in error state" % repository_id)
-        return web.Response(text="Repository not in error state", status=400)
+        return ErrorResponse(400, "Repository not in error state")
 
     build = Build(
         version=None,
@@ -612,7 +613,7 @@ async def trigger_build(request):
         repository_id = int(repository_id)
     except (ValueError, TypeError):
         logger.error("trigger_build_latest error: invalid repository_id received")
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     repository = (
         request.cirrina.db_session.query(SourceRepository)
@@ -621,7 +622,7 @@ async def trigger_build(request):
     )
     if not repository:
         logger.error("trigger_build_latest error: repo %d not found" % repository_id)
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
     logger.info("trigger_build_latest for repo %d" % repository_id)
 

@@ -11,6 +11,7 @@ from molior.molior.logger import get_logger
 
 from .projectversion import get_projectversion_deps_manually
 from .helper.validator import is_name_valid
+from .tools import ErrorResponse, paginate
 from .app import app
 
 logger = get_logger()
@@ -53,27 +54,11 @@ async def get_projects(request):
         "500":
             description: internal server error
     """
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
     filter_name = request.GET.getone("q", "")
     try:
         count_only = request.GET.getone("count_only").lower() == "true"
     except (ValueError, KeyError):
         count_only = False
-
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page", status=400)
-        page = 1 if page < 1 else page
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page_size", status=400)
-        page_size = 1 if page_size < 1 else page_size
 
     query = (
         request.cirrina.db_session.query(Project)  # pylint: disable=no-member
@@ -85,17 +70,14 @@ async def get_projects(request):
         query = query.filter(Project.name.like("%{}%".format(filter_name)))
 
     nb_results = query.count()
-
-    if page and page_size:
-        results = query.limit(page_size).offset((page - 1) * page_size).all()
-    else:
-        results = query.all()
+    query = paginate(request, query)
+    results = query.all()
 
     data = {"total_result_count": nb_results}
     if not count_only:
         data["results"] = [
-            {"id": project.id, "name": project.name, "description": project.description}
-            for project in results
+            {"id": item.id, "name": item.name, "description": item.description}
+            for item in results
         ]
 
     return web.json_response(data)
@@ -136,13 +118,11 @@ async def get_project(request):
     try:
         project_id = int(project_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for project_id", status=400)
+        return ErrorResponse(400, "Incorrect value for project_id")
 
     project = request.cirrina.db_session.query(Project).filter_by(id=project_id).first()
     if not project:
-        return web.Response(
-            status=404, text="Project with id {} could not be found!".format(project_id)
-        )
+        return ErrorResponse(404, "Project with id {} could not be found!".format(project_id))
 
     versions = (
         request.cirrina.db_session.query(ProjectVersion)
@@ -196,9 +176,7 @@ async def get_project_byname(request):
 
     project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
     if not project:
-        return web.Response(
-            status=404, text="Project with name {} could not be found!".format(project_name)
-        )
+        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
 
     data = {
         "id": project.id,
