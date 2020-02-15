@@ -15,8 +15,9 @@ from molior.model.buildtask import BuildTask
 from molior.model.buildvariant import BuildVariant
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
+from molior.model.projectversion import ProjectVersion, get_projectversion
 from molior.model.sourepprover import SouRepProVer
+from molior.model.architecture import Architecture
 from molior.molior.notifier import build_added
 
 from .app import app
@@ -24,11 +25,12 @@ from .inputparser import parse_int
 from .helper.hook import get_hook_triggers
 from .tools import ErrorResponse, paginate
 
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")
 
 
 def get_last_gitref(db_session, repo, projectversion):
-    last_build = db_session.query(Build).filter(Build.sourcerepository_id == repo.id, Build.buildtype == "source").order_by(Build.id.desc()).first()
+    last_build = db_session.query(Build).filter(Build.sourcerepository_id == repo.id,
+                                                Build.buildtype == "source").order_by(Build.id.desc()).first()
     if last_build:
         return last_build.git_ref
     return None
@@ -204,11 +206,7 @@ async def get_repositories(request):
 
     projectversion = None
     if project_version_id is not None:
-        projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == project_version_id)
-        .first()
-        )
+        projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == project_version_id).first()
 
     if not count_only:
         data["results"] = []
@@ -242,30 +240,30 @@ async def get_repositories(request):
                 ],
             }
             if projectversion:
-                repoinfo.update( {
-                "projectversion": {
-                    "id": projectversion.id,
-                    "name": projectversion.project.name,
-                    "version": projectversion.name,
-                    "last_gitref": get_last_gitref(
-                        request.cirrina.db_session, repository, projectversion
-                    ),
-                    "architectures": get_architectures(
-                        request.cirrina.db_session, repository, projectversion
-                    ),
-                }})
-            else:
-                repoinfo.update( {"projectversions": [
-                    {
+                repoinfo.update({
+                    "projectversion": {
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-#                        "last_gitref": get_last_gitref(
-#                            request.cirrina.db_session, repository, projectversion
-#                        ),
-                    }
-                    for projectversion in repository.projectversions
-               ]})
+                        "last_gitref": get_last_gitref(
+                            request.cirrina.db_session, repository, projectversion
+                            ),
+                        "architectures": get_architectures(
+                            request.cirrina.db_session, repository, projectversion
+                            ),
+                        }
+                    })
+            else:
+                repoinfo.update({"projectversions": [{
+                            "id": projectversion.id,
+                            "name": projectversion.project.name,
+                            "version": projectversion.name,
+                            # "last_gitref": get_last_gitref(
+                            #     request.cirrina.db_session, repository, projectversion
+                            # ),
+                        }
+                        for projectversion in repository.projectversions
+                    ]})
             data["results"].append(repoinfo)
         return web.json_response(data)
 
@@ -302,9 +300,9 @@ async def get_repositories(request):
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-#                        "last_gitref": get_last_gitref(
-#                            request.cirrina.db_session, repository, projectversion
-#                        ),
+                        # "last_gitref": get_last_gitref(
+                        #     request.cirrina.db_session, repository, projectversion
+                        # ),
                     }
                     for projectversion in repository.projectversions
                 ],
@@ -315,9 +313,52 @@ async def get_repositories(request):
     return web.json_response(data)
 
 
-@app.http_get("/api2/project/{project_id}/{projectversion_id}/repositories")
+@app.http_get("/api2/repositories")
 @app.authenticated
 async def get_repositories2(request):
+    """
+    Returns source repositories with the given filters applied.
+
+    ---
+    description: Returns a repository.
+    tags:
+        - SourceRepositories
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: url
+          in: query
+          required: false
+          type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+    """
+    url = request.GET.getone("url", "")
+    repositories = request.cirrina.db_session.query(SourceRepository)
+
+    if url:
+        repositories = repositories.filter(SourceRepository.url.like("%{}%".format(url)))
+
+    count = repositories.count()
+    repositories = repositories.order_by(SourceRepository.name)
+
+    data = {"total_result_count": count, "results": []}
+    for repository in repositories:
+        data["results"].append({
+            "id": repository.id,
+            "name": repository.name,
+            "url": repository.url,
+            "state": repository.state,
+        })
+    return web.json_response(data)
+
+
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/repositories")
+@app.authenticated
+async def get_projectversion_repositories(request):
     """
     Returns source repositories with the given filters applied.
 
@@ -442,8 +483,7 @@ async def add_repository(request):
         "400":
             description: Invalid data received.
     """
-#    project_id = request.match_info["project_id"]
-#    projectversion_id = request.match_info["projectversion_id"]
+    db = request.cirrina.db_session
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
@@ -453,21 +493,50 @@ async def add_repository(request):
     if not architectures:
         return ErrorResponse(400, "No architectures recieved")
 
-    repoinfo = giturlparse.parse(url)
-    # repoinfo.resource repoinfo.owner repoinfo.name
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Project not found")
 
-    query = request.cirrina.db_session.query(SourceRepository).filter(
-            or_(SourceRepository.url == url,
-                SourceRepository.url.like("%{}%{}%{}%".format(repoinfo.resource, repoinfo.owner, repoinfo.name)))
-            )
-    repositories = query.all()
-    logger.info(repositories)
+    try:
+        repoinfo = giturlparse.parse(url)
+    except giturlparse.parser.ParserError:
+        return ErrorResponse(400, "Invalid git URL")
 
-    # entry = SourceRepository(url=url)
-    # entry.state = "new"
-    # request.cirrina.db_session.add(entry)
-    # request.cirrina.db_session.commit()
+    query = db.query(SourceRepository).filter(or_(
+                SourceRepository.url == url,
+                SourceRepository.url.like("%{}%{}%{}%".format(repoinfo.resource, repoinfo.owner, repoinfo.name))
+            ))
+    if query.count() == 1:
+        repo = query.first()
+        if repo not in projectversion.sourcerepositories:
+            projectversion.sourcerepositories.append(repo)
+            db.commit()
+    else:
+        repo = SourceRepository(url=url)
+        repo.state = "new"
+        db.add(repo)
+        projectversion.sourcerepositories.append(repo)
+        db.commit()
 
+    sourepprover_id = db.query(SouRepProVer).filter(
+                          SouRepProVer.c.sourcerepository_id == repo.id,
+                          SouRepProVer.c.projectversion_id == projectversion.id).first().id
+
+    for architecture in architectures:
+        arch = db.query(Architecture).filter(Architecture.name == architecture).first()
+        if not arch:
+            # FIXME: delete new repo
+            return ErrorResponse(400, "Unknown architecture '{}'".format(arch))
+
+        base_mirror_id = projectversion.buildvariants[0].base_mirror_id
+        buildvar = db.query(BuildVariant).filter(
+                       BuildVariant.architecture_id == arch.id,
+                       BuildVariant.base_mirror_id == base_mirror_id).first()
+
+        buildconf = BuildConfiguration(buildvariant=buildvar, sourcerepositoryprojectversion_id=sourepprover_id)
+        db.add(buildconf)
+
+    db.commit()
     return web.Response(status=200, text="SourceRepository added")
 
 
@@ -508,11 +577,7 @@ async def post_repositories(request):
     url = params.get("url")
     dependencies = params.get("dependency_id", [])
 
-    if (
-        request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
-        .filter(SourceRepository.url == url)
-        .first()
-    ):
+    if request.cirrina.db_session.query(SourceRepository).filter(SourceRepository.url == url).first():
         return ErrorResponse(400, "SourceRepoistory already exists.")
 
     db_deps = []

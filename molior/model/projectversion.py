@@ -149,3 +149,13 @@ def get_projectversion_deps(projectversion_id, session):
         projectversion_ids.append(row[1])
 
     return projectversion_ids
+
+
+def get_projectversion(request):
+    project_id = request.match_info["project_id"]
+    projectversion_id = request.match_info["projectversion_id"]
+    return request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+            ProjectVersion.project_id == Project.id,
+            ProjectVersion.name == projectversion_id,
+            Project.name == project_id
+        ).first()

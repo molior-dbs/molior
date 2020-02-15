@@ -569,7 +569,7 @@ async def post_add_repository(request):
     )
     if src_repo not in project_v.sourcerepositories:
         project_v.sourcerepositories.append(src_repo)
-        request.cirrina.db_session.commit()  # pylint: disable=no-member
+        request.cirrina.db_session.commit()
 
     sourepprover_id = (
         (
@@ -652,9 +652,7 @@ async def post_add_repository(request):
     return web.Response(status=200, text="SourceRepository added.")
 
 
-@app.http_delete(
-    "/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}"
-)
+@app.http_delete("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
 @app.req_role(["member", "owner"])
 @app.authenticated
 async def delete_repository(request):
