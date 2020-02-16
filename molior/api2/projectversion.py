@@ -6,7 +6,7 @@ from molior.auth import req_role
 from molior.model.projectversion import ProjectVersion
 from molior.model.project import Project
 from molior.model.buildvariant import BuildVariant
-from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
+from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid, paginate
 
 from ..api.projectversion import projectversion_to_dict
 
@@ -60,35 +60,19 @@ async def get_projectversions2(request):
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     filter_name = request.GET.getone("q", None)
-    try:
-        page = int(request.GET.getone("page"))
-    except (ValueError, KeyError):
-        page = 1
 
-    try:
-        page_size = int(request.GET.getone("page_size"))
-    except (ValueError, KeyError):
-        page_size = 10
-
-    query = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-    )
-
+    query = request.cirrina.db_session.query(ProjectVersion).join(Project)
     if project_id:
         query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
-
     if filter_name:
         query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
-
     if basemirror_id:
         query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
     elif is_basemirror:
         query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
 
     query = query.order_by(Project.name, ProjectVersion.name)
-
-    query = query.offset((page - 1) * page_size).limit(page_size)
+    query = paginate(request, query)
 
     projectversions = query.all()
     nb_projectversions = query.count()

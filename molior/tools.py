@@ -23,21 +23,24 @@ def paginate(request, query):
     if not page:
         return query
 
-    if page:
-        try:
-            page = int(page)
-            if page < 1:
-                page = 1
-        except (ValueError, TypeError):
-            page = 1
+    if not page_size:
+        page_size = request.GET.getone("per_page", None)
+        if not page_size:
+            return query
 
-    if page_size:
-        try:
-            page_size = int(page_size)
-            if page_size < 1:
-                page_size = 10
-        except (ValueError, TypeError):
-            page_size = 1
+    try:
+        page = int(page)
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+
+    try:
+        page_size = int(page_size)
+        if page_size < 1:
+            page_size = 10
+    except (ValueError, TypeError):
+        page_size = 10
 
     return query.limit(page_size).offset((page - 1) * page_size)
 

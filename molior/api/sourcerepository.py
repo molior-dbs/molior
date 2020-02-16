@@ -12,7 +12,7 @@ from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.projectversion import ProjectVersion
 from molior.model.sourepprover import SouRepProVer
 from molior.molior.notifier import build_added
-from molior.tools import ErrorResponse, parse_int, get_hook_triggers
+from molior.tools import ErrorResponse, parse_int, get_hook_triggers, paginate
 
 
 def get_last_gitref(db_session, repo, projectversion):
@@ -99,7 +99,7 @@ async def get_repositories(request):
           in: query
           required: false
           type: integer
-        - name: per_page
+        - name: page_size
           in: query
           required: false
           type: integer
@@ -137,23 +137,7 @@ async def get_repositories(request):
     except (ValueError, KeyError):
         count_only = False
 
-    try:
-        page = int(custom_filter.GET.getone("page"))
-    except (ValueError, KeyError):
-        page = None
-    if page:
-        page = 0 if page < 1 else page
-
-    try:
-        per_page = int(custom_filter.GET.getone("per_page"))
-    except (ValueError, KeyError):
-        per_page = None
-    if per_page:
-        per_page = 1 if per_page < 1 else per_page
-
-    repositories = request.cirrina.db_session.query(
-        SourceRepository
-    )  # pylint: disable=no-member
+    repositories = request.cirrina.db_session.query(SourceRepository)
 
     # Apply project version
     if project_version_id is not None:
@@ -182,12 +166,7 @@ async def get_repositories(request):
     # Count entries
     nb_repositories = repositories.count()  # pylint: disable=no-member
     repositories = repositories.order_by(SourceRepository.name)
-
-    # Apply pagination
-    if page and per_page:
-        repositories = repositories.offset(page * per_page)
-    if per_page:
-        repositories = repositories.limit(per_page)
+    repositories = paginate(request, repositories)
 
     data = {"total_result_count": nb_repositories}
 

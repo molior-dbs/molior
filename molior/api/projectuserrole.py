@@ -7,6 +7,7 @@ from molior.auth import req_role
 from molior.model.project import Project
 from molior.model.user import User
 from molior.model.userrole import UserRole, USER_ROLES
+from molior.tools import paginate
 
 from .messagetypes import Subject, Event
 
@@ -77,24 +78,8 @@ async def get_project_users(request):
     except (ValueError, TypeError):
         return web.Response(status=400, text="Incorrect project_id")
 
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
     filter_name = request.GET.getone("filter_name", "")
     filter_role = request.GET.getone("filter_role", "")
-
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            page = 1
-        page = 1 if page < 1 else page
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            page_size = 10
-        page_size = 1 if page_size < 1 else page_size
 
     project = request.cirrina.db_session.query(Project).filter_by(id=project_id).first()
     if not project:
@@ -122,11 +107,8 @@ async def get_project_users(request):
         if role:
             query = query.filter(UserRole.role == role)
 
-    if page and page_size:
-        roles = query.limit(page_size).offset((page - 1) * page_size).all()
-    else:
-        roles = query.all()
-
+    query = paginate(request, query)
+    roles = query.all()
     nb_roles = query.count()
 
     data = {

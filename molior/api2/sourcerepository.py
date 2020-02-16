@@ -99,7 +99,7 @@ async def get_projectversion_repositories(request):
           in: query
           required: false
           type: integer
-        - name: per_page
+        - name: page_size
           in: query
           required: false
           type: integer

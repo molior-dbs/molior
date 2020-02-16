@@ -15,7 +15,7 @@ from molior.model.sourcerepository import SourceRepository
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.maintainer import Maintainer
-from molior.tools import check_user_role
+from molior.tools import check_user_role, paginate
 from molior.molior.notifier import build_added
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -237,16 +237,6 @@ async def get_builds(request):
         buildvariant_id = int(custom_filter.GET.getone("buildvariant_id"))
     except (ValueError, KeyError):
         buildvariant_id = None
-
-    try:
-        page = int(custom_filter.GET.getone("page"))
-    except (ValueError, KeyError):
-        page = None
-
-    try:
-        per_page = int(custom_filter.GET.getone("per_page"))
-    except (ValueError, KeyError):
-        per_page = None
 
     try:
         project_id = int(custom_filter.GET.getone("project_id"))
@@ -528,13 +518,7 @@ FROM descendants order by id;
     builds = builds.outerjoin(parent, parent.id == Build.parent_id)
 
     builds = builds.order_by(func.coalesce(parent.parent_id, Build.parent_id, Build.id).desc(), Build.id)
-
-    # Apply pagination
-    if page and per_page:
-        builds = builds.offset(page * per_page)
-
-    if per_page:
-        builds = builds.limit(per_page)
+    builds = paginate(request, builds)
 
     data = {"total_result_count": nb_builds, "results": []}
 

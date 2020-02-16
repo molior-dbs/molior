@@ -7,6 +7,7 @@ from molior.auth import Auth, req_admin
 from molior.model.user import User
 from molior.model.userrole import UserRole
 from molior.model.project import Project
+from molior.tools import paginate
 
 from .messagetypes import Subject, Event
 
@@ -72,9 +73,6 @@ async def get_users(request):
       "400":
         description: invalid input where given
     """
-
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
     filter_name = request.GET.getone("q", "")
     filter_admin = request.GET.getone("filter_admin", "false")
 
@@ -83,35 +81,16 @@ async def get_users(request):
     except (ValueError, KeyError):
         count_only = False
 
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page", status=400)
-        page = 1 if page < 1 else page
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page_size", status=400)
-        page_size = 1 if page_size < 1 else page_size
-
     query = request.cirrina.db_session.query(User)
-
     if filter_admin.lower() == "true":
         query = query.filter(User.is_admin)
-
     if filter_name:
         query = query.filter(User.username.like("%{}%".format(filter_name)))
 
     nb_users = query.count()
     query = query.order_by(User.username)
-
-    if page and page_size:
-        users = query.limit(page_size).offset((page - 1) * page_size).all()
-    else:
-        users = query.all()
+    query = paginate(request, query)
+    users = query.all()
 
     data = {"total_result_count": nb_users}
     if not count_only:
