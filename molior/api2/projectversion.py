@@ -1,17 +1,14 @@
-import logging
-
 from aiohttp import web
 from sqlalchemy.sql import or_
 
-from molior.app import app
+from molior.app import app, logger
+from molior.auth import req_role
 from molior.model.projectversion import ProjectVersion
 from molior.model.project import Project
 from molior.model.buildvariant import BuildVariant
 from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
 
 from ..api.projectversion import projectversion_to_dict
-
-logger = logging.getLogger("molior")
 
 
 @app.http_get("/api2/project/{project_id}/versions")
@@ -151,7 +148,7 @@ async def get_projectversion_byname(request):
 
 
 @app.http_post("/api2/project/{project_id}/versions")
-@app.req_role("owner")
+@req_role("owner")
 async def create_projectversions(request):
     """
     Creates a new projectversion.

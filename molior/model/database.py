@@ -1,6 +1,3 @@
-"""
-Provides the molior database.
-"""
 import os
 import yaml
 
@@ -9,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import QueuePool
 
-from molior.molior.logger import get_logger
+from molior.app import logger
 
 CONFIG_PATH = "/etc/molior/molior.yml"
 
@@ -33,16 +30,13 @@ class Database(object):
     """
 
     def __init__(self):
-        self._log = get_logger()
         self._engine = None
         self._db = ""
 
         self._connection = None
 
         if not os.path.exists(CONFIG_PATH):
-            self._log.error(
-                "Could not find molior database configuration: '%s'", CONFIG_PATH
-            )
+            logger.error("Could not find molior database configuration: '%s'", CONFIG_PATH)
 
     def _connect(self):
         """

@@ -1,15 +1,13 @@
-"""
-This module provides the molior ProjectVersion
-database model.
-"""
 from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func, select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
-import molior.model.buildconfiguration  # pylint: disable=unused-import
-import molior.model.sourcerepository  # noqa: F401 pylint: disable=unused-import
+from molior.app import logger
 from molior.molior.configuration import Configuration
-from molior.molior.logger import get_logger
+
+# reeded for relations:
+import molior.model.buildconfiguration  # noqa: F401
+import molior.model.sourcerepository    # noqa: F401
 
 from .project import Project
 from .sourepprover import SouRepProVer
@@ -18,8 +16,6 @@ from .proverbuivar import ProVerBuiVar
 from .database import Base
 
 MIRROR_STATES = ["undefined", "created", "updating", "publishing", "error", "ready"]
-
-logger = get_logger()
 
 
 class ProjectVersion(Base):  # pylint: disable=too-few-public-methods

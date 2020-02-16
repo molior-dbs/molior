@@ -1,19 +1,14 @@
-"""
-Async Backend Worker Task
-"""
-
 import asyncio
+
+from molior.app import logger
+from molior.molior.backend import Backend
+from molior.molior.buildlogger import write_log
 
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from .logger import get_logger
 from .notifier import send_mail_notification
-from molior.molior.backend import Backend
-from molior.molior.buildlogger import write_log
 
-
-logger = get_logger()
 backend_queue = asyncio.Queue()
 
 

@@ -1,7 +1,3 @@
-"""
-This module provides the aptly REST
-api wrapper class.
-"""
 import uuid
 import json
 import asyncio

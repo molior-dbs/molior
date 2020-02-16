@@ -1,16 +1,11 @@
-"""
-Provides the DebianRepository class to interact
-with a debian repository server.
-"""
 import asyncio
+
 from datetime import datetime, timedelta
 
-from .logger import get_logger
+from molior.app import logger
+from molior.aptly import TaskState
 from .utils import get_aptly_connection
 from .configuration import Configuration
-from molior.aptly import TaskState
-
-logger = get_logger()
 
 
 class DebianRepository:

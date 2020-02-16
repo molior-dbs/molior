@@ -1,4 +1,3 @@
-import logging
 import uuid
 
 from datetime import datetime
@@ -6,7 +5,7 @@ from aiohttp import web
 from sqlalchemy.sql import func, or_
 from sqlalchemy.orm import aliased
 
-from molior.app import app
+from molior.app import app, logger
 from molior.model.build import Build, BUILD_STATES
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.buildvariant import BuildVariant
@@ -19,9 +18,7 @@ from molior.model.maintainer import Maintainer
 from molior.tools import check_user_role
 from molior.molior.notifier import build_added
 
-
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("molior")
 
 
 def can_rebuild(build, web_session, db_session):

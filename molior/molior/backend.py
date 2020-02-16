@@ -1,10 +1,8 @@
 import asyncio
 import importlib
 
-from .logger import get_logger
+from molior.app import logger
 from .configuration import Configuration
-
-logger = get_logger()
 
 
 class Backend:

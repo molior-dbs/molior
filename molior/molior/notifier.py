@@ -1,6 +1,3 @@
-"""
-Provides functions to send notifications to molior web clients
-"""
 import socket
 from pathlib import Path
 import aiohttp
@@ -8,14 +5,11 @@ import aiohttp
 import json
 from jinja2 import Template
 
+from molior.app import logger
 from molior.api.messagetypes import Subject, Event
 from .emailer import send_mail
 from .configuration import Configuration
 from .worker_notification import notification_queue
-
-from .logger import get_logger
-
-logger = get_logger()
 
 
 def _get_build_data(build):

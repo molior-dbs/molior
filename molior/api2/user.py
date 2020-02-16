@@ -1,11 +1,7 @@
-import logging
-
 from aiohttp import web
 
 from molior.app import app
 from molior.model.user import User
-
-logger = logging.getLogger("molior")
 
 
 @app.http_get("/api2/user/{username}")

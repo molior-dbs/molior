@@ -1,13 +1,9 @@
-import logging
-
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
 from molior.molior.configuration import Configuration
 from molior.model.user import User
-from molior.molior.auth import Auth
-
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
+from molior.auth import Auth
 
 
 @app.auth_handler

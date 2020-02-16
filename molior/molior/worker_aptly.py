@@ -1,12 +1,10 @@
-"""
-Async Aptly Worker Task
-"""
-
 import asyncio
 import operator
+
 from launchy import Launchy
 from sqlalchemy import or_
 
+from molior.app import logger
 from molior.model.database import Session
 from molior.model.build import Build
 from molior.model.buildvariant import BuildVariant
@@ -19,10 +17,7 @@ from molior.aptly.errors import AptlyError, NotFoundError
 from molior.molior.utils import get_aptly_connection
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.debianrepository import DebianRepository
-from .logger import get_logger
 from ..ops import DebSrcPublish, DebPublish
-
-logger = get_logger()
 
 
 async def startup_mirror(task_queue):

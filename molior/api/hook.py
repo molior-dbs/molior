@@ -162,8 +162,8 @@ async def create_webhook(request):
 
 
 @app.http_put("/api/hooks/{hook_id}")
-# FIXME: req_role
 @app.authenticated
+# FIXME: req_role
 async def update_hook(request):
     """
     Updates a hook

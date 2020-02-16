@@ -1,4 +1,3 @@
-import logging
 import uuid
 import giturlparse
 
@@ -6,6 +5,7 @@ from sqlalchemy.sql import or_
 from aiohttp import web
 
 from molior.app import app
+from molior.auth import req_role
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
@@ -20,8 +20,6 @@ from molior.tools import ErrorResponse, paginate
 
 # FIXME: move to tools/model:
 from ..api.sourcerepository import get_last_gitref, get_architectures
-
-logger = logging.getLogger("molior")
 
 
 @app.http_get("/api2/repositories")
@@ -158,7 +156,7 @@ async def get_projectversion_repositories(request):
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/repositories")
-@app.req_role(["member", "owner"])
+@req_role(["member", "owner"])
 async def add_repository(request):
     """
     Adds given sourcerepositories to the given

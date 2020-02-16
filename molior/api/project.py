@@ -1,15 +1,13 @@
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
+from molior.auth import req_role, req_admin
 from molior.molior.configuration import Configuration
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
-from molior.molior.logger import get_logger
 from molior.tools import ErrorResponse, paginate, is_name_valid
 
 from .projectversion import get_projectversion_deps_manually
-
-logger = get_logger()
 
 
 @app.http_get("/api/projects")
@@ -142,7 +140,7 @@ async def get_project(request):
 
 
 @app.http_post("/api/projects")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def create_project(request):
     """
@@ -200,7 +198,7 @@ async def create_project(request):
 
 @app.http_put("/api/projects/{project_id}")
 @app.authenticated
-@app.req_role("owner")
+@req_role("owner")
 async def update_project(request):
     """
     Update a project.

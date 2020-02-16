@@ -1,15 +1,12 @@
-import logging
-
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
+from molior.auth import req_admin
 from molior.model.build import Build
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.buildvariant import BuildVariant
 from molior.molior.utils import get_aptly_connection
-
-logger = logging.getLogger("molior")
 
 
 def error(status, msg, *args):
@@ -27,7 +24,7 @@ def error(status, msg, *args):
 
 
 @app.http_post("/api/mirror")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def create_mirror(request):
     """
@@ -359,7 +356,7 @@ async def get_mirror(request):
 
 
 @app.http_delete("/api/mirror/{id}")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def delete_mirror(request):
     """
@@ -461,7 +458,7 @@ async def delete_mirror(request):
 
 
 @app.http_put("/api/mirror/{id}")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def put_update_mirror(request):
     """

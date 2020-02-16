@@ -1,15 +1,14 @@
-"""
-Provides the git clone operation
-"""
 import asyncio
-from launchy import Launchy
 import shlex
 import uuid
 import os
 import re
+
+from launchy import Launchy
 from sqlalchemy import or_
 from pathlib import Path
 
+from molior.app import logger
 from molior.model.database import Session
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
@@ -20,7 +19,6 @@ from molior.model.chroot import Chroot
 from molior.model.buildvariant import BuildVariant
 from molior.model.architecture import Architecture
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
-from molior.molior.logger import get_logger
 from molior.molior.utils import get_changelog_attr, strip_epoch_version
 
 from molior.molior.core import (
@@ -36,8 +34,6 @@ from molior.molior.configuration import Configuration
 from molior.molior.worker_backend import backend_queue
 
 from .git import GitCheckout, GetBuildInfo
-
-logger = get_logger()
 
 
 async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):

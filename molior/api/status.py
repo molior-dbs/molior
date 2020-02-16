@@ -1,6 +1,7 @@
 from aiohttp import web
 
 from molior.app import app
+from molior.auth import req_admin
 from molior.version import MOLIOR_VERSION
 from molior.molior.backend import Backend
 
@@ -47,7 +48,7 @@ async def get_status(request):
 
 
 @app.http_post("/api/status/maintenance")
-@app.req_admin
+@req_admin
 async def set_maintenance(request):
     """
     Set maintenance mode and message

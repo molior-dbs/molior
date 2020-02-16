@@ -4,12 +4,13 @@ Provides the main molior server.
 import asyncio
 import concurrent.futures
 import click
+
 from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
 from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
 
-from molior.molior.logger import get_logger
+from molior.app import logger
 from molior.molior.worker import Worker
 from molior.molior.worker_aptly import AptlyWorker
 from molior.molior.worker_backend import BackendWorker, backend_queue
@@ -19,7 +20,7 @@ from molior.app import app
 from molior.version import MOLIOR_VERSION
 
 from molior.molior.backend import Backend
-from molior.molior.auth import Auth
+from molior.auth import Auth
 
 # import api handlers
 import molior.api.build              # noqa: F401
@@ -46,7 +47,6 @@ import molior.api2.projectversion    # noqa: F401
 import molior.api2.sourcerepository  # noqa: F401
 import molior.api2.user              # noqa: F401
 
-logger = get_logger()
 processed_repos = []
 
 loop = asyncio.get_event_loop()

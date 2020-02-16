@@ -1,16 +1,14 @@
-import logging
 import re
 
 from aiohttp.web import Response
 
+from molior.app import logger
 from molior.model.projectversion import ProjectVersion
 from molior.model.project import Project
 from molior.model.buildvariant import BuildVariant
 from molior.model.architecture import Architecture
 from molior.model.user import User
 from molior.model.userrole import UserRole
-
-logger = logging.getLogger("molior")
 
 
 def ErrorResponse(status, msg):

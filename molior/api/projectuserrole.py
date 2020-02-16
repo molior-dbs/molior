@@ -1,16 +1,14 @@
-import logging
 import sqlalchemy.exc
 
 from aiohttp import web
 
 from molior.app import app
+from molior.auth import req_role
 from molior.model.project import Project
 from molior.model.user import User
 from molior.model.userrole import UserRole, USER_ROLES
 
 from .messagetypes import Subject, Event
-
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 
 @app.http_get("/api/projects/{project_id}/users")
@@ -218,7 +216,7 @@ async def get_project_userrole(request):
 
 
 @app.http_put("/api/projects/{project_id}/users/{user_id}")
-@app.req_role("owner")
+@req_role("owner")
 async def upsert_project_user_role(request):
     """
     Set/update a user role for a project.
@@ -317,7 +315,7 @@ async def upsert_project_user_role(request):
 
 
 @app.http_delete("/api/projects/{project_id}/users/{user_id}")
-@app.req_role("owner")
+@req_role("owner")
 async def remove_project_user(request):
     """
     Remove a user role for a project.

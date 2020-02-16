@@ -1,10 +1,8 @@
 import asyncio
 import json
-import logging
 
+from molior.app import logger
 from .messagetypes import Subject, Event
-
-logger = logging.getLogger("molior")
 
 
 class LiveLogger:

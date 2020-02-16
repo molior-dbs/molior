@@ -1,15 +1,14 @@
-import logging
 import os
+
 from aiohttp import web
 from pathlib import Path
 
-from molior.app import app
+from molior.app import app, logger
 from molior.molior.configuration import Configuration
 from molior.model.database import Session
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
 
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 
 if not os.environ.get("IS_SPHINX", False):
     config = Configuration()

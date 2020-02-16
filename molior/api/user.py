@@ -1,17 +1,14 @@
-import logging
 import sqlalchemy.exc
 
 from aiohttp import web
 
 from molior.app import app
+from molior.auth import Auth, req_admin
 from molior.model.user import User
 from molior.model.userrole import UserRole
 from molior.model.project import Project
-from molior.molior.auth import Auth
 
 from .messagetypes import Subject, Event
-
-logger = logging.getLogger("molior")
 
 
 @app.http_get("/api/users")
@@ -182,7 +179,7 @@ async def get_user_byid(request):
 
 
 @app.http_put("/api/users/{user_id}")
-@app.req_admin
+@req_admin
 async def put_user_byid(request):
     """
     Update a user by id (not yet implemented).
@@ -262,7 +259,7 @@ async def put_user_byid(request):
 
 
 @app.http_delete("/api/users/{user_id}")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def delete_user_byid(*_):
     """
@@ -286,7 +283,7 @@ async def delete_user_byid(*_):
 
 
 @app.http_get("/api/users/{user_id}/roles")
-@app.req_admin
+@req_admin
 async def get_user_roles(request):
     """
     Return a list of project/role for a user.
@@ -355,7 +352,7 @@ async def get_user_roles(request):
 
 
 @app.http_post("/api/users")
-@app.req_admin
+@req_admin
 async def create_user(request):
     """
     Create a user

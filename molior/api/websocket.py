@@ -1,15 +1,13 @@
-import logging
 import asyncio
 import json
 
 from pathlib import Path
 
-from molior.app import app
+from molior.app import app, logger
 from .messagetypes import Subject, Event, Action
 from .livelogger import LiveLogger
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
-logger = logging.getLogger("molior")
 
 
 async def start_livelogger(websocket, data):

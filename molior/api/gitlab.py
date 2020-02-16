@@ -1,18 +1,15 @@
-import logging
 import uuid
 
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
 from molior.model.sourcerepository import SourceRepository
 from molior.molior.notifier import build_added
 from molior.molior.configuration import Configuration
 
-
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("molior")
 
 
 @app.http_post("/api/build/gitlab")

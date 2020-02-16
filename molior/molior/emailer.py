@@ -1,18 +1,14 @@
-"""
-Provides functions to send email notifications.
-"""
 import os
 import smtplib
+
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.utils import COMMASPACE, formatdate
 from email.encoders import encode_base64
 
-from .logger import get_logger
+from molior.app import logger
 from .configuration import Configuration
-
-logger = get_logger()
 
 
 def send_mail(receiver, subject, text, files):

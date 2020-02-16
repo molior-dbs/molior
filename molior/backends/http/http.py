@@ -1,12 +1,10 @@
 import asyncio
 import json
 
-from molior.app import app
-from molior.molior.logger import get_logger
+from molior.app import app, logger
 from molior.molior.worker_backend import backend_queue
 from molior.molior.configuration import Configuration
 
-logger = get_logger()
 registry = {"amd64": [], "arm64": []}
 build_tasks = {"amd64": asyncio.Queue(), "arm64": asyncio.Queue()}
 running_nodes = {"amd64": [], "arm64": []}

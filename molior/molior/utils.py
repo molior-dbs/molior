@@ -1,16 +1,12 @@
-"""
-Provides utilities for molior core.
-"""
 import re
 import os
 import shlex
+
 from launchy import Launchy
 
+from molior.app import logger
 from molior.aptly import AptlyApi
 from .configuration import Configuration
-from .logger import get_logger
-
-logger = get_logger()
 
 
 def get_aptly_connection():

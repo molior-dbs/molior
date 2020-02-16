@@ -1,11 +1,7 @@
-import logging
-
 from aiohttp import web
 
 from molior.app import app
 from molior.model.userrole import USER_ROLES
-
-logger = logging.getLogger("molior")
 
 
 @app.http_get("/api/userroles")

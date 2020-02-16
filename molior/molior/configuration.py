@@ -1,12 +1,8 @@
-"""
-This module provides the molior configuration
-"""
-from pathlib import Path
 import yaml
 
-from .logger import get_logger
+from pathlib import Path
 
-logger = get_logger()
+from molior.app import logger
 
 
 class Configuration(object):  # pylint: disable=too-few-public-methods

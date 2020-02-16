@@ -2,10 +2,7 @@ from aiohttp import web
 
 from molior.app import app
 from molior.model.project import Project
-from molior.molior.logger import get_logger
 from molior.tools import ErrorResponse
-
-logger = get_logger()
 
 
 @app.http_get("/api2/project/{project_name}")

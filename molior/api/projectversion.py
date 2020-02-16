@@ -1,9 +1,9 @@
-import logging
 import uuid
 
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
+from molior.auth import req_role
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
 from molior.model.project import Project
 from molior.model.build import Build
@@ -14,8 +14,6 @@ from molior.model.sourepprover import SouRepProVer
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.molior.notifier import build_added
 from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
-
-logger = logging.getLogger("molior")
 
 
 def get_projectversion_deps_manually(projectversion, to_dict=True):
@@ -244,7 +242,7 @@ async def get_projectversion(request):
 
 
 @app.http_post("/api/projects/{project_id}/versions")
-@app.req_role("owner")
+@req_role("owner")
 async def create_projectversions(request):
     """
     Creates a new projectversion.
@@ -354,8 +352,7 @@ async def create_projectversions(request):
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
-@app.req_role(["member", "owner"])
-@app.authenticated
+@req_role(["member", "owner"])
 async def post_add_repository(request):
     """
     Adds given sourcerepositories to the given
@@ -508,8 +505,7 @@ async def post_add_repository(request):
 
 
 @app.http_delete("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
-@app.req_role(["member", "owner"])
-@app.authenticated
+@req_role(["member", "owner"])
 async def delete_repository(request):
     """
     Adds given sourcerepositories to the given
@@ -594,8 +590,7 @@ async def delete_repository(request):
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/clone")
-@app.req_role("owner")
-@app.authenticated
+@req_role("owner")
 async def clone_projectversion(request):
     """
     Clone a given projectversion
@@ -729,8 +724,7 @@ async def clone_projectversion(request):
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/overlay")
-@app.req_role("owner")
-@app.authenticated
+@req_role("owner")
 async def create_projectversion_overlay(request):
     """
     Creates an overlay of a project version
@@ -825,7 +819,7 @@ async def create_projectversion_overlay(request):
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/toggleci")
-@app.req_role("owner")
+@req_role("owner")
 async def post_projectversion_toggle_ci(request):
     """
     Toggles the ci enabled flag on a projectversion.
@@ -881,7 +875,7 @@ async def post_projectversion_toggle_ci(request):
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/lock")
-@app.req_role("owner")
+@req_role("owner")
 async def post_projectversion_lock(request):
     """
     Locks a projectversion.
@@ -940,7 +934,7 @@ async def post_projectversion_lock(request):
 
 
 @app.http_put("/api/projectversions/{projectversion_id}/mark-delete")
-@app.req_role("owner")
+@req_role("owner")
 async def mark_delete_projectversion(request):
     """
     Marks a projectversion as deleted.
@@ -1044,7 +1038,7 @@ async def mark_delete_projectversion(request):
 
 
 @app.http_delete("/api/projectversions/{projectversion_id}/dependency")
-@app.req_role("owner")
+@req_role("owner")
 async def delete_projectversion_dependency(request):
     """
     Deletes a projectversion dependency.
@@ -1127,7 +1121,7 @@ async def delete_projectversion_dependency(request):
 
 @app.http_post("/api/projectversions/{projectversion_id}/dependency")
 @app.authenticated
-@app.req_role("owner")
+@req_role("owner")
 async def post_projectversion_dependency(request):
     """
     Adds a projectversiondependency to a projectversion.

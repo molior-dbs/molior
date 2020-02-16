@@ -1,9 +1,7 @@
 import asyncio
 
-from molior.app import app
-from .logger import get_logger
+from molior.app import app, logger
 
-logger = get_logger()
 notification_queue = asyncio.Queue()
 
 

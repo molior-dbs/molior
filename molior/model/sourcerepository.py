@@ -1,7 +1,3 @@
-"""
-This module provides the molior SourceRepository
-database model.
-"""
 from pathlib import Path
 
 from sqlalchemy import Column, String, Integer, Enum
@@ -12,7 +8,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 import molior.model.projectversion  # pylint: disable=unused-import
 import molior.model.hook  # noqa: F401, pylint: disable=unused-import
 
-from molior.molior.logger import get_logger
+from molior.app import logger
 from .database import Base
 from .sourepprover import SouRepProVer
 from .buildorder import BuildOrder
@@ -23,8 +19,6 @@ from molior.molior.configuration import Configuration
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
 DEFAULT_CWD = "/var/lib/molior"
-
-logger = get_logger()
 
 
 class SourceRepository(Base):  # pylint: disable=too-few-public-methods

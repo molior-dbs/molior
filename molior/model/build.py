@@ -1,20 +1,17 @@
-"""
-This module provides the molior Build database
-model.
-"""
+import pytz
+
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship, backref
-import pytz
 from datetime import datetime
 
-from molior.molior.logger import get_logger
-from .database import Base
-from .buildorder import BuildOrder
-from .sourcerepository import SourceRepository
+from molior.app import logger
 from molior.molior.notifier import build_changed
 from molior.molior.buildlogger import write_log_title
 
-logger = get_logger()
+from .database import Base
+from .buildorder import BuildOrder
+from .sourcerepository import SourceRepository
+
 local_tz = pytz.timezone("Europe/Zurich")
 
 BUILD_STATES = [

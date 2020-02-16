@@ -1,7 +1,3 @@
-"""
-Worker Thread
-"""
-
 import shutil
 import asyncio
 
@@ -10,11 +6,9 @@ from molior.model.build import Build
 from molior.model.sourcerepository import SourceRepository
 from molior.molior.buildlogger import write_log, write_log_title
 
-from .logger import get_logger
+from molior.app import logger
 from ..ops import GitClone, get_latest_tag
 from ..ops import BuildProcess, ScheduleBuilds
-
-logger = get_logger()
 
 
 class Worker:
