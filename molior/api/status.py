@@ -1,4 +1,5 @@
 from aiohttp import web
+from os.path import expanduser
 
 from molior.app import app
 from molior.auth import req_admin
@@ -39,10 +40,16 @@ async def get_status(request):
         maintenance_message = value[0]
         break
 
+    sshkey_file = expanduser("~/.ssh/id_rsa.pub")
+    sshkey = ""
+    with open(sshkey_file) as f:
+        sshkey = f.read()
+
     status = {
         "versions": {"molior-server": [MOLIOR_VERSION]},
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
+        "sshkey": sshkey,
     }
     return web.json_response(status)
 
