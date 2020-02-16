@@ -1,15 +1,9 @@
-"""
-Provides api functions to interact with the hook database
-model.
-"""
 from aiohttp import web
 
+from molior.app import app
 from molior.model.hook import Hook
 from molior.model.sourcerepository import SourceRepository
-
-from .app import app
-from .inputparser import parse_int
-from .helper.hook import get_hook_triggers
+from molior.tools import parse_int, get_hook_triggers
 
 
 @app.http_get("/api/hooks")

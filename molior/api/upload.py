@@ -1,17 +1,13 @@
-"""
-Provides the upload request handler.
-"""
 import logging
 import os
 from aiohttp import web
 from pathlib import Path
 
+from molior.app import app
 from molior.molior.configuration import Configuration
 from molior.model.database import Session
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
-
-from .app import app
 
 logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 

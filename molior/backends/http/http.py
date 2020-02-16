@@ -1,11 +1,8 @@
-"""
-Simple http/websocket based molior backend
-"""
 import asyncio
 import json
 
+from molior.app import app
 from molior.molior.logger import get_logger
-from molior.api.app import app
 from molior.molior.worker_backend import backend_queue
 from molior.molior.configuration import Configuration
 

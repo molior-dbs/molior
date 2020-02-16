@@ -1,17 +1,15 @@
-"""
-Provides api functions to interact with the GitLab interface.
-"""
-from aiohttp import web
 import logging
 import uuid
 
+from aiohttp import web
+
+from molior.app import app
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
 from molior.model.sourcerepository import SourceRepository
 from molior.molior.notifier import build_added
 from molior.molior.configuration import Configuration
 
-from .app import app
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 logger = logging.getLogger("molior")

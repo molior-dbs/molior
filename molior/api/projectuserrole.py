@@ -1,17 +1,13 @@
-"""
-Per project user role API endpoints
-"""
 import logging
-
-from aiohttp import web
 import sqlalchemy.exc
 
-from molior.model.project import Project
+from aiohttp import web
 
+from molior.app import app
+from molior.model.project import Project
 from molior.model.user import User
 from molior.model.userrole import UserRole, USER_ROLES
 
-from .app import app
 from .messagetypes import Subject, Event
 
 logger = logging.getLogger("molior")  # pylint: disable=invalid-name

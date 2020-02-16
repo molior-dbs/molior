@@ -1,14 +1,11 @@
-"""
-Various helper to manager and check user roles
-"""
 import logging
 
 from aiohttp import web
 
+from molior.app import app
 from molior.model.userrole import USER_ROLES
-from .app import app
 
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")
 
 
 @app.http_get("/api/userroles")

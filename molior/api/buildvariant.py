@@ -1,15 +1,10 @@
-"""
-Provides functions to interact with the BuildVariant
-database model.
-"""
 from aiohttp import web
 
+from molior.app import app
 from molior.model.architecture import Architecture
 from molior.model.buildvariant import BuildVariant
 from molior.model.projectversion import ProjectVersion
-
-from .app import app
-from .inputparser import parse_int
+from molior.tools import parse_int
 
 
 @app.http_get("/api/buildvariants")

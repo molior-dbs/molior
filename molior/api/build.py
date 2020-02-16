@@ -1,14 +1,12 @@
-"""
-Provides api functions to interact with the Build
-database model.
-"""
+import logging
+import uuid
+
 from datetime import datetime
 from aiohttp import web
 from sqlalchemy.sql import func, or_
 from sqlalchemy.orm import aliased
-import logging
-import uuid
 
+from molior.app import app
 from molior.model.build import Build, BUILD_STATES
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.buildvariant import BuildVariant
@@ -18,10 +16,9 @@ from molior.model.sourcerepository import SourceRepository
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.maintainer import Maintainer
-from .userrolehelper import check_user_role
+from molior.tools import check_user_role
 from molior.molior.notifier import build_added
 
-from .app import app
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 logger = logging.getLogger("molior")

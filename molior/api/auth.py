@@ -1,14 +1,11 @@
-"""
-Provides the moliorweb authentication module.
-"""
 import logging
 
 from aiohttp import web
 
+from molior.app import app
 from molior.molior.configuration import Configuration
 from molior.model.user import User
 from molior.molior.auth import Auth
-from .app import app
 
 logger = logging.getLogger("molior")  # pylint: disable=invalid-name
 

@@ -1,11 +1,6 @@
-"""
-Provides functions to check the current status
-of the molior packages and their version
-"""
-
 from aiohttp import web
 
-from .app import app
+from molior.app import app
 from molior.version import MOLIOR_VERSION
 from molior.molior.backend import Backend
 

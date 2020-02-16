@@ -15,31 +15,36 @@ from molior.molior.worker_aptly import AptlyWorker
 from molior.molior.worker_backend import BackendWorker, backend_queue
 from molior.molior.worker_notification import NotificationWorker
 from molior.model.database import database
-from molior.api import app as moliorapi
+from molior.app import app
 from molior.version import MOLIOR_VERSION
 
 from molior.molior.backend import Backend
 from molior.molior.auth import Auth
 
 # import api handlers
-import molior.api.build  # pylint: disable=unused-import
-import molior.api.gitlab  # pylint: disable=unused-import
-import molior.api.project  # pylint: disable=unused-import
-import molior.api.buildstate  # pylint: disable=unused-import
-import molior.api.mirror  # pylint: disable=unused-import
-import molior.api.websocket  # pylint: disable=unused-import
-import molior.api.auth  # pylint: disable=unused-import
-import molior.api.user  # pylint: disable=unused-import
-import molior.api.userrole  # pylint: disable=unused-import
-import molior.api.architecture  # pylint: disable=unused-import
-import molior.api.sourcerepository  # pylint: disable=unused-import
-import molior.api.projectuserrole  # pylint: disable=unused-import
-import molior.api.projectversion  # pylint: disable=unused-import
-import molior.api.info  # pylint: disable=unused-import
-import molior.api.buildvariant  # pylint: disable=unused-import
-import molior.api.status  # pylint: disable=unused-import
-import molior.api.hook  # pylint: disable=unused-import
-import molior.api.upload  # noqa: F401, pylint: disable=unused-import
+import molior.api.build              # noqa: F401
+import molior.api.gitlab             # noqa: F401
+import molior.api.project            # noqa: F401
+import molior.api.buildstate         # noqa: F401
+import molior.api.mirror             # noqa: F401
+import molior.api.websocket          # noqa: F401
+import molior.api.auth               # noqa: F401
+import molior.api.user               # noqa: F401
+import molior.api.userrole           # noqa: F401
+import molior.api.architecture       # noqa: F401
+import molior.api.sourcerepository   # noqa: F401
+import molior.api.projectuserrole    # noqa: F401
+import molior.api.projectversion     # noqa: F401
+import molior.api.info               # noqa: F401
+import molior.api.buildvariant       # noqa: F401
+import molior.api.status             # noqa: F401
+import molior.api.hook               # noqa: F401
+import molior.api.upload             # noqa: F401
+
+import molior.api2.project           # noqa: F401
+import molior.api2.projectversion    # noqa: F401
+import molior.api2.sourcerepository  # noqa: F401
+import molior.api2.user              # noqa: F401
 
 logger = get_logger()
 processed_repos = []
@@ -121,8 +126,8 @@ def mainloop(host, port, debug):
     """
     Starts the molior app.
     """
-    moliorapi.set_context_functions(create_cirrina_context, destroy_cirrina_context)
-    moliorapi.run(host, port, logger=logger, debug=debug)
+    app.set_context_functions(create_cirrina_context, destroy_cirrina_context)
+    app.run(host, port, logger=logger, debug=debug)
 
 
 if __name__ == "__main__":

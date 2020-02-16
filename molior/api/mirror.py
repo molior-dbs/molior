@@ -1,20 +1,13 @@
-"""
-Provides functions for managing aptly mirrors.
-"""
-from aiohttp import web
 import logging
 
+from aiohttp import web
+
+from molior.app import app
 from molior.model.build import Build
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.buildvariant import BuildVariant
-
 from molior.molior.utils import get_aptly_connection
-
-# FIXME: cannot import in here from molior.molior.notifier import build_added
-
-
-from .app import app
 
 logger = logging.getLogger("molior")
 

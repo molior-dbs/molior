@@ -1,21 +1,13 @@
-"""
-Provides test molior core class.
-"""
 import pytest
 import asyncio
-from pathlib import Path
-# from datetime import datetime
 
+from pathlib import Path
 from mock import patch, MagicMock
 
 from molior.molior.errors import MaintainerParseError
-from molior.api.helper.validator import (
-    is_name_valid,
-    validate_version_format)
-from molior.molior.core import (
-    get_projectversion,
-    get_target_config)
+from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
+from molior.tools import is_name_valid, validate_version_format
 
 
 def test_get_projectversion_no_cfg():

@@ -1,6 +1,3 @@
-"""
-Provides the molior LiveLogger class.
-"""
 import asyncio
 import json
 import logging

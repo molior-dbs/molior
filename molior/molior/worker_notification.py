@@ -1,10 +1,6 @@
-"""
-Async Notification Worker Task
-"""
-
 import asyncio
 
-from molior.api import app
+from molior.app import app
 from .logger import get_logger
 
 logger = get_logger()

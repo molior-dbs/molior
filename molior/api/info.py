@@ -1,12 +1,7 @@
-"""
-Provides functions to get information about
-the molior web API
-"""
 from aiohttp import web
 
+from molior.app import app
 from molior.molior.configuration import Configuration
-
-from .app import app
 
 
 @app.http_get("/api/info/aptlyhostname")

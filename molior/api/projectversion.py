@@ -1,12 +1,9 @@
-"""
-Provides functions to interact with the ProjectVersion
-database model.
-"""
 import logging
 import uuid
-from aiohttp import web
-from sqlalchemy.sql import or_
 
+from aiohttp import web
+
+from molior.app import app
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
 from molior.model.project import Project
 from molior.model.build import Build
@@ -16,14 +13,9 @@ from molior.model.sourcerepository import SourceRepository
 from molior.model.sourepprover import SouRepProVer
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.molior.notifier import build_added
+from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
 
-from .app import app
-from .inputparser import parse_int
-from .helper.buildvariant import get_buildvariants
-from .helper.validator import is_name_valid
-from .tools import ErrorResponse
-
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")
 
 
 def get_projectversion_deps_manually(projectversion, to_dict=True):
@@ -198,142 +190,6 @@ async def get_projectversions(request):
     return web.json_response(data)
 
 
-@app.http_get("/api2/project/{project_id}/versions")
-@app.authenticated
-async def get_projectversions2(request):
-    """
-    Returns a list of projectversions.
-
-    ---
-    description: Returns a list of projectversions.
-    tags:
-        - ProjectVersions
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: basemirror_id
-          in: query
-          required: false
-          type: integer
-        - name: is_basemirror
-          in: query
-          required: false
-          type: bool
-        - name: project_id
-          in: query
-          required: false
-          type: integer
-        - name: project_name
-          in: query
-          required: false
-          type: string
-        - name: page
-          in: query
-          required: false
-          type: integer
-        - name: page_size
-          in: query
-          required: false
-          type: integer
-    produces:
-        - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    """
-    project_id = request.match_info["project_id"]
-    basemirror_id = request.GET.getone("basemirror_id", None)
-    is_basemirror = request.GET.getone("isbasemirror", False)
-    filter_name = request.GET.getone("q", None)
-    try:
-        page = int(request.GET.getone("page"))
-    except (ValueError, KeyError):
-        page = 1
-
-    try:
-        page_size = int(request.GET.getone("page_size"))
-    except (ValueError, KeyError):
-        page_size = 10
-
-    query = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-    )
-
-    if project_id:
-        query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
-
-    if filter_name:
-        query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
-
-    if basemirror_id:
-        query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
-    elif is_basemirror:
-        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
-
-    query = query.order_by(Project.name, ProjectVersion.name)
-
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    projectversions = query.all()
-    nb_projectversions = query.count()
-
-    results = []
-
-    for projectversion in projectversions:
-        projectversion_dict = projectversion_to_dict(projectversion)
-        results.append(projectversion_dict)
-
-    data = {"total_result_count": nb_projectversions, "results": results}
-
-    return web.json_response(data)
-
-
-@app.http_get("/api2/project/{project_name}/{project_version}")
-@app.authenticated
-async def get_projectversion_byname(request):
-    """
-    Returns a project with version information.
-
-    ---
-    description: Returns information about a project.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: project_name
-          in: path
-          required: true
-          type: string
-        - name: project_version
-          in: path
-          required: true
-          type: string
-    produces:
-        - text/json
-    responses:
-        "200":
-            description: successful
-        "404":
-            description: no entry found
-    """
-
-    project_name = request.match_info["project_name"]
-    project_version = request.match_info["project_version"]
-
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(
-            ProjectVersion.name == project_version).join(Project).filter(
-            Project.name == project_name).first()
-    if not projectversion:
-        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
-
-    data = projectversion_to_dict(projectversion)
-    return web.json_response(data)
-
-
 @app.http_get("/api/projectversions/{projectversion_id}")
 @app.authenticated
 async def get_projectversion(request):
@@ -388,7 +244,6 @@ async def get_projectversion(request):
 
 
 @app.http_post("/api/projects/{project_id}/versions")
-@app.http_post("/api2/project/{project_id}/versions")
 @app.req_role("owner")
 async def create_projectversions(request):
     """

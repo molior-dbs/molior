@@ -1,6 +1,3 @@
-"""
-Provides the molior web app.
-"""
 from functools import wraps
 
 import cirrina
@@ -8,9 +5,7 @@ from aiohttp import web
 
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
-
-from .userrolehelper import check_admin, check_user_role
-from .inputparser import parse_int
+from molior.tools import check_admin, check_user_role, parse_int
 
 __title__ = "Molior REST API Documentation"
 __description__ = "Documentation of the molior REST API."

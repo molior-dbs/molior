@@ -1,12 +1,7 @@
-"""
-Provides functions to interact with the architecture
-database model.
-"""
 from aiohttp import web
 
+from molior.app import app
 from molior.model.architecture import Architecture
-
-from .app import app
 
 
 @app.http_get("/api/architectures")

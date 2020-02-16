@@ -1,18 +1,15 @@
-"""
-Provides the moliorweb websocket message handler.
-"""
-
 import logging
 import asyncio
 import json
+
 from pathlib import Path
 
-from .app import app
+from molior.app import app
 from .messagetypes import Subject, Event, Action
 from .livelogger import LiveLogger
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
-logger = logging.getLogger("molior")  # pylint: disable=invalid-name
+logger = logging.getLogger("molior")
 
 
 async def start_livelogger(websocket, data):
