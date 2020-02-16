@@ -366,9 +366,7 @@ FROM descendants order by id;
                         parent["childs"] = []
                     parent["childs"].append(buildjson)
                 else:
-                    logger.info(
-                        "build tree: parent {} not found".format(build.parent_id)
-                    )
+                    logger.info("build tree: parent {} not found".format(build.parent_id))
 
             if depth == 0:
                 toplevel.append(build_id)
@@ -536,7 +534,6 @@ FROM descendants order by id;
     builds = builds.outerjoin(parent, parent.id == Build.parent_id)
 
     builds = builds.order_by(func.coalesce(parent.parent_id, Build.parent_id, Build.id).desc(), Build.id)
-    logger.info(builds)
 
     # Apply pagination
     if page and per_page:
@@ -554,7 +551,7 @@ FROM descendants order by id;
     return web.json_response(data)
 
 
-@app.http_get("/api/builds/{build_id:\d+}")  # noqa: W605
+@app.http_get("/api/builds/{build_id:\\d+}")
 @app.authenticated
 async def get_build(request):
     """

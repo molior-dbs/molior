@@ -537,6 +537,34 @@ async def add_repository(request):
         db.add(buildconf)
 
     db.commit()
+
+    if repo.state == "new":
+        build = Build(
+            version=None,
+            git_ref=None,
+            ci_branch=None,
+            is_ci=None,
+            versiontimestamp=None,
+            sourcename=repo.name,
+            buildstate="new",
+            buildtype="build",
+            buildconfiguration=None,
+            sourcerepository=repo,
+            maintainer=None
+        )
+
+        db.add(build)
+        db.commit()
+        await build_added(build)
+
+        token = uuid.uuid4()
+        buildtask = BuildTask(build=build, task_id=str(token))
+        db.add(buildtask)
+        db.commit()
+
+        args = {"clone": [build.id, repo.id]}
+        await request.cirrina.task_queue.put(args)
+
     return web.Response(status=200, text="SourceRepository added")
 
 
