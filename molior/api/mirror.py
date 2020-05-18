@@ -162,10 +162,7 @@ async def create_mirror(request):
         ]
     }
     await request.cirrina.aptly_queue.put(args)
-
-    return web.Response(
-        status=200, text="Mirror {} successfully created.".format(mirror)
-    )
+    return web.Response(status=200, text="Mirror {} successfully created.".format(mirror))
 
 
 @app.http_get("/api/mirror")
