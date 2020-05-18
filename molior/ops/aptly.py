@@ -58,7 +58,7 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
             logger.error("buildsrc_succeeded no build found for %d", build_id)
             return False
 
-        write_log(build.id, "")
+        write_log(build.id, "\n")
         write_log_title(build.id, "Publishing")
         sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
         srcfiles = debchanges_get_files(sourcepath, sourcename, version)

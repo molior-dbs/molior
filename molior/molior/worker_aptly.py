@@ -345,8 +345,9 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
             await build.set_successful()
             session.commit()
 
+            write_log(build_id, "\n")
+            write_log_title(build_id, "Done", no_footer_newline=True)
             logger.info("mirror %s succesfully created", mirrorname)
-            write_log_title(build.id, "Done")
 
     except Exception as exc:
         logger.exception(exc)
