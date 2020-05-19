@@ -14,7 +14,7 @@ from .sourepprover import SouRepProVer
 from .buildorder import BuildOrder
 from .sourcerepositoryhook import SourceRepositoryHook
 
-from molior.molior.utils import parse_repository_name
+from molior.tools import parse_repository_name
 from molior.molior.configuration import Configuration
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]

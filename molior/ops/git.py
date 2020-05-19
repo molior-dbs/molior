@@ -12,8 +12,7 @@ from molior.model.build import Build
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.errors import MaintainerParseError
 from molior.molior.core import get_maintainer, get_target_config
-from molior.molior.utils import get_changelog_attr
-from molior.tools import validate_version_format
+from molior.tools import get_changelog_attr, validate_version_format
 
 
 async def run_git(cmd, cwd, build_id):

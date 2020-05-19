@@ -6,7 +6,7 @@ from molior.model.build import Build
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.buildvariant import BuildVariant
-from molior.molior.utils import get_aptly_connection
+from molior.tools import get_aptly_connection, paginate
 
 
 def error(status, msg, *args):

@@ -1,6 +1,8 @@
 import re
 
 from molior.app import logger
+from molior.tools import get_changelog_attr
+
 from molior.model.project import Project
 from molior.model.buildvariant import BuildVariant
 from molior.model.architecture import Architecture
@@ -10,7 +12,6 @@ from molior.model.buildconfiguration import BuildConfiguration
 
 from .configuration import Configuration
 from .errors import MaintainerParseError
-from .utils import get_changelog_attr
 
 TARGET_ARCH_ORDER = ["amd64", "i386", "arm64", "armhf"]
 

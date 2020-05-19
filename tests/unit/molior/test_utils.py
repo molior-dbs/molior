@@ -1,8 +1,4 @@
-"""
-Provides test molior core class.
-"""
-
-from molior.molior.utils import parse_repository_name
+from molior.tools import parse_repository_name
 
 
 def test_parse_repository_name():

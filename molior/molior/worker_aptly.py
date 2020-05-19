@@ -14,7 +14,7 @@ from molior.model.architecture import Architecture
 from molior.model.chroot import Chroot
 from molior.molior.notifier import build_added
 from molior.aptly.errors import AptlyError, NotFoundError
-from molior.molior.utils import get_aptly_connection
+from molior.tools import get_aptly_connection
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.debianrepository import DebianRepository
 from ..ops import DebSrcPublish, DebPublish

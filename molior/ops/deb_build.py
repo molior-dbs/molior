@@ -9,6 +9,8 @@ from sqlalchemy import or_
 from pathlib import Path
 
 from molior.app import logger
+from molior.tools import get_changelog_attr, strip_epoch_version
+
 from molior.model.database import Session
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
@@ -19,7 +21,6 @@ from molior.model.chroot import Chroot
 from molior.model.buildvariant import BuildVariant
 from molior.model.architecture import Architecture
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
-from molior.molior.utils import get_changelog_attr, strip_epoch_version
 
 from molior.molior.core import (
     get_target_arch,

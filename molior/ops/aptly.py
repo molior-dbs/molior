@@ -5,6 +5,8 @@ from launchy import Launchy
 from pathlib import Path
 
 from molior.app import logger
+from molior.tools import strip_epoch_version
+
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -13,7 +15,6 @@ from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
 from ..molior.notifier import send_mail_notification
 from ..molior.buildlogger import write_log, write_log_title
-from ..molior.utils import strip_epoch_version
 
 
 def debchanges_get_files(sourcepath, sourcename, version, arch="source"):

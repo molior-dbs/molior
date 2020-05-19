@@ -3,8 +3,9 @@ import asyncio
 from datetime import datetime, timedelta
 
 from molior.app import logger
+from molior.tools import get_aptly_connection
 from molior.aptly import TaskState
-from .utils import get_aptly_connection
+
 from .configuration import Configuration
 
 
