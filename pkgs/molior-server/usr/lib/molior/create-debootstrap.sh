@@ -24,7 +24,7 @@ eval $(parse_yaml $CONFIG_FILE)
 APTLY=$aptly__apt_url
 APTLY_KEY=$aptly__key
 
-if [ $1 != "info" -a "$#" -ne 5 ]; then
+if [ "$1" != "info" -a "$#" -ne 5 ]; then
   echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" >&2
   echo "       $0 info" 1>&2
   exit 1
@@ -47,6 +47,8 @@ else
   TAR_PXZ=""
 fi
 
+set -e
+
 build_debootstrap()
 {
   target=$DEBOOTSTRAP
@@ -56,7 +58,12 @@ build_debootstrap()
     rm -rf $target
   fi
 
-  echo "I: Creating debootstrap for $DIST_RELEASE $DEBOOTSTRAP_NAME"
+  echo
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  message="Creating debootstrap for $DIST_RELEASE $DEBOOTSTRAP_NAME"
+  printf "| %-44s %s |" "molior: $message" "`date -R`"
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  echo
 
   MIRROR="$APTLY/$DIST_NAME/$DIST_VERSION/"
 

@@ -33,9 +33,8 @@ else
   TAR_PXZ=""
 fi
 
-set -e
 
-if [ $1 != "info" -a "$#" -ne 5 ]; then
+if [ "$1" != "info" -a "$#" -ne 5 ]; then
   echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" 1>&2
   echo "       $0 info" 1>&2
   exit 1
@@ -50,6 +49,8 @@ ARCH=$5
 CHROOT_NAME="${DIST_NAME}-$DIST_VERSION-${ARCH}"
 target="/var/lib/schroot/chroots/${CHROOT_NAME}"
 
+set -e
+
 build_chroot()
 {
   if [ -e "$target.tar.xz" ]; then
@@ -57,7 +58,13 @@ build_chroot()
     exit 1
   fi
   mkdir -p "$target"
-  echo "I: Creating schroot for $DIST_RELEASE $CHROOT_NAME"
+
+  echo
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  message="Creating schroot for $DIST_RELEASE $CHROOT_NAME"
+  printf "| %-44s %s |" "molior: $message" "`date -R`"
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  echo
 
   REPO="$APTLY/$DIST_NAME/$DIST_VERSION/"
   echo I: Using APT repository $REPO

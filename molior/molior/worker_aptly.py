@@ -391,6 +391,7 @@ async def create_schroot(task_queue, chroot_id, build_id, dist, name, version, a
         if not ret == 0:
             logger.error("error creating build env")
             write_log(build_id, "Error creating build environment\n")
+            write_log(build_id, "\n")
             write_log_title(build_id, "Done", no_footer_newline=True)
             await build.set_failed()
             session.commit()
