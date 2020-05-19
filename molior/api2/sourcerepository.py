@@ -4,7 +4,7 @@ import giturlparse
 from sqlalchemy.sql import or_
 from aiohttp import web
 
-from molior.app import app
+from molior.app import app, logger
 from molior.auth import req_role
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
@@ -215,10 +215,11 @@ async def add_repository(request):
 
     query = db.query(SourceRepository).filter(or_(
                 SourceRepository.url == url,
-                SourceRepository.url.like("%{}%{}%{}%".format(repoinfo.resource, repoinfo.owner, repoinfo.name))
-            ))
+                SourceRepository.url.like("%{}%{}%{}".format(repoinfo.resource, repoinfo.owner, repoinfo.name)),
+                SourceRepository.url.like("%{}%{}%{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
     if query.count() == 1:
         repo = query.first()
+        logger.info("found existing repo {} for {} {} {}".format(repo.url, repoinfo.resource, repoinfo.owner, repoinfo.name))
         if repo not in projectversion.sourcerepositories:
             projectversion.sourcerepositories.append(repo)
             db.commit()
