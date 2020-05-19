@@ -66,6 +66,9 @@ async def GitClone(build_id, repo_id, task_queue):
             ret = await run_git(git_command, str(repo.src_path), build_id)
             if ret != 0:
                 logger.error("error running git command: %s", git_command)
+                repo.set_error()
+                await build.set_failed()
+                session.commit()
                 return
 
         write_log(build_id, "\n")
