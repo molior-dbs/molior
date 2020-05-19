@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 
 from molior.aptly.errors import AptlyError
+from molior.app import logger
 from .taskstate import TaskState
 
 
@@ -337,29 +338,30 @@ class AptlyApi:
         try:
             # remove publish (may fail)
             async with aiohttp.ClientSession() as http:
-                async with http.delete(
-                    self.__api_url
-                    + "/publish/{}/{}".format(publish_name, mirror_distribution),
-                    auth=self.auth,
-                ) as resp:
+                async with http.delete(self.__api_url + "/publish/{}/{}".format(publish_name, mirror_distribution),
+                                       auth=self.auth,) as resp:
                     if self.__check_status_code(resp.status):
                         data = json.loads(await resp.text())
                         await self.wait_task(data["ID"])
-
-            # remove snapshot (may fail)
-            await self.mirror_snapshot_delete(base_mirror, mirror, version)
         except Exception:
-            # FIXME: log warning? logger.exception(exc)
-            pass
+            logger.warn("Error deleting mirror publish  {}/{}".format(publish_name, mirror_distribution))
 
-        async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/mirrors/{}".format(name), auth=self.auth
-            ) as resp:
-                if self.__check_status_code(resp.status):
-                    data = json.loads(await resp.text())
-                    return await self.wait_task(data["ID"])
-        return False
+        try:
+            # remove snapshot (may fail)
+            await self.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+        except Exception:
+            logger.warn("Error deleting mirror snapshot {}/{}".format(publish_name, mirror_distribution))
+
+        try:
+            async with aiohttp.ClientSession() as http:
+                async with http.delete(self.__api_url + "/mirrors/{}".format(name), auth=self.auth) as resp:
+                    if self.__check_status_code(resp.status):
+                        data = json.loads(await resp.text())
+                        return await self.wait_task(data["ID"])
+        except Exception:
+            logger.warn("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
+
+        return True
 
     async def mirror_snapshot_delete(self, base_mirror, base_mirror_version, mirror, version):
         """
@@ -373,13 +375,11 @@ class AptlyApi:
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/snapshots/{}".format(name), auth=self.auth
-            ) as resp:
+            async with http.delete(self.__api_url + "/snapshots/{}".format(name), auth=self.auth) as resp:
                 if self.__check_status_code(resp.status):
                     data = json.loads(await resp.text())
                     return await self.wait_task(data["ID"])
-        return False
+        return True
 
     async def mirror_snapshot(self, base_mirror, base_mirror_version, mirror, version):
         """

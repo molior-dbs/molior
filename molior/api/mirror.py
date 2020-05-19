@@ -3,6 +3,7 @@ from aiohttp import web
 from molior.app import app, logger
 from molior.auth import req_admin
 from molior.model.build import Build
+from molior.model.chroot import Chroot
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.buildvariant import BuildVariant
@@ -204,41 +205,24 @@ async def get_mirrors(request):
         "400":
             description: bad request
     """
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
     filter_name = request.GET.getone("q", "")
+    basemirror = request.GET.getone("basemirror", False)
 
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page", status=400)
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page_size", status=400)
-        page_size = 1 if page_size < 1 else page_size
-
-    query = request.cirrina.db_session.query(
-        ProjectVersion
-    )  # pylint: disable=no-member
+    query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
-    query = query.filter(Project.is_mirror == "true").order_by(Project.name)
+    query = query.filter(Project.is_mirror == "true")
 
     if filter_name:
         query = query.filter(Project.name.like("%{}%".format(filter_name)))
 
+    if basemirror:
+        query = query.filter(Project.is_basemirror == "true", ProjectVersion.mirror_state == "ready")
+
     query = query.order_by(Project.name, ProjectVersion.name)
     nb_results = query.count()
 
-    if page is not None and page_size:
-        query = query.offset((page - 1) * page_size)
-        query = query.limit(page_size)
-
+    query = paginate(request, query)
     results = query.all()
-
     data = {"total_result_count": nb_results, "results": []}
 
     for mirror in results:
@@ -268,7 +252,6 @@ async def get_mirrors(request):
                 "apt_url": apt_url,
             }
         )
-
     return web.json_response(data)
 
 
@@ -285,19 +268,7 @@ async def get_mirror(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: page
-          in: query
-          required: false
-          type: integer
-          default: 1
-          description: page number
-        - name: page_size
-          in: query
-          required: false
-          type: integer
-          default: 10
-          description: max. mirrors per page
-        - name: q
+        - name: name
           in: query
           required: false
           type: string
@@ -348,7 +319,6 @@ async def get_mirror(request):
         "state": mirror.mirror_state,
         "apt_url": apt_url,
     }
-
     return web.json_response(result)
 
 
@@ -431,20 +401,23 @@ async def delete_mirror(request):
 
     project = entry.project
 
-    bvs = request.cirrina.db_session.query(BuildVariant).filter(
-            BuildVariant.base_mirror_id == entry.id).all()  # pylint: disable=no-member
+    bvs = request.cirrina.db_session.query(BuildVariant).filter(BuildVariant.base_mirror_id == entry.id).all()
     for bvariant in bvs:
         # FIXME: delete buildconfigurations
-        request.cirrina.db_session.delete(bvariant)  # pylint: disable=no-member
+        if entry.project.is_basemirror:
+            chroot = request.cirrina.db_session.query(Chroot).filter(Chroot.buildvariant == bvariant).first()
+            if chroot:
+                request.cirrina.db_session.delete(chroot)
+        request.cirrina.db_session.delete(bvariant)
 
     builds = request.cirrina.db_session.query(Build) .filter(Build.projectversion_id == entry.id).all()
     for build in builds:
         # FIXME: delete buildconfigurations
         # FIXME: remove buildout dir
-        request.cirrina.db_session.delete(build)  # pylint: disable=no-member
+        request.cirrina.db_session.delete(build)
 
-    request.cirrina.db_session.delete(entry)  # pylint: disable=no-member
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.delete(entry)
+    request.cirrina.db_session.commit()
 
     if not project.projectversions:
         request.cirrina.db_session.delete(project)  # pylint: disable=no-member
