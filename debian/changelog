@@ -1,3 +1,15 @@
+molior (1.4.0~alpha2) stretch; urgency=medium
+
+  * build for molior 1.4.0
+  * add improved api2
+  * buildscript: fix removing chroot tar
+  * do not remove ci builds in every build
+  * fix last git ref in sourcerepository API
+  * source repositories: do not return last_gitref
+  * mirror: allow slash in distribution
+
+ -- André Roth <neolynx@gmail.com>  Tue, 19 May 2020 19:37:10 +0200
+
 molior (1.3.3) stretch; urgency=medium
 
   * vbox: add contrib and non-free for stretch-backports
