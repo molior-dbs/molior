@@ -257,6 +257,11 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             maintainer=maintainer,
         )
 
+        # update patent
+        parent.version = info.version
+        parent.sourcerepository = repo
+        parent.maintainer = maintainer
+
         session.add(build)
         session.commit()
         build.log_state("created")
