@@ -261,6 +261,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         parent.version = info.version
         parent.sourcerepository = repo
         parent.maintainer = maintainer
+        parent.git_ref = info.commit_hash
 
         session.add(build)
         session.commit()
