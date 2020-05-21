@@ -151,6 +151,8 @@ async def main():
         except aiohttp.client_exceptions.WSServerHandshakeError as exc:
             logger.info("WebSocket error: %s", str(exc.message))
             await asyncio.sleep(4)
+        except aiohttp.client_exceptions.ClientConnectorError as exc:
+            await asyncio.sleep(4)
         except Exception as exc:
             logger.exception(exc)
         await asyncio.sleep(1)
