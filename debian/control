@@ -59,7 +59,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
   openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, bash-completion, haveged,
-# editors
+# editor
   vim-nox,
 # add some tools:
   tree, bzip2, wget, telnet, man, psmisc,
@@ -76,8 +76,9 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   net-tools, ifupdown, isc-dhcp-client, iputils-ping,
   openssh-server, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, haveged,
-# editors
-  vim-nox,
+# vim:
+  vim-nox, python3-flake8, flake8, cmake, python3-pytest, python3-pytest-cov,
+  libpython3-dev, fonts-hack-ttf, build-essential, exuberant-ctags,
 # add some tools:
   htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xbase-clients,
 # molior:
