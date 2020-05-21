@@ -1,3 +1,9 @@
+molior (1.4.0~alpha3) stretch; urgency=medium
+
+  * vbox-dev: do not precreate keys in deployment
+
+ -- André Roth <neolynx@gmail.com>  Thu, 21 May 2020 09:35:33 +0000
+
 molior (1.4.0~alpha2) stretch; urgency=medium
 
   * build for molior 1.4.0
