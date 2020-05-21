@@ -270,36 +270,6 @@ EOF
             chown $SYSUSER:$SYSUSER $SYSHOME/.bashrc
         fi
 
-        cat > $SYSHOME/README.txt <<EOF
-Molior Development VBox
-=======================
-
-This VM runs the following services:
-- molior-server
-- molior-web      (http://localhost, http://localhost:8888 on the host system)
-- aptly      (http://localhost:3142, http://localhost:8889 on the host system)
-- ssh         (user/pass: admin/molior-dev, localhost:8222 on the host system)
-
-Install Virtualbox Guest Additions
-----------------------------------
-
-Insert Guest Additions CD and run the following commands:
-- sudo mount /dev/sr0 /mnt
-- sudo /mnt/VBoxLinuxAdditions.run
-- sudo umount /mnt
-- sudo reboot
-
-Create SSH Key Pair
--------------------
-
-In order to clone git repos run the following:
-- ssh-keygen
-- Accept all defaults
-- cat ~/.ssh/id_rsa.pub
-- Add the output to your git servers SSH settings
-
-EOF
-
     ;;
     abort-upgrade|abort-remove|abort-deconfigure) exit 0;;
 esac
