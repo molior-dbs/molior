@@ -82,7 +82,9 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xbase-clients,
 # molior:
   molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
-  molior-tools
+  molior-tools,
+# development tools:
+  nodejs, npm
 Description: molior development virtual machine
  Development environment for molior
 
