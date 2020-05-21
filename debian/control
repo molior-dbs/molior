@@ -71,60 +71,51 @@ Package: molior-vbox
 Architecture: all
 Pre-Depends: molior-os-config
 Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
-  systemd-sysv, libpam-systemd,
-  net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
-  openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
-  dialog, bsdmainutils, less, gawk, bash-completion, haveged,
+  systemd-sysv, libpam-systemd, bash-completion,
+  net-tools, ifupdown, isc-dhcp-client, iputils-ping,
+  openssh-server, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, haveged,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
-# add browser (stretch, buster)
-  chromium-sandbox | chromium (<< 73.0),
-  chromium (<< 73.0) | chromium (>= 73.0),
-# VirtualBox need kernel headers for guest additions
-  linux-headers-amd64,
-# add desktop dependencies
-  xserver-xorg-video-vesa, xserver-xorg-input-evdev, libgl1-mesa-dri,
-  xserver-xorg-video-modesetting, xserver-xorg, lightdm, lxde, policykit-1,
-  lxterminal,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
   molior-tools
-Description: molior ISO installer for testing
- Testing setup for molior
+Description: molior development virtual machine
+ Development environment for molior
 
 Package: molior-node-amd64
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
   linux-image-amd64, grub-pc,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing
- Testing setup for molior
+ Molior build node installation for amd64/i386 builds
 
 Package: molior-node-amd64-efi
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
   linux-image-amd64, grub-efi-amd64,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing
@@ -133,16 +124,16 @@ Description: molior build node ISO installer for testing
 Package: molior-node-arm64-efi
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
   linux-image-arm64, grub-efi-arm64,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing
