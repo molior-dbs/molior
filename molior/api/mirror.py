@@ -207,6 +207,7 @@ async def get_mirrors(request):
     """
     filter_name = request.GET.getone("q", "")
     basemirror = request.GET.getone("basemirror", False)
+    is_basemirror = request.GET.getone("is_basemirror", False)
 
     query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
@@ -217,6 +218,8 @@ async def get_mirrors(request):
 
     if basemirror:
         query = query.filter(Project.is_basemirror == "true", ProjectVersion.mirror_state == "ready")
+    elif is_basemirror:
+        query = query.filter(Project.is_basemirror == "true")
 
     query = query.order_by(Project.name, ProjectVersion.name)
     nb_results = query.count()
