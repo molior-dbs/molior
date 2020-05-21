@@ -149,6 +149,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
         with Session() as session:
 
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("aptly worker: mirror build with id %d not found", build_id)
+                return
+
             # FIXME: get entry from build.projectversion_id
             query = session.query(ProjectVersion)
             query = query.join(Project, Project.id == ProjectVersion.project_id)
@@ -158,11 +163,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             if not entry:
                 logger.error("finalize mirror: mirror '%s' not found", mirrorname)
-                return
-
-            build = session.query(Build).filter(Build.id == build_id).first()
-            if not build:
-                logger.error("aptly worker: mirror build with id %d not found", build_id)
+                write_log(build.id, "E: error mirror not found\n")
                 return
 
             apt = get_aptly_connection()
@@ -172,6 +173,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     upd_progress = await apt.mirror_get_progress(task_id)
                     if not upd_progress:
                         logger.error("Error getting mirror progress %s", mirrorname)
+                        write_log(build.id, "E: error updating mirror\n")
                         entry.mirror_state = "error"
                         await build.set_failed()
                         session.commit()
