@@ -421,18 +421,21 @@ class AptlyApi:
         """
         progress = {}
         async with aiohttp.ClientSession() as http:
-            async with http.get(
-                self.__api_url + "/tasks/{}".format(task_id), auth=self.auth
-            ) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                state = json.loads(await resp.text())
+            for i in range(20):
+                try:
+                    async with http.get(self.__api_url + "/tasks/{}".format(task_id), auth=self.auth) as resp:
+                        if not self.__check_status_code(resp.status):
+                            self.__raise_aptly_error(resp)
+                        state = json.loads(await resp.text())
 
-            async with http.get(
-                self.__api_url + "/tasks/{}/detail".format(task_id), auth=self.auth
-            ) as resp:
-                if self.__check_status_code(resp.status):
-                    progress = json.loads(await resp.text())
+                    async with http.get(self.__api_url + "/tasks/{}/detail".format(task_id), auth=self.auth) as resp:
+                        if self.__check_status_code(resp.status):
+                            progress = json.loads(await resp.text())
+                    break
+                except Exception:
+                    logger.warn("Error fetching mirror progress, retrying in 30s")
+                    await asyncio.sleep(30)
+                    continue
 
         if not progress:
             progress = {
