@@ -30,7 +30,7 @@ async def startup_mirror(task_queue):
 
     with Session() as session:
         # get mirrors in updating state
-        query = session.query(ProjectVersion)  # pylint: disable=no-member
+        query = session.query(ProjectVersion)
         query = query.join(Project, Project.id == ProjectVersion.project_id)
         query = query.filter(Project.is_mirror.is_(True))
         query = query.filter(or_(ProjectVersion.mirror_state == "updating",
@@ -47,23 +47,36 @@ async def startup_mirror(task_queue):
             # FIXME: only one buildvariant supported
             base_mirror = ""
             base_mirror_version = ""
-            taskname = "Update mirror"
-            if mirror.mirror_state == "publishing":
-                taskname = "Publish snapshot:"
-            if not mirror.project.is_basemirror:
-                base_mirror = mirror.buildvariants[0].base_mirror.project.name
-                base_mirror_version = mirror.buildvariants[0].base_mirror.name
-                task_name = "{} {}-{}-{}-{}".format(taskname, base_mirror, base_mirror_version, mirror.project.name, mirror.name)
-            else:
-                task_name = "{} {}-{}".format(taskname, mirror.project.name, mirror.name)
+            tasknames = ["Update mirror", "Publish snapshot:"]
 
             m_tasks = None
+            build_state = None
+            mirror_state = None
             if tasks:
-                m_tasks = [task for task in tasks if task["Name"] == task_name]
+                for i in range(len(tasknames)):
+                    taskname = tasknames[i]
+                    if not mirror.project.is_basemirror:
+                        base_mirror = mirror.buildvariants[0].base_mirror.project.name
+                        base_mirror_version = mirror.buildvariants[0].base_mirror.name
+                        task_name = "{} {}-{}-{}-{}".format(taskname, base_mirror, base_mirror_version,
+                                                            mirror.project.name, mirror.name)
+                    else:
+                        task_name = "{} {}-{}".format(taskname, mirror.project.name, mirror.name)
+                    m_tasks = [task for task in tasks if task["Name"] == task_name]
+                    if m_tasks:
+                        if i == 0:
+                            build_state = "building"
+                            mirror_state = "updating"
+                        elif i == 1:
+                            build_state = "publishing"
+                            mirror_state = "publishing"
+                        break
+
             if not m_tasks:
                 # No task on aptly found
+                logger.info("no mirroring tasks found on aptly")
                 mirror.mirror_state = "error"
-                session.commit()  # pylint: disable=no-member
+                session.commit()
                 continue
 
             m_task = max(m_tasks, key=operator.itemgetter("ID"))
@@ -84,11 +97,9 @@ async def startup_mirror(task_queue):
 
             # FIXME: do not allow db cleanup while mirroring
 
-            # FIXME: detect if still publishing
-            if mirror.mirror_state == "error":
-                mirror.mirror_state = "updating"
-                build.buildstate = "building"
-                session.commit()
+            mirror.mirror_state = mirror_state
+            build.buildstate = build_state
+            session.commit()
 
             write_log(build.id, "W: continuing active mirroring\n")
 
@@ -138,7 +149,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
         with Session() as session:
 
             # FIXME: get entry from build.projectversion_id
-            query = session.query(ProjectVersion)  # pylint: disable=no-member
+            query = session.query(ProjectVersion)
             query = query.join(Project, Project.id == ProjectVersion.project_id)
             query = query.filter(Project.is_mirror.is_(True))
             query = query.filter(ProjectVersion.name == version)
@@ -157,14 +168,12 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             if entry.mirror_state == "updating":
                 while True:
-                    try:
-                        upd_progress = await apt.mirror_get_progress(task_id)
-                    except Exception as exc:
-                        logger.error("update mirror %s get progress exception: %s", mirrorname, exc)
-                        # FIXME: retry !
+                    upd_progress = await apt.mirror_get_progress(task_id)
+                    if not upd_progress:
+                        logger.error("Error getting mirror progress %s", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
                         return
 
                     # 0: init, 1: running, 2: success, 3: failed
@@ -175,7 +184,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         logger.error("update mirror %s progress error", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
                         return
 
                     logger.info("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
@@ -204,7 +213,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     logger.error("error creating mirror %s snapshot: %s", mirrorname, exc)
                     entry.mirror_state = "error"
                     await build.set_publish_failed()
-                    session.commit()  # pylint: disable=no-member
+                    session.commit()
                     return
 
                 while True:
@@ -214,7 +223,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         logger.exception("error getting mirror %s state", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
                         return
                     # States:
                     # 0: init, 1: running, 2: success, 3: failed
@@ -224,7 +233,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         logger.error("creating mirror %s snapshot failed", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
                         return
 
                     # FIMXE: why sleep ?
@@ -233,7 +242,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 await apt.delete_task(task_id)
 
                 entry.mirror_state = "publishing"
-                session.commit()  # pylint: disable=no-member
+                session.commit()
 
                 # publish new snapshot
                 write_log(build.id, "I: publishing mirror\n")
@@ -245,7 +254,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
                     entry.mirror_state = "error"
                     await build.set_publish_failed()
-                    session.commit()  # pylint: disable=no-member
+                    session.commit()
                     await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
                     return
 
@@ -258,7 +267,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
 
                         await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
                         return
@@ -271,7 +280,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         logger.error("error publishing mirror %s snapshot", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
-                        session.commit()  # pylint: disable=no-member
+                        session.commit()
                         await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
                         return
 
@@ -287,18 +296,14 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             if entry.project.is_basemirror:
                 for arch_name in entry.mirror_architectures[1:-1].split(","):
-                    arch = (
-                        session.query(Architecture)
-                        .filter(Architecture.name == arch_name)
-                        .first()
-                    )  # pylint: disable=no-member
+                    arch = session.query(Architecture).filter(Architecture.name == arch_name).first()
                     if not arch:
                         await build.set_publish_failed()
                         logger.error("finalize mirror: architecture '%s' not found", arch_name)
                         return
 
                     buildvariant = BuildVariant(base_mirror=entry, architecture=arch)
-                    session.add(buildvariant)  # pylint: disable=no-member
+                    session.add(buildvariant)
 
                     write_log(build.id, "I: starting chroot environments build\n")
 
@@ -348,7 +353,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             entry.is_locked = True
             entry.mirror_state = "ready"
-            session.commit()  # pylint: disable=no-member
+            session.commit()
 
             await build.set_successful()
             session.commit()
@@ -489,7 +494,7 @@ class AptlyWorker:
         write_log_title(build.id, "Create Mirror")
 
         mirror_project = (
-            session.query(Project)  # pylint: disable=no-member
+            session.query(Project)
             .filter(Project.name == mirror, Project.is_mirror.is_(True))
             .first()
         )
@@ -497,14 +502,12 @@ class AptlyWorker:
             mirror_project = Project(
                 name=mirror, is_mirror=True, is_basemirror=is_basemirror
             )
-            session.add(mirror_project)  # pylint: disable=no-member
+            session.add(mirror_project)
 
         project_version = (
             session.query(ProjectVersion)
             .join(Project)
-            .filter(  # pylint: disable=no-member
-                Project.name == mirror, Project.is_mirror.is_(True)
-            )
+            .filter(Project.name == mirror, Project.is_mirror.is_(True))
             .filter(ProjectVersion.name == version)
             .first()
         )
@@ -521,7 +524,7 @@ class AptlyWorker:
         db_buildvariant = None
         if not is_basemirror:
             db_basemirror = (
-                session.query(ProjectVersion)  # pylint: disable=no-member
+                session.query(ProjectVersion)
                 .filter(ProjectVersion.id == basemirror_id)
                 .first()
             )
@@ -535,7 +538,7 @@ class AptlyWorker:
             base_mirror = db_basemirror.project.name
             base_mirror_version = db_basemirror.name
             db_buildvariant = (
-                session.query(BuildVariant)  # pylint: disable=no-member
+                session.query(BuildVariant)
                 .filter(BuildVariant.base_mirror_id == basemirror_id)
                 .first()
             )
@@ -677,7 +680,7 @@ class AptlyWorker:
             return
 
         mirror.mirror_state = "updating"
-        session.commit()  # pylint: disable=no-member
+        session.commit()
 
     async def _src_publish(self, args, session):
         build_id = args[0]
