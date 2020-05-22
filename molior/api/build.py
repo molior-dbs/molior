@@ -667,10 +667,12 @@ async def rebuild_build(request):
     build = request.cirrina.db_session.query(Build).filter(Build.id == build_id).first()
 
     if not build:
+        logger.error("build %d not found" % build_id)
         return web.Response(text="Build not found", status=400)
 
     if not can_rebuild(build, request.cirrina.web_session, request.cirrina.db_session):
-        return web.Response(text="This build can not be rebuilt", status=400)
+        logger.error("build %d cannot be rebuilt" % build_id)
+        return web.Response(text="This build cannot be rebuilt", status=400)
 
     args = {"rebuild": [build_id]}
     await request.cirrina.task_queue.put(args)
