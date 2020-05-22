@@ -91,6 +91,12 @@ class BackendWorker:
                     if build_id:
                         handled = True
                         await self._failed(session, build_id)
+                    node_dummy = task.get("node_registered")
+                    if node_dummy:
+                        # Schedule builds
+                        args = {"schedule": []}
+                        await self.task_queue.put(args)
+                        handled = True
 
                 if not handled:
                     logger.error("backend: got unknown task %s", str(task))
