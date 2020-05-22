@@ -50,6 +50,7 @@ async def node_register(ws_client):
         registry[arch].insert(0, ws_client)
         logger.info("backend: node registered: %s/%s", arch, node)
         asyncio.ensure_future(watchdog(ws_client))
+        await backend_queue.put({"node_registered": 1})
     else:
         logger.error("backend: invalid architecture received: '%s'", arch)
 
