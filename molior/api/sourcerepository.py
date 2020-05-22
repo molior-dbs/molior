@@ -534,8 +534,6 @@ async def trigger_clone(request):
     request.cirrina.db_session.add(build)
     await build_added(build)
 
-    await build.set_building()
-
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
     request.cirrina.db_session.add(buildtask)
@@ -610,8 +608,6 @@ async def trigger_build(request):
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
     await build_added(build)
-
-    await build.set_building()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
