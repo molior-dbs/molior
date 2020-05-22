@@ -42,8 +42,11 @@ async def get_status(request):
 
     sshkey_file = expanduser("~/.ssh/id_rsa.pub")
     sshkey = ""
-    with open(sshkey_file) as f:
-        sshkey = f.read()
+    try:
+        with open(sshkey_file) as f:
+            sshkey = f.read()
+    except Exception:
+        pass
 
     status = {
         "versions": {"molior-server": [MOLIOR_VERSION]},
