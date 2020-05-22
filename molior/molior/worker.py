@@ -46,7 +46,6 @@ class Worker:
             )
             return
 
-        await build.set_building()
         repo.set_cloning()
         session.commit()
 
@@ -65,7 +64,8 @@ class Worker:
             logger.error("rebuild: build %d not found", build_id)
             return
 
-        await build.set_building()
+        if build.buildstate != "building":
+            await build.set_building()
 
         repo = (
             session.query(SourceRepository)
@@ -119,7 +119,9 @@ class Worker:
             await asyncio.sleep(2)
             return
 
-        await build.set_building()
+        if build.buildstate != "building":
+            await build.set_building()
+
         repo.set_busy()
         session.commit()  # pylint: disable=no-member
 
