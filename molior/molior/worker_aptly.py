@@ -33,7 +33,9 @@ async def startup_mirror(task_queue):
         query = session.query(ProjectVersion)  # pylint: disable=no-member
         query = query.join(Project, Project.id == ProjectVersion.project_id)
         query = query.filter(Project.is_mirror.is_(True))
-        query = query.filter(or_(ProjectVersion.mirror_state == "updating", ProjectVersion.mirror_state == "publishing"))
+        query = query.filter(or_(ProjectVersion.mirror_state == "updating",
+                                 ProjectVersion.mirror_state == "publishing",
+                                 ProjectVersion.mirror_state == "error"))
 
         if not query.count():
             return
@@ -46,10 +48,8 @@ async def startup_mirror(task_queue):
             base_mirror = ""
             base_mirror_version = ""
             taskname = "Update mirror"
-            buildstate = "building"
             if mirror.mirror_state == "publishing":
                 taskname = "Publish snapshot:"
-                buildstate = "publishing"
             if not mirror.project.is_basemirror:
                 base_mirror = mirror.buildvariants[0].base_mirror.project.name
                 base_mirror_version = mirror.buildvariants[0].base_mirror.name
@@ -72,18 +72,25 @@ async def startup_mirror(task_queue):
                 session.query(Build)
                 .filter(
                     Build.buildtype == "mirror",
-                    Build.buildstate == buildstate,
                     Build.projectversion_id == mirror.id,
                 )
                 .first()
             )
             if not build:
-                # No task on aptly found
+                logger.info("no build found for mirror")
                 mirror.mirror_state = "error"
-                session.commit()  # pylint: disable=no-member
+                session.commit()
                 continue
 
             # FIXME: do not allow db cleanup while mirroring
+
+            # FIXME: detect if still publishing
+            if mirror.mirror_state == "error":
+                mirror.mirror_state = "updating"
+                build.buildstate = "building"
+                session.commit()
+
+            write_log(build.id, "W: continuing active mirroring\n")
 
             components = mirror.mirror_components.split(",")
             loop.create_task(
@@ -154,6 +161,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         upd_progress = await apt.mirror_get_progress(task_id)
                     except Exception as exc:
                         logger.error("update mirror %s get progress exception: %s", mirrorname, exc)
+                        # FIXME: retry !
                         entry.mirror_state = "error"
                         await build.set_failed()
                         session.commit()  # pylint: disable=no-member
