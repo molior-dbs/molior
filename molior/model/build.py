@@ -7,6 +7,7 @@ from datetime import datetime
 from molior.app import logger
 from molior.molior.notifier import build_changed
 from molior.molior.buildlogger import write_log_title
+# from molior.tools import check_user_role
 
 from .database import Base
 from .buildorder import BuildOrder
@@ -28,12 +29,10 @@ BUILD_STATES = [
 
 BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror"]
 
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-class Build(Base):  # pylint: disable=too-few-public-methods
-    """
-    Database model for a build.
-    """
 
+class Build(Base):
     __tablename__ = "build"
 
     id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
@@ -41,12 +40,8 @@ class Build(Base):  # pylint: disable=too-few-public-methods
     startstamp = Column(DateTime(timezone=True), nullable=True)
     buildendstamp = Column(DateTime(timezone=True), nullable=True)
     endstamp = Column(DateTime(timezone=True), nullable=True)
-    buildstate = Column(
-        "buildstate", Enum(*BUILD_STATES, name="buildstate_enum"), default="new"
-    )
-    buildtype = Column(
-        "buildtype", Enum(*BUILD_TYPES, name="buildtype_enum"), default="deb"
-    )
+    buildstate = Column("buildstate", Enum(*BUILD_STATES, name="buildstate_enum"), default="new")
+    buildtype = Column("buildtype", Enum(*BUILD_TYPES, name="buildtype_enum"), default="deb")
     versiontimestamp = Column(DateTime(timezone=True))
     version = Column(String)
     git_ref = Column(String)
@@ -60,16 +55,10 @@ class Build(Base):  # pylint: disable=too-few-public-methods
     sourcerepository = relationship("SourceRepository")
     projectversion_id = Column(ForeignKey("projectversion.id"))
     parent_id = Column(ForeignKey("build.id"))
-    children = relationship(
-        "Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id]
-    )
+    children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
-    build_after = relationship(
-        "SourceRepository",
-        secondary=BuildOrder,
-        primaryjoin=(BuildOrder.c.build_id == id),
-        secondaryjoin=(BuildOrder.c.dependency == SourceRepository.id),
-    )
+    build_after = relationship("SourceRepository", secondary=BuildOrder, primaryjoin=(BuildOrder.c.build_id == id),
+                               secondaryjoin=(BuildOrder.c.dependency == SourceRepository.id))
 
     def log_state(self, statemsg):
         prefix = ""
@@ -182,3 +171,81 @@ class Build(Base):  # pylint: disable=too-few-public-methods
             if all_ok:
                 await self.parent.parent.set_successful()
                 write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+
+    def can_rebuild(self, web_session, db_session):
+        """
+        Returns if the given build can be rebuilt
+
+        ---
+        description: Returns if the given build can be rebuilt
+        parameters:
+            - name: build
+              required: true
+              type: object
+            - name: session
+              required: true
+              type: object
+        """
+        is_failed = self.buildstate in ("build_failed", "publish_failed")
+        if not is_failed:
+            return False
+
+        if self.buildconfiguration:
+            # project_id = self.buildconfiguration.projectversions[0].project.id
+            is_locked = self.buildconfiguration.projectversions[0].is_locked
+        else:
+            # project_id = None
+            is_locked = None
+
+        if is_locked:
+            return False
+
+#        if project_id:
+#            return check_user_role(web_session, db_session, project_id, ["member", "owner"])
+
+        return False
+
+    def to_json(self):
+        buildjson = {
+            "id": self.id,
+            "parent_id": self.parent_id,
+            # circular dep "can_rebuild": self.can_rebuild(request.cirrina.web_session, request.cirrina.db_session),
+            "buildstate": self.buildstate,
+            "buildtype": self.buildtype,
+            "startstamp": self.startstamp.strftime(DATETIME_FORMAT) if self.startstamp else "",
+            "endstamp": self.endstamp.strftime(DATETIME_FORMAT) if self.endstamp else "",
+            "version": self.version,
+            "sourcename": self.sourcename,
+            "maintainer": ("{} {}".format(self.maintainer.firstname, self.maintainer.surname)
+                           if self.maintainer else ""),
+            "maintainer_email": (self.maintainer.email if self.maintainer else ""),
+            "git_ref": self.git_ref,
+            "branch": self.ci_branch,
+        }
+        if self.buildconfiguration:
+            buildjson.update(
+                {
+                    "project": {
+                        "name": self.buildconfiguration.projectversions[0].project.name,
+                        "id": self.buildconfiguration.projectversions[0].project.id,
+                        "version": {
+                            "name": self.buildconfiguration.projectversions[0].name,
+                            "id": self.buildconfiguration.projectversions[0].id,
+                            "is_locked": self.buildconfiguration.projectversions[0].is_locked,
+                        },
+                    },
+                    "buildvariant": {
+                        "architecture": {
+                            "name": self.buildconfiguration.buildvariant.architecture.name,
+                            "id": self.buildconfiguration.buildvariant.architecture.id,
+                        },
+                        "base_mirror": {
+                            "name": self.buildconfiguration.buildvariant.base_mirror.project.name,
+                            "version": self.buildconfiguration.buildvariant.base_mirror.name,
+                            "id": self.buildconfiguration.buildvariant.base_mirror.id,
+                        },
+                        "name": self.buildconfiguration.buildvariant.name,
+                    },
+                }
+            )
+        return buildjson

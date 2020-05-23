@@ -1,5 +1,7 @@
-from pathlib import Path
+import re
+import os
 
+from pathlib import Path
 from sqlalchemy import Column, String, Integer, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -14,7 +16,6 @@ from .sourepprover import SouRepProVer
 from .buildorder import BuildOrder
 from .sourcerepositoryhook import SourceRepositoryHook
 
-from molior.tools import parse_repository_name
 from molior.molior.configuration import Configuration
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
@@ -54,7 +55,12 @@ class SourceRepository(Base):  # pylint: disable=too-few-public-methods
         Returns:
             name (str): The name of the repository
         """
-        return parse_repository_name(str(self.url))
+        url = str(self.url)
+        if url.endswith(".git"):
+            search = re.search(r"([0-9a-zA-Z_\-.]+).git$", url)
+            if search:
+                return search.group(1)
+        return os.path.basename(url)
 
     @property
     def path(self):
