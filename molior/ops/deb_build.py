@@ -10,6 +10,7 @@ from pathlib import Path
 
 from molior.app import logger
 from molior.tools import get_changelog_attr, strip_epoch_version
+from molior.molior.notifier import build_changed
 
 from molior.model.database import Session
 from molior.model.sourcerepository import SourceRepository
@@ -266,6 +267,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         session.add(build)
         session.commit()
         build.log_state("created")
+        await build_changed(parent)
         await build_added(build)
 
         # add build order dependencies
