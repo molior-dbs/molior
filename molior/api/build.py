@@ -6,7 +6,7 @@ from sqlalchemy.sql import func, or_
 from sqlalchemy.orm import aliased
 
 from molior.app import app, logger
-from molior.model.build import Build, BUILD_STATES
+from molior.model.build import Build, BUILD_STATES, DATETIME_FORMAT
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.buildvariant import BuildVariant
 from molior.model.buildtask import BuildTask
@@ -15,108 +15,8 @@ from molior.model.sourcerepository import SourceRepository
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.maintainer import Maintainer
-from molior.tools import check_user_role, paginate
+from molior.tools import paginate
 from molior.molior.notifier import build_added
-
-DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-
-def can_rebuild(build, web_session, db_session):
-    """
-    Returns if the given build can be rebuilt
-
-    ---
-    description: Returns if the given build can be rebuilt
-    parameters:
-        - name: build
-          required: true
-          type: object
-        - name: session
-          required: true
-          type: object
-    """
-    is_failed = build.buildstate in ("build_failed", "publish_failed")
-    if not is_failed:
-        return False
-
-    if build.buildconfiguration:
-        project_id = build.buildconfiguration.projectversions[0].project.id
-        is_locked = build.buildconfiguration.projectversions[0].is_locked
-    else:
-        project_id = None
-        is_locked = None
-
-    if is_locked:
-        return False
-
-    if project_id:
-        return check_user_role(web_session, db_session, project_id, ["member", "owner"])
-
-    return False
-
-
-def build_json(request, build):
-    buildjson = {
-        "id": build.id,
-        "can_rebuild": can_rebuild(
-            build, request.cirrina.web_session, request.cirrina.db_session
-        ),
-        "buildstate": build.buildstate,
-        "buildtype": build.buildtype,
-        "startstamp": build.startstamp.strftime(DATETIME_FORMAT)
-        if build.startstamp
-        else "",
-        "endstamp": build.endstamp.strftime(DATETIME_FORMAT) if build.endstamp else "",
-        "version": build.version,
-        "sourcename": build.sourcename,
-        "maintainer": (
-            "{} {}".format(build.maintainer.firstname, build.maintainer.surname)
-            if build.maintainer
-            else ""
-        ),
-        "maintainer_email": (build.maintainer.email if build.maintainer else ""),
-        "git_ref": build.git_ref,
-        "branch": build.ci_branch,
-    }
-    if build.sourcerepository:
-        buildjson.update(
-            {
-                "sourcerepository": {
-                    "name": build.sourcerepository.name,
-                    "url": build.sourcerepository.url,
-                    "id": build.sourcerepository.id,
-                }
-            }
-        )
-    if build.buildconfiguration:
-        buildjson.update(
-            {
-                "project": {
-                    "name": build.buildconfiguration.projectversions[0].project.name,
-                    "id": build.buildconfiguration.projectversions[0].project.id,
-                    "version": {
-                        "name": build.buildconfiguration.projectversions[0].name,
-                        "id": build.buildconfiguration.projectversions[0].id,
-                        "is_locked": build.buildconfiguration.projectversions[
-                            0
-                        ].is_locked,
-                    },
-                },
-                "buildvariant": {
-                    "architecture": {
-                        "name": build.buildconfiguration.buildvariant.architecture.name,
-                        "id": build.buildconfiguration.buildvariant.architecture.id,
-                    },
-                    "base_mirror": {
-                        "name": build.buildconfiguration.buildvariant.base_mirror.project.name,
-                        "version": build.buildconfiguration.buildvariant.base_mirror.name,
-                        "id": build.buildconfiguration.buildvariant.base_mirror.id,
-                    },
-                    "name": build.buildconfiguration.buildvariant.name,
-                },
-            }
-        )
-    return buildjson
 
 
 @app.http_get("/api/builds", threaded=True)
@@ -340,7 +240,7 @@ FROM descendants order by id;
                 .first()
             )
 
-            buildjson = build_json(request, build)
+            buildjson = build.to_json()
             parents[build.id] = buildjson
 
             if build.parent_id:
@@ -524,7 +424,7 @@ FROM descendants order by id;
 
     if not count_only:
         for build in builds:
-            data["results"].append(build_json(request, build))
+            data["results"].append(build.to_json())
 
     return web.json_response(data)
 
@@ -584,16 +484,12 @@ async def get_build(request):
         "id": build.id,
         "buildstate": build.buildstate,
         "buildtype": build.buildtype,
-        "startstamp": build.startstamp.strftime(DATETIME_FORMAT)
-        if build.startstamp
-        else "",
+        "startstamp": build.startstamp.strftime(DATETIME_FORMAT) if build.startstamp else "",
         "endstamp": build.endstamp.strftime(DATETIME_FORMAT) if build.endstamp else "",
         "version": build.version,
         "maintainer": maintainer,
         "sourcename": build.sourcename,
-        "can_rebuild": can_rebuild(
-            build, request.cirrina.web_session, request.cirrina.db_session
-        ),
+        "can_rebuild": build.can_rebuild(build, request.cirrina.web_session, request.cirrina.db_session),
         "branch": build.ci_branch,
         "git_ref": build.git_ref,
     }
@@ -670,7 +566,7 @@ async def rebuild_build(request):
         logger.error("build %d not found" % build_id)
         return web.Response(text="Build not found", status=400)
 
-    if not can_rebuild(build, request.cirrina.web_session, request.cirrina.db_session):
+    if not build.can_rebuild(request.cirrina.web_session, request.cirrina.db_session):
         logger.error("build %d cannot be rebuilt" % build_id)
         return web.Response(text="This build cannot be rebuilt", status=400)
 
@@ -837,7 +733,7 @@ FROM descendants order by id;
             .first()
         )
 
-        buildjson = build_json(request, build)
+        buildjson = build.to_json()
         parents[build.id] = buildjson
 
         if build.parent_id:

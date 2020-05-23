@@ -12,66 +12,6 @@ from .configuration import Configuration
 from .worker_notification import notification_queue
 
 
-def _get_build_data(build):
-    """
-    Returns the given build model
-    as formatted dict.
-
-    Args:
-        build (molior.model.build.Build): The build model.
-
-    Returns:
-        dict: The data dict.
-    """
-    maintainer = "-"
-    if build.maintainer:
-        maintainer = "{} {}".format(
-            build.maintainer.firstname, build.maintainer.surname
-        )
-
-    data = {
-        "id": build.id,
-        "startstamp": str(build.startstamp),
-        "endstamp": str(build.endstamp),
-        "buildstate": build.buildstate,
-        "buildtype": build.buildtype,
-        "branch": build.ci_branch,
-        "git_ref": build.git_ref,
-        "sourcename": build.sourcename,
-        "version": build.version,
-        "maintainer": maintainer,
-    }
-    if build.sourcerepository:
-        data.update(
-            {
-                "sourcerepository": {
-                    "id": build.sourcerepository.id,
-                    "url": build.sourcerepository.url,
-                    "name": build.sourcerepository.name,
-                }
-            }
-        )
-    if build.buildconfiguration:
-        data.update(
-            {
-                "buildvariant": {
-                    "architecture": {
-                        "id": build.buildconfiguration.buildvariant.architecture.id,
-                        "name": build.buildconfiguration.buildvariant.architecture.name,
-                    },
-                    "basemirror": {
-                        "id": build.buildconfiguration.buildvariant.base_mirror.id,
-                        "version": build.buildconfiguration.buildvariant.base_mirror.name,
-                        "name": build.buildconfiguration.buildvariant.base_mirror.project.name,
-                    },
-                    "name": build.buildconfiguration.buildvariant.name,
-                },
-                "projectversion_id": build.buildconfiguration.projectversions[0].id,
-            }
-        )
-    return data
-
-
 async def build_added(build):
     """
     Sends a `build_added` notification to the web clients
@@ -79,19 +19,12 @@ async def build_added(build):
     Args:
         build (molior.model.build.Build): The build model.
     """
-    logger.debug(
-        "notifying web clients that build with id '%s' was added with state '%s'",
-        build.id,
-        build.buildstate,
-    )
-    data = _get_build_data(build)
-    args = {
-        "notify": {
+    data = build.to_json()
+    args = {"notify": {
             "event": Event.added.value,
             "subject": Subject.build.value,
             "data": data,
-        }
-    }
+            }}
     await notification_queue.put(args)
 
 
@@ -102,12 +35,7 @@ async def build_changed(build):
     Args:
         build (molior.model.build.Build): The build model.
     """
-    logger.debug(
-        "notifying web client that build with id '%s' was changed to '%s'",
-        build.id,
-        build.buildstate,
-    )
-    data = _get_build_data(build)
+    data = build.to_json()
     args = {
         "notify": {
             "event": Event.changed.value,

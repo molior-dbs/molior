@@ -1,5 +1,4 @@
 import re
-import os
 import shlex
 
 from launchy import Launchy
@@ -56,14 +55,11 @@ def check_admin(web_session, db_session):
     Helper to check current user is admin
     """
     if "username" in web_session:
-        res = (
-            db_session.query(User)  # pylint: disable=no-member
-            .filter_by(username=web_session["username"])
-            .first()
-        )
+        res = db_session.query(User).filter_by(username=web_session["username"]).first()
         if not res:
             return False
         return res.is_admin
+    return False
 
 
 def parse_int(value):
@@ -125,27 +121,19 @@ def check_user_role(web_session, db_session, project_id, role, allow_admin=True)
         .first()
     )
     if not user:
-        return False  # no user in database
+        return False
 
     if allow_admin and user.is_admin:
         return True
 
-    project = (
-        db_session.query(Project)
-        .filter_by(id=project_id)  # pylint: disable=no-member
-        .first()
-    )
+    project = db_session.query(Project).filter_by(id=project_id).first()
     if not project:
-        return False  # no project in database
+        return False
 
     logger.debug("searching role for user %d and project %d", user.id, project.id)
-    role_rec = (
-        db_session.query(UserRole)
-        .filter_by(user=user, project=project)  # pylint: disable=no-member
-        .first()
-    )
+    role_rec = db_session.query(UserRole).filter_by(user=user, project=project).first()
     if not role_rec:
-        return False  # no role in database
+        return False
 
     roles = [role] if isinstance(role, str) else role
 
@@ -232,33 +220,6 @@ def get_aptly_connection():
     aptly_passwd = cfg.aptly.get("pass")
     aptly = AptlyApi(api_url, gpg_key, username=aptly_user, password=aptly_passwd)
     return aptly
-
-
-def parse_repository_name(url):
-    """
-    Returns the repository name
-    of a git clone url.
-
-    Args:
-        url (str): Git clone url to parse
-
-    Returns:
-        name (str): The name of the repository
-
-    Examples:
-        >>> url = 'ssh://git@foo.com:1337/~jon/foobar.git'
-        >>> parse_repository_name(repo_name)
-        >>> 'foobar'
-        or:
-        >>> url = 'ssh://git@foo.com:1337/~jon/foobar'
-        >>> parse_repository_name(repo_name)
-        >>> 'foobar'
-    """
-    if url.endswith(".git"):
-        search = re.search(r"([0-9a-zA-Z_\-.]+).git$", url)
-        if search:
-            return search.group(1)
-    return os.path.basename(url)
 
 
 async def get_changelog_attr(name, path):
