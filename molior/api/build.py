@@ -489,7 +489,7 @@ async def get_build(request):
         "version": build.version,
         "maintainer": maintainer,
         "sourcename": build.sourcename,
-        "can_rebuild": build.can_rebuild(build, request.cirrina.web_session, request.cirrina.db_session),
+        # "can_rebuild": build.can_rebuild(request.cirrina.web_session, request.cirrina.db_session),
         "branch": build.ci_branch,
         "git_ref": build.git_ref,
     }
