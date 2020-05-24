@@ -15,15 +15,18 @@ def test_get_projectversion_no_cfg():
     Test get_projectversion if config dict is empty
     """
     path = Path("/foo/bar")
-    result = get_projectversion(path)
-    assert result == ""
+    with patch("molior.molior.core.logger"):
+        result = get_projectversion(path)
+        assert result == ""
 
 
 def test_get_projectversion_v_set():
     """
     Test get_projectversion if a cfg version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
 
         cfg = MagicMock()
         cfg.config_version = "1"
@@ -39,7 +42,9 @@ def test_get_projectversion_n_v_set():
     """
     Test get_projectversion if no cfg version is set but no target_repo_version
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = None
@@ -55,7 +60,9 @@ def test_get_projectversion_tgt_inv():
     """
     Test get_projectversion if no cfg version is set and an invalid target_repo_version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = 1
@@ -71,7 +78,9 @@ def test_get_projectversion_tgt_set():
     """
     Test get_projectversion if no cfg version is set and a valid target_repo_version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = "foo-next"
@@ -89,15 +98,18 @@ def test_get_target_config_no_cfg():
     """
     path = Path("/foo/bar")
     setattr(path.__class__, "exists", MagicMock(return_value=False))
-    result = get_target_config(path)
-    assert result == []
+    with patch("molior.molior.core.logger"):
+        result = get_target_config(path)
+        assert result == []
 
 
 def test_get_target_cfg_empty_cfg():
     """
     Test get target config if config is empty
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config.return_value = {}
         mock.return_value = cfg
@@ -112,7 +124,9 @@ def test_get_target_config():
     """
     Test get target config
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config.return_value = {"targets": {"testproject": ["1", "next"]}}
         mock.return_value = cfg

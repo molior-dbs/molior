@@ -19,9 +19,7 @@ class DebianRepository:
     CI_PACKAGES_TTL = 7
     DATETIME_FORMAT = "%Y%m%d%H%M%S"
 
-    def __init__(
-        self, basemirror_name, basemirror_version, project_name, project_version, archs
-    ):
+    def __init__(self, basemirror_name, basemirror_version, project_name, project_version, archs):
         self.basemirror_name = basemirror_name
         self.basemirror_version = basemirror_version
         self.project_name = project_name
@@ -137,9 +135,7 @@ class DebianRepository:
             try:
                 task_state = await self.__api.get_task_state(task_id)
             except Exception as exc:
-                logger.warning(
-                    "error occured while awaiting task finish: '%s'", str(exc)
-                )
+                logger.error("error awaiting aptly task: '%s'", str(exc))
                 return False
 
             if task_state.get("State") == TaskState.SUCCESSFUL.value:
@@ -186,14 +182,10 @@ class DebianRepository:
         try:
             for old_package in old_packages[:1]:
                 logger.info("removing old package from aptly: '%s'", old_package)
-                task_id = await self.__api.repo_packages_delete(
-                    self.name, [old_package]
-                )
+                task_id = await self.__api.repo_packages_delete(self.name, [old_package])
                 ret = await self.__await_task(task_id)
                 if not ret:
-                    logger.error(
-                        "Error deleting package: %s (task %d)", old_package, task_id
-                    )
+                    logger.error("Error deleting package: %s (task %d)", old_package, task_id)
         except Exception as exc:
             logger.exception(exc)
 
