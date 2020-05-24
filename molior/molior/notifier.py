@@ -1,15 +1,47 @@
 import socket
-from pathlib import Path
+import json
 import aiohttp
 
-import json
+from pathlib import Path
 from jinja2 import Template
+from enum import Enum
 
 from molior.app import logger
-from molior.api.messagetypes import Subject, Event
 from .emailer import send_mail
 from .configuration import Configuration
 from .worker_notification import notification_queue
+
+
+class Subject(Enum):
+    """Provides the molior subject types"""
+
+    websocket = 1
+    eventwatch = 2
+    userrole = 3
+    user = 4
+    project = 5
+    projectversion = 6
+    build = 7
+    livelog = 8
+
+
+class Event(Enum):
+    """Provides the molior event types"""
+
+    added = 1
+    changed = 2
+    removed = 3
+    connected = 4
+
+
+class Action(Enum):
+    """Provides the molior action types"""
+
+    add = 1
+    change = 2
+    remove = 3
+    start = 4
+    stop = 5
 
 
 async def build_added(build):

@@ -2,7 +2,7 @@ import asyncio
 import json
 
 from molior.app import logger
-from .messagetypes import Subject, Event
+from molior.notifier import Subject, Event
 
 
 class LiveLogger:
