@@ -80,7 +80,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   vim-nox, python3-flake8, flake8, cmake, python3-pytest, python3-pytest-cov,
   libpython3-dev, fonts-hack-ttf, build-essential, exuberant-ctags,
 # add some tools:
-  htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xbase-clients,
+  htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xauth,
 # molior:
   molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
   molior-tools,
