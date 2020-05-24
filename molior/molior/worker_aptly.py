@@ -199,12 +199,12 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     args = {
                         "notify": {
                             "event": Event.changed.value,
-                            "subject": Subject.mirror.value,
-                            "data": upd_progress,
+                            "subject": Subject.build.value,
+                            "data": {"id": build.id, "progress": upd_progress["PercentSize"]},
                         }
                     }
                     await notification_queue.put(args)
-                    await asyncio.sleep(20)
+                    await asyncio.sleep(10)
 
                 await apt.delete_task(task_id)
 
@@ -303,12 +303,13 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     args = {
                         "notify": {
                             "event": Event.changed.value,
-                            "subject": Subject.mirror.value,
-                            "data": upd_progress,
+                            "subject": Subject.build.value,
+                            "data": {"id": build.id, "progress": upd_progress["PercentPackages"]},
                         }
                     }
+                    logger.info("notify: {}".format(args))
                     await notification_queue.put(args)
-                    await asyncio.sleep(20)
+                    await asyncio.sleep(10)
 
             if entry.project.is_basemirror:
                 for arch_name in entry.mirror_architectures[1:-1].split(","):

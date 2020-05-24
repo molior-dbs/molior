@@ -239,7 +239,7 @@ FROM descendants order by id;
                 .first()
             )
 
-            buildjson = build.to_json()
+            buildjson = build.data()
             parents[build.id] = buildjson
 
             if build.parent_id:
@@ -423,7 +423,7 @@ FROM descendants order by id;
 
     if not count_only:
         for build in builds:
-            data["results"].append(build.to_json())
+            data["results"].append(build.data())
 
     return web.json_response(data)
 
@@ -732,7 +732,7 @@ FROM descendants order by id;
             .first()
         )
 
-        buildjson = build.to_json()
+        buildjson = build.data()
         parents[build.id] = buildjson
 
         if build.parent_id:

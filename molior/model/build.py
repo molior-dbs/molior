@@ -55,6 +55,7 @@ class Build(Base):
     sourcerepository_id = Column(ForeignKey("sourcerepository.id"))
     sourcerepository = relationship("SourceRepository")
     projectversion_id = Column(ForeignKey("projectversion.id"))
+    projectversion = relationship("ProjectVersion")
     parent_id = Column(ForeignKey("build.id"))
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
@@ -206,7 +207,7 @@ class Build(Base):
 
         return False
 
-    def to_json(self):
+    def data(self):
         buildjson = {
             "id": self.id,
             "parent_id": self.parent_id,
@@ -223,6 +224,12 @@ class Build(Base):
             "git_ref": self.git_ref,
             "branch": self.ci_branch,
         }
+
+        if self.projectversion:
+            if self.projectversion.project.is_mirror:
+                if self.buildtype == "mirror" or self.buildtype == "chroot":
+                    buildjson.update({"architectures": self.projectversion.mirror_architectures[1:-1].split(",")})
+
         if self.buildconfiguration:
             buildjson.update(
                 {
@@ -258,7 +265,7 @@ class Build(Base):
         Args:
             build (molior.model.build.Build): The build model.
         """
-        data = self.to_json()
+        data = self.data()
         args = {"notify": {
                 "event": Event.added.value,
                 "subject": Subject.build.value,
@@ -273,7 +280,7 @@ class Build(Base):
         Args:
             build (molior.model.build.Build): The build model.
         """
-        data = self.to_json()
+        data = self.data()
         args = {
             "notify": {
                 "event": Event.changed.value,
