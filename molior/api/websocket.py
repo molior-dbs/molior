@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from molior.app import app, logger
-from molior.notifier import Subject, Event, Action
+from molior.molior.notifier import Subject, Event, Action
 from .livelogger import LiveLogger
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")

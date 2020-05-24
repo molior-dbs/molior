@@ -5,9 +5,10 @@ from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
 from molior.app import logger
-from molior.molior.notifier import build_changed
 from molior.molior.buildlogger import write_log_title
 # from molior.tools import check_user_role
+from molior.molior.notifier import Subject, Event
+from molior.molior.queues import notification_queue
 
 from .database import Base
 from .buildorder import BuildOrder
@@ -93,7 +94,7 @@ class Build(Base):
     async def set_needs_build(self):
         self.log_state("needs build")
         self.buildstate = "needs_build"
-        await build_changed(self)
+        await self.build_changed()
 
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "building":
@@ -102,14 +103,14 @@ class Build(Base):
     async def set_scheduled(self):
         self.log_state("scheduled")
         self.buildstate = "scheduled"
-        await build_changed(self)
+        await self.build_changed()
 
     async def set_building(self):
         self.log_state("building")
         self.buildstate = "building"
         now = local_tz.localize(datetime.now(), is_dst=None)
         self.startstamp = now
-        await build_changed(self)
+        await self.build_changed()
 
     async def set_failed(self):
         self.log_state("failed")
@@ -117,7 +118,7 @@ class Build(Base):
         now = local_tz.localize(datetime.now(), is_dst=None)
         self.buildendstamp = now
         self.endstamp = now
-        await build_changed(self)
+        await self.build_changed()
 
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
@@ -131,19 +132,19 @@ class Build(Base):
         self.buildstate = "needs_publish"
         now = local_tz.localize(datetime.now(), is_dst=None)
         self.buildendstamp = now
-        await build_changed(self)
+        await self.build_changed()
 
     async def set_publishing(self):
         self.log_state("publishing")
         self.buildstate = "publishing"
-        await build_changed(self)
+        await self.build_changed()
 
     async def set_publish_failed(self):
         self.log_state("publishing failed")
         self.buildstate = "publish_failed"
         now = local_tz.localize(datetime.now(), is_dst=None)
         self.endstamp = now
-        await build_changed(self)
+        await self.build_changed()
 
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
@@ -157,7 +158,7 @@ class Build(Base):
         self.buildstate = "successful"
         now = local_tz.localize(datetime.now(), is_dst=None)
         self.endstamp = now
-        await build_changed(self)
+        await self.build_changed()
 
         if self.buildtype == "deb":
             # update (grand) parent build
@@ -249,3 +250,49 @@ class Build(Base):
                 }
             )
         return buildjson
+
+    async def build_added(self):
+        """
+        Sends a `build_added` notification to the web clients
+
+        Args:
+            build (molior.model.build.Build): The build model.
+        """
+        data = self.to_json()
+        args = {"notify": {
+                "event": Event.added.value,
+                "subject": Subject.build.value,
+                "data": data,
+                }}
+        await notification_queue.put(args)
+
+    async def build_changed(self):
+        """
+        Sends a `build_changed` notification to the web clients
+
+        Args:
+            build (molior.model.build.Build): The build model.
+        """
+        data = self.to_json()
+        args = {
+            "notify": {
+                "event": Event.changed.value,
+                "subject": Subject.build.value,
+                "data": data,
+            }
+        }
+        await notification_queue.put(args)
+
+        # running hooks if needed
+        if self.buildtype != "deb":  # only run hooks for deb builds
+            return
+
+        if (
+           self.buildstate != "building"  # only send building, ok, nok
+           and self.buildstate != "successful"
+           and self.buildstate != "build_failed"
+           and self.buildstate != "publish_failed"):
+            return
+
+        args = {"hooks": {"build_id": self.id}}
+        await notification_queue.put(args)

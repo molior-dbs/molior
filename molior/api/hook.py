@@ -40,7 +40,7 @@ async def get_webhooks(request):
         request.cirrina.db_session.query(SourceRepository)
         .filter(SourceRepository.id == repository_id)
         .first()
-    )  # pylint: disable=no-member
+    )
 
     data = {
         "total_result_count": len(repo.hooks),

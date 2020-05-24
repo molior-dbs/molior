@@ -12,12 +12,13 @@ from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.architecture import Architecture
 from molior.model.chroot import Chroot
-from molior.molior.notifier import build_added
 from molior.aptly.errors import AptlyError, NotFoundError
 from molior.tools import get_aptly_connection
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.debianrepository import DebianRepository
 from ..ops import DebSrcPublish, DebPublish
+from molior.molior.notifier import Subject, Event
+from molior.molior.queues import notification_queue
 
 
 async def startup_mirror(task_queue):
@@ -70,7 +71,7 @@ async def startup_mirror(task_queue):
                         elif i == 1:
                             build_state = "publishing"
                             mirror_state = "publishing"
-                        break
+                        # do not break here, use last task in the list
 
             if not m_tasks:
                 # No task on aptly found
@@ -195,8 +196,15 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                                 upd_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
                                 upd_progress["PercentSize"],
                                 )
-
-                    await asyncio.sleep(2)
+                    args = {
+                        "notify": {
+                            "event": Event.changed.value,
+                            "subject": Subject.mirror.value,
+                            "data": upd_progress,
+                        }
+                    }
+                    await notification_queue.put(args)
+                    await asyncio.sleep(20)
 
                 await apt.delete_task(task_id)
 
@@ -292,7 +300,15 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         upd_progress["PercentPackages"],
                     )
 
-                    await asyncio.sleep(2)
+                    args = {
+                        "notify": {
+                            "event": Event.changed.value,
+                            "subject": Subject.mirror.value,
+                            "data": upd_progress,
+                        }
+                    }
+                    await notification_queue.put(args)
+                    await asyncio.sleep(20)
 
             if entry.project.is_basemirror:
                 for arch_name in entry.mirror_architectures[1:-1].split(","):
@@ -326,7 +342,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     session.add(chroot_build)
                     session.commit()
                     chroot_build.log_state("created")
-                    await build_added(chroot_build)
+                    await chroot_build.build_added()
 
                     await chroot_build.set_needs_build()
                     session.commit()
@@ -488,7 +504,7 @@ class AptlyWorker:
 
         build.log_state("created")
         session.add(build)
-        await build_added(build)
+        await build.build_added()
         session.commit()
 
         write_log_title(build.id, "Create Mirror")

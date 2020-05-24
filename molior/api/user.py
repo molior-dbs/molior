@@ -8,7 +8,7 @@ from molior.model.user import User
 from molior.model.userrole import UserRole
 from molior.model.project import Project
 from molior.tools import paginate
-from molior.notifier import Subject, Event
+from molior.molior.notifier import Subject, Event
 
 
 @app.http_get("/api/users")

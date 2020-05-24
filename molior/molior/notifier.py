@@ -3,13 +3,11 @@ import json
 import aiohttp
 
 from pathlib import Path
-from jinja2 import Template
 from enum import Enum
 
 from molior.app import logger
 from .emailer import send_mail
 from .configuration import Configuration
-from .worker_notification import notification_queue
 
 
 class Subject(Enum):
@@ -23,6 +21,7 @@ class Subject(Enum):
     projectversion = 6
     build = 7
     livelog = 8
+    mirror = 9
 
 
 class Event(Enum):
@@ -44,111 +43,6 @@ class Action(Enum):
     stop = 5
 
 
-async def build_added(build):
-    """
-    Sends a `build_added` notification to the web clients
-
-    Args:
-        build (molior.model.build.Build): The build model.
-    """
-    data = build.to_json()
-    args = {"notify": {
-            "event": Event.added.value,
-            "subject": Subject.build.value,
-            "data": data,
-            }}
-    await notification_queue.put(args)
-
-
-async def build_changed(build):
-    """
-    Sends a `build_changed` notification to the web clients
-
-    Args:
-        build (molior.model.build.Build): The build model.
-    """
-    data = build.to_json()
-    args = {
-        "notify": {
-            "event": Event.changed.value,
-            "subject": Subject.build.value,
-            "data": data,
-        }
-    }
-    await notification_queue.put(args)
-
-    # only run hooks for deb builds
-    if build.buildtype != "deb":
-        return
-
-    # only send building, ok, nok
-    if (
-        build.buildstate != "building"
-        and build.buildstate != "successful"
-        and build.buildstate != "build_failed"
-        and build.buildstate != "publish_failed"
-    ):
-        return
-
-    maintainer = build.maintainer
-
-    cfg_host = Configuration().hostname
-    hostname = cfg_host if cfg_host else socket.getfqdn()
-
-    class ResultObject:
-        pass
-
-    repository = ResultObject()
-    if build.sourcerepository:
-        repository.url = build.sourcerepository.url
-        repository.name = build.sourcerepository.name
-
-    buildres = ResultObject()
-    buildres.id = build.id
-    buildres.status = build.buildstate
-    buildres.version = build.version
-    buildres.url = "http://{}/build/{}".format(hostname, build.id)
-    buildres.raw_log_url = "http://{}/buildout/{}/build.log".format(hostname, build.id)
-    buildres.commit = build.git_ref
-    buildres.branch = build.ci_branch
-
-    platform = ResultObject()
-    if build.buildconfiguration:
-        platform.distrelease = (
-            build.buildconfiguration.buildvariant.base_mirror.project.name
-        )
-        platform.version = build.buildconfiguration.buildvariant.base_mirror.name
-        platform.architecture = build.buildconfiguration.buildvariant.architecture.name
-
-    project = ResultObject()
-    if build.buildconfiguration:
-        project.name = build.buildconfiguration.projectversions[0].project.name
-        project.version = build.buildconfiguration.projectversions[0].name
-
-    args = {
-        "repository": repository,
-        "build": buildres,
-        "platform": platform,
-        "maintainer": maintainer,
-        "project": project,
-    }
-
-    if build.sourcerepository:
-        for hook in build.sourcerepository.hooks:
-            if not hook.enabled:
-                continue
-
-            try:
-                url = Template(hook.url).render(**args)
-                body = Template(hook.body).render(**args)
-
-                await trigger_hook(hook.method, url, skip_ssl=hook.skip_ssl, body=body)
-            except Exception as exc:
-                logger.error(
-                    "could not trigger web hook '%s' to '%s': %s", hook.method, url, exc
-                )
-
-
 async def trigger_hook(method, url, skip_ssl, body=None):
     """
     Triggers a web hook.
@@ -166,7 +60,7 @@ async def trigger_hook(method, url, skip_ssl, body=None):
     try:
         data = json.loads(body)
     except Exception as exc:
-        logger.error("could not trigger web hook '%s' to '%s': %s", method, url, exc)
+        logger.error("hook: error parsing json body: {}".format(exc))
         return
 
     connector = aiohttp.TCPConnector(verify_ssl=verify)
@@ -175,23 +69,13 @@ async def trigger_hook(method, url, skip_ssl, body=None):
         async with aiohttp.ClientSession(connector=connector) as http:
             async with http.post(url, headers=headers, data=json.dumps(data)) as resp:
                 if resp.status != 200:
-                    logger.warning(
-                        "trigger web hook '%s' to '%s' returned %d ",
-                        method,
-                        url,
-                        resp.status,
-                    )
+                    logger.warning("trigger web hook '%s' to '%s' returned %d ", method, url, resp.status)
 
     elif method.lower() == "get":
         async with aiohttp.ClientSession() as http:
             async with http.get(url) as resp:
                 if resp.status != 200:
-                    logger.warning(
-                        "trigger web hook '%s' to '%s' returned %d ",
-                        method,
-                        url,
-                        resp.status,
-                    )
+                    logger.warning("trigger web hook '%s' to '%s' returned %d ", method, url, resp.status)
 
 
 def send_mail_notification(build):
