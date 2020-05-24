@@ -90,9 +90,7 @@ def test_generate_snapshot_name():
         project_version = "1"
         archs = []
 
-        repo = DebianRepository(
-            basemirror_name, basemirror_version, project_name, project_version, archs
-        )
+        repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
 
         date_time_mock.now.return_value = datetime(2018, 1, 1, 12, 0, 0)
         publish_name.return_value = "test"
@@ -117,9 +115,7 @@ def test_await_task_exception():
         project_name = "testproject"
         project_version = "1"
         archs = []
-        repo = DebianRepository(
-            basemirror_name, basemirror_version, project_name, project_version, archs
-        )
+        repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
 
         loop = asyncio.get_event_loop()
         res = loop.run_until_complete(repo._DebianRepository__await_task(1337))
@@ -144,9 +140,7 @@ def test_await_task():
         project_name = "testproject"
         project_version = "1"
         archs = []
-        repo = DebianRepository(
-            basemirror_name, basemirror_version, project_name, project_version, archs
-        )
+        repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
 
         res = repo._DebianRepository__await_task(1337)
         assert res
@@ -202,9 +196,7 @@ def test_remove_old_packages():
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
 
-        aptly_connection.repo_packages_delete = Mock(
-            side_effect=asyncio.coroutine(lambda a, b: 1337)
-        )
+        aptly_connection.repo_packages_delete = Mock(side_effect=asyncio.coroutine(lambda a, b: 1337))
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"

@@ -105,6 +105,16 @@ class ProjectVersion(Base):  # pylint: disable=too-few-public-methods
         full = "deb {0} {1} {2}".format(url, dist, "main")
         return url if url_only else full
 
+    def mirror_changed(self):
+        pass
+        # await app.websocket_broadcast(
+        #    {
+        #        "event": Event.changed.value,
+        #        "subject": Subject.mirror.value,
+        #        "data": {},
+        #    }
+        # )
+
 
 def get_projectversion_deps(projectversion_id, session):
     """

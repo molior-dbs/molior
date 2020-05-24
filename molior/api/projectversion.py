@@ -12,7 +12,6 @@ from molior.model.buildvariant import BuildVariant
 from molior.model.sourcerepository import SourceRepository
 from molior.model.sourepprover import SouRepProVer
 from molior.model.buildconfiguration import BuildConfiguration
-from molior.molior.notifier import build_added
 from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
 
 
@@ -491,7 +490,7 @@ async def post_add_repository(request):
 
         request.cirrina.db_session.add(build)
         request.cirrina.db_session.commit()
-        await build_added(build)
+        await build.build_added()
 
         token = uuid.uuid4()
         buildtask = BuildTask(build=build, task_id=str(token))

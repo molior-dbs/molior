@@ -6,7 +6,6 @@ from molior.app import app, logger
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
 from molior.model.sourcerepository import SourceRepository
-from molior.molior.notifier import build_added
 from molior.molior.configuration import Configuration
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -252,7 +251,7 @@ async def process_tag_push(request, data):
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     build_task = BuildTask(build=build, task_id=str(token))
@@ -385,7 +384,7 @@ async def process_push(request, data):
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     build_task = BuildTask(build=build, task_id=str(token))

@@ -10,7 +10,6 @@ from pathlib import Path
 
 from molior.app import logger
 from molior.tools import get_changelog_attr, strip_epoch_version
-from molior.molior.notifier import build_changed
 
 from molior.model.database import Session
 from molior.model.sourcerepository import SourceRepository
@@ -30,7 +29,6 @@ from molior.molior.core import (
     get_buildorder,
 )
 
-from molior.molior.notifier import build_added
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.configuration import Configuration
 from molior.molior.worker_backend import backend_queue
@@ -267,8 +265,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         session.add(build)
         session.commit()
         build.log_state("created")
-        await build_changed(parent)
-        await build_added(build)
+        await parent.build_changed()
+        await build.build_added()
 
         # add build order dependencies
         build_after = get_buildorder(repo.src_path)
@@ -359,7 +357,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             session.commit()
 
             deb_build.log_state("created")
-            await build_added(deb_build)
+            await deb_build.build_added()
 
         # FIXME: if not found, abort?
 

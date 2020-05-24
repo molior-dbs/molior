@@ -18,9 +18,9 @@ from molior.molior.worker_notification import NotificationWorker
 from molior.model.database import database
 from molior.app import app
 from molior.version import MOLIOR_VERSION
-
 from molior.molior.backend import Backend
 from molior.auth import Auth
+from molior.molior.queues import task_queue, aptly_queue
 
 # import api handlers
 import molior.api.build              # noqa: F401
@@ -51,10 +51,6 @@ import molior.api2.mirror            # noqa: F401
 processed_repos = []
 
 loop = asyncio.get_event_loop()
-
-# worker queues
-task_queue = asyncio.Queue()
-aptly_queue = asyncio.Queue()
 
 
 def run_backend_thread(backend):

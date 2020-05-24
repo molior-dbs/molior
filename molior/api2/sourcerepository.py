@@ -15,7 +15,6 @@ from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion, get_projectversion
 from molior.model.sourepprover import SouRepProVer
 from molior.model.architecture import Architecture
-from molior.molior.notifier import build_added
 from molior.tools import ErrorResponse, paginate
 
 # FIXME: move to tools/model:
@@ -267,7 +266,7 @@ async def add_repository(request):
 
         db.add(build)
         db.commit()
-        await build_added(build)
+        await build.build_added()
 
         token = uuid.uuid4()
         buildtask = BuildTask(build=build, task_id=str(token))

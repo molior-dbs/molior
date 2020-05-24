@@ -11,7 +11,6 @@ from molior.model.buildvariant import BuildVariant
 from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.projectversion import ProjectVersion
 from molior.model.sourepprover import SouRepProVer
-from molior.molior.notifier import build_added
 from molior.tools import ErrorResponse, parse_int, get_hook_triggers, paginate
 
 
@@ -532,7 +531,7 @@ async def trigger_clone(request):
     )
 
     request.cirrina.db_session.add(build)
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
@@ -607,7 +606,7 @@ async def trigger_build(request):
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))

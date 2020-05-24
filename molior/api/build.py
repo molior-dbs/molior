@@ -16,7 +16,6 @@ from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion
 from molior.model.maintainer import Maintainer
 from molior.tools import paginate
-from molior.molior.notifier import build_added
 
 
 @app.http_get("/api/builds", threaded=True)
@@ -654,7 +653,7 @@ async def trigger_build(request):
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
