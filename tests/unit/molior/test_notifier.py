@@ -1,7 +1,7 @@
 import asyncio
 
 from urllib.parse import quote_plus
-from mock import patch, MagicMock, Mock
+from mock import patch, MagicMock, Mock, mock_open
 
 from molior.model.build import Build
 from molior.molior.worker_notification import NotificationWorker
@@ -49,7 +49,8 @@ def test_build_changed_url_encoding():
                 lambda method, url, skip_ssl, body: None)
             ) as trigger_hook, patch(
             "molior.molior.worker_notification.app") as app, patch(
-            "molior.molior.worker_notification.Session") as Session:
+            "molior.molior.worker_notification.Session") as Session, patch(
+            "molior.molior.configuration.open", mock_open(read_data="{'hostname': 'testhostname'}")):
         cfg.return_value.hostname = "localhost"
 
         enter = MagicMock()
