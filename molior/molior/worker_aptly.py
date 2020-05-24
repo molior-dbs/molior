@@ -17,8 +17,7 @@ from molior.tools import get_aptly_connection
 from molior.molior.buildlogger import write_log, write_log_title
 from molior.molior.debianrepository import DebianRepository
 from ..ops import DebSrcPublish, DebPublish
-from molior.molior.notifier import Subject, Event
-from molior.molior.queues import notification_queue
+from molior.molior.notifier import Subject, Event, notify
 
 
 async def startup_mirror(task_queue):
@@ -54,6 +53,7 @@ async def startup_mirror(task_queue):
             build_state = None
             mirror_state = None
             if tasks:
+                logger.info("tasks {}".format(tasks))
                 for i in range(len(tasknames)):
                     taskname = tasknames[i]
                     if not mirror.project.is_basemirror:
@@ -63,8 +63,10 @@ async def startup_mirror(task_queue):
                                                             mirror.project.name, mirror.name)
                     else:
                         task_name = "{} {}-{}".format(taskname, mirror.project.name, mirror.name)
-                    m_tasks = [task for task in tasks if task["Name"] == task_name]
-                    if m_tasks:
+                    logger.info("taskname {}".format(task_name))
+                    tmp_tasks = [task for task in tasks if task["Name"] == task_name]
+                    if tmp_tasks:
+                        m_tasks = tmp_tasks
                         if i == 0:
                             build_state = "building"
                             mirror_state = "updating"
@@ -198,14 +200,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                                 upd_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
                                 upd_progress["PercentSize"],
                                 )
-                    args = {
-                        "notify": {
-                            "event": Event.changed.value,
-                            "subject": Subject.build.value,
-                            "data": {"id": build.id, "progress": upd_progress["PercentSize"]},
-                        }
-                    }
-                    await notification_queue.put(args)
+
+                    await notify(Subject.build.value, Event.changed.value,
+                                 {"id": build.id, "progress": upd_progress["PercentSize"]})
+                    await notify(Subject.mirror.value, Event.changed.value,
+                                 {"id": entry.id, "progress": upd_progress["PercentSize"]})
                     await asyncio.sleep(10)
 
                 await apt.delete_task(task_id)
@@ -302,15 +301,10 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         upd_progress["PercentPackages"],
                     )
 
-                    args = {
-                        "notify": {
-                            "event": Event.changed.value,
-                            "subject": Subject.build.value,
-                            "data": {"id": build.id, "progress": upd_progress["PercentPackages"]},
-                        }
-                    }
-                    logger.info("notify: {}".format(args))
-                    await notification_queue.put(args)
+                    await notify(Subject.build.value, Event.changed.value,
+                                 {"id": build.id, "progress": upd_progress["PercentPackages"]})
+                    await notify(Subject.mirror.value, Event.changed.value,
+                                 {"id": entry.id, "progress": upd_progress["PercentPackages"]})
                     await asyncio.sleep(10)
 
             if entry.project.is_basemirror:

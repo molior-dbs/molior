@@ -8,6 +8,7 @@ from enum import Enum
 from molior.app import logger
 from .emailer import send_mail
 from .configuration import Configuration
+from molior.molior.queues import notification_queue
 
 
 class Subject(Enum):
@@ -143,3 +144,11 @@ def send_mail_notification(build):
         build_log_link=link,
     )
     send_mail(receiver, subject, content, [str(log_file)])
+
+
+async def notify(subject, event, data):
+    await notification_queue.put({"notify": {"subject": subject, "event": event, "data": data}})
+
+
+async def run_hooks(build_id):
+        await notification_queue.put({"hooks": {"build_id": build_id}})

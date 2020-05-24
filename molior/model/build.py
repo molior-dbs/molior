@@ -7,8 +7,7 @@ from datetime import datetime
 from molior.app import logger
 from molior.molior.buildlogger import write_log_title
 # from molior.tools import check_user_role
-from molior.molior.notifier import Subject, Event
-from molior.molior.queues import notification_queue
+from molior.molior.notifier import Subject, Event, notify, run_hooks
 
 from .database import Base
 from .buildorder import BuildOrder
@@ -266,12 +265,7 @@ class Build(Base):
             build (molior.model.build.Build): The build model.
         """
         data = self.data()
-        args = {"notify": {
-                "event": Event.added.value,
-                "subject": Subject.build.value,
-                "data": data,
-                }}
-        await notification_queue.put(args)
+        await notify(Subject.build.value, Event.added.value, data)
 
     async def build_changed(self):
         """
@@ -281,14 +275,7 @@ class Build(Base):
             build (molior.model.build.Build): The build model.
         """
         data = self.data()
-        args = {
-            "notify": {
-                "event": Event.changed.value,
-                "subject": Subject.build.value,
-                "data": data,
-            }
-        }
-        await notification_queue.put(args)
+        await notify(Subject.build.value, Event.changed.value, data)
 
         # running hooks if needed
         if self.buildtype != "deb":  # only run hooks for deb builds
@@ -301,5 +288,4 @@ class Build(Base):
            and self.buildstate != "publish_failed"):
             return
 
-        args = {"hooks": {"build_id": self.id}}
-        await notification_queue.put(args)
+        await run_hooks(self.id)
