@@ -5,9 +5,5 @@ targets:
 build_after:
   - "cirrina"
   - "launchy"
-  - "launchy"
-  - "aiohttp-session"
-  - "aiohttp-swagger"
-  - "aiohttp_jrpc"
   - "async-cron"
   - "git-url-parse"
