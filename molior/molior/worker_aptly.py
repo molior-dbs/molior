@@ -26,7 +26,7 @@ async def startup_mirror(task_queue):
     for all mirrors which have the state 'updating'
     """
     loop = asyncio.get_event_loop()
-    apt = get_aptly_connection()
+    aptly = get_aptly_connection()
 
     with Session() as session:
         # get mirrors in updating state
@@ -41,7 +41,7 @@ async def startup_mirror(task_queue):
             return
 
         mirrors = query.all()
-        tasks = await apt.get_tasks()
+        tasks = await aptly.get_tasks()
 
         for mirror in mirrors:
             # FIXME: only one buildvariant supported
@@ -59,12 +59,15 @@ async def startup_mirror(task_queue):
                     if not mirror.project.is_basemirror:
                         base_mirror = mirror.buildvariants[0].base_mirror.project.name
                         base_mirror_version = mirror.buildvariants[0].base_mirror.name
-                        task_name = "{} {}-{}-{}-{}".format(taskname, base_mirror, base_mirror_version,
-                                                            mirror.project.name, mirror.name)
+                        task_name = "{} {}-{}-{}-{}-".format(taskname, base_mirror, base_mirror_version,
+                                                             mirror.project.name, mirror.name)
                     else:
-                        task_name = "{} {}-{}".format(taskname, mirror.project.name, mirror.name)
+                        task_name = "{} {}-{}-".format(taskname, mirror.project.name, mirror.name)
                     logger.info("taskname {}".format(task_name))
-                    tmp_tasks = [task for task in tasks if task["Name"] == task_name]
+                    # FIXME: search for each component
+                    #  "Publish snapshot: buster-10.4-cmps-main, buster-10.4-cmps-non-free",
+
+                    tmp_tasks = [task for task in tasks if task["Name"].startswith(task_name)]
                     if tmp_tasks:
                         m_tasks = tmp_tasks
                         if i == 0:
@@ -116,7 +119,8 @@ async def startup_mirror(task_queue):
                     mirror.project.name,
                     mirror.name,
                     components,
-                    m_task.get("ID"),
+                    # FIXME: add all running tasks
+                    [m_task.get("ID")],
                 )
             )
 
@@ -132,22 +136,22 @@ async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, 
         components (list): The mirror's components
     """
 
-    apt = get_aptly_connection()
+    aptly = get_aptly_connection()
     # FIXME: do not allow db cleanup while mirroring
-    task_id = await apt.mirror_update(base_mirror, base_mirror_version, mirror, version)
+    task_ids = await aptly.mirror_update(base_mirror, base_mirror_version, mirror, version, components)
 
-    logger.info("start update progress: aptly task %s", task_id)
+    logger.info("start update progress: aptly tasks %s", str(task_ids))
     loop = asyncio.get_event_loop()
     loop.create_task(finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version,
-                                     mirror, version, components, task_id))
+                                     mirror, version, components, task_ids))
 
 
-async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version, mirror, version, components, task_id):
+async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version, mirror, version, components, task_ids):
     """
     """
     try:
         mirrorname = "{}-{}".format(mirror, version)
-        logger.info("finalizing mirror %s task %d, build_%d", mirrorname, task_id, build_id)
+        logger.info("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
 
         with Session() as session:
 
@@ -168,46 +172,90 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 write_log(build.id, "E: error mirror not found\n")
                 return
 
-            apt = get_aptly_connection()
+            aptly = get_aptly_connection()
+
+            progress = {}
+            for task_id in task_ids:
+                progress[task_id] = {}
+                progress[task_id]["State"] = 1  # set running
+
+            fields = ["TotalNumberOfPackages", "RemainingNumberOfPackages",
+                      "TotalDownloadSize", "RemainingDownloadSize"]
 
             if entry.mirror_state == "updating":
                 while True:
-                    upd_progress = await apt.mirror_get_progress(task_id)
-                    if not upd_progress:
-                        logger.error("Error getting mirror progress %s", mirrorname)
+                    for task_id in task_ids:
+                        if progress[task_id]["State"] == 1:  # task is running
+                            upd_progress = await aptly.mirror_get_progress(task_id)
+                            if upd_progress:
+                                progress[task_id].update(upd_progress)
+                            else:
+                                progress[task_id]["State"] = 3  # mark failed
+
+                    # check if at least 1 is running
+                    # 0: init, 1: running, 2: success, 3: failed
+                    running = False
+                    failed = False
+                    for task_id in task_ids:
+                        logger.info("task {}: {}".format(task_id, progress[task_id]))
+                        if progress[task_id]["State"] == 1:
+                            running = True
+                        if progress[task_id]["State"] == 3:
+                            failed = True
+
+                    logger.info("running: {}, failed {}".format(running, failed))
+
+                    if not running and failed:
+                        logger.error("Error updating mirror %s", mirrorname)
                         write_log(build.id, "E: error updating mirror\n")
                         entry.mirror_state = "error"
                         await build.set_failed()
                         session.commit()
+                        # FIXME: delete all tasks
+                        # await aptly.delete_task(task_id)
                         return
 
-                    # 0: init, 1: running, 2: success, 3: failed
-                    if upd_progress["State"] == 2:
+                    if not running and not failed:
                         break
 
-                    if upd_progress["State"] == 3:
-                        logger.error("update mirror %s progress error", mirrorname)
-                        entry.mirror_state = "error"
-                        await build.set_failed()
-                        session.commit()
-                        return
+                    total_progress = {}
+                    for field in fields:
+                        total_progress[field] = 0
 
-                    logger.info("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
-                                upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
-                                upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"],
-                                (upd_progress["TotalDownloadSize"] - upd_progress["RemainingDownloadSize"])
-                                / 1024.0 / 1024.0 / 1024.0,
-                                upd_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
-                                upd_progress["PercentSize"],
-                                )
+                    if running:
+                        for task_id in task_ids:
+                            for field in fields:
+                                if field in progress[task_id]:
+                                    total_progress[field] += progress[task_id][field]
 
-                    await notify(Subject.build.value, Event.changed.value,
-                                 {"id": build.id, "progress": upd_progress["PercentSize"]})
-                    await notify(Subject.mirror.value, Event.changed.value,
-                                 {"id": entry.id, "progress": upd_progress["PercentSize"]})
+                        if total_progress["TotalNumberOfPackages"] > 0:
+                            total_progress["PercentPackages"] = (
+                                (total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"])
+                                / total_progress["TotalNumberOfPackages"] * 100.0)
+                        else:
+                            total_progress["PercentPackages"] = 0.0
+
+                        if "TotalDownloadSize" in total_progress and total_progress["TotalDownloadSize"] > 0:
+                            total_progress["PercentSize"] = (
+                                (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
+                                / total_progress["TotalDownloadSize"] * 100.0)
+                        else:
+                            total_progress["PercentSize"] = 0.0
+
+                        logger.info("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
+                                    total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"],
+                                    total_progress["TotalNumberOfPackages"], total_progress["PercentPackages"],
+                                    (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
+                                    / 1024.0 / 1024.0 / 1024.0,
+                                    total_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
+                                    total_progress["PercentSize"],
+                                    )
+
+                        await notify(Subject.build.value, Event.changed.value,
+                                     {"id": build.id, "progress": total_progress["PercentSize"]})
+                        await notify(Subject.mirror.value, Event.changed.value,
+                                     {"id": entry.id, "progress": total_progress["PercentSize"]})
                     await asyncio.sleep(10)
-
-                await apt.delete_task(task_id)
 
                 write_log(build.id, "I: creating snapshot\n")
 
@@ -217,7 +265,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 # snapshot after initial download
                 logger.info("creating snapshot for: %s", mirrorname)
                 try:
-                    task_id = await apt.mirror_snapshot(base_mirror, base_mirror_version, mirror, version)
+                    task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version, mirror, version, components)
                 except AptlyError as exc:
                     logger.error("error creating mirror %s snapshot: %s", mirrorname, exc)
                     entry.mirror_state = "error"
@@ -226,29 +274,33 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     return
 
                 while True:
-                    try:
-                        task_state = await apt.get_task_state(task_id)
-                    except Exception:
-                        logger.exception("error getting mirror %s state", mirrorname)
-                        entry.mirror_state = "error"
-                        await build.set_publish_failed()
-                        session.commit()
-                        return
-                    # States:
-                    # 0: init, 1: running, 2: success, 3: failed
-                    if task_state["State"] == 2:
-                        break
-                    if task_state["State"] == 3:
+                    running = False
+                    failed = False
+                    for task_id in task_ids:
+                        try:
+                            task_state = await aptly.get_task_state(task_id)
+                        except Exception:
+                            failed = True
+
+                        # 0: init, 1: running, 2: success, 3: failed
+                        if task_state["State"] == 1:
+                            running = True
+                        if task_state["State"] == 3:
+                            failed = True
+
+                    if not running and failed:
                         logger.error("creating mirror %s snapshot failed", mirrorname)
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
                         return
+                    if not running and not failed:
+                        break
 
-                    # FIMXE: why sleep ?
                     await asyncio.sleep(2)
 
-                await apt.delete_task(task_id)
+                # FIXME: delete all tasksk
+                # await aptly.delete_task(task_id)
 
                 entry.mirror_state = "publishing"
                 session.commit()
@@ -257,20 +309,22 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 write_log(build.id, "I: publishing mirror\n")
                 logger.info("publishing snapshot: %s", mirrorname)
                 try:
-                    task_id = await apt.mirror_publish(base_mirror, base_mirror_version, mirror, version,
-                                                       entry.mirror_distribution, components)
+                    task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror, version,
+                                                         entry.mirror_distribution, components)
                 except Exception as exc:
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
                     entry.mirror_state = "error"
                     await build.set_publish_failed()
                     session.commit()
-                    await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+                    await aptly.mirror_delete(base_mirror, base_mirror_version, mirror, version,
+                                              entry.mirror_distribution, components)
                     return
 
             if entry.mirror_state == "publishing":
                 while True:
+                    upd_progress = None
                     try:
-                        upd_progress = await apt.mirror_get_progress(task_id)
+                        upd_progress = await aptly.mirror_get_progress(task_id)
                     except Exception as exc:
                         logger.error("error publishing mirror %s: %s", mirrorname, str(exc))
 
@@ -278,7 +332,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         await build.set_publish_failed()
                         session.commit()
 
-                        await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
                         return
 
                     # States:
@@ -290,16 +344,26 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         entry.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
-                        await apt.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
                         return
 
-                    logger.info(
-                        "published %d/%d packages (%.02f%%)",
-                        upd_progress["TotalNumberOfPackages"]
-                        - upd_progress["RemainingNumberOfPackages"],
-                        upd_progress["TotalNumberOfPackages"],
-                        upd_progress["PercentPackages"],
-                    )
+                    if upd_progress["TotalNumberOfPackages"] > 0:
+                        upd_progress["PercentPackages"] = (
+                            (upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"])
+                            / upd_progress["TotalNumberOfPackages"] * 100.0)
+                    else:
+                        upd_progress["PercentPackages"] = 0.0
+
+                    if "TotalDownloadSize" in upd_progress and upd_progress["TotalDownloadSize"] > 0:
+                        upd_progress["PercentSize"] = (
+                            (upd_progress["TotalDownloadSize"] - upd_progress["RemainingDownloadSize"])
+                            / upd_progress["TotalDownloadSize"] * 100.0)
+                    else:
+                        upd_progress["PercentSize"] = 0.0
+
+                    logger.info("published %d/%d packages (%.02f%%)",
+                                upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
+                                upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
 
                     await notify(Subject.build.value, Event.changed.value,
                                  {"id": build.id, "progress": upd_progress["PercentPackages"]})
@@ -536,11 +600,7 @@ class AptlyWorker:
         base_mirror_version = None
         db_buildvariant = None
         if not is_basemirror:
-            db_basemirror = (
-                session.query(ProjectVersion)
-                .filter(ProjectVersion.id == basemirror_id)
-                .first()
-            )
+            db_basemirror = session.query(ProjectVersion).filter(ProjectVersion.id == basemirror_id).first()
             if not db_basemirror:
                 write_log(build.id, "E: could not find a basemirror with id '%d'\n" % basemirror_id)
                 logger.error("could not find a basemirror with id '%d'", basemirror_id)
@@ -550,11 +610,7 @@ class AptlyWorker:
 
             base_mirror = db_basemirror.project.name
             base_mirror_version = db_basemirror.name
-            db_buildvariant = (
-                session.query(BuildVariant)
-                .filter(BuildVariant.base_mirror_id == basemirror_id)
-                .first()
-            )
+            db_buildvariant = session.query(BuildVariant).filter(BuildVariant.base_mirror_id == basemirror_id).first()
 
             if not db_buildvariant:
                 write_log(build.id, "E: could not find a buildvariant for basemirror with id '%d'\n" % db_basemirror.id)
@@ -585,27 +641,31 @@ class AptlyWorker:
 
         write_log(build.id, "I: adding GPG keys\n")
 
-        apt = get_aptly_connection()
+        aptly = get_aptly_connection()
         if key_url:
             try:
-                await apt.gpg_add_key(key_url=key_url)
+                await aptly.gpg_add_key(key_url=key_url)
             except AptlyError as exc:
                 write_log(build.id, "E: Error adding keys from '%s'\n" % key_url)
                 logger.error("key error: %s", exc)
                 await build.set_failed()
+                mirror_project_version.mirror_state = "error"
+                session.commit()
                 return False
         elif keyserver and keys:
             try:
-                await apt.gpg_add_key(key_server=keyserver, keys=keys)
+                await aptly.gpg_add_key(key_server=keyserver, keys=keys)
             except AptlyError as exc:
                 write_log(build.id, "E: Error adding keys %s\n" % str(keys))
                 logger.error("key error: %s", exc)
                 await build.set_failed()
+                mirror_project_version.mirror_state = "error"
+                session.commit()
                 return False
 
         write_log(build.id, "I: creating mirror\n")
         try:
-            await apt.mirror_create(
+            await aptly.mirror_create(
                 mirror,
                 version,
                 base_mirror,
@@ -623,12 +683,16 @@ class AptlyWorker:
             write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
             logger.error("aptly seems to be not available: %s", str(exc))
             await build.set_failed()
+            mirror_project_version.mirror_state = "error"
+            session.commit()
             return False
 
         except AptlyError as exc:
             write_log(build.id, "E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
             logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
             await build.set_failed()
+            mirror_project_version.mirror_state = "error"
+            session.commit()
             return False
 
         args = {"update_mirror": [
@@ -640,6 +704,7 @@ class AptlyWorker:
                 version,
                 components]}
         await self.aptly_queue.put(args)
+        return True
 
     async def _update_mirror(self, args, session):
         build_id = args[0]
@@ -758,8 +823,8 @@ class AptlyWorker:
         logger.info("aptly worker: got drop publish task: %s/%s %s %s %s",
                     base_mirror_name, base_mirror_version, projectname, projectversion, dist)
 
-        apt = get_aptly_connection()
-        await apt.publish_drop(base_mirror_name, base_mirror_version, projectname, projectversion, dist)
+        aptly = get_aptly_connection()
+        await aptly.publish_drop(base_mirror_name, base_mirror_version, projectname, projectversion, dist)
 
     async def _init_repository(self, args, session):
         basemirror_name = args[1]
@@ -778,8 +843,8 @@ class AptlyWorker:
 
     async def _cleanup(self, args, session):
         logger.info("aptly worker: running cleanup")
-        apt = get_aptly_connection()
-        await apt.cleanup()
+        aptly = get_aptly_connection()
+        await aptly.cleanup()
 
     async def run(self):
         """
