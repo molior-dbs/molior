@@ -275,10 +275,12 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         for dep_git in build_after:
             dep_repo = session.query(SourceRepository).filter(SourceRepository.url == dep_git).first()
             if not dep_repo:
-                build.log_state("Error: build after repo '%s' not found" % dep_git)
-                write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
-                # FIXME: write to build log
-                continue
+                dep_repo = session.query(SourceRepository).filter(SourceRepository.name == dep_git).first()
+                if not dep_repo:
+                    build.log_state("Error: build after repo '%s' not found" % dep_git)
+                    write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
+                    # FIXME: write to build log
+                    continue
             found = True
             build.log_state("adding build after dependency to: %s" % dep_git)
             write_log(parent_build_id, "I: adding build after dependency to: %s\n" % dep_git)

@@ -31,15 +31,9 @@ class SourceRepository(Base):  # pylint: disable=too-few-public-methods
 
     id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
     url = Column(String)
-    state = Column(
-        "state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new"
-    )
-    dependencies = relationship(
-        "SourceRepository",
-        secondary=BuildOrder,
-        primaryjoin=id == BuildOrder.c.sourcerepository,
-        secondaryjoin=id == BuildOrder.c.dependency,
-    )
+    state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
+    dependencies = relationship("SourceRepository", secondary=BuildOrder,
+                                primaryjoin=id == BuildOrder.c.sourcerepository, secondaryjoin=id == BuildOrder.c.dependency)
     projectversions = relationship("ProjectVersion", secondary=SouRepProVer)
     hooks = relationship("Hook", secondary=SourceRepositoryHook)
 
