@@ -1,4 +1,13 @@
 config_version: '1'
 targets:
   molior:
-  - "1.4.0"
+  - "1.4"
+build_after:
+  - "cirrina"
+  - "launchy"
+  - "launchy"
+  - "aiohttp-session"
+  - "aiohttp-swagger"
+  - "aiohttp_jrpc"
+  - "async-cron"
+  - "git-url-parse"
