@@ -271,24 +271,27 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         # add build order dependencies
         build_after = get_buildorder(repo.src_path)
         build_after_deps = []
-        found = False
+        found = True
         for dep_git in build_after:
-            dep_repo = session.query(SourceRepository).filter(SourceRepository.url == dep_git).first()
+            dep_repo = session.query(SourceRepository).filter(or_(SourceRepository.url == dep_git,
+                                                                  SourceRepository.url.like("%{}".format(dep_git)),
+                                                                  SourceRepository.url.like("%{}.git".format(dep_git)))).first()
             if not dep_repo:
-                dep_repo = session.query(SourceRepository).filter(SourceRepository.name == dep_git).first()
-                if not dep_repo:
-                    build.log_state("Error: build after repo '%s' not found" % dep_git)
-                    write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
-                    # FIXME: write to build log
-                    continue
-            found = True
+                build.log_state("Error: build after repo '%s' not found" % dep_git)
+                write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
+                # FIXME: write to build log
+                found = False
+                continue
             build.log_state("adding build after dependency to: %s" % dep_git)
             write_log(parent_build_id, "I: adding build after dependency to: %s\n" % dep_git)
             build_after_deps.append(dep_repo)
 
-        if found:
-            build.build_after = build_after_deps
-            session.commit()
+        if not found:
+            # adding source repo to indicate unknonwn build order dependencies
+            build_after_deps.append(build.sourcerepository)
+
+        build.build_after = build_after_deps
+        session.commit()
 
         projectversion_ids = []
         build_configs = get_buildconfigs(targets, session)
