@@ -265,28 +265,25 @@ class AptlyApi:
         """
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
-        data = {
-            "Name": name,
-            "ArchiveURL": url,
-            "Distribution": mirror_distribution,
-            "Components": components,
-            "Architectures": architectures,
-            "DownloadSources": download_sources,
-            "DownloadUdebs": download_udebs,
-            "DownloadInstaller": download_installer,
-        }
+        for component in components:
+            data = {
+                "Name": "{}-{}".format(name, component),
+                "ArchiveURL": url,
+                "Distribution": mirror_distribution,
+                "Components": [component],
+                "Architectures": architectures,
+                "DownloadSources": download_sources,
+                "DownloadUdebs": download_udebs,
+                "DownloadInstaller": download_installer,
+            }
 
-        async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/mirrors",
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
+            async with aiohttp.ClientSession() as http:
+                async with http.post(self.__api_url + "/mirrors", headers=self.headers,
+                                     data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
 
-    async def mirror_update(self, base_mirror, base_mirror_version, mirror, version):
+    async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
         """
         Creates a debian archive mirror.
 
@@ -294,7 +291,7 @@ class AptlyApi:
             mirror (str): The mirror's name.
 
         Returns:
-            aptly task ID
+            array of aptly task IDs
 
         Raises:
             molior.aptly.errors.AptlyError: If a known error occurs while
@@ -302,26 +299,25 @@ class AptlyApi:
         """
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
-        data = {
-            "Name": name,
-            "ForceUpdate": True,
-            "SkipExistingPackages": True,
-            "MaxTries": 7,
-        }
+        tasks = []
+        for component in components:
+            data = {
+                "Name": "{}-{}".format(name, component),
+                "ForceUpdate": True,
+                "SkipExistingPackages": True,
+                "MaxTries": 7,
+            }
 
-        async with aiohttp.ClientSession() as http:
-            async with http.put(
-                self.__api_url + "/mirrors/{}".format(name),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                res = json.loads(await resp.text())
-        return res["ID"]
+            async with aiohttp.ClientSession() as http:
+                async with http.put(self.__api_url + "/mirrors/{}-{}".format(name, component), headers=self.headers,
+                                    data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    res = json.loads(await resp.text())
+            tasks.append(res["ID"])
+        return tasks
 
-    async def mirror_delete(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution):
+    async def mirror_delete(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components):
         """
         Delete a mirror from aptly and DB.
 
@@ -335,8 +331,8 @@ class AptlyApi:
         """
         name, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
+        # remove publish (may fail)
         try:
-            # remove publish (may fail)
             async with aiohttp.ClientSession() as http:
                 async with http.delete(self.__api_url + "/publish/{}/{}".format(publish_name, mirror_distribution),
                                        auth=self.auth,) as resp:
@@ -346,24 +342,26 @@ class AptlyApi:
         except Exception:
             logger.warn("Error deleting mirror publish  {}/{}".format(publish_name, mirror_distribution))
 
+        # remove snapshots (may fail)
         try:
-            # remove snapshot (may fail)
-            await self.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+            await self.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version, components)
         except Exception:
             logger.warn("Error deleting mirror snapshot {}/{}".format(publish_name, mirror_distribution))
 
-        try:
-            async with aiohttp.ClientSession() as http:
-                async with http.delete(self.__api_url + "/mirrors/{}".format(name), auth=self.auth) as resp:
-                    if self.__check_status_code(resp.status):
-                        data = json.loads(await resp.text())
-                        return await self.wait_task(data["ID"])
-        except Exception:
-            logger.warn("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
+        # remove mirrors
+        for component in components:
+            try:
+                async with aiohttp.ClientSession() as http:
+                    async with http.delete(self.__api_url + "/mirrors/{}-{}".format(name, component), auth=self.auth) as resp:
+                        if self.__check_status_code(resp.status):
+                            data = json.loads(await resp.text())
+                            await self.wait_task(data["ID"])
+            except Exception:
+                logger.warn("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
 
         return True
 
-    async def mirror_snapshot_delete(self, base_mirror, base_mirror_version, mirror, version):
+    async def mirror_snapshot_delete(self, base_mirror, base_mirror_version, mirror, version, components):
         """
         Deletes a snapshot.
 
@@ -374,14 +372,20 @@ class AptlyApi:
         """
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
-        async with aiohttp.ClientSession() as http:
-            async with http.delete(self.__api_url + "/snapshots/{}".format(name), auth=self.auth) as resp:
-                if self.__check_status_code(resp.status):
-                    data = json.loads(await resp.text())
-                    return await self.wait_task(data["ID"])
-        return True
+        ret = True
+        for component in components:
+            async with aiohttp.ClientSession() as http:
+                async with http.delete(self.__api_url + "/snapshots/{}-{}".format(name, component), auth=self.auth) as resp:
+                    data = None
+                    if self.__check_status_code(resp.status):
+                        data = json.loads(await resp.text())
+                    else:
+                        ret = False
+                    if data and not await self.wait_task(data["ID"]):
+                        ret = False
+        return ret
 
-    async def mirror_snapshot(self, base_mirror, base_mirror_version, mirror, version):
+    async def mirror_snapshot(self, base_mirror, base_mirror_version, mirror, version, components):
         """
         Creates a snapshot from a debian archive mirror.
 
@@ -394,19 +398,18 @@ class AptlyApi:
         """
 
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
-        data = {"Name": name}
+        tasks = []
+        for component in components:
+            data = {"Name": "{}-{}".format(name, component)}
 
-        async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/mirrors/{}/snapshots".format(name),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                res = json.loads(await resp.text())
-        return res["ID"]
+            async with aiohttp.ClientSession() as http:
+                async with http.post(self.__api_url + "/mirrors/{}-{}/snapshots".format(name, component),
+                                     headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    res = json.loads(await resp.text())
+            tasks.append(res["ID"])
+        return tasks
 
     async def mirror_get_progress(self, task_id):
         """
@@ -445,25 +448,6 @@ class AptlyApi:
                 "RemainingDownloadSize": 0,
             }
         state.update(progress)
-
-        if state["TotalNumberOfPackages"] > 0:
-            state["PercentPackages"] = (
-                (state["TotalNumberOfPackages"] - state["RemainingNumberOfPackages"])
-                / state["TotalNumberOfPackages"]
-                * 100.0
-            )
-        else:
-            state["PercentPackages"] = 0.0
-
-        if "TotalDownloadSize" in state and state["TotalDownloadSize"] > 0:
-            state["PercentSize"] = (
-                (state["TotalDownloadSize"] - state["RemainingDownloadSize"])
-                / state["TotalDownloadSize"]
-                * 100.0
-            )
-        else:
-            state["PercentSize"] = 0.0
-
         return state
 
     async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components):
@@ -493,7 +477,7 @@ class AptlyApi:
             "AcquireByHash": True,
         }
         for component in components:
-            data["Sources"].append({"Component": component, "Name": name})
+            data["Sources"].append({"Component": component, "Name": "{}-{}".format(name, component)})
 
         async with aiohttp.ClientSession() as http:
             async with http.post(

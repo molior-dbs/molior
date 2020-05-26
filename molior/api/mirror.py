@@ -395,7 +395,8 @@ async def delete_mirror(request):
 
     try:
         # FIXME: use altpy queue !
-        await apt.mirror_delete(base_mirror, base_mirror_version, entry.project.name, entry.name, entry.mirror_distribution)
+        await apt.mirror_delete(base_mirror, base_mirror_version, entry.project.name,
+                                entry.name, entry.mirror_distribution, entry.mirror_components.split(","))
     except Exception as exc:
         # mirror did not exist
         # FIXME: handle mirror has snapshots and cannot be deleted?
