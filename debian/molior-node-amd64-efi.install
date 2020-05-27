@@ -1,5 +1,5 @@
 #!/usr/bin/dh-exec
 
-pkgs/createssh/* .
-pkgs/etc .
+pkgdata/createssh/* .
+pkgdata/etc .
 

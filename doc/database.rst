@@ -37,11 +37,11 @@ The dia file can now be viewed with the `dia` programm
 Migrations
 ~~~~~~~~~~
 To perform database upgrades/migrations a simple shell script with the incremented upgrade-number can be placed in
-the pkgs/molior-server/usr/share/molior/database/ folder.
+the pkgdata/molior-server/usr/share/molior/database/ folder.
 
 Example:
 
-pkgs/molior-server/usr/share/molior/database/upgrade-17
+pkgdata/molior-server/usr/share/molior/database/upgrade-17
 
 .. code:: python
 

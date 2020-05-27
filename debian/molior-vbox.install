@@ -1,6 +1,6 @@
 #!/usr/bin/dh-exec
 
-pkgs/createssh/* .
-pkgs/etc .
-pkgs/usr .
+pkgdata/createssh/* .
+pkgdata/etc .
+pkgdata/usr .
 
