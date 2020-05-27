@@ -1,4 +1,4 @@
 #! /usr/bin/dh-exec
 
-pkgs/molior-client-http/* .
+pkgdata/molior-client-http/* .
 
