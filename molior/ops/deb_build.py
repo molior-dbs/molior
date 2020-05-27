@@ -8,30 +8,22 @@ from launchy import Launchy
 from sqlalchemy import or_
 from pathlib import Path
 
-from molior.app import logger
-from molior.tools import get_changelog_attr, strip_epoch_version
+from ..app import logger
+from ..tools import get_changelog_attr, strip_epoch_version
 
-from molior.model.database import Session
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.maintainer import Maintainer
-from molior.model.chroot import Chroot
-from molior.model.buildvariant import BuildVariant
-from molior.model.architecture import Architecture
-from molior.model.projectversion import ProjectVersion, get_projectversion_deps
-
-from molior.molior.core import (
-    get_target_arch,
-    get_targets,
-    get_buildconfigs,
-    get_buildorder,
-)
-
-from molior.molior.buildlogger import write_log, write_log_title
-from molior.molior.configuration import Configuration
-from molior.molior.worker_backend import backend_queue
-
+from ..model.database import Session
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.maintainer import Maintainer
+from ..model.chroot import Chroot
+from ..model.buildvariant import BuildVariant
+from ..model.architecture import Architecture
+from ..model.projectversion import ProjectVersion, get_projectversion_deps
+from ..molior.core import get_target_arch, get_targets, get_buildconfigs, get_buildorder
+from ..molior.buildlogger import write_log, write_log_title
+from ..molior.configuration import Configuration
+from ..molior.worker_backend import backend_queue
 from .git import GitCheckout, GetBuildInfo
 
 
@@ -332,6 +324,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                 parent_id=build.id,
                 sourcerepository=repo,
                 maintainer=maintainer,
+                projectversion_id=build_config.projectversions[0].id
             )
 
             session.add(deb_build)
@@ -400,13 +393,9 @@ def chroot_ready(build, session):
 
     buildvar = build.buildconfiguration.buildvariant
     if buildvar.architecture.name == "all":
-        buildvar = (
-            session.query(BuildVariant)
-            .join(Architecture)
-            .filter(BuildVariant.base_mirror == buildvar.base_mirror)
-            .filter(Architecture.name == target_arch)
-            .first()
-        )
+        buildvar = (session.query(BuildVariant).join(Architecture)
+                    .filter(BuildVariant.base_mirror == buildvar.base_mirror)
+                    .filter(Architecture.name == target_arch).first())
 
     chroot = session.query(Chroot).filter(Chroot.buildvariant == buildvar).first()
     if chroot:
@@ -515,7 +504,8 @@ async def ScheduleBuilds():
 
             repo_deps = []
             if build.parent.builddeps:
-                builddeps = build.parent.builddeps[1:-1].split(",")
+                builddeps = build.parent.builddeps
+                logger.info("builddeps {}".format(builddeps))
                 for builddep in builddeps:
                     repo_dep = session.query(SourceRepository).filter(SourceRepository.projectversions.any(
                                              id=build.projectversion_id)).filter(or_(
@@ -523,6 +513,11 @@ async def ScheduleBuilds():
                                                 SourceRepository.url.like("%/{}".format(builddep)),
                                                 SourceRepository.url.like("%/{}.git".format(builddep)))).first()
 
+                    if not repo_dep:
+                        logger.error("build-{}: dependency {} not found in projectversion {}".format(build.id,
+                                     builddep, build.projectversion_id))
+                        repo_deps.append(-1)
+                        break
                     repo_deps.append(repo_dep.id)
 
             if not repo_deps:
@@ -532,6 +527,9 @@ async def ScheduleBuilds():
 
             ready = True
             for dep_repo_id in repo_deps:
+                if dep_repo_id == -1:
+                    return  # build order dependency not found
+
                 dep_repo = session.query(SourceRepository).filter(SourceRepository.id == dep_repo_id).first()
                 if not dep_repo:
                     logger.warning("scheduler: repo %d not found", dep_repo_id)
@@ -551,7 +549,7 @@ async def ScheduleBuilds():
                             Build.buildstate == "building",
                             Build.buildstate == "needs_publish",
                             Build.buildstate == "publishing",
-                        ), Build.buildtype == "build",
+                        ), Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
                         Build.projectversion_id == build.projectversion_id).all()
 
@@ -575,10 +573,11 @@ async def ScheduleBuilds():
                     break
 
                 # find successful builds in the same and dependent projectversions
+                # FIXME: search same architecture as well
                 found = False
                 successful_builds = session.query(Build).filter(
                         Build.buildstate == "successful",
-                        Build.buildtype == "build",
+                        Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
                         Build.projectversion_id == build.projectversion_id).all()
 
