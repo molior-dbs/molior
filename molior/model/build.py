@@ -10,7 +10,6 @@ from molior.molior.buildlogger import write_log_title
 from molior.molior.notifier import Subject, Event, notify, run_hooks
 
 from .database import Base
-from .buildorder import BuildOrder
 from .sourcerepository import SourceRepository
 
 local_tz = pytz.timezone("Europe/Zurich")
@@ -52,14 +51,13 @@ class Build(Base):
     maintainer_id = Column(ForeignKey("maintainer.id"))
     maintainer = relationship("Maintainer")
     sourcerepository_id = Column(ForeignKey("sourcerepository.id"))
-    sourcerepository = relationship("SourceRepository")
+    sourcerepository = relationship(SourceRepository)
     projectversion_id = Column(ForeignKey("projectversion.id"))
     projectversion = relationship("ProjectVersion")
     parent_id = Column(ForeignKey("build.id"))
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
-    build_after = relationship("SourceRepository", secondary=BuildOrder, primaryjoin=(BuildOrder.c.build_id == id),
-                               secondaryjoin=(BuildOrder.c.dependency == SourceRepository.id))
+    builddeps = Column(String)
 
     def log_state(self, statemsg):
         prefix = ""

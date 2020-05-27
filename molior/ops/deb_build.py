@@ -15,7 +15,6 @@ from molior.model.database import Session
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
-from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.maintainer import Maintainer
 from molior.model.chroot import Chroot
 from molior.model.buildvariant import BuildVariant
@@ -270,28 +269,10 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
 
         # add build order dependencies
         build_after = get_buildorder(repo.src_path)
-        build_after_deps = []
-        found = True
-        for dep_git in build_after:
-            dep_repo = session.query(SourceRepository).filter(or_(SourceRepository.url == dep_git,
-                                                                  SourceRepository.url.like("%/{}".format(dep_git)),
-                                                                  SourceRepository.url.like("%/{}.git".format(dep_git)))).first()
-            if not dep_repo:
-                build.log_state("Error: build after repo '%s' not found" % dep_git)
-                write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
-                # FIXME: write to build log
-                found = False
-                continue
-            build.log_state("adding build after dependency to: %s" % dep_git)
-            write_log(parent_build_id, "I: adding build after dependency to: %s\n" % dep_git)
-            build_after_deps.append(dep_repo)
-
-        if not found:
-            # adding source repo to indicate unknonwn build order dependencies
-            build_after_deps.append(build.sourcerepository)
-
-        build.build_after = build_after_deps
-        session.commit()
+        if build_after:
+            logger.info("build after %s", build_after)
+            build.builddeps = "{" + ",".join(build_after) + "}"
+            session.commit()
 
         projectversion_ids = []
         build_configs = get_buildconfigs(targets, session)
@@ -299,15 +280,10 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         for build_config in build_configs:
             projectversion_ids.extend([projectversion.id for projectversion in build_config.projectversions])
             # FIXME: filter for buildtype?
-            deb_build = (
-                session.query(Build)
-                .filter(
-                    Build.buildconfiguration == build_config,
-                    Build.versiontimestamp == info.tag_stamp,
-                    Build.version == info.version,
-                )
-                .first()
-            )
+            deb_build = session.query(Build).filter(
+                            Build.buildconfiguration == build_config,
+                            Build.versiontimestamp == info.tag_stamp,
+                            Build.version == info.version).first()
             if deb_build:
                 logger.warning("already built %s", repo.name)
                 write_log(parent_build_id, "E: already built {}\n".format(repo.name))
@@ -532,147 +508,97 @@ async def ScheduleBuilds():
 
     with Session() as session:
 
-        needed_builds = (
-            session.query(Build)
-            .filter(Build.buildstate == "needs_build", Build.buildtype == "deb")
-            .all()
-        )
+        needed_builds = session.query(Build).filter(Build.buildstate == "needs_build", Build.buildtype == "deb").all()
         for build in needed_builds:
             if not chroot_ready(build, session):
                 continue
 
-            repo_id = build.sourcerepository_id
-            for projectversion in build.buildconfiguration.projectversions:
-                projectversion_id = projectversion.id
-                # build.log_state("scheduler: projectversion %d, repo %d needs build" % (projectversion_id, repo_id))
+            repo_deps = []
+            if build.parent.builddeps:
+                builddeps = build.parent.builddeps[1:-1].split(",")
+                for builddep in builddeps:
+                    repo_dep = session.query(SourceRepository).filter(SourceRepository.projectversions.any(
+                                             id=build.projectversion_id)).filter(or_(
+                                                SourceRepository.url == builddep,
+                                                SourceRepository.url.like("%/{}".format(builddep)),
+                                                SourceRepository.url.like("%/{}.git".format(builddep)))).first()
 
-                repo_deps = []
-                if build.parent.build_after:
-                    for build_after_repo in build.parent.build_after:
-                        repo_deps.append(build_after_repo.id)
-                else:
-                    repo_deps_query = """
-                    WITH RECURSIVE getparents(sourcerepository, dependency) AS (
-                    SELECT s1.sourcerepository, s1.dependency
-                      FROM buildorder s1
-                      WHERE s1.sourcerepository = :repo_id
-                    UNION ALL
-                    SELECT s2.sourcerepository, s2.dependency
-                      FROM
-                        buildorder s2,
-                        getparents s1
-                      WHERE s2.sourcerepository = s1.dependency
-                    )
-                    SELECT * from getparents;
-                    """
-                    results = session.execute(repo_deps_query, {"repo_id": repo_id})
-                    for row in results:
-                        repo_deps.append(row[1])
+                    repo_deps.append(repo_dep.id)
 
-                if not repo_deps:
-                    # build.log_state("scheduler: no build order dependencies, scheduling...")
-                    await schedule_build(build, session)
+            if not repo_deps:
+                # build.log_state("scheduler: no build order dependencies, scheduling...")
+                await schedule_build(build, session)
+                break
+
+            ready = True
+            for dep_repo_id in repo_deps:
+                dep_repo = session.query(SourceRepository).filter(SourceRepository.id == dep_repo_id).first()
+                if not dep_repo:
+                    logger.warning("scheduler: repo %d not found", dep_repo_id)
+                    continue
+
+                # FIXME: buildconfig arch dependent!
+
+                # find running builds in the same projectversion
+                found_running = False
+
+                # check no build order dep is needs_build, building, publishing, ...
+                # FIXME: this needs maybe checking of source packages as well?
+                running_builds = session.query(Build).filter(or_(
+                            Build.buildstate == "new",
+                            Build.buildstate == "needs_build",
+                            Build.buildstate == "scheduled",
+                            Build.buildstate == "building",
+                            Build.buildstate == "needs_publish",
+                            Build.buildstate == "publishing",
+                        ), Build.buildtype == "build",
+                        Build.sourcerepository_id == dep_repo_id,
+                        Build.projectversion_id == build.projectversion_id).all()
+
+                if running_builds:
+                    found_running = True
+
+                    projectversion = session.query(ProjectVersion).filter(
+                            ProjectVersion.id == build.projectversion_id).first()
+                    if not projectversion:
+                        pvname = "unknown"
+                        logger.warning("scheduler: projectversion %d not found", build.projectversion_id)
+                    else:
+                        pvname = projectversion.fullname
+                    builds = [str(b.id) for b in running_builds]
+                    write_log(build.id, "W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
+                                         dep_repo.name, ", ".join(builds), pvname))
                     break
 
-                pv_deps = get_projectversion_deps(projectversion.id, session)
-                projectversion_ids = [projectversion_id]
-                # FIXME: no mirrors
-                projectversion_ids.extend(pv_deps)
+                if found_running:
+                    ready = False
+                    break
 
-                ready = True
-                for dep_repo_id in repo_deps:
-                    dep_repo = session.query(SourceRepository).filter(SourceRepository.id == dep_repo_id).first()
-                    if not dep_repo:
-                        logger.warning("scheduler: repo %d not found", dep_repo_id)
-                        continue
+                # find successful builds in the same and dependent projectversions
+                found = False
+                successful_builds = session.query(Build).filter(
+                        Build.buildstate == "successful",
+                        Build.buildtype == "build",
+                        Build.sourcerepository_id == dep_repo_id,
+                        Build.projectversion_id == build.projectversion_id).all()
 
-                    # FIXME: buildconfig arch dependent!
+                if successful_builds:
+                    found = True
 
-                    # find running builds in the same and dependent projectversions
-                    found_running = False
-                    for pv_id in projectversion_ids:
-                        # build.log_state("scheduler: trying to find running build order dependency in projectversion %d" % pv_id)
+                if not found:
+                    ready = False
+                    projectversion = session.query(ProjectVersion).filter(
+                            ProjectVersion.id == build.projectversion_id).first()
+                    if not projectversion:
+                        pvname = "unknown"
+                        logger.warning("scheduler: projectversion %d not found", build.projectversion_id)
+                    else:
+                        pvname = projectversion.fullname
 
-                        # check no build order dep is needs_build, building, publishing, ...
-                        # FIXME: this needs maybe checking of source packages as well?
-                        running_builds = (
-                            session.query(Build)
-                            .join(Build.buildconfiguration)
-                            .filter(
-                                or_(
-                                    Build.buildstate == "new",
-                                    Build.buildstate == "needs_build",
-                                    Build.buildstate == "scheduled",
-                                    Build.buildstate == "building",
-                                    Build.buildstate == "needs_publish",
-                                    Build.buildstate == "publishing",
-                                ),
-                                Build.buildtype == "deb",
-                                Build.sourcerepository_id == dep_repo_id,
-                                BuildConfiguration.projectversions.any(
-                                    ProjectVersion.id == pv_id
-                                ),
-                            )
-                            .all()
-                        )
+                    write_log(build.id, "W: waiting for repo {} to be built in projectversion {}\n".format(
+                                         dep_repo.name, pvname))
+                    break
 
-                        if running_builds:
-                            found_running = True
-
-                            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == pv_id).first()
-                            if not projectversion:
-                                pvname = "unknown"
-                                logger.warning("scheduler: projectversion %d not found", pv_id)
-                            else:
-                                pvname = projectversion.fullname
-                            builds = [str(b.id) for b in running_builds]
-                            write_log(build.id, "W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
-                                                 dep_repo.name, ", ".join(builds), pvname))
-                            break
-
-                    if found_running:
-                        ready = False
-                        break
-
-                    # find successful builds in the same and dependent projectversions
-                    found = False
-                    for pv_id in projectversion_ids:
-                        successful_builds = (
-                            session.query(Build)
-                            .join(Build.buildconfiguration)
-                            .filter(
-                                Build.buildstate == "successful",
-                                Build.buildtype == "deb",
-                                Build.sourcerepository_id == dep_repo_id,
-                                BuildConfiguration.projectversions.any(
-                                    ProjectVersion.id == pv_id
-                                ),
-                            )
-                            .all()
-                        )
-
-                        if successful_builds:
-                            found = True
-                            break
-                    if not found:
-                        ready = False
-                        projectversion = (
-                            session.query(ProjectVersion)
-                            .filter(ProjectVersion.id == pv_id)
-                            .first()
-                        )
-                        if not projectversion:
-                            pvname = "unknown"
-                            logger.warning(
-                                "scheduler: projectversion %d not found", pv_id
-                            )
-                        else:
-                            pvname = projectversion.fullname
-
-                        write_log(build.id, "W: waiting for repo {} to be built in projectversion {}\n".format(
-                                             dep_repo.name, pvname))
-                        break
-
-                if ready:
-                    # build.log_state("scheduler: found all required build order dependencies, scheduling...")
-                    await schedule_build(build, session)
+            if ready:
+                # build.log_state("scheduler: found all required build order dependencies, scheduling...")
+                await schedule_build(build, session)
