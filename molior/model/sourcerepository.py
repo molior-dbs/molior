@@ -13,7 +13,6 @@ import molior.model.hook  # noqa: F401, pylint: disable=unused-import
 from molior.app import logger
 from .database import Base
 from .sourepprover import SouRepProVer
-from .buildorder import BuildOrder
 from .sourcerepositoryhook import SourceRepositoryHook
 
 from molior.molior.configuration import Configuration
@@ -32,8 +31,6 @@ class SourceRepository(Base):  # pylint: disable=too-few-public-methods
     id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
     url = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
-    dependencies = relationship("SourceRepository", secondary=BuildOrder,
-                                primaryjoin=id == BuildOrder.c.sourcerepository, secondaryjoin=id == BuildOrder.c.dependency)
     projectversions = relationship("ProjectVersion", secondary=SouRepProVer)
     hooks = relationship("Hook", secondary=SourceRepositoryHook)
 

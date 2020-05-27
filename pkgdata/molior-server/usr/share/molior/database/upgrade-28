@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE build ADD COLUMN builddeps varchar[];
+DROP TABLE buildorder;
+
+EOF
