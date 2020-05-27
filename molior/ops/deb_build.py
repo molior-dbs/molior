@@ -274,8 +274,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         found = True
         for dep_git in build_after:
             dep_repo = session.query(SourceRepository).filter(or_(SourceRepository.url == dep_git,
-                                                                  SourceRepository.url.like("%{}".format(dep_git)),
-                                                                  SourceRepository.url.like("%{}.git".format(dep_git)))).first()
+                                                                  SourceRepository.url.like("%/{}".format(dep_git)),
+                                                                  SourceRepository.url.like("%/{}.git".format(dep_git)))).first()
             if not dep_repo:
                 build.log_state("Error: build after repo '%s' not found" % dep_git)
                 write_log(parent_build_id, "E: build after repo '%s' not found\n" % dep_git)
@@ -426,18 +426,13 @@ def chroot_ready(build, session):
     if buildvar.architecture.name == "all":
         buildvar = (
             session.query(BuildVariant)
-            .join(Architecture)  # pylint: disable=no-member
+            .join(Architecture)
             .filter(BuildVariant.base_mirror == buildvar.base_mirror)
             .filter(Architecture.name == target_arch)
             .first()
         )
 
-    chroot = (
-        session.query(Chroot)
-        .filter(Chroot.buildvariant == buildvar)  # pylint: disable=no-member
-        .first()
-    )
-
+    chroot = session.query(Chroot).filter(Chroot.buildvariant == buildvar).first()
     if chroot:
         if chroot.ready:
             return True
@@ -517,9 +512,7 @@ def get_apt_repos(project_version, session, is_ci=False):
         list: List of apt urls.
     """
     dep_ids = get_projectversion_deps(project_version.id, session)
-    deps = (
-        session.query(ProjectVersion).filter(ProjectVersion.id.in_(set(dep_ids))).all()
-    )
+    deps = session.query(ProjectVersion).filter(ProjectVersion.id.in_(set(dep_ids))).all()
 
     urls = []
 
@@ -588,11 +581,7 @@ async def ScheduleBuilds():
 
                 ready = True
                 for dep_repo_id in repo_deps:
-                    dep_repo = (
-                        session.query(SourceRepository)
-                        .filter(SourceRepository.id == dep_repo_id)
-                        .first()
-                    )
+                    dep_repo = session.query(SourceRepository).filter(SourceRepository.id == dep_repo_id).first()
                     if not dep_repo:
                         logger.warning("scheduler: repo %d not found", dep_repo_id)
                         continue
@@ -630,20 +619,14 @@ async def ScheduleBuilds():
                         if running_builds:
                             found_running = True
 
-                            projectversion = (
-                                session.query(ProjectVersion)
-                                .filter(ProjectVersion.id == pv_id)
-                                .first()
-                            )
+                            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == pv_id).first()
                             if not projectversion:
                                 pvname = "unknown"
-                                logger.warning(
-                                    "scheduler: projectversion %d not found", pv_id
-                                )
+                                logger.warning("scheduler: projectversion %d not found", pv_id)
                             else:
                                 pvname = projectversion.fullname
                             builds = [str(b.id) for b in running_builds]
-                            write_log(build.id, "W: waiting for repo {} to finish builds ({}) in projectversion {}\n".format(
+                            write_log(build.id, "W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
                                                  dep_repo.name, ", ".join(builds), pvname))
                             break
 
