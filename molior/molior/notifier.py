@@ -21,7 +21,7 @@ class Subject(Enum):
     project = 5
     projectversion = 6
     build = 7
-    livelog = 8
+    buildlog = 8
     mirror = 9
 
 
