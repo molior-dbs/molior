@@ -202,7 +202,7 @@ class Build(Base):
 #        if project_id:
 #            return check_user_role(web_session, db_session, project_id, ["member", "owner"])
 
-        return False
+        return True
 
     def data(self):
         buildjson = {
