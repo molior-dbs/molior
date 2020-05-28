@@ -5,6 +5,8 @@ from pathlib import Path
 
 from molior.app import app, logger
 from molior.molior.notifier import Subject, Event, Action
+from molior.model.database import Session
+from molior.model.build import Build
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
 
@@ -14,10 +16,11 @@ class LiveLogger:
     Provides helper functions for livelogging on molior.
     """
 
-    def __init__(self, sender, file_path):
+    def __init__(self, sender, build_id):
         self.__sender = sender
-        self.__filepath = file_path
+        self.build_id = build_id
         self.__up = False
+        self.__filepath = BUILD_OUT_PATH / build_id / "build.log"
 
     async def stop(self):
         """
@@ -33,8 +36,18 @@ class LiveLogger:
         try:
             with self.__filepath.open() as log_file:
                 while self.__up:
-                    data = log_file.read(8192)
+                    data = log_file.read(1024)
                     if not data:
+                        with Session() as session:
+                            build = session.query(Build).filter(Build.id == self.build_id).first()
+                            if not build:
+                                logger.error("rebuild: build %d not found", self.build_id)
+                                self.__up = False
+                                continue
+                            if build.buildstate != "building":
+                                logger.info("buildlog: end of build {}".format(self.build_id))
+                                self.__up = False
+                                continue
                         await asyncio.sleep(1)
                         logger.info("buildlog no read")
                         continue
@@ -44,6 +57,7 @@ class LiveLogger:
                         "subject": Subject.buildlog.value,
                         "data": data,
                     }
+                    # logger.info(data)
                     await self.__sender(json.dumps(message))
                     await asyncio.sleep(0.1)
                     # if line.startswith("Finished"):
@@ -68,8 +82,7 @@ async def start_livelogger(websocket, data):
     if "build_id" not in data:
         return False
 
-    path = BUILD_OUT_PATH / str(data.get("build_id")) / "build.log"
-    llogger = LiveLogger(websocket.send_str, path)
+    llogger = LiveLogger(websocket.send_str, data.get("build_id"))
 
     if hasattr(websocket, "logger") and websocket.logger:
         await stop_livelogger(websocket, data)
@@ -78,7 +91,6 @@ async def start_livelogger(websocket, data):
     # FIXME: use separate thread for file IO
     loop = asyncio.get_event_loop()
     loop.create_task(llogger.start())
-    logger.debug("new logger task created for '%s'", str(path))
 
 
 async def stop_livelogger(websocket, _):
