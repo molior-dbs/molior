@@ -2,7 +2,7 @@ Source: molior
 Section: misc
 Priority: optional
 Standards-Version: 3.9.8
-Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-systemd (>= 1.5), dh-exec, python3-setuptools,
+Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-exec, python3-setuptools,
     python3-pytest, python3-pytest-cov, python3-coverage, python3-mock, python3-yaml, python3-sqlalchemy,
     python3-jinja2, python3-sphinx, python3-sphinx-rtd-theme, python3-sphinxcontrib.plantuml,
     python3-cirrina, python3-launchy, flake8, git
@@ -85,7 +85,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
   molior-tools,
 # development tools:
-  npm, python3-all, dh-python, dh-systemd, dh-exec, python3-sphinx,
+  npm, python3-all, dh-python, debhelper, dh-exec, python3-sphinx,
   python3-sphinx-rtd-theme, python3-sphinxcontrib.plantuml
 Description: molior development virtual machine
  Development environment for molior
