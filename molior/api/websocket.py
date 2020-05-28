@@ -22,7 +22,7 @@ class LiveLogger:
         self.__up = False
         self.__filepath = BUILD_OUT_PATH / str(build_id) / "build.log"
 
-    async def stop(self):
+    def stop(self):
         """
         Stops the livelogging loop.
         """
@@ -36,22 +36,20 @@ class LiveLogger:
         try:
             with self.__filepath.open() as log_file:
                 while self.__up:
-                    data = log_file.read(1024)
+                    data = log_file.read(16384)
                     if not data:
                         with Session() as session:
                             build = session.query(Build).filter(Build.id == self.build_id).first()
                             if not build:
                                 logger.error("rebuild: build %d not found", self.build_id)
-                                self.__up = False
+                                self.stop()
                                 continue
                             if build.buildstate != "building":
                                 logger.info("buildlog: end of build {}".format(self.build_id))
-                                self.__up = False
+                                self.stop()
                                 continue
                         await asyncio.sleep(1)
-                        logger.info("buildlog no read")
                         continue
-                    logger.info("buildlog read {}".format(len(data)))
                     message = {
                         "event": Event.added.value,
                         "subject": Subject.buildlog.value,
@@ -59,9 +57,6 @@ class LiveLogger:
                     }
                     # logger.info(data)
                     await self.__sender(json.dumps(message))
-                    await asyncio.sleep(0.1)
-                    # if line.startswith("Finished"):
-                    #    await self.stop()
         except FileNotFoundError:
             logger.error("livelogger: log file not found: {}".format(self.__filepath))
         except Exception as exc:
@@ -98,7 +93,7 @@ async def stop_livelogger(websocket, _):
     Stops the livelogger.
     """
     if hasattr(websocket, "logger") and websocket.logger:
-        await websocket.logger.stop()
+        websocket.logger.stop()
 
 
 async def dispatch(websocket, message):
