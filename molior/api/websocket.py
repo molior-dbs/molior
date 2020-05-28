@@ -33,7 +33,7 @@ class LiveLogger:
         try:
             with self.__filepath.open() as log_file:
                 while self.__up:
-                    data = log_file.read(4096)
+                    data = log_file.read(8192)
                     if not data:
                         await asyncio.sleep(1)
                         logger.info("buildlog no read")
@@ -45,6 +45,7 @@ class LiveLogger:
                         "data": data,
                     }
                     await self.__sender(json.dumps(message))
+                    await asyncio.sleep(0.1)
                     # if line.startswith("Finished"):
                     #    await self.stop()
         except FileNotFoundError:
