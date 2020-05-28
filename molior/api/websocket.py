@@ -20,7 +20,7 @@ class LiveLogger:
         self.__sender = sender
         self.build_id = build_id
         self.__up = False
-        self.__filepath = BUILD_OUT_PATH / build_id / "build.log"
+        self.__filepath = BUILD_OUT_PATH / str(build_id) / "build.log"
 
     async def stop(self):
         """
