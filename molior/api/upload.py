@@ -4,11 +4,11 @@ from aiohttp import web
 from pathlib import Path
 from aiofile import AIOFile, Writer
 
-from .app import app, logger
-from .molior.configuration import Configuration
-from .model.database import Session
-from .model.build import Build
-from .model.buildtask import BuildTask
+from ..app import app, logger
+from ..molior.configuration import Configuration
+from ..model.database import Session
+from ..model.build import Build
+from ..model.buildtask import BuildTask
 
 
 if not os.environ.get("IS_SPHINX", False):
@@ -75,7 +75,7 @@ async def ws_logs_connected(ws_client):
 
 @app.websocket_message("/internal/buildlog/{token}", group="log", authenticated=False)
 async def ws_logs(ws_client, msg):
-    afp, writer = ws_client.cirrina.logfile
+    afp, writer = ws_client.cirrina.buildlog
     await writer(msg)
     await afp.fsync()
     return ws_client
@@ -83,7 +83,7 @@ async def ws_logs(ws_client, msg):
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
-    afp, _ = ws_client.cirrina.buildlog.logfile
+    afp, _ = ws_client.cirrina.buildlog.buildlog
     await afp.fsync()
     await afp.close()
     return ws_client
