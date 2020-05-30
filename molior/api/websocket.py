@@ -43,9 +43,6 @@ class LiveLogger:
                     retries = 0
                     while self.__up:
                         async for data in reader:
-                            for i in range(len(data)):
-                                logger.info("%02x", data[i])
-                            logger.info("buidlog: '{}'".format(data))
                             message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": str(data, 'utf-8')}
                             await self.__sender(json.dumps(message))
 
