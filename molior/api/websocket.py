@@ -38,12 +38,15 @@ class LiveLogger:
         self.__up = True
         while self.__up:
             try:
-                async with AIOFile(str(self.__filepath), "r") as log_file:
+                async with AIOFile(str(self.__filepath), "rb") as log_file:
                     reader = Reader(log_file, chunk_size=16384)
                     retries = 0
                     while self.__up:
                         async for data in reader:
-                            message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": data}
+                            for i in range(len(data)):
+                                logger.info("%02x", data[i])
+                            logger.info("buidlog: '{}'".format(data))
+                            message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": str(data, 'utf-8')}
                             await self.__sender(json.dumps(message))
 
                         # EOF
@@ -70,7 +73,7 @@ class LiveLogger:
             except Exception as exc:
                 logger.error("livelogger: error sending live logs")
                 logger.exception(exc)
-                await asyncio.sleep(1)
+                self.stop()
 
 
 async def start_livelogger(websocket, data):
