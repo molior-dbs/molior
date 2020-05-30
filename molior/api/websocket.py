@@ -49,11 +49,11 @@ class LiveLogger:
                         with Session() as session:
                             build = session.query(Build).filter(Build.id == self.build_id).first()
                             if not build:
-                                logger.error("rebuild: build %d not found", self.build_id)
+                                logger.error("build: build %d not found", self.build_id)
                                 self.stop()
                                 continue
-                            if build.buildstate != "building" or   \
-                               build.buildstate != "publishing" or \
+                            if build.buildstate != "building" and   \
+                               build.buildstate != "publishing" and \
                                build.buildstate != "needs_publish":
                                 logger.info("buildlog: end of build {}".format(self.build_id))
                                 self.stop()
