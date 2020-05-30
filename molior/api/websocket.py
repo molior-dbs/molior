@@ -85,7 +85,7 @@ async def start_livelogger(websocket, data):
     llogger = LiveLogger(websocket.send_str, data.get("build_id"))
 
     if hasattr(websocket, "logger") and websocket.logger:
-        logger.error("livelogger: removeing existing livelogger")
+        logger.error("livelogger: removing existing livelogger")
         await stop_livelogger(websocket, data)
 
     websocket.logger = llogger
