@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from pathlib import Path
+from aiofile import AIOFile, Reader
 
 from molior.app import app, logger
 from molior.molior.notifier import Subject, Event, Action
@@ -24,44 +25,48 @@ class LiveLogger:
 
     def stop(self):
         """
-        Stops the livelogging loop.
+        Stops the livelogging
         """
+        logger.info("build-{}: stopping livelogger".format(self.build_id))
         self.__up = False
 
     async def start(self):
         """
-        Starts the livelogging.
+        Starts the livelogging
         """
+        logger.info("build-{}: starting livelogger".format(self.build_id))
         self.__up = True
-        try:
-            with self.__filepath.open() as log_file:
-                while self.__up:
-                    data = log_file.read(16384)
-                    if not data:
+        while self.__up:
+            try:
+                async with AIOFile(str(self.__filepath), "r") as log_file:
+                    reader = Reader(log_file, chunk_size=16384)
+                    while self.__up:
+                        async for data in reader:
+                            message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": data}
+                            await self.__sender(json.dumps(message))
+
+                        # EOF
                         with Session() as session:
                             build = session.query(Build).filter(Build.id == self.build_id).first()
                             if not build:
                                 logger.error("rebuild: build %d not found", self.build_id)
                                 self.stop()
                                 continue
-                            if build.buildstate != "building":
+                            if build.buildstate != "building" or   \
+                               build.buildstate != "publishing" or \
+                               build.buildstate != "needs_publish":
                                 logger.info("buildlog: end of build {}".format(self.build_id))
                                 self.stop()
                                 continue
                         await asyncio.sleep(1)
                         continue
-                    message = {
-                        "event": Event.added.value,
-                        "subject": Subject.buildlog.value,
-                        "data": data,
-                    }
-                    # logger.info(data)
-                    await self.__sender(json.dumps(message))
-        except FileNotFoundError:
-            logger.error("livelogger: log file not found: {}".format(self.__filepath))
-        except Exception as exc:
-            logger.error("livelogger: error sending live logs")
-            logger.exception(exc)
+            except FileNotFoundError:
+                logger.error("livelogger: log file not found: {}".format(self.__filepath))
+                await asyncio.sleep(1)
+            except Exception as exc:
+                logger.error("livelogger: error sending live logs")
+                logger.exception(exc)
+                await asyncio.sleep(1)
 
 
 async def start_livelogger(websocket, data):
@@ -73,17 +78,17 @@ async def start_livelogger(websocket, data):
         websocket: The websocket instance.
         data (dict): The received data.
     """
-    logger.info("start_livelogger {}".format(data))
     if "build_id" not in data:
+        logger.error("livelogger: no build ID found")
         return False
 
     llogger = LiveLogger(websocket.send_str, data.get("build_id"))
 
     if hasattr(websocket, "logger") and websocket.logger:
+        logger.error("livelogger: removeing existing livelogger")
         await stop_livelogger(websocket, data)
 
     websocket.logger = llogger
-    # FIXME: use separate thread for file IO
     loop = asyncio.get_event_loop()
     loop.create_task(llogger.start())
 
@@ -94,6 +99,8 @@ async def stop_livelogger(websocket, _):
     """
     if hasattr(websocket, "logger") and websocket.logger:
         websocket.logger.stop()
+    else:
+        logger.error("stop_livelogger: no active logger found")
 
 
 async def dispatch(websocket, message):
@@ -143,10 +150,8 @@ async def websocket_message(websocket, msg):
     """
     On websocket message handler.
     """
-    logger.info("message received from user '%s'", websocket.cirrina.web_session.get("username"))
     try:
         data = json.loads(msg)
-        logger.debug("received data %s", str(data))
     except json.decoder.JSONDecodeError:
         logger.error("cannot parse websocket message from user '%s'", websocket.cirrina.web_session.get("username"))
 
