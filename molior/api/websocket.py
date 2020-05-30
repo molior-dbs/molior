@@ -40,25 +40,29 @@ class LiveLogger:
             try:
                 async with AIOFile(str(self.__filepath), "r") as log_file:
                     reader = Reader(log_file, chunk_size=16384)
+                    retries = 0
                     while self.__up:
                         async for data in reader:
                             message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": data}
                             await self.__sender(json.dumps(message))
 
                         # EOF
-                        with Session() as session:
-                            build = session.query(Build).filter(Build.id == self.build_id).first()
-                            if not build:
-                                logger.error("build: build %d not found", self.build_id)
-                                self.stop()
-                                continue
-                            if build.buildstate != "building" and   \
-                               build.buildstate != "publishing" and \
-                               build.buildstate != "needs_publish":
-                                logger.info("buildlog: end of build {}".format(self.build_id))
-                                self.stop()
-                                continue
-                        await asyncio.sleep(1)
+                        retries += 1
+                        if retries == 100:
+                            retries = 0
+                            with Session() as session:
+                                build = session.query(Build).filter(Build.id == self.build_id).first()
+                                if not build:
+                                    logger.error("build: build %d not found", self.build_id)
+                                    self.stop()
+                                    continue
+                                if build.buildstate != "building" and   \
+                                   build.buildstate != "publishing" and \
+                                   build.buildstate != "needs_publish":
+                                    logger.info("buildlog: end of build {}".format(self.build_id))
+                                    self.stop()
+                                    continue
+                        await asyncio.sleep(.1)
                         continue
             except FileNotFoundError:
                 logger.error("livelogger: log file not found: {}".format(self.__filepath))
