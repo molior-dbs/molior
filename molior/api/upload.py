@@ -2,6 +2,7 @@ import os
 
 from aiohttp import web
 from pathlib import Path
+from aiofile import AIOFile, Writer
 
 from molior.app import app, logger
 from molior.molior.configuration import Configuration
@@ -20,17 +21,10 @@ else:
 @app.http_upload("/internal/buildupload/{token}", upload_dir=upload_dir)
 async def file_upload(request, tempfile, filename, size):
     token = request.match_info["token"]
-    logger.debug(
-        "file uploaded: %s (%s) %dbytes, token %s", tempfile, filename, size, token
-    )
+    logger.debug("file uploaded: %s (%s) %dbytes, token %s", tempfile, filename, size, token)
 
     with Session() as session:
-        build = (
-            session.query(Build)
-            .join(BuildTask)
-            .filter(BuildTask.task_id == token)
-            .first()
-        )
+        build = session.query(Build).join(BuildTask).filter(BuildTask.task_id == token).first()
         if not build:
             logger.error("file_upload: no build found for token '%s'", token)
             return web.Response(status=400, text="Invalid file upload.")
@@ -65,30 +59,31 @@ async def ws_logs_connected(ws_client):
     token = ws_client.cirrina.request.match_info["token"]
 
     with Session() as session:
-        build = (
-            session.query(Build)
-            .join(BuildTask)
-            .filter(BuildTask.task_id == token)
-            .first()
-        )
+        build = session.query(Build).join(BuildTask).filter(BuildTask.task_id == token).first()
         if not build:
             logger.error("file_upload: no build found for token '%s'", token)
             # FIXME: disconnect
             return ws_client
 
-        filename = get_log_file_path(build.id)
-        ws_client.cirrina.logfile = open(filename, "w", encoding="utf-8")
-
+    filename = get_log_file_path(build.id)
+    afp = AIOFile(filename, 'w')
+    await afp.open()
+    writer = Writer(afp)
+    ws_client.molior.logfile = (afp, writer)
     return ws_client
 
 
 @app.websocket_message("/internal/buildlog/{token}", group="log", authenticated=False)
 async def ws_logs(ws_client, msg):
-    ws_client.cirrina.logfile.write(msg)
+    afp, writer = ws_client.molior.logfile
+    await writer(msg)
+    await afp.fsync()
     return ws_client
 
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
-    ws_client.cirrina.logfile.close()
+    afp, _ = ws_client.molior.logfile
+    await afp.fsync()
+    await afp.close()
     return ws_client
