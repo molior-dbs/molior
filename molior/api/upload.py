@@ -83,7 +83,7 @@ async def ws_logs(ws_client, msg):
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
-    afp, _ = ws_client.cirrina.buildlog.buildlog
+    afp, _ = ws_client.cirrina.buildlog
     await afp.fsync()
     await afp.close()
     return ws_client
