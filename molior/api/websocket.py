@@ -47,22 +47,26 @@ class LiveLogger:
                             await self.__sender(json.dumps(message))
 
                         # EOF
-                        retries += 1
-                        if retries == 100:
+                        if retries % 100 == 0:
                             retries = 0
                             with Session() as session:
                                 build = session.query(Build).filter(Build.id == self.build_id).first()
                                 if not build:
                                     logger.error("build: build %d not found", self.build_id)
+                                    message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
+                                    await self.__sender(json.dumps(message))
                                     self.stop()
                                     continue
                                 if build.buildstate != "building" and   \
                                    build.buildstate != "publishing" and \
                                    build.buildstate != "needs_publish":
                                     logger.info("buildlog: end of build {}".format(self.build_id))
+                                    message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
+                                    await self.__sender(json.dumps(message))
                                     self.stop()
                                     continue
                         await asyncio.sleep(.1)
+                        retries += 1
                         continue
             except FileNotFoundError:
                 logger.error("livelogger: log file not found: {}".format(self.__filepath))
