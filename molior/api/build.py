@@ -181,7 +181,7 @@ async def get_builds(request):
     # Create initial query
     builds = (
         request.cirrina.db_session.query(Build)
-        .outerjoin(Build.buildconfiguration)  # pylint: disable=no-member
+        .outerjoin(Build.buildconfiguration)
         .outerjoin(BuildConfiguration.buildvariant)
         .outerjoin(BuildVariant.architecture)
         .outerjoin(BuildVariant.base_mirror)
@@ -350,7 +350,7 @@ FROM descendants order by id;
                 .join(Architecture)
                 .filter(
                     BuildVariant.name.like("%{}%".format(buildvariant))
-                )  # pylint: disable=no-member
+                )
                 .distinct()
             )
         ]
@@ -364,7 +364,7 @@ FROM descendants order by id;
             BuildConfiguration.projectversions.any(
                 ProjectVersion.fullname.like(
                     "%{}%".format(project)
-                )  # pylint: disable=no-member
+                )
             )
         )
 
@@ -374,7 +374,7 @@ FROM descendants order by id;
     if maintainer:
         builds = builds.filter(
             Maintainer.fullname.ilike("%{}%".format(maintainer))
-        )  # pylint: disable=no-member
+        )
 
     if architecture:
         builds = builds.filter(Architecture.name.like("%{}%".format(architecture)))
@@ -404,7 +404,7 @@ FROM descendants order by id;
         )
 
     # Count builds
-    nb_builds = builds.count()  # pylint: disable=no-member
+    nb_builds = builds.count()
 
     # sort hierarchically
 
