@@ -196,6 +196,7 @@ async def create_project(request):
     return web.json_response({"id": project.id, "name": project.name})
 
 
+@app.http_put("/api/project/{project_id}")
 @app.http_put("/api/projects/{project_id}")
 @app.authenticated
 @req_role("owner")
@@ -236,15 +237,11 @@ async def update_project(request):
     except (ValueError, TypeError):
         return web.Response(text="Incorrect value for project_id", status=400)
 
-    project = (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter_by(id=project_id)
-        .first()
-    )
-
+    project = request.cirrina.db_session.query(Project).filter_by(id=project_id).first()
+    if not project:
+        return web.Response(text="project {} not found".format(project_id), status=400)
     project.description = description
-
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
     return web.Response(status=200)
 
 
