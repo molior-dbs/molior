@@ -94,6 +94,7 @@ class Build(Base):
 
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "building":
+                self.parent.parent.endstamp = None
                 await self.parent.parent.set_building()
 
     async def set_scheduled(self):
