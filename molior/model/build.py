@@ -1,18 +1,14 @@
-import pytz
-
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
-from molior.app import logger
-from molior.molior.buildlogger import write_log_title
-# from molior.tools import check_user_role
-from molior.molior.notifier import Subject, Event, notify, run_hooks
+from ..app import logger
+from ..tools import get_local_tz, write_log_title
+# from .tools import check_user_role
+from ..molior.notifier import Subject, Event, notify, run_hooks
 
 from .database import Base
 from .sourcerepository import SourceRepository
-
-local_tz = pytz.timezone("Europe/Zurich")
 
 BUILD_STATES = [
     "new",
@@ -92,6 +88,8 @@ class Build(Base):
     async def set_needs_build(self):
         self.log_state("needs build")
         self.buildstate = "needs_build"
+        self.endstamp = None
+        self.buildendstamp = None
         await self.build_changed()
 
         if self.buildtype == "deb":
@@ -106,14 +104,14 @@ class Build(Base):
     async def set_building(self):
         self.log_state("building")
         self.buildstate = "building"
-        now = local_tz.localize(datetime.now(), is_dst=None)
+        now = get_local_tz().localize(datetime.now(), is_dst=None)
         self.startstamp = now
         await self.build_changed()
 
     async def set_failed(self):
         self.log_state("failed")
         self.buildstate = "build_failed"
-        now = local_tz.localize(datetime.now(), is_dst=None)
+        now = get_local_tz().localize(datetime.now(), is_dst=None)
         self.buildendstamp = now
         self.endstamp = now
         await self.build_changed()
@@ -128,7 +126,7 @@ class Build(Base):
     async def set_needs_publish(self):
         self.log_state("needs publish")
         self.buildstate = "needs_publish"
-        now = local_tz.localize(datetime.now(), is_dst=None)
+        now = get_local_tz().localize(datetime.now(), is_dst=None)
         self.buildendstamp = now
         await self.build_changed()
 
@@ -140,7 +138,7 @@ class Build(Base):
     async def set_publish_failed(self):
         self.log_state("publishing failed")
         self.buildstate = "publish_failed"
-        now = local_tz.localize(datetime.now(), is_dst=None)
+        now = get_local_tz().localize(datetime.now(), is_dst=None)
         self.endstamp = now
         await self.build_changed()
 
@@ -154,7 +152,7 @@ class Build(Base):
     async def set_successful(self):
         self.log_state("successful")
         self.buildstate = "successful"
-        now = local_tz.localize(datetime.now(), is_dst=None)
+        now = get_local_tz().localize(datetime.now(), is_dst=None)
         self.endstamp = now
         await self.build_changed()
 

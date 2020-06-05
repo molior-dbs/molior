@@ -5,14 +5,13 @@ import operator
 from launchy import Launchy
 from datetime import datetime
 
-from molior.app import logger
-from molior.model.database import Session
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.molior.buildlogger import write_log, write_log_title
-from molior.molior.errors import MaintainerParseError
-from molior.molior.core import get_maintainer, get_target_config
-from molior.tools import get_changelog_attr, validate_version_format
+from ..app import logger
+from ..tools import write_log, write_log_title, get_changelog_attr, validate_version_format
+from ..model.database import Session
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..molior.errors import MaintainerParseError
+from ..molior.core import get_maintainer, get_target_config
 
 
 async def run_git(cmd, cwd, build_id):

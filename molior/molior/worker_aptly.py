@@ -4,20 +4,20 @@ import operator
 from launchy import Launchy
 from sqlalchemy import or_
 
-from molior.app import logger
-from molior.model.database import Session
-from molior.model.build import Build
-from molior.model.buildvariant import BuildVariant
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.model.architecture import Architecture
-from molior.model.chroot import Chroot
-from molior.aptly.errors import AptlyError, NotFoundError
-from molior.tools import get_aptly_connection
-from molior.molior.buildlogger import write_log, write_log_title
-from molior.molior.debianrepository import DebianRepository
+from ..app import logger
+from ..tools import get_aptly_connection, write_log, write_log_title
 from ..ops import DebSrcPublish, DebPublish
-from molior.molior.notifier import Subject, Event, notify
+from ..aptly.errors import AptlyError, NotFoundError
+from .debianrepository import DebianRepository
+from .notifier import Subject, Event, notify
+
+from ..model.database import Session
+from ..model.build import Build
+from ..model.buildvariant import BuildVariant
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion
+from ..model.architecture import Architecture
+from ..model.chroot import Chroot
 
 
 async def startup_mirror(task_queue):

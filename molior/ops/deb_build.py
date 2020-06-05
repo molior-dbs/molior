@@ -9,7 +9,7 @@ from sqlalchemy import or_
 from pathlib import Path
 
 from ..app import logger
-from ..tools import get_changelog_attr, strip_epoch_version
+from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title
 
 from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
@@ -21,7 +21,6 @@ from ..model.buildvariant import BuildVariant
 from ..model.architecture import Architecture
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..molior.core import get_target_arch, get_targets, get_buildconfigs, get_buildorder
-from ..molior.buildlogger import write_log, write_log_title
 from ..molior.configuration import Configuration
 from ..molior.worker_backend import backend_queue
 from .git import GitCheckout, GetBuildInfo

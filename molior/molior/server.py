@@ -1,6 +1,3 @@
-"""
-Provides the main molior server.
-"""
 import asyncio
 import concurrent.futures
 import click
@@ -47,8 +44,6 @@ import molior.api2.projectversion    # noqa: F401
 import molior.api2.sourcerepository  # noqa: F401
 import molior.api2.user              # noqa: F401
 import molior.api2.mirror            # noqa: F401
-
-processed_repos = []
 
 loop = asyncio.get_event_loop()
 
@@ -129,6 +124,7 @@ def mainloop(host, port, debug):
 
 if __name__ == "__main__":
     logger.info("molior v%s", MOLIOR_VERSION)
+
     Launchy.attach_loop(loop)
 
     backend = Backend().init(backend_queue)
