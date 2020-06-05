@@ -4,17 +4,16 @@ import shlex
 from launchy import Launchy
 from pathlib import Path
 
-from molior.app import logger
-from molior.tools import strip_epoch_version
+from ..app import logger
+from ..tools import strip_epoch_version, write_log, write_log_title
+from ..molior.debianrepository import DebianRepository
+from ..molior.configuration import Configuration
+from ..molior.notifier import send_mail_notification
 
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
-from ..molior.debianrepository import DebianRepository
-from ..molior.configuration import Configuration
-from ..molior.notifier import send_mail_notification
-from ..molior.buildlogger import write_log, write_log_title
 
 
 def debchanges_get_files(sourcepath, sourcename, version, arch="source"):

@@ -1,13 +1,13 @@
 import asyncio
 
-from molior.app import logger
-from molior.molior.backend import Backend
-from molior.molior.buildlogger import write_log
+from ..app import logger
+from ..tools import write_log
+from .backend import Backend
+from .notifier import send_mail_notification
 
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from .notifier import send_mail_notification
 
 backend_queue = asyncio.Queue()
 

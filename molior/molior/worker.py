@@ -1,14 +1,14 @@
 import shutil
 import asyncio
 
-from molior.model.database import Session
-from molior.model.build import Build
-from molior.model.sourcerepository import SourceRepository
-from molior.molior.buildlogger import write_log, write_log_title
-
-from molior.app import logger
+from ..app import logger
 from ..ops import GitClone, get_latest_tag
 from ..ops import BuildProcess, ScheduleBuilds
+from ..tools import write_log, write_log_title
+
+from ..model.database import Session
+from ..model.build import Build
+from ..model.sourcerepository import SourceRepository
 
 
 class Worker:
@@ -28,7 +28,7 @@ class Worker:
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("rebuild: build %d not found", build_id)
+            logger.error("clone: build %d not found", build_id)
             return
 
         repo = (
@@ -61,7 +61,7 @@ class Worker:
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("rebuild: build %d not found", build_id)
+            logger.error("build: build %d not found", build_id)
             return
 
         if build.buildstate != "building":
@@ -102,7 +102,7 @@ class Worker:
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("rebuild: build %d not found", build_id)
+            logger.error("buildlatest: build %d not found", build_id)
             return
 
         repo = (
