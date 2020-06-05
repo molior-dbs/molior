@@ -28,7 +28,7 @@ BUILD_STATES = [
 
 BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror"]
 
-DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
 class Build(Base):
