@@ -49,7 +49,7 @@ async def get_status(request):
         pass
 
     status = {
-        "versions": {"molior-server": [MOLIOR_VERSION]},
+        "version": MOLIOR_VERSION,
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
         "sshkey": sshkey,
