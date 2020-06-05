@@ -310,7 +310,7 @@ def write_log_title(build_id, line, no_footer_newline=False, no_header_newline=T
         build_id (int): The build's id.
         lines (list): The log line.
     """
-    now = local_tz.localize(datetime.now(), is_dst=None)
+    now = get_local_tz().localize(datetime.now(), is_dst=None)
     date = datetime.strftime(now, "%a, %d %b %Y %H:%M:%S %z")
 
     header_newline = "\n"
