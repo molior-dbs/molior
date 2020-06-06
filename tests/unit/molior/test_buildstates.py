@@ -1,9 +1,11 @@
 import asyncio
+import sys
 
-from mock import MagicMock
-from molior.model.build import Build
-from molior.model.maintainer import Maintainer  # noqa: F401, needed for test wtf
-from mock import patch
+from mock import MagicMock, patch, mock
+sys.modules['aiofile'] = mock.MagicMock()
+
+from molior.model.build import Build            # noqa: E402
+from molior.model.maintainer import Maintainer  # noqa: F401
 
 
 def test_src_build_failed():
