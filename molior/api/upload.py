@@ -65,10 +65,12 @@ async def ws_logs_connected(ws_client):
             # FIXME: disconnect
             return ws_client
 
+    logger.info("ws: recieving logs for build {}".format(build.id))
     filename = get_log_file_path(build.id)
     afp = AIOFile(filename, 'w')
     await afp.open()
     writer = Writer(afp)
+    ws_client.cirrina.build_id = build.id
     ws_client.cirrina.buildlog = (afp, writer)
     return ws_client
 
@@ -83,6 +85,7 @@ async def ws_logs(ws_client, msg):
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
+    logger.info("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
     afp, _ = ws_client.cirrina.buildlog
     await afp.fsync()
     await afp.close()
