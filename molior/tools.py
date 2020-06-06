@@ -19,7 +19,6 @@ from .model.architecture import Architecture
 from .model.user import User
 from .model.userrole import UserRole
 
-BORDER = 80 * "+"
 local_tz = None
 
 
@@ -294,12 +293,9 @@ async def write_log(build_id, line):
     if not path.parent.exists():
         path.parent.mkdir()
 
-    afp = AIOFile(path, 'a+')
-    await afp.open()
-    writer = Writer(afp)
-    await writer(line)
-    # await afp.fsync()
-    await afp.close()
+    async with AIOFile(path, "a+") as afp:
+        writer = Writer(afp)
+        await writer(line)
 
 
 async def write_log_title(build_id, line, no_footer_newline=False, no_header_newline=True, error=False):
@@ -326,6 +322,7 @@ async def write_log_title(build_id, line, no_footer_newline=False, no_header_new
     if error:
         color = 31
 
+    BORDER = 80 * "+"
     await write_log(build_id, "{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
     await write_log(build_id, "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
     await write_log(build_id, "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
