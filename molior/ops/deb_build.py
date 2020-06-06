@@ -19,8 +19,8 @@ from ..model.maintainer import Maintainer
 from ..model.chroot import Chroot
 from ..model.buildvariant import BuildVariant
 from ..model.architecture import Architecture
-from ..model.projectversion import ProjectVersion, get_projectversion_deps
-from ..molior.core import get_target_arch, get_targets, get_buildconfigs, get_buildorder
+from ..model.projectversion import ProjectVersion
+from ..molior.core import get_target_arch, get_targets, get_buildconfigs, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
 from ..molior.worker_backend import backend_queue
 from .git import GitCheckout, GetBuildInfo
@@ -460,34 +460,6 @@ async def schedule_build(build, session):
         }
     )
     return True
-
-
-def get_apt_repos(project_version, session, is_ci=False):
-    """
-    Returns a list of all needed apt sources urls
-    for the given project_version.
-
-    Args:
-        base_mirror (str): The base mirror name ("jessie-8.9").
-        projectversion (ProjectVersion): The project_version.
-        distribution (str): The distribution
-
-    Returns:
-        list: List of apt urls.
-    """
-    dep_ids = get_projectversion_deps(project_version.id, session)
-    deps = session.query(ProjectVersion).filter(ProjectVersion.id.in_(set(dep_ids))).all()
-
-    urls = []
-
-    if is_ci:
-        urls.append(project_version.get_apt_repo(dist="unstable"))
-
-    urls.append(project_version.get_apt_repo())
-    for project_ver in deps:
-        urls.append(project_ver.get_apt_repo())
-
-    return urls
 
 
 async def ScheduleBuilds():
