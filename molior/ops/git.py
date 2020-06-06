@@ -17,7 +17,7 @@ from ..molior.core import get_maintainer, get_target_config
 async def run_git(cmd, cwd, build_id):
 
     async def outh(line):
-        write_log(build_id, "%s\n" % line)
+        await write_log(build_id, "%s\n" % line)
 
     process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd)
     await process.launch()
@@ -41,9 +41,9 @@ async def GitClone(build_id, repo_id, task_queue):
         repo.set_busy()
         session.commit()
 
-        write_log_title(build_id, "Clone Respository")
+        await write_log_title(build_id, "Clone Respository")
         logger.info("cloning repository '%s' into '%s'", repo.url, str(repo.src_path))
-        write_log(build_id, "I: cloning repository '{}'\n".format(repo.url))
+        await write_log(build_id, "I: cloning repository '{}'\n".format(repo.url))
 
         if not repo.path.exists():
             repo.path.mkdir()
@@ -70,7 +70,7 @@ async def GitClone(build_id, repo_id, task_queue):
                 session.commit()
                 return
 
-        write_log(build_id, "\n")
+        await write_log(build_id, "\n")
 
         repo.set_ready()
         session.commit()
