@@ -4,8 +4,6 @@ from ..app import logger
 from ..tools import write_log
 from .backend import Backend
 from .notifier import send_mail_notification
-from ..molior.core import get_target_arch, get_apt_repos
-from .configuration import Configuration
 
 from ..model.database import Session
 from ..model.build import Build
@@ -27,40 +25,16 @@ class BackendWorker:
     async def startup_scheduling(self):
         with Session() as session:
 
-            scheduled_builds = session.query(Build, BuildTask).filter(Build.buildstate == "scheduled", Build.buildtype == "deb",
-                                                                      BuildTask.build_id == Build.id).all()
+            scheduled_builds = session.query(Build).filter(Build.buildstate == "scheduled", Build.buildtype == "deb").all()
             if not scheduled_builds:
                 return
 
-            config = Configuration()
-            apt_url = config.aptly.get("apt_url")
-
             for build in scheduled_builds:
-                arch = build.buildconfiguration.buildvariant.architecture.name
-                base_mirror_db = build.buildconfiguration.buildvariant.base_mirror
-                distrelease_name = base_mirror_db.project.name
-                distrelease_version = base_mirror_db.name
-                project_version = build.buildconfiguration.projectversions[0]
-                apt_urls = get_apt_repos(project_version, session, is_ci=build.is_ci)
-                arch_any_only = False if arch == get_target_arch(build, session) else True
+                buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
+                session.delete(buildtask)
+                await build.set_needs_build()
 
-                logger.info(build)
-                job = [
-                    build.id,
-                    build.buildtask.task_id,
-                    build.version,
-                    apt_url,
-                    arch,
-                    arch_any_only,
-                    distrelease_name,
-                    distrelease_version,
-                    "unstable" if build.is_ci else "stable",
-                    build.sourcename,
-                    project_version.project.name,
-                    project_version.name,
-                    apt_urls,
-                ]
-                self._schedule(job)
+            session.commit()
 
     async def _schedule(self, job):
         b = Backend()
