@@ -9,6 +9,7 @@ from ..molior.notifier import Subject, Event, notify, run_hooks
 
 from .database import Base
 from .sourcerepository import SourceRepository
+from .buildtask import BuildTask
 
 BUILD_STATES = [
     "new",
@@ -54,6 +55,7 @@ class Build(Base):
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
     builddeps = Column(String)
+    buildtask = relationship(BuildTask, uselist=False)
 
     def log_state(self, statemsg):
         prefix = ""
