@@ -68,7 +68,7 @@ async def build(params, masterws):
                     logger.exception(exc)
 
             async def output(data):
-                await buildws.send(data)
+                await buildws.send_bytes(data)
 
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
 
