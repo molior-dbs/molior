@@ -39,9 +39,9 @@ class LiveLogger:
                 await self.__sender(json.dumps(message))
                 self.stop()
                 return True
-            if build.buildstate != "building" and   \
-               build.buildstate != "publishing" and \
-               build.buildstate != "needs_publish":
+            if build.buildstate == "build_failed" or \
+               build.buildstate == "publish_failed" or \
+               build.buildstate == "successful":
                 logger.info("buildlog: end of build {}".format(self.build_id))
                 message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
                 await self.__sender(json.dumps(message))
