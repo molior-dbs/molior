@@ -762,7 +762,6 @@ class AptlyWorker:
 
     async def _src_publish(self, args, session):
         build_id = args[0]
-        projectversion_ids = args[1]
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
@@ -774,7 +773,7 @@ class AptlyWorker:
 
         ret = False
         try:
-            ret = await DebSrcPublish(build.id, build.sourcename, build.version, projectversion_ids, build.is_ci)
+            ret = await DebSrcPublish(build)
         except Exception as exc:
             logger.exception(exc)
 

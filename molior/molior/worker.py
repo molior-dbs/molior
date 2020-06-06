@@ -67,11 +67,7 @@ class Worker:
         if build.buildstate != "building":
             await build.set_building()
 
-        repo = (
-            session.query(SourceRepository)
-            .filter(SourceRepository.id == repo_id)
-            .first()
-        )
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
             logger.error("build: repo %d not found", repo_id)
             return
@@ -84,16 +80,7 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        asyncio.ensure_future(
-            BuildProcess(
-                self.task_queue,
-                self.aptly_queue,
-                build_id,
-                repo.id,
-                git_ref,
-                ci_branch,
-            )
-        )
+        asyncio.ensure_future(BuildProcess(self.task_queue, self.aptly_queue, build_id, repo.id, git_ref, ci_branch))
 
     async def _buildlatest(self, args, session):
         logger.debug("worker: got buildlatest task")
@@ -105,11 +92,7 @@ class Worker:
             logger.error("buildlatest: build %d not found", build_id)
             return
 
-        repo = (
-            session.query(SourceRepository)
-            .filter(SourceRepository.id == repo_id)
-            .first()
-        )
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
             logger.error("buildlatest: repo %d not found", repo_id)
             return
@@ -165,23 +148,33 @@ class Worker:
             logger.error("rebuild: build %d not found", build_id)
             return
 
-        if build.buildstate != "build_failed" and build.buildstate != "publish_failed":
-            logger.error("rebuild: build %d not in error state", build_id)
-            return
+        ok = False
+        if build.buildtype == "deb":
+            if build.buildstate == "build_failed":
+                buildout = "/var/lib/molior/buildout/%d" % build_id
+                logger.info("removing %s", buildout)
+                try:
+                    shutil.rmtree(buildout)
+                except Exception as exc:
+                    logger.exception(exc)
+                    pass
 
-        buildout = "/var/lib/molior/buildout/%d" % build_id
-        logger.info("removing %s", buildout)
-        try:
-            shutil.rmtree(buildout)
-        except Exception as exc:
-            logger.exception(exc)
-            pass
+                await build.set_needs_build()
+                session.commit()
 
-        await build.set_needs_build()
-        session.commit()
+                args = {"schedule": []}
+                await self.task_queue.put(args)
+                ok = True
 
-        args = {"schedule": []}
-        await self.task_queue.put(args)
+        if build.buildtype == "source":
+            if build.buildstate == "publish_failed":
+                await build.set_needs_publish()
+                session.commit()
+                await write_log(build.parent.id, "I: publishing source package\n")
+                await self.aptly_queue.put({"src_publish": [build.id]})
+
+        if not ok:
+            logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, build.buildstate))
 
     async def _schedule(self, _):
         asyncio.ensure_future(ScheduleBuilds())

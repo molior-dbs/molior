@@ -51,6 +51,7 @@ class Build(Base):
     sourcerepository = relationship(SourceRepository)
     projectversion_id = Column(ForeignKey("projectversion.id"))
     projectversion = relationship("ProjectVersion")
+    projectversions = Column(String)
     parent_id = Column(ForeignKey("build.id"))
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)

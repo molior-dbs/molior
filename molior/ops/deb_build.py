@@ -269,7 +269,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         build_configs = get_buildconfigs(targets, session)
         found = False
         for build_config in build_configs:
-            projectversion_ids.extend([projectversion.id for projectversion in build_config.projectversions])
             # FIXME: filter for buildtype?
             deb_build = session.query(Build).filter(
                             Build.buildconfiguration == build_config,
@@ -303,6 +302,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                     ))
                 continue
 
+            projectversion_ids.extend([projectversion.id for projectversion in build_config.projectversions])
             found = True
 
             await write_log(parent_build_id, "I: creating build for projectversion '%s/%s'\n" % (
@@ -332,12 +332,17 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             deb_build.log_state("created")
             await deb_build.build_added()
 
-        # FIXME: if not found, abort?
-
-        session.commit()
+        if not found:
+            await write_log(parent_build_id, "E: no projectversion found to build for")
+            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            await parent.set_successful()
+            session.commit()
+            return
 
         # make list unique, filter duplicates (multiple archs)
         projectversion_ids = list(set(projectversion_ids))
+
+        build.projectversions = "{" + ",".join([str(p) for p in projectversion_ids]) + "}"
 
         await build.set_building()
         session.commit()
@@ -373,7 +378,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         session.commit()
 
         await write_log(parent_build_id, "I: publishing source package\n")
-        await aptly_queue.put({"src_publish": [build.id, projectversion_ids]})
+        await aptly_queue.put({"src_publish": [build.id]})
 
 
 def chroot_ready(build, session):

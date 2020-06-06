@@ -25,7 +25,7 @@ async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
         async with AIOFile(changes_file, "rb") as f:
             data = await f.read()
             file_tag = False
-            for line in data.split('\n'):
+            for line in str(data, 'utf-8').split('\n'):
                 line = line.rstrip()
                 if not file_tag:
                     if line == "Files:":
@@ -41,45 +41,40 @@ async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
     return files
 
 
-async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_build):
+async def DebSrcPublish(build):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
 
     Args:
-        projectversion_id (int): The projectversion's id.
-        src_files (list): List of file paths to the src files.
+        build: source package build
 
     Returns:
         bool: True if successful, otherwise False.
     """
 
-    with Session() as session:
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("buildsrc_succeeded no build found for %d", build_id)
-            return False
+    await write_log(build.id, "\n")
+    await write_log_title(build.id, "Publishing")
+    sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
+    srcfiles = await debchanges_get_files(sourcepath, build.sourcename, build.version)
+    if not srcfiles:
+        logger.error("no source files found")
+        return False
 
-        await write_log(build.id, "\n")
-        await write_log_title(build.id, "Publishing")
-        sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
-        srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
-        if not srcfiles:
-            logger.error("no source files found")
-            return False
+    publish_files = []
+    for f in srcfiles:
+        logger.info("publisher: adding %s", f)
+        publish_files.append("{}/{}".format(sourcepath, f))
 
-        publish_files = []
-        for f in srcfiles:
-            logger.info("publisher: adding %s", f)
-            publish_files.append("{}/{}".format(sourcepath, f))
+    logger.info("publisher: publishing %s for projectversion ids %s", build.sourcename, str(build.projectversions))
 
-        logger.info("publisher: publishing %s for projectversion ids %s", sourcename, str(projectversion_ids))
-
-        ret = False
-        for projectversion_id in projectversion_ids:
+    ret = False
+    for projectversion_id in build.projectversions:
+        with Session() as session:
             projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
             if not projectversion:
-                # FIXME: raise
+                logger.error("publisher: error finding projectversion {}".format(projectversion_id))
+                await write_log(build.id, "E: error finding projectversion {}\n".format(projectversion_id))
                 continue
 
             await write_log(build.id, "I: publishing for %s\n" % projectversion.fullname)
@@ -89,14 +84,17 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
             project_version = projectversion.name
             archs = [bdv.architecture.name for bdv in projectversion.buildvariants]
 
-            debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
-            try:
-                await debian_repo.add_packages(publish_files, ci_build=ci_build)
-                ret = True
-            except Exception as exc:
-                logger.exception(exc)
-        await write_log(build.id, "\n")
+        debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
+        try:
+            await debian_repo.add_packages(publish_files, ci_build=build.is_ci)
+            ret = True
+        except Exception as exc:
+            await write_log(build.id, "E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            logger.exception(exc)
 
+    await write_log(build.id, "\n")
+
+    if ret:
         files2delete = publish_files
         v = strip_epoch_version(build.version)
         changes_file = "{}_{}_{}.changes".format(build.sourcename, v, "source")
