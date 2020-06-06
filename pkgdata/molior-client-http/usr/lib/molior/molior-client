@@ -73,7 +73,7 @@ async def build(params, masterws):
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
 
             try:
-                process = Launchy(shlex.split(buildcmd), output, output, buffered=False, env=env)
+                process = Launchy(shlex.split(buildcmd), output, output, buffered=False, collect_time=0.1, env=env)
                 await process.launch()
                 ret = await process.wait()
             except Exception as exc:
