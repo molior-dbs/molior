@@ -3,6 +3,7 @@ import shlex
 
 from launchy import Launchy
 from pathlib import Path
+from aiofile import AIOFile
 
 from ..app import logger
 from ..tools import strip_epoch_version, write_log, write_log_title
@@ -16,14 +17,15 @@ from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 
 
-def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
+async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
     v = strip_epoch_version(version)
     changes_file = "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
     files = []
     try:
-        with open(changes_file, "r") as f:
+        async with AIOFile(changes_file, "rb") as f:
+            data = await f.read()
             file_tag = False
-            for line in f.readlines():
+            for line in data.split('\n'):
                 line = line.rstrip()
                 if not file_tag:
                     if line == "Files:":
@@ -61,7 +63,7 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
         await write_log(build.id, "\n")
         await write_log_title(build.id, "Publishing")
         sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
-        srcfiles = debchanges_get_files(sourcepath, sourcename, version)
+        srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
         if not srcfiles:
             logger.error("no source files found")
             return False
@@ -123,7 +125,7 @@ async def publish_packages(build, out_path):
     """
 
     arch = build.buildconfiguration.buildvariant.architecture.name
-    outfiles = debchanges_get_files(out_path, build.sourcename, build.version, arch)
+    outfiles = await debchanges_get_files(out_path, build.sourcename, build.version, arch)
 
     files2upload = []
     for f in outfiles:
