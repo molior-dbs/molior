@@ -60,17 +60,17 @@ class BackendWorker:
     async def _succeeded(self, session, build_id):
         self.build_outcome[build_id] = True
         if build_id in self.logging_done:
-            await self.backend_queue.put({"terminate": [build_id]})
+            await backend_queue.put({"terminate": build_id})
 
     async def _failed(self, session, build_id):
         self.build_outcome[build_id] = False
         if build_id in self.logging_done:
-            await self.backend_queue.put({"terminate": [build_id]})
+            await backend_queue.put({"terminate": build_id})
 
     async def _logging_done(self, session, build_id):
         self.logging_done.append(build_id)
         if build_id in self.build_outcome:
-            await self.backend_queue.put({"terminate": [build_id]})
+            await backend_queue.put({"terminate": build_id})
 
     async def _terminate(self, session, build_id):
         outcome = self.build_outcome[build_id]
