@@ -93,8 +93,7 @@ async def ws_logs_disconnected(ws_client):
     async def terminate(afp):
         await afp.fsync()
         await afp.close()
-        await backend_queue.put({"succeeded": ws_client.cirrina.build_id})
-
+        await backend_queue.put({"logging_done": ws_client.cirrina.build_id})
     get_event_loop().create_task(terminate(afp))
 
     return ws_client
