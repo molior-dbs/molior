@@ -3,9 +3,9 @@ import json
 import asyncio
 import aiohttp
 
-from molior.aptly.errors import AptlyError
-from molior.app import logger
+from ..app import logger
 from .taskstate import TaskState
+from .errors import AptlyError
 
 
 class AptlyApi:
@@ -25,7 +25,7 @@ class AptlyApi:
     PASSPHRASE_FILE = "/var/lib/aptly/gpg-pass"
 
     def __init__(self, api_url, gpg_key, username=None, password=None):
-        self.__api_url = api_url
+        self.url = api_url
         self.gpg_key = gpg_key
         self.headers = {"content-type": "application/json"}
         if username:
@@ -80,7 +80,7 @@ class AptlyApi:
         """
         tasks = []
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.__api_url + "/tasks", auth=self.auth) as resp:
+            async with http.get(self.url + "/tasks", auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 tasks = json.loads(await resp.text())
@@ -98,9 +98,7 @@ class AptlyApi:
                 communicating with the aptly api.
         """
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/tasks/{}".format(task_id), auth=self.auth
-            ) as resp:
+            async with http.delete(self.url + "/tasks/{}".format(task_id), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
 
@@ -117,9 +115,7 @@ class AptlyApi:
         """
         state = []
         async with aiohttp.ClientSession() as http:
-            async with http.get(
-                self.__api_url + "/tasks/{}".format(task_id), auth=self.auth
-            ) as resp:
+            async with http.get(self.url + "/tasks/{}".format(task_id), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 state = json.loads(await resp.text())
@@ -207,22 +203,14 @@ class AptlyApi:
                 async with aiohttp.ClientSession() as http:
                     async with http.get(key_url) as resp:
                         if not resp.status == 200:
-                            raise AptlyError(
-                                "ConnectionError", "Could not download key"
-                            )
+                            raise AptlyError("ConnectionError", "Could not download key")
                         data["GpgKeyArmor"] = await resp.text()
             except Exception:
-                raise AptlyError(
-                    "ConnectionError", "Could not download key: {}".format(key_url)
-                )
+                raise AptlyError("ConnectionError", "Could not download key: {}".format(key_url))
 
             async with aiohttp.ClientSession() as http:
-                async with http.post(
-                    self.__api_url + "/gpg/key",
-                    headers=self.headers,
-                    data=json.dumps(data),
-                    auth=self.auth,
-                ) as resp:
+                async with http.post(self.url + "/gpg/key", headers=self.headers,
+                                     data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
         else:
@@ -230,29 +218,13 @@ class AptlyApi:
             for key in keys:
                 data["GpgKeyID"] = key
                 async with aiohttp.ClientSession() as http:
-                    async with http.post(
-                        self.__api_url + "/gpg/key",
-                        headers=self.headers,
-                        data=json.dumps(data),
-                        auth=self.auth,
-                    ) as resp:
+                    async with http.post(self.url + "/gpg/key", headers=self.headers,
+                                         data=json.dumps(data), auth=self.auth) as resp:
                         if not self.__check_status_code(resp.status):
                             self.__raise_aptly_error(resp)
 
-    async def mirror_create(
-        self,
-        mirror,
-        version,
-        base_mirror,
-        base_mirror_version,
-        url,
-        mirror_distribution,
-        components,
-        architectures,
-        download_sources=True,
-        download_udebs=True,
-        download_installer=True,
-    ):
+    async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
+                            components, architectures, download_sources=True, download_udebs=True, download_installer=True):
         """
         Creates a debian archive mirror.
 
@@ -278,7 +250,7 @@ class AptlyApi:
             }
 
             async with aiohttp.ClientSession() as http:
-                async with http.post(self.__api_url + "/mirrors", headers=self.headers,
+                async with http.post(self.url + "/mirrors", headers=self.headers,
                                      data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
@@ -309,7 +281,7 @@ class AptlyApi:
             }
 
             async with aiohttp.ClientSession() as http:
-                async with http.put(self.__api_url + "/mirrors/{}-{}".format(name, component), headers=self.headers,
+                async with http.put(self.url + "/mirrors/{}-{}".format(name, component), headers=self.headers,
                                     data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
@@ -334,7 +306,7 @@ class AptlyApi:
         # remove publish (may fail)
         try:
             async with aiohttp.ClientSession() as http:
-                async with http.delete(self.__api_url + "/publish/{}/{}".format(publish_name, mirror_distribution),
+                async with http.delete(self.url + "/publish/{}/{}".format(publish_name, mirror_distribution),
                                        auth=self.auth,) as resp:
                     if self.__check_status_code(resp.status):
                         data = json.loads(await resp.text())
@@ -352,7 +324,7 @@ class AptlyApi:
         for component in components:
             try:
                 async with aiohttp.ClientSession() as http:
-                    async with http.delete(self.__api_url + "/mirrors/{}-{}".format(name, component), auth=self.auth) as resp:
+                    async with http.delete(self.url + "/mirrors/{}-{}".format(name, component), auth=self.auth) as resp:
                         if self.__check_status_code(resp.status):
                             data = json.loads(await resp.text())
                             await self.wait_task(data["ID"])
@@ -375,7 +347,7 @@ class AptlyApi:
         ret = True
         for component in components:
             async with aiohttp.ClientSession() as http:
-                async with http.delete(self.__api_url + "/snapshots/{}-{}".format(name, component), auth=self.auth) as resp:
+                async with http.delete(self.url + "/snapshots/{}-{}".format(name, component), auth=self.auth) as resp:
                     data = None
                     if self.__check_status_code(resp.status):
                         data = json.loads(await resp.text())
@@ -403,7 +375,7 @@ class AptlyApi:
             data = {"Name": "{}-{}".format(name, component)}
 
             async with aiohttp.ClientSession() as http:
-                async with http.post(self.__api_url + "/mirrors/{}-{}/snapshots".format(name, component),
+                async with http.post(self.url + "/mirrors/{}-{}/snapshots".format(name, component),
                                      headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
@@ -426,12 +398,12 @@ class AptlyApi:
         async with aiohttp.ClientSession() as http:
             for i in range(20):
                 try:
-                    async with http.get(self.__api_url + "/tasks/{}".format(task_id), auth=self.auth) as resp:
+                    async with http.get(self.url + "/tasks/{}".format(task_id), auth=self.auth) as resp:
                         if not self.__check_status_code(resp.status):
                             self.__raise_aptly_error(resp)
                         state = json.loads(await resp.text())
 
-                    async with http.get(self.__api_url + "/tasks/{}/detail".format(task_id), auth=self.auth) as resp:
+                    async with http.get(self.url + "/tasks/{}/detail".format(task_id), auth=self.auth) as resp:
                         if self.__check_status_code(resp.status):
                             progress = json.loads(await resp.text())
                     break
@@ -480,12 +452,8 @@ class AptlyApi:
             data["Sources"].append({"Component": component, "Name": "{}-{}".format(name, component)})
 
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/publish/{}".format(publish_name),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.post("{}/publish/{}".format(self.url, publish_name), headers=self.headers,
+                                 data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -502,12 +470,8 @@ class AptlyApi:
         """
         data = {"Name": name, "PackageRefs": package_refs}
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/snapshots",
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.post(self.url + "/snapshots", headers=self.headers,
+                                 data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -525,12 +489,8 @@ class AptlyApi:
         """
         data = {"force": "1"}
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/snapshots/{}".format(name),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.delete(self.url + "/snapshots/{}".format(name),
+                                   headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -545,7 +505,7 @@ class AptlyApi:
         """
         data = None
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.__api_url + "/snapshots", auth=self.auth) as resp:
+            async with http.get(self.url + "/snapshots", auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -577,12 +537,8 @@ class AptlyApi:
         }
 
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/publish/{}".format(destination),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.post(self.url + "/publish/{}".format(destination),
+                                 headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -599,7 +555,7 @@ class AptlyApi:
             destination (str): Publish point destination name.
                 e.g. jessie_8.8_repos_test_1
         """
-        data = {
+        data = json.dumps({
             "Snapshots": [{"Name": name, "Component": component}],
             "Signing": {
                 "Batch": True,
@@ -607,15 +563,11 @@ class AptlyApi:
                 "PassphraseFile": self.PASSPHRASE_FILE,
             },
             "AcquireByHash": True,
-        }
+        })
 
         async with aiohttp.ClientSession() as http:
-            async with http.put(
-                self.__api_url + "/publish/{}/{}".format(destination, dist),
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.put("{}/publish/{}/{}".format(self.url, destination, dist),
+                                headers=self.headers, data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -634,9 +586,7 @@ class AptlyApi:
         """
         data = None
         async with aiohttp.ClientSession() as http:
-            async with http.get(
-                self.__api_url + "/repos/{}/packages".format(repo_name), auth=self.auth
-            ) as resp:
+            async with http.get(self.url + "/repos/{}/packages".format(repo_name), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -650,13 +600,9 @@ class AptlyApi:
             repo_name (str): The repository's name.
             package_refs (list): Packages to be removed.
         """
-        data = {"PackageRefs": package_refs}
+        data = json.dumps({"PackageRefs": package_refs})
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/repos/{}/packages".format(repo_name),
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.delete("{}/repos/{}/packages".format(self.url, repo_name), data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -671,7 +617,7 @@ class AptlyApi:
         """
         data = None
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.__api_url + "/repos", auth=self.auth) as resp:
+            async with http.get(self.url + "/repos", auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -697,19 +643,12 @@ class AptlyApi:
             with open(filename, "rb") as _file:
                 post_files = {"file": _file}
                 async with aiohttp.ClientSession() as http:
-                    async with http.post(
-                        self.__api_url + "/files/{}".format(upload_dir),
-                        auth=self.auth,
-                        data=post_files,
-                    ) as resp:
+                    async with http.post(self.url + "/files/{}".format(upload_dir), auth=self.auth, data=post_files) as resp:
                         if not self.__check_status_code(resp.status):
                             self.__raise_aptly_error(resp)
 
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/repos/{}/file/{}".format(repo_name, upload_dir),
-                auth=self.auth,
-            ) as resp:
+            async with http.post(self.url + "/repos/{}/file/{}".format(repo_name, upload_dir), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -732,12 +671,7 @@ class AptlyApi:
         """
         data = {"Name": name}
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/repos",
-                headers=self.headers,
-                data=json.dumps(data),
-                auth=self.auth,
-            ) as resp:
+            async with http.post(self.url + "/repos", headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
@@ -750,9 +684,7 @@ class AptlyApi:
             directory_name (str): The directory's name.
         """
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/files/{}".format(directory_name), auth=self.auth
-            ) as resp:
+            async with http.delete(self.url + "/files/{}".format(directory_name), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
@@ -766,7 +698,7 @@ class AptlyApi:
         """
         data = None
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.__api_url + "/publish", auth=self.auth) as resp:
+            async with http.get(self.url + "/publish", auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
@@ -787,10 +719,7 @@ class AptlyApi:
         """
         _, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, repo, version)
         async with aiohttp.ClientSession() as http:
-            async with http.delete(
-                self.__api_url + "/publish/{}/{}".format(publish_name, distribution),
-                auth=self.auth,
-            ) as resp:
+            async with http.delete(self.url + "/publish/{}/{}".format(publish_name, distribution), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
@@ -804,10 +733,6 @@ class AptlyApi:
         Returns:
         """
         async with aiohttp.ClientSession() as http:
-            async with http.post(
-                self.__api_url + "/db/cleanup",
-                headers=self.headers,
-                auth=self.auth,
-            ) as resp:
+            async with http.post(self.url + "/db/cleanup", headers=self.headers, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
