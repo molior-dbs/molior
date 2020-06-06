@@ -30,6 +30,25 @@ class LiveLogger:
         logger.info("build-{}: stopping livelogger".format(self.build_id))
         self.__up = False
 
+    async def check_abort(self):
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == self.build_id).first()
+            if not build:
+                logger.error("build: build %d not found", self.build_id)
+                message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
+                await self.__sender(json.dumps(message))
+                self.stop()
+                return True
+            if build.buildstate != "building" and   \
+               build.buildstate != "publishing" and \
+               build.buildstate != "needs_publish":
+                logger.info("buildlog: end of build {}".format(self.build_id))
+                message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
+                await self.__sender(json.dumps(message))
+                self.stop()
+                return True
+        return False
+
     async def start(self):
         """
         Starts the livelogging
@@ -49,28 +68,14 @@ class LiveLogger:
                         # EOF
                         if retries % 100 == 0:
                             retries = 0
-                            with Session() as session:
-                                build = session.query(Build).filter(Build.id == self.build_id).first()
-                                if not build:
-                                    logger.error("build: build %d not found", self.build_id)
-                                    message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
-                                    await self.__sender(json.dumps(message))
-                                    self.stop()
-                                    continue
-                                if build.buildstate != "building" and   \
-                                   build.buildstate != "publishing" and \
-                                   build.buildstate != "needs_publish":
-                                    logger.info("buildlog: end of build {}".format(self.build_id))
-                                    message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
-                                    await self.__sender(json.dumps(message))
-                                    self.stop()
-                                    continue
+                            if self.check_abort():
+                                continue  # self.__up will be falsem drop out of for loops
                         await asyncio.sleep(.1)
                         retries += 1
                         continue
             except FileNotFoundError:
-                logger.error("livelogger: log file not found: {}".format(self.__filepath))
                 await asyncio.sleep(1)
+                self.check_abort()
             except Exception as exc:
                 logger.error("livelogger: error sending live logs")
                 logger.exception(exc)
