@@ -111,34 +111,6 @@ async def stop_livelogger(websocket, _):
         logger.error("stop_livelogger: no active logger found")
 
 
-async def dispatch(websocket, message):
-    """
-    Dispatchers websocket requests to different
-    handler functions.
-
-    Args:
-        websocket: The websocket instance.
-        message (dict): The received message dict.
-
-    Returns:
-        bool: True if successful, False otherwise.
-    """
-    handlers = {
-        Subject.buildlog.value: {
-            Action.start.value: start_livelogger,
-            Action.stop.value: stop_livelogger,
-        }
-    }
-
-    if "subject" not in message or "action" not in message:
-        logger.error("unknown websocket message recieved: {}".format(message))
-        return False
-
-    handler = handlers.get(message.get("subject")).get(message.get("action"))
-    await handler(websocket, message.get("data"))
-    return True
-
-
 @app.websocket_connect()
 async def websocket_connected(websocket):
     """
@@ -163,7 +135,21 @@ async def websocket_message(websocket, msg):
     except json.decoder.JSONDecodeError:
         logger.error("cannot parse websocket message from user '%s'", websocket.cirrina.web_session.get("username"))
 
-    await dispatch(websocket, data)
+    if "subject" not in data or "action" not in data:
+        logger.error("unknown websocket message recieved: {}".format(data))
+        return
+
+    if data.get("subject") != Subject.buildlog.value:
+        logger.error("unknown websocket message recieved: {}".format(data))
+        return
+
+    if data.get("action") == Action.start.value:
+        await start_livelogger(websocket, data.get("data"))
+    elif data.get("action") == Action.stop.value:
+        await stop_livelogger(websocket, data.get("data"))
+    else:
+        logger.error("unknown websocket message recieved: {}".format(data))
+        return
 
 
 @app.websocket_disconnect()

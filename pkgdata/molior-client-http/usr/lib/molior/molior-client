@@ -67,16 +67,13 @@ async def build(params, masterws):
                 except Exception as exc:
                     logger.exception(exc)
 
-            async def outh(line):
-                if asyncio.iscoroutinefunction(buildws.send_str):
-                    await buildws.send_str(line + "\n")
-                else:
-                    buildws.send_str(line + "\n")
+            async def output(data):
+                await buildws.send(data)
 
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
 
             try:
-                process = Launchy(shlex.split(buildcmd), outh, outh, env=env)
+                process = Launchy(shlex.split(buildcmd), output, output, buffered=False, env=env)
                 await process.launch()
                 ret = await process.wait()
             except Exception as exc:
