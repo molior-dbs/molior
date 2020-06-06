@@ -294,7 +294,7 @@ async def write_log(build_id, line):
     if not path.parent.exists():
         path.parent.mkdir()
 
-    afp = AIOFile(path, 'w')
+    afp = AIOFile(path, 'a+')
     await afp.open()
     writer = Writer(afp)
     await writer(line)
