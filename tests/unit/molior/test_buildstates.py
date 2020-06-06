@@ -15,8 +15,9 @@ def test_src_build_failed():
     src_build.log_state = MagicMock()
     src_build.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(src_build.set_failed())
 
@@ -36,8 +37,9 @@ def test_deb_build_failed():
     src_build.parent.log_state = MagicMock()
     src_build.parent.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(src_build.set_failed())
 
@@ -56,8 +58,9 @@ def test_src_build_publish_failed():
     src_build.log_state = MagicMock()
     src_build.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(src_build.set_publish_failed())
 
@@ -78,8 +81,9 @@ def test_deb_build_publish_failed():
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(deb_build.set_publish_failed())
 
@@ -103,8 +107,9 @@ def test_deb_build_successful_only_build():
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(deb_build.set_successful())
 
@@ -133,8 +138,9 @@ def test_deb_build_successful_all_successful():
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(deb_build.set_successful())
 
@@ -163,8 +169,9 @@ def test_deb_build_successful_other_failed():
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
 
-    with patch("molior.tools.write_log"), \
-            patch("molior.tools.write_log_title"):
+    with patch(
+            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
+            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(deb_build.set_successful())
 

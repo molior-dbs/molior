@@ -125,16 +125,16 @@ class Worker:
         repo.set_busy()
         session.commit()  # pylint: disable=no-member
 
-        write_log_title(build.id, "Checking Repository")
+        await write_log_title(build.id, "Checking Repository")
 
-        write_log(build.id, "I: fetching git tags\n")
+        await write_log(build.id, "I: fetching git tags\n")
         try:
             # this does a git fetch
             latest_tag = await get_latest_tag(repo.src_path, build_id)
         except Exception as exc:
             logger.error("worker: error getting latest git tag")
-            write_log(build.id, "E: Error getting git tags\n")
-            write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
+            await write_log(build.id, "E: Error getting git tags\n")
+            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
             logger.exception(exc)
             await build.set_failed()
             repo.set_ready()
@@ -146,13 +146,13 @@ class Worker:
 
         if not latest_tag:
             logger.error("sourcerepository '%s' has no release tag", repo.url)
-            write_log(build.id, "E: no git tags found\n")
-            write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
+            await write_log(build.id, "E: no git tags found\n")
+            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
             await build.set_failed()
             session.commit()  # pylint: disable=no-member
             return
 
-        write_log(build.id, "\n")
+        await write_log(build.id, "\n")
         git_ref = str(latest_tag)
         args = {"build": [build_id, repo_id, git_ref, None]}
         await self.task_queue.put(args)

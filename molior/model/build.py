@@ -122,7 +122,7 @@ class Build(Base):
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
-                write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+                await write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -148,7 +148,7 @@ class Build(Base):
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
-                write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+                await write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -170,7 +170,7 @@ class Build(Base):
                     break
             if all_ok:
                 await self.parent.parent.set_successful()
-                write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+                await write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
 
     def can_rebuild(self, web_session, db_session):
         """

@@ -58,8 +58,8 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
             logger.error("buildsrc_succeeded no build found for %d", build_id)
             return False
 
-        write_log(build.id, "\n")
-        write_log_title(build.id, "Publishing")
+        await write_log(build.id, "\n")
+        await write_log_title(build.id, "Publishing")
         sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
         srcfiles = debchanges_get_files(sourcepath, sourcename, version)
         if not srcfiles:
@@ -80,7 +80,7 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
                 # FIXME: raise
                 continue
 
-            write_log(build.id, "I: publishing for %s\n" % projectversion.fullname)
+            await write_log(build.id, "I: publishing for %s\n" % projectversion.fullname)
             basemirror_name = projectversion.buildvariants[0].base_mirror.project.name
             basemirror_version = projectversion.buildvariants[0].base_mirror.name
             project_name = projectversion.project.name
@@ -93,7 +93,7 @@ async def DebSrcPublish(build_id, sourcename, version, projectversion_ids, ci_bu
                 ret = True
             except Exception as exc:
                 logger.exception(exc)
-        write_log(build.id, "\n")
+        await write_log(build.id, "\n")
 
         files2delete = publish_files
         v = strip_epoch_version(build.version)
@@ -133,22 +133,22 @@ async def publish_packages(build, out_path):
     count_files = len(files2upload)
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build.id)
-        write_log(build.id, "E: no debian packages found to upload\n")
-        write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
+        await write_log(build.id, "E: no debian packages found to upload\n")
+        await write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
         return False
 
     # FIXME: check on startup
     key = Configuration().debsign_gpg_email
     if not key:
         logger.error("Signing key not defined in configuration")
-        write_log(build.id, "E: no signinig key defined in configuration\n")
-        write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
+        await write_log(build.id, "E: no signinig key defined in configuration\n")
+        await write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
         return False
 
-    write_log(build.id, "I: Signing packages\n")
+    await write_log(build.id, "I: Signing packages\n")
 
     async def outh(line):
-        write_log(build.id, "%s\n" % line)
+        await write_log(build.id, "%s\n" % line)
 
     v = strip_epoch_version(build.version)
     changes_file = "{}_{}_{}.changes".format(build.sourcename, v, arch)
@@ -209,19 +209,19 @@ async def DebPublish(task_queue, build_id):
         session.commit()
         try:
             out_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
-            write_log(build.parent.parent.id, "I: publishing build %d\n" % build.id)
-            write_log_title(build_id, "Publishing", no_header_newline=False)
+            await write_log(build.parent.parent.id, "I: publishing build %d\n" % build.id)
+            await write_log_title(build_id, "Publishing", no_header_newline=False)
             if not await publish_packages(build, out_path):
                 logger.error("publisher: error publishing build %d" % build_id)
-                write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
-                write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
+                await write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
+                await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
                 await build.set_publish_failed()
                 session.commit()
                 return
         except Exception as exc:
             logger.error("publisher: error publishing build %d" % build_id)
-            write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
-            write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            await write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
+            await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
             logger.exception(exc)
             await build.set_publish_failed()
             session.commit()
@@ -231,7 +231,7 @@ async def DebPublish(task_queue, build_id):
             session.delete(buildtask)
             session.commit()
 
-        write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
+        await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await build.set_successful()
         session.commit()
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from launchy import Launchy
 from aiohttp.web import Response
+from aiofile import AIOFile, Writer
 
 from .app import logger
 from .aptly import AptlyApi
@@ -279,29 +280,29 @@ def get_local_tz():
     return local_tz
 
 
-def write_log(build_id, line):
+async def write_log(build_id, line):
     """
     Writes given line to logfile for given
     build_id.
 
     Args:
         build_id (int): The build's id.
-        lines (list): The log line.
+        line (string): The log line.
 
-    Returns:
-        bool: True if successful, otherwise False.
     """
     path = Path(Configuration().working_dir) / "buildout" / str(build_id) / "build.log"
     if not path.parent.exists():
         path.parent.mkdir()
 
-    with path.open(mode="a+", encoding="utf-8") as log_file:
-        log_file.write(line)
+    afp = AIOFile(path, 'w')
+    await afp.open()
+    writer = Writer(afp)
+    await writer(line)
+    # await afp.fsync()
+    await afp.close()
 
-    return True
 
-
-def write_log_title(build_id, line, no_footer_newline=False, no_header_newline=True, error=False):
+async def write_log_title(build_id, line, no_footer_newline=False, no_header_newline=True, error=False):
     """
     Writes given line as title to logfile for
     given build_id.
@@ -325,6 +326,6 @@ def write_log_title(build_id, line, no_footer_newline=False, no_header_newline=T
     if error:
         color = 31
 
-    write_log(build_id, "{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
-    write_log(build_id, "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
-    write_log(build_id, "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
+    await write_log(build_id, "{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
+    await write_log(build_id, "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
+    await write_log(build_id, "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
