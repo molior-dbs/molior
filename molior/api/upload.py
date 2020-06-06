@@ -3,13 +3,14 @@ import os
 from aiohttp import web
 from pathlib import Path
 from aiofile import AIOFile, Writer
+from asyncio import get_event_loop
 
 from ..app import app, logger
 from ..molior.configuration import Configuration
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from .worker_backend import backend_queue
+from ..molior.worker_backend import backend_queue
 
 
 if not os.environ.get("IS_SPHINX", False):
@@ -88,7 +89,12 @@ async def ws_logs(ws_client, msg):
 async def ws_logs_disconnected(ws_client):
     logger.info("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
     afp, _ = ws_client.cirrina.buildlog
-    await afp.fsync()
-    await afp.close()
-    await backend_queue.put({"succeeded": ws_client.cirrina.build_id})
+
+    async def terminate(afp):
+        await afp.fsync()
+        await afp.close()
+        await backend_queue.put({"succeeded": ws_client.cirrina.build_id})
+
+    get_event_loop().create_task(terminate(afp))
+
     return ws_client
