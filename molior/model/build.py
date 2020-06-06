@@ -13,7 +13,6 @@ from .buildtask import BuildTask
 
 BUILD_STATES = [
     "new",
-    "successful",
     "needs_build",
     "scheduled",
     "building",
@@ -21,6 +20,7 @@ BUILD_STATES = [
     "needs_publish",
     "publishing",
     "publish_failed",
+    "successful",
 ]
 
 BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror"]
