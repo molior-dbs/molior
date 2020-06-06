@@ -79,6 +79,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_build_id = None
 
         elif status["status"] == "success":
+            logger.info("node: finished build {}".format(build_id))
             await backend_queue.put({"succeeded": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
