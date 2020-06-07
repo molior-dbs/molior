@@ -1,7 +1,6 @@
 import asyncio
 import operator
 
-from launchy import Launchy
 from sqlalchemy import or_
 
 from ..app import logger
