@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE build DROP COLUMN architectures;
+ALTER TABLE build ADD COLUMN architecture character varying;
+
+EOF

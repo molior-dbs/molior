@@ -57,6 +57,7 @@ class Build(Base):
     is_ci = Column(Boolean, default=False)
     builddeps = Column(String)
     buildtask = relationship(BuildTask, uselist=False)
+    architecture = Column(String)
 
     def log_state(self, statemsg):
         prefix = ""
@@ -207,7 +208,7 @@ class Build(Base):
         return True
 
     def data(self):
-        buildjson = {
+        data = {
             "id": self.id,
             "parent_id": self.parent_id,
             # circular dep "can_rebuild": self.can_rebuild(request.cirrina.web_session, request.cirrina.db_session),
@@ -226,36 +227,19 @@ class Build(Base):
 
         if self.projectversion:
             if self.projectversion.project.is_mirror:
-                if self.buildtype == "mirror" or self.buildtype == "chroot":
-                    buildjson.update({"architectures": self.projectversion.mirror_architectures[1:-1].split(",")})
+                if self.buildtype == "mirror":
+                    data.update({"architectures": self.projectversion.mirror_architectures[1:-1].split(",")})
+                elif self.buildtype == "deb" or self.buildtype == "chroot":
+                    data.update({"architecture": self.architecture})
 
         if self.buildconfiguration:
-            buildjson.update(
-                {
-                    "project": {
-                        "name": self.buildconfiguration.projectversions[0].project.name,
-                        "id": self.buildconfiguration.projectversions[0].project.id,
-                        "version": {
-                            "name": self.buildconfiguration.projectversions[0].name,
-                            "id": self.buildconfiguration.projectversions[0].id,
-                            "is_locked": self.buildconfiguration.projectversions[0].is_locked,
-                        },
-                    },
-                    "buildvariant": {
-                        "architecture": {
-                            "name": self.buildconfiguration.buildvariant.architecture.name,
-                            "id": self.buildconfiguration.buildvariant.architecture.id,
-                        },
-                        "base_mirror": {
-                            "name": self.buildconfiguration.buildvariant.base_mirror.project.name,
-                            "version": self.buildconfiguration.buildvariant.base_mirror.name,
-                            "id": self.buildconfiguration.buildvariant.base_mirror.id,
-                        },
-                        "name": self.buildconfiguration.buildvariant.name,
-                    },
-                }
-            )
-        return buildjson
+            data.update({"project": {
+                            "name": self.buildconfiguration.projectversions[0].project.name,
+                            "version": self.buildconfiguration.projectversions[0].name,
+                            },
+                         "buildvariant": self.buildconfiguration.buildvariant.name
+                         })
+        return data
 
     async def build_added(self):
         """
