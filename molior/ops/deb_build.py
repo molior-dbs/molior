@@ -481,7 +481,6 @@ async def ScheduleBuilds():
             repo_deps = []
             if build.parent.builddeps:
                 builddeps = build.parent.builddeps
-                logger.info("builddeps {}".format(builddeps))
                 for builddep in builddeps:
                     repo_dep = session.query(SourceRepository).filter(SourceRepository.projectversions.any(
                                              id=build.projectversion_id)).filter(or_(

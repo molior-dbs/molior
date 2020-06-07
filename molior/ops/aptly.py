@@ -63,7 +63,7 @@ async def DebSrcPublish(build):
 
     publish_files = []
     for f in srcfiles:
-        logger.info("publisher: adding %s", f)
+        logger.debug("publisher: adding %s", f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
     logger.info("publisher: publishing %s for projectversion ids %s", build.sourcename, str(build.projectversions))
@@ -176,7 +176,7 @@ async def publish_packages(build, out_path):
     files2delete = files2upload
     files2delete.append("{}/{}".format(out_path, changes_file))
     for f in files2delete:
-        logger.info("publisher: removing %s", f)
+        logger.debug("publisher: removing %s", f)
         os.remove(f)
 
     return True

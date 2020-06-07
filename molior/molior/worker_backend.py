@@ -109,7 +109,7 @@ class BackendWorker:
                     logger.info("backend: got emtpy task, aborting...")
                     break
 
-                logger.info("backend: got task {}".format(task))
+                logger.debug("backend: got task {}".format(task))
                 with Session() as session:
                     handled = False
                     job = task.get("schedule")
