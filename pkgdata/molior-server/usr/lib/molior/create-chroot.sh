@@ -34,8 +34,8 @@ else
 fi
 
 
-if [ "$1" != "info" -a "$#" -ne 5 ]; then
-  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" 1>&2
+if [ "$1" != "info" -a "$#" -lt 5 ]; then
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> [components,]" 1>&2
   echo "       $0 info" 1>&2
   exit 1
 fi
@@ -45,6 +45,7 @@ DIST_RELEASE=$2
 DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
+COMPONENTS=$6
 
 CHROOT_NAME="${DIST_NAME}-$DIST_VERSION-${ARCH}"
 target="/var/lib/schroot/chroots/${CHROOT_NAME}"
@@ -69,6 +70,9 @@ build_chroot()
   REPO="$APTLY/$DIST_NAME/$DIST_VERSION/"
   echo I: Using APT repository $REPO
 
+  if [ -n "$COMPONENTS" ]; then
+      COMPONENTS="--components main,$COMPONENTS"
+  fi
   INCLUDE="--include=gnupg1"
   KEY_URL=`echo $APTLY/$APTLY_KEY | sed 's/ //g'`
   echo I: Downloading gpg public key: $KEY_URL
@@ -79,7 +83,7 @@ build_chroot()
   rm -rf $target/
   echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO
   if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
-    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $DIST_RELEASE $target $REPO
+    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO
     if [ "$ARCH" = "armhf" ]; then
       cp /usr/bin/qemu-arm-static $target/usr/bin/
     else
@@ -87,7 +91,7 @@ build_chroot()
     fi
     chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
   else
-    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $DIST_RELEASE $target $REPO
+    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO
   fi
 
   echo I: Configuring chroot

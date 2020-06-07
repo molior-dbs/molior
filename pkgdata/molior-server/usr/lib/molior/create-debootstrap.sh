@@ -24,8 +24,8 @@ eval $(parse_yaml $CONFIG_FILE)
 APTLY=$aptly__apt_url
 APTLY_KEY=$aptly__key
 
-if [ "$1" != "info" -a "$#" -ne 5 ]; then
-  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture>" >&2
+if [ "$1" != "info" -a "$#" -lt 5 ]; then
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> [components,]" >&2
   echo "       $0 info" 1>&2
   exit 1
 fi
@@ -35,6 +35,7 @@ DIST_RELEASE=$2
 DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
+COMPONENTS=$6
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
 DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
@@ -52,7 +53,6 @@ set -e
 build_debootstrap()
 {
   target=$DEBOOTSTRAP
-  include="gnupg1"
 
   if [ -d $target ]; then
     rm -rf $target
@@ -71,12 +71,16 @@ build_debootstrap()
 
   echo I: Using APT repository $MIRROR
 
+  if [ -n "$COMPONENTS" ]; then
+      COMPONENTS="--components main,$COMPONENTS"
+  fi
+  INCLUDE="--include=gnupg1"
   KEY_URL=`echo $APTLY/$APTLY_KEY | sed 's/ //g'`
   echo I: Downloading gpg public key: $KEY_URL
   wget -q $KEY_URL -O- | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
 
   if echo $ARCH | grep -q arm; then
-    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase --include=$include $DIST_RELEASE $target $MIRROR
+    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $MIRROR
     if [ $? -ne 0 ]; then
       echo "debootstrap failed"
       exit 1
@@ -92,7 +96,7 @@ build_debootstrap()
       exit 2
     fi
   else
-    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase --include=$include $DIST_RELEASE $target $MIRROR
+    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $MIRROR
     if [ $? -ne 0 ]; then
       echo "debootstrap failed"
       exit 3

@@ -3,11 +3,12 @@ import asyncio
 
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
-from ..ops import BuildProcess, ScheduleBuilds
+from ..ops import BuildProcess, ScheduleBuilds, CreateBuildEnv
 from ..tools import write_log, write_log_title
 
 from ..model.database import Session
 from ..model.build import Build
+from ..model.chroot import Chroot
 from ..model.sourcerepository import SourceRepository
 
 
@@ -173,11 +174,41 @@ class Worker:
                 await write_log(build.parent.id, "I: publishing source package\n")
                 await self.aptly_queue.put({"src_publish": [build.id]})
 
+        if build.buildtype == "chroot":
+            if build.buildstate == "build_failed":
+                chroot = session.query(Chroot).filter(Chroot.build_id == build_id).first()
+                if not chroot:
+                    logger.error("rebuild: chroot not found")
+                else:
+                    args = {"buildenv": [
+                            chroot.id,
+                            build_id,
+                            chroot.buildvariant.base_mirror.mirror_distribution,
+                            chroot.buildvariant.base_mirror.project.name,
+                            chroot.buildvariant.base_mirror.name,
+                            chroot.buildvariant.architecture.name,
+                            chroot.buildvariant.base_mirror.mirror_components
+                            ]}
+                    logger.info("queueing {}".format(args))
+                    await self.task_queue.put(args)
+                    ok = True
+
         if not ok:
             logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, build.buildstate))
 
     async def _schedule(self, _):
         asyncio.ensure_future(ScheduleBuilds())
+
+    async def _buildenv(self, args):
+        chroot_id = args[0]
+        build_id = args[1]
+        dist = args[2]
+        name = args[3]
+        version = args[4]
+        arch = args[5]
+        components = args[6]
+        logger.info("asyncio.ensure_future(CreateBuildEnv")
+        asyncio.ensure_future(CreateBuildEnv(self.task_queue, chroot_id, build_id, dist, name, version, arch, components))
 
     async def run(self):
         """
@@ -192,6 +223,7 @@ class Worker:
                     logger.info("worker: got emtpy task, aborting...")
                     break
 
+                logger.info("worker: got task {}".format(task))
                 with Session() as session:
 
                     handled = False
@@ -220,8 +252,15 @@ class Worker:
 
                     if not handled:
                         args = task.get("schedule")
-                        handled = True
-                        await self._schedule(session)
+                        if args:
+                            handled = True
+                            await self._schedule(session)
+
+                    if not handled:
+                        args = task.get("buildenv")
+                        if args:
+                            handled = True
+                            await self._buildenv(args)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))

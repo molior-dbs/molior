@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE chroot ADD COLUMN build_id integer REFERENCES build(id);
+
+EOF
