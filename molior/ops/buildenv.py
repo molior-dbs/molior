@@ -4,6 +4,7 @@ from ..app import logger
 from ..tools import write_log, write_log_title
 from ..model.database import Session
 from ..model.build import Build
+from ..model.chroot import Chroot
 
 
 async def CreateBuildEnv(task_queue, chroot_id, build_id, dist, name, version, arch, components):

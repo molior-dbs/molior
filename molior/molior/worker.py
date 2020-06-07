@@ -252,7 +252,7 @@ class Worker:
 
                     if not handled:
                         args = task.get("schedule")
-                        if args:
+                        if args == []:
                             handled = True
                             await self._schedule(session)
 
