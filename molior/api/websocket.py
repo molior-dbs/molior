@@ -12,7 +12,7 @@ from molior.model.build import Build
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
 
 
-class LiveLogger:
+class BuildLogger:
     """
     Provides helper functions for livelogging on molior.
     """
@@ -27,7 +27,7 @@ class LiveLogger:
         """
         Stops the livelogging
         """
-        logger.info("build-{}: stopping livelogger".format(self.build_id))
+        logger.debug("build-{}: stopping buildlogger".format(self.build_id))
         self.__up = False
 
     async def check_abort(self):
@@ -42,7 +42,6 @@ class LiveLogger:
             if build.buildstate == "build_failed" or \
                build.buildstate == "publish_failed" or \
                build.buildstate == "successful":
-                logger.info("buildlog: end of build {}".format(self.build_id))
                 message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
                 await self.__sender(json.dumps(message))
                 self.stop()
@@ -53,7 +52,7 @@ class LiveLogger:
         """
         Starts the livelogging
         """
-        logger.info("build-{}: starting livelogger".format(self.build_id))
+        logger.debug("build-{}: starting buildlogger".format(self.build_id))
         self.__up = True
         while self.__up:
             try:
@@ -77,14 +76,14 @@ class LiveLogger:
                 await asyncio.sleep(1)
                 self.check_abort()
             except Exception as exc:
-                logger.error("livelogger: error sending live logs")
+                logger.error("buildlogger: error sending buildlogs")
                 logger.exception(exc)
                 self.stop()
 
 
-async def start_livelogger(websocket, data):
+async def start_buildlogger(ws, data):
     """
-    Starts the livelogger for the given
+    Starts the buildlogger for the given
     websocket client.
 
     Args:
@@ -92,53 +91,45 @@ async def start_livelogger(websocket, data):
         data (dict): The received data.
     """
     if "build_id" not in data:
-        logger.error("livelogger: no build ID found")
+        logger.error("buildlogger: no build ID found")
         return False
 
-    llogger = LiveLogger(websocket.send_str, data.get("build_id"))
+    if hasattr(ws, "molior_buildlogger") and ws.molior_buildlogger:
+        await stop_buildlogger(ws)
 
-    if hasattr(websocket, "logger") and websocket.logger:
-        logger.error("livelogger: removing existing livelogger")
-        await stop_livelogger(websocket, data)
-
-    websocket.logger = llogger
+    molior_buildlogger = BuildLogger(ws.send_str, data.get("build_id"))
+    ws.molior_buildlogger = molior_buildlogger
     loop = asyncio.get_event_loop()
-    loop.create_task(llogger.start())
+    loop.create_task(molior_buildlogger.start())
 
 
-async def stop_livelogger(websocket, _):
+async def stop_buildlogger(ws):
     """
-    Stops the livelogger.
+    Stops the buildlogger.
     """
-    if hasattr(websocket, "logger") and websocket.logger:
-        websocket.logger.stop()
-    else:
-        logger.error("stop_livelogger: no active logger found")
+    if hasattr(ws, "molior_buildlogger") and ws.molior_buildlogger:
+        ws.molior_buildlogger.stop()
+        delattr(ws, "molior_buildlogger")
 
 
 @app.websocket_connect()
-async def websocket_connected(websocket):
+async def websocket_connected(ws):
     """
-    Sends a `success` message to the websocket client
-    on connect.
+    Sends a 'connected' message to the websocket client on connect.
     """
-    if asyncio.iscoroutinefunction(websocket.send_str):
-        await websocket.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
-    else:
-        websocket.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
-
-    logger.info("new authenticated connection, user: %s", websocket.cirrina.web_session.get("username"))
+    await ws.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
+    logger.info("websocket: new connection from user %s", ws.cirrina.web_session.get("username"))
 
 
 @app.websocket_message("/api/websocket")
-async def websocket_message(websocket, msg):
+async def websocket_message(ws, msg):
     """
     On websocket message handler.
     """
     try:
         data = json.loads(msg)
     except json.decoder.JSONDecodeError:
-        logger.error("cannot parse websocket message from user '%s'", websocket.cirrina.web_session.get("username"))
+        logger.error("cannot parse websocket message from user '%s'", ws.cirrina.web_session.get("username"))
 
     if "subject" not in data or "action" not in data:
         logger.error("unknown websocket message recieved: {}".format(data))
@@ -149,17 +140,19 @@ async def websocket_message(websocket, msg):
         return
 
     if data.get("action") == Action.start.value:
-        await start_livelogger(websocket, data.get("data"))
+        await start_buildlogger(ws, data.get("data"))
     elif data.get("action") == Action.stop.value:
-        await stop_livelogger(websocket, data.get("data"))
+        await stop_buildlogger(ws)
     else:
         logger.error("unknown websocket message recieved: {}".format(data))
         return
 
 
 @app.websocket_disconnect()
-async def websocket_closed(_):
+async def websocket_closed(ws):
     """
     On websocket disconnect handler.
     """
     logger.debug("websocket connection closed")
+    if hasattr(ws, "molior_buildlogger"):
+        delattr(ws, "molior_buildlogger")

@@ -196,13 +196,10 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     running = False
                     failed = False
                     for task_id in task_ids:
-                        logger.info("task {}: {}".format(task_id, progress[task_id]))
                         if progress[task_id]["State"] == 1:
                             running = True
                         if progress[task_id]["State"] == 3:
                             failed = True
-
-                    logger.info("running: {}, failed {}".format(running, failed))
 
                     if not running and failed:
                         logger.error("Error updating mirror %s", mirrorname)
@@ -241,14 +238,14 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         else:
                             total_progress["PercentSize"] = 0.0
 
-                        logger.info("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
-                                    total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"],
-                                    total_progress["TotalNumberOfPackages"], total_progress["PercentPackages"],
-                                    (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
-                                    / 1024.0 / 1024.0 / 1024.0,
-                                    total_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
-                                    total_progress["PercentSize"],
-                                    )
+                        logger.debug("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
+                                     total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"],
+                                     total_progress["TotalNumberOfPackages"], total_progress["PercentPackages"],
+                                     (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
+                                     / 1024.0 / 1024.0 / 1024.0,
+                                     total_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
+                                     total_progress["PercentSize"],
+                                     )
 
                         await notify(Subject.build.value, Event.changed.value,
                                      {"id": build.id, "progress": total_progress["PercentSize"]})
@@ -360,9 +357,9 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     else:
                         upd_progress["PercentSize"] = 0.0
 
-                    logger.info("published %d/%d packages (%.02f%%)",
-                                upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
-                                upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
+                    logger.debug("published %d/%d packages (%.02f%%)",
+                                 upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
+                                 upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
 
                     await notify(Subject.build.value, Event.changed.value,
                                  {"id": build.id, "progress": upd_progress["PercentPackages"]})

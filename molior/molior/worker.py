@@ -223,7 +223,7 @@ class Worker:
                     logger.info("worker: got emtpy task, aborting...")
                     break
 
-                logger.info("worker: got task {}".format(task))
+                logger.debug("worker: got task {}".format(task))
                 with Session() as session:
 
                     handled = False

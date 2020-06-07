@@ -67,7 +67,7 @@ async def ws_logs_connected(ws_client):
             # FIXME: disconnect
             return ws_client
 
-    logger.info("ws: recieving logs for build {}".format(build.id))
+    logger.debug("ws: recieving logs for build {}".format(build.id))
     filename = get_log_file_path(build.id)
     afp = AIOFile(filename, 'w')
     await afp.open()

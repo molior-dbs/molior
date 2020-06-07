@@ -588,7 +588,7 @@ async def trigger_build(request):
         logger.error("trigger_build_latest error: repo %d not found" % repository_id)
         return ErrorResponse(400, "Repository not found")
 
-    logger.info("trigger_build_latest for repo %d" % repository_id)
+    logger.debug("trigger_build_latest for repo %d" % repository_id)
 
     build = Build(
         version=None,
