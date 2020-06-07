@@ -394,6 +394,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         parent_id=build.id,
                         sourcerepository=None,
                         maintainer=None,
+                        architecture=arch
                     )
 
                     session.add(chroot_build)
@@ -465,36 +466,10 @@ class AptlyWorker:
             download_installer,
         ) = args
 
-        build = Build(
-            version=version,
-            git_ref=None,
-            ci_branch=None,
-            is_ci=False,
-            versiontimestamp=None,
-            sourcename=mirror,
-            buildstate="new",
-            buildtype="mirror",
-            buildconfiguration=None,
-            sourcerepository=None,
-            maintainer=None,
-        )
-
-        build.log_state("created")
-        session.add(build)
-        await build.build_added()
-        session.commit()
-
-        await write_log_title(build.id, "Create Mirror")
-
-        mirror_project = (
-            session.query(Project)
-            .filter(Project.name == mirror, Project.is_mirror.is_(True))
-            .first()
-        )
+        # FIXME: the following db checking should happen in api
+        mirror_project = session.query(Project).filter(Project.name == mirror, Project.is_mirror.is_(True)).first()
         if not mirror_project:
-            mirror_project = Project(
-                name=mirror, is_mirror=True, is_basemirror=is_basemirror
-            )
+            mirror_project = Project(name=mirror, is_mirror=True, is_basemirror=is_basemirror)
             session.add(mirror_project)
 
         project_version = (
@@ -506,11 +481,8 @@ class AptlyWorker:
         )
 
         if project_version:
-            await write_log(build.id, "W: mirror with name '%s' and version '%s' already exists\n" % (mirror, version))
             logger.error("mirror with name '%s' and version '%s' already exists", mirror, version)
-            await build.set_successful()
-            session.commit()
-            return True
+            return
 
         base_mirror = None
         base_mirror_version = None
@@ -518,22 +490,17 @@ class AptlyWorker:
         if not is_basemirror:
             db_basemirror = session.query(ProjectVersion).filter(ProjectVersion.id == basemirror_id).first()
             if not db_basemirror:
-                await write_log(build.id, "E: could not find a basemirror with id '%d'\n" % basemirror_id)
                 logger.error("could not find a basemirror with id '%d'", basemirror_id)
-                await build.set_failed()
-                session.commit()
-                return False
+                return
 
             base_mirror = db_basemirror.project.name
             base_mirror_version = db_basemirror.name
             db_buildvariant = session.query(BuildVariant).filter(BuildVariant.base_mirror_id == basemirror_id).first()
 
             if not db_buildvariant:
-                await write_log(build.id, "E: could not find a buildvariant for basemirror with id '%d'\n" % db_basemirror.id)
                 logger.error("could not find a buildvariant for basemirror with id '%d'", db_basemirror.id)
-                await build.set_failed()
-                session.commit()
-                return False
+                return
+        # FIXME: until here, should be in api
 
         mirror_project_version = ProjectVersion(
             name=version,
@@ -552,8 +519,27 @@ class AptlyWorker:
         session.add(mirror_project_version)
         session.commit()
 
-        build.projectversion_id = mirror_project_version.id
+        build = Build(
+            version=version,
+            git_ref=None,
+            ci_branch=None,
+            is_ci=False,
+            versiontimestamp=None,
+            sourcename=mirror,
+            buildstate="new",
+            buildtype="mirror",
+            buildconfiguration=None,
+            sourcerepository=None,
+            maintainer=None,
+            projectversion_id=mirror_project_version.id
+        )
+
+        build.log_state("created")
+        session.add(build)
+        await build.build_added()
         session.commit()
+
+        await write_log_title(build.id, "Create Mirror")
 
         await write_log(build.id, "I: adding GPG keys\n")
 

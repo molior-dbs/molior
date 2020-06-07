@@ -323,7 +323,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                 parent_id=build.id,
                 sourcerepository=repo,
                 maintainer=maintainer,
-                projectversion_id=build_config.projectversions[0].id
+                projectversion_id=build_config.projectversions[0].id,
+                architecture=build_config.buildvariant.architecture.name
             )
 
             session.add(deb_build)
