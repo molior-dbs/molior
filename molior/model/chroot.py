@@ -17,6 +17,7 @@ class Chroot(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "chroot"
 
     id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    build_id = Column(ForeignKey("build.id"))
     buildvariant_id = Column(ForeignKey("buildvariant.id"))
     buildvariant = relationship(BuildVariant)
     ready = Column(Boolean)

@@ -411,22 +411,21 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     await chroot_build.set_scheduled()
                     session.commit()
 
-                    chroot = Chroot(buildvariant=buildvariant, ready=False)
+                    chroot = Chroot(buildvariant=buildvariant, build_id=chroot_build.id, ready=False)
                     session.add(chroot)
                     session.commit()
 
-                    loop = asyncio.get_event_loop()
-                    loop.create_task(
-                        create_schroot(
-                            task_queue,
+                    # create chroot build envs
+                    args = {"buildenv": [
                             chroot.id,
                             chroot_build.id,
                             buildvariant.base_mirror.mirror_distribution,
                             buildvariant.base_mirror.project.name,
                             buildvariant.base_mirror.name,
                             buildvariant.architecture.name,
-                        )
-                    )
+                            buildvariant.base_mirror.mirror_components
+                            ]}
+                    await task_queue.put(args)
 
             entry.is_locked = True
             entry.mirror_state = "ready"
@@ -441,85 +440,6 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
     except Exception as exc:
         logger.exception(exc)
-
-
-async def create_schroot(task_queue, chroot_id, build_id, dist, name, version, arch):
-    """
-    Creates a sbuild chroot and other build environments.
-
-    Args:
-        dist (str): The distrelease
-        version (str): The version
-        arch (str): The architecture
-
-    Returns:
-        bool: True on success
-    """
-
-    with Session() as session:
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("aptly worker: mirror build with id %d not found", build_id)
-            return False
-
-        await write_log_title(build_id, "Chroot Environment")
-
-        await build.set_building()
-        session.commit()
-
-        logger.info("creating build environments for %s-%s-%s", dist, version, arch)
-        await write_log(build_id, "Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
-
-        async def outh(line):
-            await write_log(build_id, "%s\n" % line)
-
-        process = Launchy(["sudo", "run-parts", "-a", "build", "-a", dist, "-a", name, "-a", version, "-a", arch,
-                          "/etc/molior/mirror-hooks.d"], outh, outh)
-        await process.launch()
-        ret = await process.wait()
-
-        if not ret == 0:
-            logger.error("error creating build env")
-            await write_log(build_id, "Error creating build environment\n")
-            await write_log(build_id, "\n")
-            await write_log_title(build_id, "Done", no_footer_newline=True)
-            await build.set_failed()
-            session.commit()
-            return False
-
-        await build.set_needs_publish()
-        session.commit()
-
-        await build.set_publishing()
-        session.commit()
-
-        process = Launchy(["sudo", "run-parts", "-a", "publish", "-a", dist, "-a", name, "-a", version, "-a", arch,
-                           "/etc/molior/mirror-hooks.d"], outh, outh)
-        await process.launch()
-        ret = await process.wait()
-
-        if not ret == 0:
-            logger.error("error publishing build env")
-            await write_log(build_id, "Error publishing build environment\n")
-            await write_log_title(build_id, "Done", no_footer_newline=True)
-            await build.set_publish_failed()
-            session.commit()
-            return False
-
-        await write_log(build_id, "\n")
-        await write_log_title(build_id, "Done", no_footer_newline=True)
-        await build.set_successful()
-        session.commit()
-
-        chroot = session.query(Chroot).filter(Chroot.id == chroot_id).first()
-        chroot.ready = True
-        session.commit()
-
-        # Schedule builds
-        args = {"schedule": []}
-        await task_queue.put(args)
-
-        return True
 
 
 class AptlyWorker:
