@@ -62,24 +62,25 @@ class Build(Base):
     def log_state(self, statemsg):
         prefix = ""
         if self.buildtype == "deb":
+            prefix = self.buildtype
             name = self.sourcerepository.name
         elif self.buildtype == "source":
-            prefix = "%s " % self.buildtype
+            prefix = self.buildtype
             name = self.sourcerepository.name
         elif self.buildtype == "mirror":
-            prefix = "%s " % self.buildtype
+            prefix = self.buildtype
             name = self.sourcename
         elif self.buildtype == "chroot":
-            prefix = "%s " % self.buildtype
+            prefix = self.buildtype
             name = self.sourcename
         elif self.buildtype == "debootstrap":
-            prefix = "%s " % self.buildtype
+            prefix = self.buildtype
             name = self.sourcename
         elif self.buildtype == "build":
-            prefix = "%s " % self.buildtype
+            prefix = "task"
             name = self.sourcename
         else:
-            name = "I have no name!"
+            name = "unknown"
         if not self.id:
             b_id = -1
         else:
@@ -87,7 +88,7 @@ class Build(Base):
         version = ""
         if self.version:
             version = self.version
-        logger.info("%sbuild-%d %s: %s %s", prefix, b_id, statemsg, name, version)
+        logger.info("build-%d %s %s: %s %s", b_id, prefix, statemsg, name, version)
 
     async def set_needs_build(self):
         self.log_state("needs build")

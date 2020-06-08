@@ -138,7 +138,7 @@ EOM
 
   echo I: Creating schroot config
   CHROOT_D=/var/lib/schroot/chroots/chroot.d
-  sudo mkdir -p $CHROOT_D
+  mkdir -p $CHROOT_D
   cat > $CHROOT_D/sbuild-$CHROOT_NAME <<EOM
 [$CHROOT_NAME]
 description=Molior $CHROOT_NAME schroot
