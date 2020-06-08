@@ -1,5 +1,3 @@
-import sqlalchemy.exc
-
 from aiohttp import web
 
 from molior.app import app
@@ -8,7 +6,6 @@ from molior.model.user import User
 from molior.model.userrole import UserRole
 from molior.model.project import Project
 from molior.tools import paginate
-from molior.molior.notifier import Subject, Event
 
 
 @app.http_get("/api/users")
@@ -156,6 +153,7 @@ async def get_user_byid(request):
     return web.json_response(data)
 
 
+@app.http_put("/api/user/{user_id}")
 @app.http_put("/api/users/{user_id}")
 @req_admin
 async def put_user_byid(request):
@@ -195,45 +193,22 @@ async def put_user_byid(request):
         description: Database problem
     """
     user_id = request.match_info["user_id"]
+
+    params = await request.json()
+
+    is_admin = params.get("is_admin")        # noqa: E221
+    email    = params.get("email")           # noqa: E221
+    password = params.get("password")        # noqa: E221
+
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for user_id", status=400)
+        return web.Response(status=400, text="Incorrect value for user_id")
 
-    user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
-    if not user:
-        return web.Response(status=404, text="User not found")
-
-    if user.username == "admin":
-        return web.Response(status=400, text="Cannot change admin")
-
-    is_admin = request.GET.getone("is_admin", None)  # str "true" or "flase"
-    if not is_admin:  # if None
-        return web.Response(text="Nothing to change", status=204)
-
-    if is_admin.lower() == "true":
-        user.is_admin = True
-        data = {"result": "{u} is now admin ".format(u=user.username)}
-    elif is_admin.lower() == "false":
-        user.is_admin = False
-        data = {"result": "{u} is no longer admin ".format(u=user.username)}
-
-    try:
-        request.cirrina.db_session.commit()  # pylint: disable=no-member
-    except sqlalchemy.exc.DataError:
-        request.cirrina.db_session.rollback()  # pylint: disable=no-member
-        return web.Response(status=500, text="Database error")
-
-    # TODO : change to a multicast group
-    await app.websocket_broadcast(
-        {
-            "event": Event.changed.value,
-            "subject": Subject.user.value,
-            "changed": {"id": user_id, "is_admin": user.is_admin},
-        }
-    )
-
-    return web.json_response(data)
+    ret = Auth().edit_user(user_id, password, email, is_admin)
+    if not ret:
+        return web.Response(status=400, text="Error modifying user")
+    return web.Response(status=200)
 
 
 @app.http_delete("/api/users/{user_id}")
@@ -382,15 +357,15 @@ async def create_user(request):
     params = await request.json()
 
     username = params.get("name")
-    password = params.get("password")
     email = params.get("email")
     is_admin = params.get("is_admin", False)
+    password = params.get("password")
     if not username:
         return web.Response(status=400, text="Invalid username")
-    if not password:
-        return web.Response(status=400, text="Invalid password")
     if not email:
         return web.Response(status=400, text="Invalid email")
+    if not password:
+        return web.Response(status=400, text="Invalid password")
     # FIXME: check if user already exists
 
     Auth().add_user(username, password, email, is_admin)
