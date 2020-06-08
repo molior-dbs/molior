@@ -384,12 +384,14 @@ async def create_user(request):
     username = params.get("name")
     password = params.get("password")
     email = params.get("email")
+    is_admin = params.get("is_admin", False)
     if not username:
         return web.Response(status=400, text="Invalid username")
     if not password:
         return web.Response(status=400, text="Invalid password")
     if not email:
         return web.Response(status=400, text="Invalid email")
+    # FIXME: check if user already exists
 
-    Auth().add_user(username, password, email)
+    Auth().add_user(username, password, email, is_admin)
     return web.Response(status=200)
