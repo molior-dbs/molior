@@ -391,5 +391,5 @@ async def create_user(request):
     if not email:
         return web.Response(status=400, text="Invalid email")
 
-    Auth().add_user(username, password)
+    Auth().add_user(username, password, email)
     return web.Response(status=200)
