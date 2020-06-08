@@ -43,13 +43,13 @@ class Auth:
             return False
         return auth_backend.login(user, password)
 
-    def add_user(self, user, password):
+    def add_user(self, user, password, email):
         global auth_backend
         if not auth_backend:
             return False
         if not hasattr(auth_backend, "add_user"):
             return False
-        return auth_backend.add_user(user, password)
+        return auth_backend.add_user(user, password, email)
 
 
 def req_admin(func):

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE molioruser ADD COLUMN email character varying;
+
+EOF
