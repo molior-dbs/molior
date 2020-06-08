@@ -66,7 +66,7 @@ async def DebSrcPublish(build):
         logger.debug("publisher: adding %s", f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
-    build.log_state("publishing %s for projectversion ids %s", build.sourcename, str(build.projectversions))
+    build.log_state("publishing {} for projectversion ids {}".format(build.sourcename, str(build.projectversions)))
 
     ret = False
     for projectversion_id in build.projectversions:
