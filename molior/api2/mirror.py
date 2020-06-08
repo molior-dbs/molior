@@ -144,12 +144,6 @@ async def create_mirror2(request):
 
         basemirror_id = entry.id
 
-    logger.info("Creating Mirror: %s %s %s %s %s %s %s %s %s %s %s %s %s %s", mirrorname, mirrorversion, mirrortype,
-                basemirror, mirrorurl, mirrordist,
-                mirrorcomponents, architectures,
-                mirrorsrc, mirrorinst, mirrorkeytype,
-                mirrorkeyurl, mirrorkeyids, mirrorkeyserver)
-
     if not mirrorcomponents:
         mirrorcomponents = ["main"]
 
@@ -183,7 +177,5 @@ async def create_mirror2(request):
             mirrorinst,
         ]
     }
-    logger.info(args)
     await request.cirrina.aptly_queue.put(args)
-
     return web.Response(status=200, text="Mirror creation started")

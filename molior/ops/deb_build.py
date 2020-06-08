@@ -38,7 +38,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
         logger.error("Signing key not defined in configuration")
         return False
 
-    logger.info("%s: creating source package", src_package_name)
+    logger.debug("%s: creating source package", src_package_name)
     await write_log(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
 
     async def outh(line):
@@ -74,7 +74,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
         logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
         return False
 
-    logger.info("%s (%d): source package v%s created", src_package_name, repo_id, version)
+    logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
     return True
 
 

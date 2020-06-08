@@ -22,7 +22,7 @@ async def watchdog(ws_client):
         arch = ws_client.molior_node_arch
         while True:
             if hasattr(ws_client, "molior_pong_pending") and ws_client.molior_pong_pending == 1:
-                logger.info("backend: ping timeout after %ds on %s/%s",
+                logger.warn("backend: ping timeout after %ds on %s/%s",
                             PING_TIMEOUT, ws_client.molior_node_arch, ws_client.molior_node_name)
                 await node_disconnected(ws_client)
                 await ws_client.close()
@@ -48,7 +48,7 @@ async def node_register(ws_client):
     ws_client.molior_node_arch = arch
     if arch in registry:
         registry[arch].insert(0, ws_client)
-        logger.info("backend: node registered: %s/%s", arch, node)
+        logger.info("backend: %s node registered: %s", arch, node)
         asyncio.ensure_future(watchdog(ws_client))
         await backend_queue.put({"node_registered": 1})
     else:
@@ -79,7 +79,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_build_id = None
 
         elif status["status"] == "success":
-            logger.info("node: finished build {}".format(build_id))
+            logger.debug("node: finished build {}".format(build_id))
             await backend_queue.put({"succeeded": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
@@ -100,7 +100,7 @@ async def node_disconnected(ws_client):
 
     if ws_client in registry[arch]:
         registry[arch].remove(ws_client)
-        logger.info("backend: node disconnected: %s/%s", arch, node)
+        logger.warn("backend: node disconnected: %s/%s", arch, node)
 
     elif ws_client in running_nodes[arch]:
         running_nodes[arch].remove(ws_client)
@@ -109,7 +109,7 @@ async def node_disconnected(ws_client):
         await backend_queue.put({"failed": build_id})
 
     else:
-        logger.error("backend: unknown node disconnect: %s/%s", arch, node)
+        logger.warn("backend: unknown node disconnect: %s/%s", arch, node)
 
 
 class HTTPBackend:
@@ -182,7 +182,7 @@ class HTTPBackend:
             try:
                 task = await build_tasks[arch].get()
                 if task is None:
-                    logger.info("backend: got emtpy task, aborting...")
+                    logger.error("backend: got emtpy task, aborting...")
                     break
 
                 build_id = task["build_id"]
@@ -196,7 +196,7 @@ class HTTPBackend:
                         continue
                     break
                 running_nodes[arch].append(node)
-                logger.info("backend: build_%d assigned to %s/%s ", build_id, arch, node.molior_node_name)
+                logger.info("build-%d: building for %s on %s ", build_id, arch, node.molior_node_name)
                 node.molior_build_id = build_id
                 if asyncio.iscoroutinefunction(node.send_str):
                     await node.send_str(json.dumps({"task": task}))

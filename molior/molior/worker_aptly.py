@@ -52,7 +52,6 @@ async def startup_mirror(task_queue):
             build_state = None
             mirror_state = None
             if tasks:
-                logger.info("tasks {}".format(tasks))
                 for i in range(len(tasknames)):
                     taskname = tasknames[i]
                     if not mirror.project.is_basemirror:
@@ -62,7 +61,6 @@ async def startup_mirror(task_queue):
                                                              mirror.project.name, mirror.name)
                     else:
                         task_name = "{} {}-{}-".format(taskname, mirror.project.name, mirror.name)
-                    logger.info("taskname {}".format(task_name))
                     # FIXME: search for each component
                     #  "Publish snapshot: buster-10.4-cmps-main, buster-10.4-cmps-non-free",
 
@@ -139,7 +137,7 @@ async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, 
     # FIXME: do not allow db cleanup while mirroring
     task_ids = await aptly.mirror_update(base_mirror, base_mirror_version, mirror, version, components)
 
-    logger.info("start update progress: aptly tasks %s", str(task_ids))
+    logger.debug("start update progress: aptly tasks %s", str(task_ids))
     loop = asyncio.get_event_loop()
     loop.create_task(finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version,
                                      mirror, version, components, task_ids))
@@ -150,7 +148,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
     """
     try:
         mirrorname = "{}-{}".format(mirror, version)
-        logger.info("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
+        logger.debug("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
 
         with Session() as session:
 
@@ -259,7 +257,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 session.commit()
 
                 # snapshot after initial download
-                logger.info("creating snapshot for: %s", mirrorname)
+                logger.debug("creating snapshot for: %s", mirrorname)
                 try:
                     task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version, mirror, version, components)
                 except AptlyError as exc:
@@ -303,7 +301,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
                 # publish new snapshot
                 await write_log(build.id, "I: publishing mirror\n")
-                logger.info("publishing snapshot: %s", mirrorname)
+                logger.debug("publishing snapshot: %s", mirrorname)
                 try:
                     task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror, version,
                                                          entry.mirror_distribution, components)
@@ -394,7 +392,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         parent_id=build.id,
                         sourcerepository=None,
                         maintainer=None,
-                        architecture=arch
+                        architecture=arch_name
                     )
 
                     session.add(chroot_build)
@@ -433,7 +431,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             await write_log(build_id, "\n")
             await write_log_title(build_id, "Done", no_footer_newline=True)
-            logger.info("mirror %s succesfully created", mirrorname)
+            logger.debug("mirror %s succesfully created", mirrorname)
 
     except Exception as exc:
         logger.exception(exc)
@@ -721,8 +719,6 @@ class AptlyWorker:
         projectname = args[2]
         projectversion = args[3]
         dist = args[4]
-        logger.info("aptly worker: got drop publish task: %s/%s %s %s %s",
-                    base_mirror_name, base_mirror_version, projectname, projectversion, dist)
 
         aptly = get_aptly_connection()
         await aptly.publish_drop(base_mirror_name, base_mirror_version, projectname, projectversion, dist)
@@ -733,13 +729,6 @@ class AptlyWorker:
         project_name = args[3]
         project_version = args[4]
         architectures = args[5]
-        logger.info("aptly worker: init debian repository: 'basemirror %s-%s, projectversion: %s/%s, archs: [%s]",
-                    basemirror_name,
-                    basemirror_version,
-                    project_name,
-                    project_version,
-                    ", ".join(architectures))
-
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
 
     async def _cleanup(self, args, session):
@@ -758,7 +747,7 @@ class AptlyWorker:
             try:
                 task = await self.aptly_queue.get()
                 if task is None:
-                    logger.info("aptly worker: got emtpy task, aborting...")
+                    logger.error("aptly worker: got emtpy task, aborting...")
                     break
 
                 with Session() as session:

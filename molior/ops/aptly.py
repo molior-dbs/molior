@@ -66,7 +66,7 @@ async def DebSrcPublish(build):
         logger.debug("publisher: adding %s", f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
-    logger.info("publisher: publishing %s for projectversion ids %s", build.sourcename, str(build.projectversions))
+    build.log_state("publishing %s for projectversion ids %s", build.sourcename, str(build.projectversions))
 
     ret = False
     for projectversion_id in build.projectversions:
@@ -100,7 +100,7 @@ async def DebSrcPublish(build):
         changes_file = "{}_{}_{}.changes".format(build.sourcename, v, "source")
         files2delete.append("{}/{}".format(sourcepath, changes_file))
         for f in files2delete:
-            logger.info("publisher: removing %s", f)
+            logger.debug("publisher: removing %s", f)
             try:
                 os.remove(f)
             except Exception as exc:
@@ -127,7 +127,7 @@ async def publish_packages(build, out_path):
 
     files2upload = []
     for f in outfiles:
-        logger.info("publisher: adding %s", f)
+        logger.debug("publisher: adding %s", f)
         files2upload.append("{}/{}".format(out_path, f))
 
     count_files = len(files2upload)
@@ -161,7 +161,7 @@ async def publish_packages(build, out_path):
         logger.error("debsign failed")
         return False
 
-    logger.info("publisher: uploading %d file%s", count_files, "" if count_files == 1 else "s")
+    logger.debug("publisher: uploading %d file%s", count_files, "" if count_files == 1 else "s")
     projectversion = build.buildconfiguration.projectversions[0]
 
     basemirror_name = projectversion.buildvariants[0].base_mirror.project.name
@@ -204,7 +204,7 @@ async def DebPublish(task_queue, build_id):
         await build.set_needs_publish()
         session.commit()
 
-        logger.info("publisher: publishing build %d", build_id)
+        build.log_state("publishing")
         await build.set_publishing()
         session.commit()
         try:
