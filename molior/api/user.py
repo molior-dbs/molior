@@ -94,7 +94,7 @@ async def get_users(request):
     data = {"total_result_count": nb_users}
     if not count_only:
         data["results"] = [
-            {"id": user.id, "username": user.username, "is_admin": user.is_admin}
+            {"id": user.id, "username": user.username, "email": user.email, "is_admin": user.is_admin}
             for user in users
         ]
 
