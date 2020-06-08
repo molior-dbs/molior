@@ -16,8 +16,33 @@ class AuthBackend:
                 return True
         return False
 
-    def add_user(self, user, password, email, is_admin):
+    def add_user(self, username, password, email, is_admin):
         with Session() as session:
-            user = User(username=user, password=func.crypt(password, func.gen_salt('bf', 8)), email=email, is_admin=is_admin)
+            user = User(username=username, password=func.crypt(password, func.gen_salt('bf', 8)), email=email, is_admin=is_admin)
             session.add(user)
             session.commit()
+
+    def edit_user(self, user_id, password, email, is_admin):
+        with Session() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user:
+                return False
+
+            if user.username == "admin":
+                return False
+
+            user.is_admin = is_admin
+            user.email = email
+            if password:
+                user.password = func.crypt(password, func.gen_salt('bf', 8))
+            session.commit()
+
+            # TODO : change to a multicast group
+            # await app.websocket_broadcast(
+            #    {
+            #        "event": Event.changed.value,
+            #        "subject": Subject.user.value,
+            #        "changed": {"id": user_id, "is_admin": user.is_admin},
+            #    }
+            # )
+        return True
