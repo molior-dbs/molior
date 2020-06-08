@@ -16,8 +16,8 @@ class AuthBackend:
                 return True
         return False
 
-    def add_user(self, user, password, email):
+    def add_user(self, user, password, email, is_admin):
         with Session() as session:
-            user = User(username=user, password=func.crypt(password, func.gen_salt('bf', 8)), email=email)
+            user = User(username=user, password=func.crypt(password, func.gen_salt('bf', 8)), email=email, is_admin=is_admin)
             session.add(user)
             session.commit()
