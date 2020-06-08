@@ -107,7 +107,7 @@ build_debootstrap()
   if chroot $target dpkg -s > /dev/null 2>&1; then
     # The package tzdata cannot be --excluded in debootstrap, so remove it here
     # In order to use debconf for configuring the timezone, the tzdata package
-    # needs to be installer later as a dependency, i.e. after the config package
+    # needs to be installed later as a dependency, i.e. after the config package
     # preseeding debconf.
     chroot $target apt-get purge --yes tzdata
     rm -f $target/etc/timezone
