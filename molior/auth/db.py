@@ -46,3 +46,16 @@ class AuthBackend:
             #    }
             # )
         return True
+
+    def delete_user(self, user_id):
+        with Session() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user:
+                return False
+
+            if user.username == "admin":
+                return False
+
+            session.delete(user)
+            session.commit()
+        return True
