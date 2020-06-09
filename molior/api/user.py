@@ -211,12 +211,13 @@ async def put_user_byid(request):
     return web.Response(status=200)
 
 
+@app.http_delete("/api/user/{user_id}")
 @app.http_delete("/api/users/{user_id}")
 @req_admin
 # FIXME: req_role
-async def delete_user_byid(*_):
+async def delete_user_byid(request):
     """
-    Delete a user by id (not yet implemented).
+    Delete a user by id.
 
     ---
     description: Delete a user
@@ -229,10 +230,30 @@ async def delete_user_byid(*_):
         required: true
         type: integer
     responses:
-      "501":
-        description: Sorry, not implememted
+      "200":
+        description: Sucess
+        schema:
+          type: object
+          properties:
+            result:
+              type: string
+      "400":
+        description: Invalid parameter
+      "404":
+        description: User not found
+      "500":
+        description: Database problem
     """
-    return web.Response(text="PUT project not implemented", status=501)
+    user_id = request.match_info["user_id"]
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return web.Response(status=400, text="Incorrect value for user_id")
+
+    ret = Auth().delete_user(user_id)
+    if not ret:
+        return web.Response(status=400, text="Error deleting user")
+    return web.Response(status=200)
 
 
 @app.http_get("/api/users/{user_id}/roles")

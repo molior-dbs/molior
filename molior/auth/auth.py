@@ -59,6 +59,14 @@ class Auth:
             return False
         return auth_backend.edit_user(user_id, password, email, is_admin)
 
+    def delete_user(self, user_id):
+        global auth_backend
+        if not auth_backend:
+            return False
+        if not hasattr(auth_backend, "delete_user"):
+            return False
+        return auth_backend.delete_user(user_id)
+
 
 def req_admin(func):
     """
