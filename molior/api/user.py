@@ -31,20 +31,21 @@ async def get_users(request):
         in: query
         required: false
         type: integer
-      - name: q
+      - name: name
         description: query to filter username
         in: query
         required: false
         type: string
-      - name: filter_admin
+      - name: email
+        description: query to filter email
+        in: query
+        required: false
+        type: string
+      - name: admin
         description: return only admin if true
         in: query
         required: false
         type: boolean
-      - name: count_only
-        description: If the items should only be counted
-        type: boolean
-        required: false
     produces:
       - text/json
     responses:
@@ -69,31 +70,27 @@ async def get_users(request):
       "400":
         description: invalid input where given
     """
-    filter_name = request.GET.getone("q", "")
-    filter_admin = request.GET.getone("filter_admin", "false")
-
-    try:
-        count_only = request.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
+    name = request.GET.getone("name", "")
+    email = request.GET.getone("email", "")
+    admin = request.GET.getone("admin", "false")
 
     query = request.cirrina.db_session.query(User)
-    if filter_admin.lower() == "true":
+    if admin.lower() == "true":
         query = query.filter(User.is_admin)
-    if filter_name:
-        query = query.filter(User.username.like("%{}%".format(filter_name)))
+    if name:
+        query = query.filter(User.username.like("%{}%".format(name)))
+    if email:
+        query = query.filter(User.email.like("%{}%".format(email)))
 
-    nb_users = query.count()
     query = query.order_by(User.username)
     query = paginate(request, query)
     users = query.all()
 
-    data = {"total_result_count": nb_users}
-    if not count_only:
-        data["results"] = [
-            {"id": user.id, "username": user.username, "email": user.email, "is_admin": user.is_admin}
-            for user in users
-        ]
+    data = {"total_result_count": query.count()}
+    data["results"] = [
+        {"id": user.id, "username": user.username, "email": user.email, "is_admin": user.is_admin}
+        for user in users
+    ]
 
     return web.json_response(data)
 
