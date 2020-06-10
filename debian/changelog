@@ -1,3 +1,9 @@
+molior (1.4.0~alpha87) stretch; urgency=medium
+
+  * mirror: improve sort order
+
+ -- André Roth <neolynx@gmail.com>  Wed, 10 Jun 2020 16:49:25 +0000
+
 molior (1.4.0~alpha86) stretch; urgency=medium
 
   * bump version 1.4.0~alpha86
