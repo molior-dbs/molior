@@ -221,7 +221,7 @@ async def get_mirrors(request):
     elif is_basemirror:
         query = query.filter(Project.is_basemirror == "true")
 
-    query = query.order_by(Project.name, ProjectVersion.name)
+    query = query.order_by(Project.name, ProjectVersion.name.desc())
     nb_results = query.count()
 
     query = paginate(request, query)
