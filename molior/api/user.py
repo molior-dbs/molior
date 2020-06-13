@@ -1,11 +1,12 @@
 from aiohttp import web
+from sqlalchemy.exc import IntegrityError
 
 from molior.app import app
 from molior.auth import Auth, req_admin
 from molior.model.user import User
 from molior.model.userrole import UserRole
 from molior.model.project import Project
-from molior.tools import paginate
+from molior.tools import paginate, ErrorResponse
 
 
 @app.http_get("/api/users")
@@ -130,7 +131,7 @@ async def get_user_byid(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for user_id", status=400)
+        return ErrorResponse(400, "Incorrect value for user_id")
 
     currentuser = (
         request.cirrina.db_session.query(User)
@@ -144,7 +145,7 @@ async def get_user_byid(request):
         user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
 
     if not user:
-        return web.Response(status=404, text="User not found")
+        return ErrorResponse(404, "User not found")
 
     data = {"username": user.username, "user_id": user.id, "is_admin": user.is_admin}
     return web.json_response(data)
@@ -200,11 +201,11 @@ async def put_user_byid(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(status=400, text="Incorrect value for user_id")
+        return ErrorResponse(400, "Incorrect value for user_id")
 
     ret = Auth().edit_user(user_id, password, email, is_admin)
     if not ret:
-        return web.Response(status=400, text="Error modifying user")
+        return ErrorResponse(400, "Error modifying user")
     return web.Response(status=200)
 
 
@@ -245,11 +246,11 @@ async def delete_user_byid(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(status=400, text="Incorrect value for user_id")
+        return ErrorResponse(400, "Incorrect value for user_id")
 
     ret = Auth().delete_user(user_id)
     if not ret:
-        return web.Response(status=400, text="Error deleting user")
+        return ErrorResponse(400, "Error deleting user")
     return web.Response(status=200)
 
 
@@ -295,11 +296,11 @@ async def get_user_roles(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(status=400, text="Incorrect user_id")
+        return ErrorResponse(400, "Incorrect user_id")
 
     user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
     if not user:
-        return web.Response(status=404, text="User not found")
+        return ErrorResponse(404, "User not found")
 
     data = {
         "username": user.username,
@@ -379,12 +380,15 @@ async def create_user(request):
     is_admin = params.get("is_admin", False)
     password = params.get("password")
     if not username:
-        return web.Response(status=400, text="Invalid username")
+        return ErrorResponse(400, "Invalid username")
     if not email:
-        return web.Response(status=400, text="Invalid email")
+        return ErrorResponse(400, "Invalid email")
     if not password:
-        return web.Response(status=400, text="Invalid password")
+        return ErrorResponse(400, "Invalid password")
     # FIXME: check if user already exists
 
-    Auth().add_user(username, password, email, is_admin)
+    try:
+        Auth().add_user(username, password, email, is_admin)
+    except IntegrityError as exc:
+        return ErrorResponse(400, str(exc.orig))
     return web.Response(status=200)

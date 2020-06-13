@@ -1,11 +1,12 @@
 import re
 import shlex
 import pytz
+import json
 
 from datetime import datetime
 from pathlib import Path
 from launchy import Launchy
-from aiohttp.web import Response
+from aiohttp.web import json_response
 from aiofile import AIOFile, Writer
 
 from .app import logger
@@ -24,7 +25,7 @@ local_tz = None
 
 def ErrorResponse(status, msg):
     logger.info("API Error: %s", msg)
-    return Response(status=status, text=msg)
+    return json_response(status=status, text=json.dumps(msg))
 
 
 def paginate(request, query):
