@@ -1,29 +1,12 @@
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.auth import req_admin
-from molior.tools import get_aptly_connection, paginate
+from ..app import app, logger
+from ..auth import req_admin
+from ..tools import OKResponse, ErrorResponse, paginate
 
-from ..model.build import Build
-from ..model.chroot import Chroot
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
-from ..model.buildvariant import BuildVariant
 from ..model.mirrorkey import MirrorKey
-
-
-def error(status, msg, *args):
-    """
-    Logs an error message and returns an error to
-    the web client.
-
-    Args:
-        status (int): The http response status.
-        msg (str): The message to display.
-        args (tuple): Arguments for string format on msg.
-    """
-    logger.error(msg.format(*args))
-    return web.Response(status=status, text=msg.format(*args))
 
 
 @app.http_post("/api/mirror")
@@ -145,7 +128,7 @@ async def create_mirror(request):
         components = ["main"]
 
     if not isinstance(is_basemirror, bool):
-        return web.Response(status=400, text="is_basemirror not a bool")
+        return ErrorResponse("is_basemirror not a bool")
 
     args = {
         "create_mirror": [
@@ -165,7 +148,7 @@ async def create_mirror(request):
         ]
     }
     await request.cirrina.aptly_queue.put(args)
-    return web.Response(status=200, text="Mirror {} successfully created.".format(mirror))
+    return OKResponse("Mirror {} successfully created.".format(mirror))
 
 
 @app.http_get("/api/mirror")
@@ -316,7 +299,7 @@ async def get_mirror(request):
     mirror = query.first()
 
     if not mirror:
-        return web.Response(text="Mirror not found", status=404)
+        return ErrorResponse(404, "Mirror not found")
 
     apt_url = mirror.get_apt_repo(url_only=True)
     base_mirror_url = str()
@@ -378,77 +361,36 @@ async def delete_mirror(request):
         "503":
             description: removal failed from database.
     """
-    apt = get_aptly_connection()
     mirror_id = request.match_info["id"]
 
     query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
     query = query.filter(Project.is_mirror.is_(True))
-    entry = query.filter(ProjectVersion.id == mirror_id).first()
+    mirror = query.filter(ProjectVersion.id == mirror_id).first()
 
-    if not entry:
+    if not mirror:
         logger.warning("error deleting mirror '%s': mirror not found", mirror_id)
-        return error(404, "Error deleting mirror '%d': mirror not found", mirror_id)
+        return ErrorResponse(404, "Error deleting mirror '%d': mirror not found" % mirror_id)
 
     # FIXME: check state, do not delete ready/updating/...
 
-    mirrorname = "{}-{}".format(entry.project.name, entry.name)
+    mirrorname = "{}-{}".format(mirror.project.name, mirror.name)
 
     # check relations
-    if entry.sourcerepositories:
+    if mirror.sourcerepositories:
         logger.warning("error deleting mirror '%s': referenced by one or more source repositories", mirrorname)
-        return error(412, "Error deleting mirror {}: still referenced by one or more source repositories", mirrorname)
-    if entry.buildconfiguration:
+        return ErrorResponse(412, "Error deleting mirror {}: still referenced from source repositories".format(mirrorname))
+    if mirror.buildconfiguration:
         logger.warning("error deleting mirror '%s': referenced by one or more build configurations", mirrorname)
-        return error(412, "Error deleting mirror {}: still referenced by one or more build configurations", mirrorname)
-    if entry.dependents:
+        return ErrorResponse(412, "Error deleting mirror {}: still referenced from build configurations".format(mirrorname))
+    if mirror.dependents:
         logger.warning("error deleting mirror '%s': referenced by one or project versions", mirrorname)
-        return error(412, "Error deleting mirror {}: still referenced by one or more project versions", mirrorname)
+        return ErrorResponse(412, "Error deleting mirror {}: still referenced from project versions".format(mirrorname))
 
-    base_mirror = ""
-    base_mirror_version = ""
-    if not entry.project.is_basemirror:
-        basemirror = entry.buildvariants[0].base_mirror
-        base_mirror = basemirror.project.name
-        base_mirror_version = basemirror.name
-        # FIXME: cleanup chroot table, schroots, debootstrap,
+    args = {"delete_mirror": [mirror.id]}
+    await request.cirrina.aptly_queue.put(args)
 
-    try:
-        # FIXME: use altpy queue !
-        await apt.mirror_delete(base_mirror, base_mirror_version, entry.project.name,
-                                entry.name, entry.mirror_distribution, entry.mirror_components.split(","))
-    except Exception as exc:
-        # mirror did not exist
-        # FIXME: handle mirror has snapshots and cannot be deleted?
-        logger.exception(exc)
-        pass
-
-    project = entry.project
-
-    bvs = request.cirrina.db_session.query(BuildVariant).filter(BuildVariant.base_mirror_id == entry.id).all()
-    for bvariant in bvs:
-        # FIXME: delete buildconfigurations
-        if entry.project.is_basemirror:
-            chroot = request.cirrina.db_session.query(Chroot).filter(Chroot.buildvariant == bvariant).first()
-            if chroot:
-                request.cirrina.db_session.delete(chroot)
-        request.cirrina.db_session.delete(bvariant)
-
-    builds = request.cirrina.db_session.query(Build) .filter(Build.projectversion_id == entry.id).all()
-    for build in builds:
-        # FIXME: delete buildconfigurations
-        # FIXME: remove buildout dir
-        request.cirrina.db_session.delete(build)
-
-    request.cirrina.db_session.delete(entry)
-    request.cirrina.db_session.commit()
-
-    if not project.projectversions:
-        request.cirrina.db_session.delete(project)
-
-    request.cirrina.db_session.commit()
-
-    return web.Response(status=200, text="Successfully deleted mirror: {}".format(mirrorname))
+    return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
 
 
 @app.http_post("/api/mirror/{id}/update")
@@ -482,19 +424,18 @@ async def put_update_mirror(request):
             description: Internal server error.
     """
     mirror_id = request.match_info["id"]
-    project_v = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == mirror_id)
-        .first()
-    )
+    mirror = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == mirror_id).first()
 
-    if project_v.is_locked:
-        return error(400, "Mirror locked. Update not allowed.")
+    if mirror.is_locked:
+        return ErrorResponse(400, "Mirror is locked")
 
-    if project_v.mirror_state != "error":
-        return error(400, "Mirror not in error state.")
+    if (mirror.mirror_state != "error" and mirror.mirror_state != "init_error" and mirror.mirror_state != "new"):
+        return ErrorResponse(400, "Mirror not in error state")
 
-    args = {"update_mirror": [project_v.id]}
+    if mirror.mirror_state == "new":
+        args = {"init_mirror": [mirror.id]}
+    else:
+        args = {"update_mirror": [mirror.id]}
     await request.cirrina.aptly_queue.put(args)
 
-    return web.Response(status=200, text="Successfully started update on mirror")
+    return OKResponse("Successfully started update on mirror")

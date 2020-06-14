@@ -253,6 +253,7 @@ class AptlyApi:
                 async with http.post(self.url + "/mirrors", headers=self.headers,
                                      data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
+                        # FIXME: get reponse body error msg
                         self.__raise_aptly_error(resp)
 
     async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
