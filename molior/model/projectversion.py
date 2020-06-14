@@ -15,17 +15,17 @@ from .projectversiondependency import ProjectVersionDependency
 from .proverbuivar import ProVerBuiVar
 from .database import Base
 
-MIRROR_STATES = ["undefined", "created", "updating", "publishing", "error", "ready"]
+MIRROR_STATES = ["new", "created", "updating", "publishing", "error", "ready"]
 
 
-class ProjectVersion(Base):  # pylint: disable=too-few-public-methods
+class ProjectVersion(Base):
     """
     Database model for a ProjectVersion.
     """
 
     __tablename__ = "projectversion"
 
-    id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    id = Column(Integer, primary_key=True)
     project_id = Column(ForeignKey("project.id"))
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
@@ -63,7 +63,7 @@ class ProjectVersion(Base):  # pylint: disable=too-few-public-methods
         )
 
     @fullname.expression
-    def fullname(cls):  # pylint: disable=no-self-argument
+    def fullname(cls):
         """
         Returns the project name and the version name
         """

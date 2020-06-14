@@ -23,6 +23,10 @@ from .model.userrole import UserRole
 local_tz = None
 
 
+def OKResponse(msg, status=200):
+    return json_response(status=status, text=json.dumps(msg))
+
+
 def ErrorResponse(status, msg):
     logger.info("API Error: %s", msg)
     return json_response(status=status, text=json.dumps(msg))

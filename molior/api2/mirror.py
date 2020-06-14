@@ -1,11 +1,13 @@
 import re
-from aiohttp import web
 
-from molior.app import app
-from molior.auth import req_admin
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.tools import ErrorResponse
+from ..app import app
+from ..auth import req_admin
+from ..tools import OKResponse, ErrorResponse
+
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion
+from ..model.mirrorkey import MirrorKey
+from ..model.buildvariant import BuildVariant
 
 
 @app.http_post("/api2/mirror")
@@ -119,7 +121,6 @@ async def create_mirror2(request):
     architectures    = params.get("architectures")     # noqa: E221
     mirrorsrc        = params.get("mirrorsrc")         # noqa: E221
     mirrorinst       = params.get("mirrorinst")        # noqa: E221
-    mirrorkeytype    = params.get("mirrorkeytype")     # noqa: E221
     mirrorkeyurl     = params.get("mirrorkeyurl")      # noqa: E221
     mirrorkeyids     = params.get("mirrorkeyids")      # noqa: E221
     mirrorkeyserver  = params.get("mirrorkeyserver")   # noqa: E221
@@ -146,10 +147,10 @@ async def create_mirror2(request):
 
     is_basemirror = mirrortype == "1"
 
-    if mirrorkeytype == "1":
+    if mirrorkeyurl != "":
         mirrorkeyids = []
         mirrorkeyserver = ""
-    elif mirrorkeytype == "2":
+    elif mirrorkeyids:
         mirrorkeyurl = ""
         mirrorkeyids = re.split(r"[, ]", mirrorkeyids)
     else:
@@ -175,4 +176,70 @@ async def create_mirror2(request):
         ]
     }
     await request.cirrina.aptly_queue.put(args)
-    return web.Response(status=200, text="Mirror creation started")
+    return OKResponse("Mirror creation started")
+
+
+@app.http_put("/api2/mirror/{name}/{version}")
+@req_admin
+# FIXME: req_role
+async def edit_mirror(request):
+    mirror_name = request.match_info["name"]
+    mirror_version = request.match_info["version"]
+    params = await request.json()
+
+    mirror = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+                ProjectVersion.project_id == Project.id,
+                ProjectVersion.name == mirror_version,
+                Project.name == mirror_name).first()
+    if not mirror:
+        return ErrorResponse(400, "Mirror not found")
+
+    mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
+    if not mirrorkey:
+        return ErrorResponse(400, "Mirror not found")
+
+    mirrortype       = params.get("mirrortype")        # noqa: E221
+    basemirror       = params.get("basemirror")        # noqa: E221
+    mirrorurl        = params.get("mirrorurl")         # noqa: E221
+    mirrordist       = params.get("mirrordist")        # noqa: E221
+    mirrorcomponents = params.get("mirrorcomponents")  # noqa: E221
+    architectures    = params.get("architectures")     # noqa: E221
+    mirrorsrc        = params.get("mirrorsrc")         # noqa: E221
+    mirrorinst       = params.get("mirrorinst")        # noqa: E221
+    mirrorkeyurl     = params.get("mirrorkeyurl")      # noqa: E221
+    mirrorkeyids     = params.get("mirrorkeyids")      # noqa: E221
+    mirrorkeyserver  = params.get("mirrorkeyserver")   # noqa: E221
+
+    basemirror_name, basemirror_version = basemirror.split("/")
+    bm = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+                ProjectVersion.project_id == Project.id,
+                ProjectVersion.name == basemirror_version,
+                Project.name == basemirror_name).first()
+    if not bm:
+        return ErrorResponse(400, "could not find a basemirror with '%s'", basemirror)
+
+    buildvariant = request.cirrina.db_session.query(BuildVariant).filter(BuildVariant.base_mirror_id == bm.id).first()
+    if not buildvariant:
+        return ErrorResponse(400, "could not find a buildvariant for '%s'", basemirror)
+
+    mirror.mirror_url = mirrorurl
+    mirror.mirror_distribution = mirrordist
+    mirror.mirror_components = mirrorcomponents
+    mirror.mirror_architectures = "{" + ", ".join(architectures) + "}"
+    mirror.mirror_with_sources = mirrorsrc
+    mirror.mirror_with_installer = mirrorinst
+    mirror.is_basemirror = mirrortype == "1"
+    mirror.buildvariants = [buildvariant]
+
+    mirrorkey.keyurl = mirrorkeyurl
+    mirrorkey.keyids = mirrorkeyids
+    mirrorkey.keyserver = mirrorkeyserver
+
+    request.cirrina.db_session.commit()
+
+    if mirror.mirror_state == "new":
+        args = {"init_mirror": [mirror.id]}
+    else:
+        args = {"update_mirror": [mirror.id]}
+    await request.cirrina.aptly_queue.put(args)
+    return OKResponse("Mirror update started")
