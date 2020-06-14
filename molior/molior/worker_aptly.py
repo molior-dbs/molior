@@ -450,7 +450,7 @@ class AptlyWorker:
 
     async def _create_mirror(self, args, session):
         (
-            mirror,
+            mirror_name,
             url,
             mirror_distribution,
             components,
@@ -458,7 +458,7 @@ class AptlyWorker:
             keyserver,
             is_basemirror,
             architectures,
-            version,
+            mirror_version,
             key_url,
             basemirror_id,
             download_sources,
@@ -466,21 +466,21 @@ class AptlyWorker:
         ) = args
 
         # FIXME: the following db checking should happen in api
-        mirror_project = session.query(Project).filter(Project.name == mirror, Project.is_mirror.is_(True)).first()
+        mirror_project = session.query(Project).filter(Project.name == mirror_name, Project.is_mirror.is_(True)).first()
         if not mirror_project:
-            mirror_project = Project(name=mirror, is_mirror=True, is_basemirror=is_basemirror)
+            mirror_project = Project(name=mirror_name, is_mirror=True, is_basemirror=is_basemirror)
             session.add(mirror_project)
 
         project_version = (
             session.query(ProjectVersion)
             .join(Project)
-            .filter(Project.name == mirror, Project.is_mirror.is_(True))
-            .filter(ProjectVersion.name == version)
+            .filter(Project.name == mirror_name, Project.is_mirror.is_(True))
+            .filter(ProjectVersion.name == mirror_version)
             .first()
         )
 
         if project_version:
-            logger.error("mirror with name '%s' and version '%s' already exists", mirror, version)
+            logger.error("mirror with name '%s' and version '%s' already exists", mirror_name, mirror_version)
             return
 
         db_buildvariant = None
@@ -496,8 +496,8 @@ class AptlyWorker:
                 return
         # FIXME: until here, should be in api
 
-        mirror_project_version = ProjectVersion(
-            name=version,
+        mirror = ProjectVersion(
+            name=mirror_version,
             project=mirror_project,
             mirror_url=url,
             mirror_distribution=mirror_distribution,
@@ -509,13 +509,13 @@ class AptlyWorker:
         )
 
         if db_buildvariant:
-            mirror_project_version.buildvariants.append(db_buildvariant)
+            mirror.buildvariants.append(db_buildvariant)
 
-        session.add(mirror_project_version)
+        session.add(mirror)
         session.commit()
 
         mirrorkey = MirrorKey(
-                projectversion_id=mirror_project_version.id,
+                projectversion_id=mirror.id,
                 keyurl=key_url,
                 keyids="{" + ",".join(keys) + "}",
                 keyserver=keyserver)
@@ -523,18 +523,18 @@ class AptlyWorker:
         session.add(mirrorkey)
 
         build = Build(
-            version=version,
+            version=mirror_version,
             git_ref=None,
             ci_branch=None,
             is_ci=False,
             versiontimestamp=None,
-            sourcename=mirror,
+            sourcename=mirror_name,
             buildstate="new",
             buildtype="mirror",
             buildconfiguration=None,
             sourcerepository=None,
             maintainer=None,
-            projectversion_id=mirror_project_version.id
+            projectversion_id=mirror.id
         )
 
         session.add(build)
@@ -542,7 +542,7 @@ class AptlyWorker:
         build.log_state("created")
         await build.build_added()
 
-        args = {"init_mirror": [build.id]}
+        args = {"init_mirror": [mirror.id]}
         await self.aptly_queue.put(args)
         return True
 
@@ -575,18 +575,18 @@ class AptlyWorker:
                 await write_log(build.id, "E: Error adding keys from '%s'\n" % key_url)
                 logger.error("key error: %s", exc)
                 await build.set_failed()
-                mirror.mirror_state = "error"
+                mirror.mirror_state = "init_error"
                 session.commit()
                 return False
         elif keyserver and keyids:
-            await write_log(build.id, "I: adding GPG keys {} from {}\n".format(", ".join(keyids), keyserver))
+            await write_log(build.id, "I: adding GPG keys {} from {}\n".format(keyids, keyserver))
             try:
                 await aptly.gpg_add_key(key_server=keyserver, keys=keyids)
             except AptlyError as exc:
                 await write_log(build.id, "E: Error adding keys %s\n" % str(keyids))
                 logger.error("key error: %s", exc)
                 await build.set_failed()
-                mirror.mirror_state = "error"
+                mirror.mirror_state = "init_error"
                 session.commit()
                 return False
 
@@ -599,8 +599,8 @@ class AptlyWorker:
                 mirror.buildvariants[0].base_mirror.name,
                 mirror.mirror_url,
                 mirror.mirror_distribution,
-                mirror.mirror_components,
-                mirror.mirror_architectures,
+                mirror.mirror_components.split(" "),
+                mirror.mirror_architectures[1:-1].split(","),
                 download_sources=mirror.mirror_with_sources,
                 download_udebs=mirror.mirror_with_installer,
                 download_installer=mirror.mirror_with_installer,
@@ -610,7 +610,7 @@ class AptlyWorker:
             await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
             logger.error("aptly seems to be not available: %s", str(exc))
             await build.set_failed()
-            mirror.mirror_state = "error"
+            mirror.mirror_state = "init_error"
             session.commit()
             return False
 
@@ -618,7 +618,7 @@ class AptlyWorker:
             await write_log(build.id, "E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
             logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
             await build.set_failed()
-            mirror.mirror_state = "error"
+            mirror.mirror_state = "init_error"
             session.commit()
             return False
 
@@ -667,7 +667,7 @@ class AptlyWorker:
                 mirror.buildvariants[0].base_mirror.name,
                 mirror.project.name,
                 mirror.name,
-                mirror.mirror_components,
+                mirror.mirror_components.split(","),
             )
         except NotFoundError as exc:
             await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
@@ -763,6 +763,62 @@ class AptlyWorker:
         aptly = get_aptly_connection()
         await aptly.cleanup()
 
+    async def _delete_mirror(self, args, session):
+        mirror_id = args[0]
+        mirror = session.query(ProjectVersion).filter(ProjectVersion.id == mirror_id).first()
+        if not mirror:
+            logger.error("aptly worker: mirror with id %d not found", mirror_id)
+            return
+
+        aptly = get_aptly_connection()
+
+        base_mirror = ""
+        base_mirror_version = ""
+        if not mirror.project.is_basemirror:
+            basemirror = mirror.buildvariants[0].base_mirror
+            base_mirror = basemirror.project.name
+            base_mirror_version = basemirror.name
+            # FIXME: cleanup chroot table, schroots, debootstrap,
+
+        try:
+            # FIXME: use altpy queue !
+            await aptly.mirror_delete(base_mirror, base_mirror_version, mirror.project.name,
+                                      mirror.name, mirror.mirror_distribution, mirror.mirror_components.split(","))
+        except Exception as exc:
+            # mirror did not exist
+            # FIXME: handle mirror has snapshots and cannot be deleted?
+            logger.exception(exc)
+            pass
+
+        project = mirror.project
+
+        bvs = session.query(BuildVariant).filter(BuildVariant.base_mirror_id == mirror.id).all()
+        for bvariant in bvs:
+            # FIXME: delete buildconfigurations
+            if mirror.project.is_basemirror:
+                chroot = session.query(Chroot).filter(Chroot.buildvariant == bvariant).first()
+                if chroot:
+                    session.delete(chroot)
+            session.delete(bvariant)
+
+        builds = session.query(Build) .filter(Build.projectversion_id == mirror.id).all()
+        for build in builds:
+            # FIXME: delete buildconfigurations
+            # FIXME: remove buildout dir
+            session.delete(build)
+
+        mirrorkey = session.query(MirrorKey) .filter(MirrorKey.projectversion_id == mirror.id).first()
+        if mirrorkey:
+            session.delete(mirrorkey)
+
+        session.delete(mirror)
+        session.commit()
+
+        if not project.projectversions:
+            session.delete(project)
+
+        session.commit()
+
     async def run(self):
         """
         Run the worker task.
@@ -821,6 +877,12 @@ class AptlyWorker:
                         if args:
                             handled = True
                             await self._init_repository(args, session)
+
+                    if not handled:
+                        args = task.get("delete_mirror")
+                        if args:
+                            handled = True
+                            await self._delete_mirror(args, session)
 
                     if not handled:
                         args = task.get("cleanup")

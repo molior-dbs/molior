@@ -198,6 +198,9 @@ async def edit_mirror(request):
     if not mirrorkey:
         return ErrorResponse(400, "Mirror not found")
 
+    if mirror.is_locked:
+        return ErrorResponse(400, "Mirror is locked")
+
     mirrortype       = params.get("mirrortype")        # noqa: E221
     basemirror       = params.get("basemirror")        # noqa: E221
     mirrorurl        = params.get("mirrorurl")         # noqa: E221
@@ -237,7 +240,7 @@ async def edit_mirror(request):
 
     request.cirrina.db_session.commit()
 
-    if mirror.mirror_state == "new":
+    if mirror.mirror_state == "init_error":
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}

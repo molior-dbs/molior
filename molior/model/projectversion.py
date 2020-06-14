@@ -15,7 +15,7 @@ from .projectversiondependency import ProjectVersionDependency
 from .proverbuivar import ProVerBuiVar
 from .database import Base
 
-MIRROR_STATES = ["new", "created", "updating", "publishing", "error", "ready"]
+MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
 
 
 class ProjectVersion(Base):
