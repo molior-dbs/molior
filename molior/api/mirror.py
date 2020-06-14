@@ -2,12 +2,14 @@ from aiohttp import web
 
 from molior.app import app, logger
 from molior.auth import req_admin
-from molior.model.build import Build
-from molior.model.chroot import Chroot
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.model.buildvariant import BuildVariant
 from molior.tools import get_aptly_connection, paginate
+
+from ..model.build import Build
+from ..model.chroot import Chroot
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion
+from ..model.buildvariant import BuildVariant
+from ..model.mirrorkey import MirrorKey
 
 
 def error(status, msg, *args):
@@ -230,11 +232,24 @@ async def get_mirrors(request):
 
     for mirror in results:
         apt_url = mirror.get_apt_repo(url_only=True)
-        base_mirror_url = str()
+        base_mirror_url = ""
+        base_mirror_id = -1
+        base_mirror_name = ""
+        mirrorkeyurl = ""
+        mirrorkeyids = ""
+        mirrorkeyserver = ""
+
         if not mirror.project.is_basemirror and mirror.buildvariants:
             # FIXME: only one buildvariant supported
             base_mirror = mirror.buildvariants[0].base_mirror
+            base_mirror_id = base_mirror.id
             base_mirror_url = base_mirror.get_apt_repo(url_only=True)
+            base_mirror_name = "{}/{}".format(base_mirror.project.name, base_mirror.name)
+            mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
+            if mirrorkey:
+                mirrorkeyurl = mirrorkey.keyurl
+                mirrorkeyids = mirrorkey.keyids[1:-1]
+                mirrorkeyserver = mirrorkey.keyserver
 
         data["results"].append(
             {
@@ -242,7 +257,9 @@ async def get_mirrors(request):
                 "name": mirror.project.name,
                 "version": mirror.name,
                 "url": mirror.mirror_url,
-                "base_mirror": base_mirror_url,
+                "basemirror_id": base_mirror_id,
+                "basemirror_url": base_mirror_url,
+                "basemirror_name": base_mirror_name,
                 "distribution": mirror.mirror_distribution,
                 "components": mirror.mirror_components,
                 "is_basemirror": mirror.project.is_basemirror,
@@ -253,6 +270,9 @@ async def get_mirrors(request):
                 "project_id": mirror.project.id,
                 "state": mirror.mirror_state,
                 "apt_url": apt_url,
+                "mirrorkeyurl": mirrorkeyurl,
+                "mirrorkeyids": mirrorkeyids,
+                "mirrorkeyserver": mirrorkeyserver
             }
         )
     return web.json_response(data)
@@ -361,7 +381,7 @@ async def delete_mirror(request):
     apt = get_aptly_connection()
     mirror_id = request.match_info["id"]
 
-    query = request.cirrina.db_session.query(ProjectVersion)  # pylint: disable=no-member
+    query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
     query = query.filter(Project.is_mirror.is_(True))
     entry = query.filter(ProjectVersion.id == mirror_id).first()
@@ -424,13 +444,14 @@ async def delete_mirror(request):
     request.cirrina.db_session.commit()
 
     if not project.projectversions:
-        request.cirrina.db_session.delete(project)  # pylint: disable=no-member
+        request.cirrina.db_session.delete(project)
 
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
 
     return web.Response(status=200, text="Successfully deleted mirror: {}".format(mirrorname))
 
 
+@app.http_post("/api/mirror/{id}/update")
 @app.http_put("/api/mirror/{id}")
 @req_admin
 # FIXME: req_role
@@ -463,7 +484,7 @@ async def put_update_mirror(request):
     mirror_id = request.match_info["id"]
     project_v = (
         request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == mirror_id)  # pylint: disable=no-member
+        .filter(ProjectVersion.id == mirror_id)
         .first()
     )
 
@@ -473,36 +494,7 @@ async def put_update_mirror(request):
     if project_v.mirror_state != "error":
         return error(400, "Mirror not in error state.")
 
-    components = project_v.mirror_components.split(",")
-
-    # FIXME: only one build variant supported
-    base_mirror = None
-    base_mirror_version = None
-    if not project_v.project.is_basemirror:
-        base_mirror = project_v.buildvariants[0].base_mirror.project.name
-        base_mirror_version = project_v.buildvariants[0].base_mirror.name
-
-    build = (
-        request.cirrina.db_session.query(Build)
-        .filter(Build.buildtype == "mirror", Build.projectversion_id == project_v.id)
-        .first()
-    )
-
-    if not build:
-        logger.error("update mirror: no build found for mirror %d", mirror_id)
-        return error(400, "no build found for mirror")
-
-    args = {
-        "update_mirror": [
-            build.id,
-            project_v.id,
-            base_mirror,
-            base_mirror_version,
-            project_v.project.name,
-            project_v.name,
-            components,
-        ]
-    }
+    args = {"update_mirror": [project_v.id]}
     await request.cirrina.aptly_queue.put(args)
 
     return web.Response(status=200, text="Successfully started update on mirror")

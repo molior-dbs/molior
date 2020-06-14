@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE mirrorkey OWNER TO molior;
+ALTER TYPE mirror_stateenum ADD VALUE 'new' AFTER 'undefined';
+
+EOF
