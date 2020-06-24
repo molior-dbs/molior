@@ -49,7 +49,7 @@ async def authenticate(request, user, passwd):
         return False
     user = user.lower()  # FIXME: move to cirrina
     if user == "admin":
-        logger.info("admin account from LDAP not allowed")
+        logger.error("admin account not allowed via auth plugin")
         return False
 
     return Auth().login(user, passwd)
