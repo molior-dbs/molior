@@ -1,6 +1,7 @@
 import shutil
 import shlex
 import operator
+import os
 
 from launchy import Launchy
 from datetime import datetime
@@ -19,7 +20,9 @@ async def run_git(cmd, cwd, build_id):
     async def outh(line):
         await write_log(build_id, "%s\n" % line)
 
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd)
+    env = os.environ.copy()
+    env["GIT_SSL_NO_VERIFY"] = ""
+    process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd, env=env)
     await process.launch()
     return await process.wait()
 
@@ -86,7 +89,7 @@ async def GitCheckout(src_repo_path, git_ref, build_id):
                     "git clean -dffx",
                     "git checkout --force {}".format(git_ref),
                     "git submodule sync --recursive",
-                    "git submodule update --init --recursive",
+                    "git submodule update --init --recursive", # add GIT_SSL_NO_VERIFY= to env
                     "git clean -dffx",
                     "git lfs pull"]
 
