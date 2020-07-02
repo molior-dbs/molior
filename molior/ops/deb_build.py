@@ -129,7 +129,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await write_log(parent_build_id, "E: the repository is not added to any projectversions from debian/molior.yml\n")
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
             repo.set_ready()
-            await parent.set_failed()
+            await parent.set_nothing_done()
             session.commit()
             return
 
@@ -200,7 +200,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await write_log(parent_build_id, "E: source package already built for version {}\n".format(info.version))
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
             repo.set_ready()
-            await parent.set_successful()
+            await parent.set_already_exists()
             session.commit()
             args = {"schedule": []}
             await task_queue.put(args)

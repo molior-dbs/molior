@@ -21,6 +21,8 @@ BUILD_STATES = [
     "publishing",
     "publish_failed",
     "successful",
+    "already_exists",
+    "nothing_done",
 ]
 
 BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror"]
@@ -174,6 +176,18 @@ class Build(Base):
             if all_ok:
                 await self.parent.parent.set_successful()
                 await write_log_title(self.parent.parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+
+    async def set_already_exists(self):
+        self.log_state("version already exists")
+        self.buildstate = "already_exists"
+        self.endstamp = get_local_tz().localize(datetime.now(), is_dst=None)
+        await self.build_changed()
+
+    async def set_nothing_done(self):
+        self.log_state("nothing do to")
+        self.buildstate = "nothing_done"
+        self.endstamp = get_local_tz().localize(datetime.now(), is_dst=None)
+        await self.build_changed()
 
     def can_rebuild(self, web_session, db_session):
         """
