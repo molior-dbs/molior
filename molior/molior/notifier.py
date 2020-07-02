@@ -32,6 +32,7 @@ class Event(Enum):
     changed = 2
     removed = 3
     connected = 4
+    done = 5
 
 
 class Action(Enum):
