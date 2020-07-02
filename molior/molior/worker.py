@@ -12,6 +12,31 @@ from ..model.chroot import Chroot
 from ..model.sourcerepository import SourceRepository
 
 
+async def cleanup_builds():
+    """
+    Cleanup existing builds on startup
+    """
+
+    cleaned_up = False
+    with Session() as session:
+        builds = session.query(Build).filter(Build.buildtype != "build", Build.buildstate == "building").all()
+        for build in builds:
+            await build.set_failed()
+            if build.buildtask:
+                session.delete(build.buildtask)
+            cleaned_up = True
+
+        builds = session.query(Build).filter(Build.buildtype != "build", Build.buildstate == "publishing").all()
+        for build in builds:
+            await build.set_publish_failed()
+            if build.buildtask:
+                session.delete(build.buildtask)
+            cleaned_up = True
+
+        if cleaned_up:
+            session.commit()
+
+
 class Worker:
     """
     Source Packaging worker task
@@ -214,6 +239,11 @@ class Worker:
         """
         Run the worker task.
         """
+
+        try:
+            await cleanup_builds()
+        except Exception as exc:
+            logger.exception(exc)
 
         while True:
             session = None
