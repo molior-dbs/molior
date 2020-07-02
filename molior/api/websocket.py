@@ -35,16 +35,10 @@ class BuildLogger:
             build = session.query(Build).filter(Build.id == self.build_id).first()
             if not build:
                 logger.error("build: build %d not found", self.build_id)
-                message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
-                await self.__sender(json.dumps(message))
-                self.stop()
                 return True
             if build.buildstate == "build_failed" or \
                build.buildstate == "publish_failed" or \
                build.buildstate == "successful":
-                message = {"subject": Subject.buildlog.value, "event": Event.removed.value}
-                await self.__sender(json.dumps(message))
-                self.stop()
                 return True
         return False
 
@@ -61,6 +55,7 @@ class BuildLogger:
                     retries = 0
                     while self.__up:
                         async for data in reader:
+                            logger.info("sending")
                             message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": str(data, 'utf-8')}
                             await self.__sender(json.dumps(message))
 
@@ -68,10 +63,10 @@ class BuildLogger:
                         if retries % 100 == 0:
                             retries = 0
                             if self.check_abort():
-                                continue  # self.__up will be falsem drop out of for loops
-                        await asyncio.sleep(.1)
+                                self.stop()
+                                break
                         retries += 1
-                        continue
+                        await asyncio.sleep(.1)
             except FileNotFoundError:
                 await asyncio.sleep(1)
                 self.check_abort()
@@ -79,6 +74,9 @@ class BuildLogger:
                 logger.error("buildlogger: error sending buildlogs")
                 logger.exception(exc)
                 self.stop()
+
+        message = {"subject": Subject.buildlog.value, "event": Event.done.value}
+        await self.__sender(json.dumps(message))
 
 
 async def start_buildlogger(ws, data):
