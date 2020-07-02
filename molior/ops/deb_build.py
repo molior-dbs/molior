@@ -32,6 +32,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     version = await get_changelog_attr("Version", repo_path)
     repo_path = Path(repo_path)
 
+    # FIXME: use global var
     key = Configuration().debsign_gpg_email
     if not key:
         await write_log(build_id, "E: Signing key not defined in configuration\n")
@@ -336,7 +337,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         if not found:
             await write_log(parent_build_id, "E: no projectversion found to build for")
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-            await parent.set_successful()
+            await parent.set_nothing_done()
             session.commit()
             return
 
