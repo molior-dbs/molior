@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TYPE buildstate_enum ADD VALUE 'already_exists';
+ALTER TYPE buildstate_enum ADD VALUE 'nothing_done';
+
+EOF
