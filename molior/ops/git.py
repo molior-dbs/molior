@@ -38,7 +38,7 @@ async def GitClone(build_id, repo_id, task_queue):
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("BuildProcess: build %d not found", build_id)
+            logger.error("Git Clone: build %d not found", build_id)
             return
 
         repo.set_busy()

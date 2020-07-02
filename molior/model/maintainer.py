@@ -8,14 +8,14 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from .database import Base
 
 
-class Maintainer(Base):  # pylint: disable=too-few-public-methods
+class Maintainer(Base):
     """
     Database model for a maintainer.
     """
 
     __tablename__ = "maintainer"
 
-    id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    id = Column(Integer, primary_key=True)
     firstname = Column(String)
     surname = Column(String)
     email = Column(String)
@@ -26,12 +26,10 @@ class Maintainer(Base):  # pylint: disable=too-few-public-methods
         Returns the full name of the maintainer. Combined
         of firstname and surname
         """
-        return "{firstname} {surname}".format(
-            firstname=self.firstname, surname=self.surname
-        )
+        return "{} {}".format(self.firstname, self.surname)
 
     @fullname.expression
-    def fullname(cls):  # pylint: disable=no-self-argument
+    def fullname(cls):
         """
         Returns the full name of the maintainer. Combined
         of firstname and surname
