@@ -46,10 +46,19 @@ async def get_repositories2(request):
     """
     db = request.cirrina.db_session
     url = request.GET.getone("url", "")
+    exclude_projectversion_id = request.GET.getone("exclude_projectversion_id", "")
+    try:
+        exclude_projectversion_id = int(exclude_projectversion_id)
+    except Exception:
+        exclude_projectversion_id = -1
+
     repositories = db.query(SourceRepository)
 
     if url:
         repositories = repositories.filter(SourceRepository.url.like("%{}%".format(url)))
+
+    if exclude_projectversion_id != -1:
+        repositories = repositories.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
 
     count = repositories.count()
     repositories = repositories.order_by(SourceRepository.name)
