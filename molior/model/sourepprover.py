@@ -1,20 +1,13 @@
-"""
-This module provides the molior Source Repository Project Version
-relation table.
-"""
-
-from sqlalchemy import Column, Integer, ForeignKey, Table, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Table, UniqueConstraint
 from .database import Base
 
-SouRepProVer = Table(  # pylint: disable=invalid-name
+SouRepProVer = Table(
     "sourcerepositoryprojectversion",
     Base.metadata,
     Column("id", Integer, primary_key=True),
     Column("sourcerepository_id", Integer, ForeignKey("sourcerepository.id")),
     Column("projectversion_id", Integer, ForeignKey("projectversion.id")),
-    UniqueConstraint(
-        "sourcerepository_id",
-        "projectversion_id",
-        name="unique_sourcerepositoryprojectversion",
-    ),
+    UniqueConstraint("sourcerepository_id", "projectversion_id",
+                     name="unique_sourcerepositoryprojectversion"),
+    Column("architectures", String)
 )

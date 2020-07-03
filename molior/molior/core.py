@@ -144,7 +144,7 @@ def get_targets(plain_targets, repo, session):
 
     if project_version:
         return (
-            session.query(SouRepProVer)  # pylint: disable=no-member
+            session.query(SouRepProVer)
             .join(ProjectVersion)
             .join(Project)
             .filter(SouRepProVer.c.sourcerepository_id == repo.id)
@@ -156,7 +156,7 @@ def get_targets(plain_targets, repo, session):
     for target in plain_targets:
         project, project_version = target
         targets += (
-            session.query(SouRepProVer)  # pylint: disable=no-member
+            session.query(SouRepProVer)
             .join(ProjectVersion)
             .join(Project)
             .filter(SouRepProVer.c.sourcerepository_id == repo.id)
