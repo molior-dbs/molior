@@ -571,7 +571,7 @@ async def rebuild_build(request):
 
     args = {"rebuild": [build_id]}
     await request.cirrina.task_queue.put(args)
-    return web.Response(status=200, text="Rebuild triggered")
+    return web.json_response("Rebuild triggered")
 
 
 @app.http_post("/api/build")

@@ -30,7 +30,7 @@ class BuildLogger:
         logger.debug("build-{}: stopping buildlogger".format(self.build_id))
         self.__up = False
 
-    async def check_abort(self):
+    def check_abort(self):
         with Session() as session:
             build = session.query(Build).filter(Build.id == self.build_id).first()
             if not build:
@@ -38,7 +38,9 @@ class BuildLogger:
                 return True
             if build.buildstate == "build_failed" or \
                build.buildstate == "publish_failed" or \
-               build.buildstate == "successful":
+               build.buildstate == "successful" or \
+               build.buildstate == "already_exists" or \
+               build.buildstate == "nothing_done":
                 return True
         return False
 
@@ -55,7 +57,6 @@ class BuildLogger:
                     retries = 0
                     while self.__up:
                         async for data in reader:
-                            logger.info("sending")
                             message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": str(data, 'utf-8')}
                             await self.__sender(json.dumps(message))
 
@@ -116,7 +117,7 @@ async def websocket_connected(ws):
     Sends a 'connected' message to the websocket client on connect.
     """
     await ws.send_str(json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value}))
-    logger.info("websocket: new connection from user %s", ws.cirrina.web_session.get("username"))
+    logger.debug("websocket: new connection from user %s", ws.cirrina.web_session.get("username"))
 
 
 @app.websocket_message("/api/websocket")
