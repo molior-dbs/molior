@@ -21,14 +21,10 @@ REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
 DEFAULT_CWD = "/var/lib/molior"
 
 
-class SourceRepository(Base):  # pylint: disable=too-few-public-methods
-    """
-    Database model for a SourceRepository.
-    """
-
+class SourceRepository(Base):
     __tablename__ = "sourcerepository"
 
-    id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    id = Column(Integer, primary_key=True)
     url = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
     projectversions = relationship("ProjectVersion", secondary=SouRepProVer)

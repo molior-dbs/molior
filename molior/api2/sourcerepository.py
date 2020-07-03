@@ -18,7 +18,7 @@ from molior.model.architecture import Architecture
 from molior.tools import ErrorResponse, paginate
 
 # FIXME: move to tools/model:
-from ..api.sourcerepository import get_last_gitref, get_architectures
+from ..api.sourcerepository import get_last_gitref
 
 
 @app.http_get("/api2/repositories")
@@ -134,8 +134,10 @@ async def get_projectversion_repositories(request):
     if not projectversion:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_id))
 
-    query = db.query(SourceRepository)
+    query = db.query(SourceRepository, SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == SourceRepository.id,
+                                                            SouRepProVer.c.projectversion_id == projectversion.id)
     query = query.filter(SourceRepository.projectversions.any(id=projectversion.id))
+
     if filter_url:
         query = query.filter(SourceRepository.url.like("%{}%".format(filter_url)))
 
@@ -154,11 +156,9 @@ async def get_projectversion_repositories(request):
             "last_gitref": get_last_gitref(
                     db, item, projectversion
             ),
-            "architectures": get_architectures(
-                db, item, projectversion
-            ),
+            "architectures": arch[1:-1].split(",")
         }
-        for item in results
+        for item, _, _, _, arch in results
     ]
     return web.json_response(data)
 
