@@ -1,18 +1,12 @@
-import uuid
-
 from aiohttp import web
 
 from molior.app import app, logger
 from molior.auth import req_role
 from molior.model.projectversion import ProjectVersion, get_projectversion_deps
 from molior.model.project import Project
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.buildvariant import BuildVariant
 from molior.model.sourcerepository import SourceRepository
 from molior.model.sourepprover import SouRepProVer
-from molior.model.buildconfiguration import BuildConfiguration
-from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid
+from molior.tools import ErrorResponse, parse_int, is_name_valid
 
 
 def get_projectversion_deps_manually(projectversion, to_dict=True):
@@ -76,8 +70,8 @@ def projectversion_to_dict(projectversion):
             "name": projectversion.project.name,
             "description": projectversion.project.description,
         },
-        "basemirror": projectversion.buildvariants[0].base_mirror.fullname,
-        "architectures": [b.architecture.name for b in projectversion.buildvariants],
+        "basemirror": projectversion.basemirror.fullname,
+        "architectures": projectversion.mirror_architectures[1:-1].split(","),
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
     }
@@ -153,22 +147,16 @@ async def get_projectversions(request):
         query = query.filter(Project.name == project_name)
 
     if basemirror_id:
-        query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
+        query = query.filter(ProjectVersion.base_mirror_id == basemirror_id)
     elif is_basemirror:
-        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
+        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
 
     if dependant_id:
         logger.info("dependant_id")
-        p_version = (
-            request.cirrina.db_session.query(
-                ProjectVersion
-            )  # pylint: disable=no-member
-            .filter(ProjectVersion.id == dependant_id)
-            .first()
-        )
+        p_version = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == dependant_id).first()
         projectversions = []
         if p_version:
-            projectversions = [p_version.buildvariants[0].base_mirror]
+            projectversions = [p_version.basemirror]
         nb_projectversions = len(projectversions)
     else:
         query = query.order_by(Project.name, ProjectVersion.name)
@@ -234,8 +222,8 @@ async def get_projectversion(request):
     projectversion_dict["dependencies"] = get_projectversion_deps_manually(projectversion)
 
     projectversion_dict["basemirror_url"] = str()
-    if projectversion.buildvariants:
-        projectversion_dict["basemirror_url"] = projectversion.buildvariants[0].base_mirror.get_apt_repo()
+    if projectversion.basemirror:
+        projectversion_dict["basemirror_url"] = projectversion.basemirror.get_apt_repo()
 
     return web.json_response(projectversion_dict)
 
@@ -312,21 +300,18 @@ async def create_projectversions(request):
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-        .filter(ProjectVersion.name == name)
-        .filter(Project.id == project.id)
-        .first()
-    )
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.name == name,
+                                                                             Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion already exists. {}".format(
                 "And is marked as deleted!" if projectversion.is_deleted else ""))
 
-    buildvariants = get_buildvariants(request.cirrina.db_session, basemirror_name, basemirror_version, architectures)
+    basemirror = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.parent.name == basemirror_name,
+                                                                         ProjectVersion.name == basemirror_version).first()
+    if not basemirror:
+        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion = ProjectVersion(name=name, project=project)
-    projectversion.buildvariants = buildvariants
+    projectversion = ProjectVersion(name=name, project=project, architectures=architectures, basemirror=basemirror)
     request.cirrina.db_session.add(projectversion)
     request.cirrina.db_session.commit()
 
@@ -389,118 +374,7 @@ async def post_add_repository(request):
         "400":
             description: Invalid data received.
     """
-    params = await request.json()
-
-    projectversion_id = request.match_info["projectversion_id"]
-    sourcerepository_id = request.match_info["sourcerepository_id"]
-    buildvariants = params.get("buildvariants", [])
-
-    if not buildvariants:
-        return ErrorResponse(400, "No buildvariants recieved.")
-
-    projectversion_id = parse_int(projectversion_id)
-
-    project_v = (
-        request.cirrina.db_session.query(ProjectVersion)  # pylint: disable=no-member
-        .filter(ProjectVersion.id == projectversion_id)
-        .first()
-    )
-
-    if not project_v:
-        return ErrorResponse(400, "Invalid data received.")
-
-    parsed_id = parse_int(sourcerepository_id)
-    if not parsed_id:
-        return ErrorResponse(400, "Invalid data received.")
-
-    src_repo = (
-        request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
-        .filter(SourceRepository.id == parsed_id)
-        .first()
-    )
-    if src_repo not in project_v.sourcerepositories:
-        project_v.sourcerepositories.append(src_repo)
-        request.cirrina.db_session.commit()
-
-    sourepprover_id = (
-        (
-            request.cirrina.db_session.query(SouRepProVer)  # pylint: disable=no-member
-            .filter(SouRepProVer.c.sourcerepository_id == src_repo.id)
-            .filter(SouRepProVer.c.projectversion_id == project_v.id)
-        )
-        .first()
-        .id
-    )
-
-    for buildvariant in buildvariants:
-        # if just the buildvariant id is given
-        if buildvariant.get("id"):
-            buildvar_id = parse_int(buildvariant.get("id"))
-            buildvar = (
-                request.cirrina.db_session.query(
-                    BuildVariant
-                )  # pylint: disable=no-member
-                .filter(BuildVariant.id == buildvar_id)
-                .first()
-            )
-        # if basemirror and architecture is given
-        elif buildvariant.get("architecture_id") and buildvariant.get("base_mirror_id"):
-            arch_id = parse_int(buildvariant.get("architecture_id"))
-            base_mirror_id = parse_int(buildvariant.get("base_mirror_id"))
-            buildvar = (
-                request.cirrina.db_session.query(BuildVariant)
-                .filter(
-                    BuildVariant.architecture_id == arch_id
-                )  # pylint: disable=no-member
-                .filter(BuildVariant.base_mirror_id == base_mirror_id)
-                .first()
-            )
-        else:
-            return ErrorResponse(400, "Invalid buildvariants received.")
-
-        buildconf = BuildConfiguration(
-            buildvariant=buildvar, sourcerepositoryprojectversion_id=sourepprover_id
-        )
-        request.cirrina.db_session.add(buildconf)
-
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
-
-    logger.info(
-        "SourceRepository '%s' with id '%s' added to ProjectVersion '%s/%s'",
-        src_repo.url,
-        src_repo.id,
-        project_v.project.name,
-        project_v.name,
-    )
-
-    if src_repo.state == "new":
-        build = Build(
-            version=None,
-            git_ref=None,
-            ci_branch=None,
-            is_ci=None,
-            versiontimestamp=None,
-            sourcename=src_repo.name,
-            buildstate="new",
-            buildtype="build",
-            buildconfiguration=None,
-            sourcerepository=src_repo,
-            maintainer=None,
-        )
-
-        request.cirrina.db_session.add(build)
-        request.cirrina.db_session.commit()
-        await build.build_added()
-
-        token = uuid.uuid4()
-        buildtask = BuildTask(build=build, task_id=str(token))
-        request.cirrina.db_session.add(buildtask)
-        request.cirrina.db_session.commit()
-
-        args = {"clone": [build.id, src_repo.id]}
-        await request.cirrina.task_queue.put(args)
-
-    return web.Response(status=200, text="SourceRepository added.")
+    return ErrorResponse(400, "API obsolete")
 
 
 @app.http_delete("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
@@ -569,19 +443,6 @@ async def delete_repository(request):
     if not sourcerepositoryprojectversion:
         return ErrorResponse(400, "Could not find the sourcerepository for the projectversion")
 
-    buildconfigs = (
-        request.cirrina.db_session.query(BuildConfiguration).filter(
-            BuildConfiguration.sourcerepositoryprojectversion_id
-            == sourcerepositoryprojectversion.id
-        )
-    ).all()
-
-    buildconfig_ids = [b.id for b in buildconfigs]
-    if request.cirrina.db_session.query(Build).filter(Build.buildconfiguration_id.in_(buildconfig_ids)).count() > 0:
-        return ErrorResponse(400, "There are already builds belonging to this repository, cannot delete it")
-
-    request.cirrina.db_session.query(BuildConfiguration).filter(
-            BuildConfiguration.sourcerepositoryprojectversion_id == sourcerepositoryprojectversion.id).delete()
     projectversion.sourcerepositories.remove(sourcerepository)
     request.cirrina.db_session.commit()
 
@@ -636,83 +497,44 @@ async def clone_projectversion(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)
-        .first()
-    )
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
 
-    if (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-        .filter(ProjectVersion.name == name)
-        .filter(Project.id == projectversion.project_id)
-        .first()
-    ):
+    if request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+            ProjectVersion.name == name,
+            Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
-    # remove association from database
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
         dependencies=projectversion.dependencies,
-        buildvariants=projectversion.buildvariants,
+        mirror_architectures=projectversion.mirror_architectures,
+        basemirror_id=projectversion.basemirror_id,
         sourcerepositories=projectversion.sourcerepositories,
         ci_builds_enabled=projectversion.ci_builds_enabled,
     )
 
     for repo in new_projectversion.sourcerepositories:
-        sourepprover_id = (
-            (
-                request.cirrina.db_session.query(
-                    SouRepProVer
-                )  # pylint: disable=no-member
-                .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-                .filter(SouRepProVer.c.projectversion_id == projectversion.id)
-            )
-            .first()
-            .id
-        )
-        new_sourepprover_id = (
-            (
-                request.cirrina.db_session.query(
-                    SouRepProVer
-                )  # pylint: disable=no-member
-                .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-                .filter(SouRepProVer.c.projectversion_id == new_projectversion.id)
-            )
-            .first()
-            .id
-        )
-        buildconfs = (
-            request.cirrina.db_session.query(BuildConfiguration)
-            .filter(
-                BuildConfiguration.sourcerepositoryprojectversion_id == sourepprover_id
-            )
-            .all()
-        )
-        for buildconf in buildconfs:
-            new_buildconf = BuildConfiguration(
-                buildvariant=buildconf.buildvariant,
-                sourcerepositoryprojectversion_id=new_sourepprover_id,
-            )
-            request.cirrina.db_session.add(new_buildconf)
+        sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
+                SouRepProVer.c.sourcerepository_id == repo.id,
+                SouRepProVer.c.projectversion_id == projectversion.id).first()
+        new_sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
+                SouRepProVer.c.sourcerepository_id == repo.id,
+                SouRepProVer.c.projectversion_id == new_projectversion.id).first()
+        new_sourepprover.architectures = sourepprover.architectures
 
     request.cirrina.db_session.add(new_projectversion)
     request.cirrina.db_session.commit()
-
-    basemirror = new_projectversion.buildvariants[0].base_mirror
-    architectures = [b.architecture.name for b in new_projectversion.buildvariants]
 
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
                 new_projectversion.id,
-                basemirror.project.name,
-                basemirror.name,
+                new_projectversion.basemirror.project.name,
+                new_projectversion.basemirror.name,
                 new_projectversion.project.name,
                 new_projectversion.name,
-                architectures,
+                new_projectversion.architectures[1:-1].split(","),
             ]
         }
     )
@@ -790,14 +612,15 @@ async def create_projectversion_overlay(request):
         project=projectversion.project,
         # add the projectversion where the overlay is created from as a dependency
         dependencies=[projectversion],
-        buildvariants=projectversion.buildvariants,
+        architectures=projectversion.architectures,
+        basemirror=projectversion.basemirror
     )
 
     request.cirrina.db_session.add(overlay_projectversion)
     request.cirrina.db_session.commit()
 
-    basemirror = overlay_projectversion.buildvariants[0].base_mirror
-    architectures = [b.architecture.name for b in overlay_projectversion.buildvariants]
+    basemirror = overlay_projectversion.basemirror
+    architectures = overlay_projectversion.architectures[1:-1].split(",")
 
     await request.cirrina.aptly_queue.put(
         {
@@ -996,9 +819,8 @@ async def mark_delete_projectversion(request):
                                  "Projectversions '{}' are still depending on this version, you can not delete it!".format(
                                   ", ".join(blocking_dependants)))
 
-    base_mirror = projectversion.buildvariants[0].base_mirror
-    base_mirror_name = base_mirror.project.name
-    base_mirror_version = base_mirror.name
+    base_mirror_name = projectversion.basemirror.project.name
+    base_mirror_version = projectversion.basemirror.name
 
     args = {
         "drop_publish": [

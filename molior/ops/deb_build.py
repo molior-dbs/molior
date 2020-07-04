@@ -17,10 +17,8 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.maintainer import Maintainer
 from ..model.chroot import Chroot
-from ..model.buildvariant import BuildVariant
-from ..model.architecture import Architecture
 from ..model.projectversion import ProjectVersion
-from ..molior.core import get_target_arch, get_targets, get_buildconfigs, get_buildorder, get_apt_repos
+from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
 from ..molior.worker_backend import backend_queue
 from .git import GitCheckout, GetBuildInfo
@@ -241,7 +239,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             sourcename=info.sourcename,
             buildstate="new",
             buildtype="source",
-            buildconfiguration=None,
             parent_id=parent_build_id,
             sourcerepository=repo,
             maintainer=maintainer,
@@ -267,72 +264,74 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             session.commit()
 
         projectversion_ids = []
-        build_configs = get_buildconfigs(targets, session)
         found = False
-        for build_config in build_configs:
-            # FIXME: filter for buildtype?
-            deb_build = session.query(Build).filter(
-                            Build.buildconfiguration == build_config,
-                            Build.versiontimestamp == info.tag_stamp,
-                            Build.version == info.version).first()
-            if deb_build:
-                logger.warning("already built %s", repo.name)
-                await write_log(parent_build_id, "E: already built {}\n".format(repo.name))
-                continue
-
-            # FIXME: why projectversion[0] ??
-            if build_config.projectversions[0].is_locked:
+        for target in targets:
+            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == target.projectversion_id).first()
+            if projectversion.is_locked:
                 repo.log_state("build to locked projectversion '%s-%s' not permitted" % (
-                        build_config.projectversions[0].project.name,
-                        build_config.projectversions[0].name,
+                        projectversion.project.name,
+                        projectversion.name,
                     ))
                 await write_log(parent_build_id, "W: build to locked projectversion '%s-%s' not permitted\n" % (
-                        build_config.projectversions[0].project.name,
-                        build_config.projectversions[0].name,
+                        projectversion.project.name,
+                        projectversion.name,
                     ))
                 continue
 
-            if is_ci and not build_config.projectversions[0].ci_builds_enabled:
+            if is_ci and not projectversion.ci_builds_enabled:
                 repo.log_state("CI builds not enabled in projectversion '%s-%s'" % (
-                        build_config.projectversions[0].project.name,
-                        build_config.projectversions[0].name,
+                        projectversion.project.name,
+                        projectversion.name,
                     ))
                 await write_log(parent_build_id, "W: CI builds not enabled in projectversion '%s-%s'\n" % (
-                        build_config.projectversions[0].project.name,
-                        build_config.projectversions[0].name,
+                        projectversion.project.name,
+                        projectversion.name,
                     ))
                 continue
 
-            projectversion_ids.extend([projectversion.id for projectversion in build_config.projectversions])
-            found = True
+            projectversion_ids.append(projectversion.id)
 
-            await write_log(parent_build_id, "I: creating build for projectversion '%s/%s'\n" % (
-                    build_config.projectversions[0].project.name,
-                    build_config.projectversions[0].name,
-                ))
+            architectures = target.architectures[1:-1].split(",")
+            for architecture in architectures:
+                deb_build = session.query(Build).filter(
+                                Build.projectversion == projectversion,
+                                Build.versiontimestamp == info.tag_stamp,
+                                Build.version == info.version,
+                                Build.buildtype == "deb",
+                                Build.architecture == architecture).first()
+                if deb_build:
+                    logger.warning("already built %s", repo.name)
+                    await write_log(parent_build_id, "E: already built {}\n".format(repo.name))
+                    continue
 
-            deb_build = Build(
-                version=info.version,
-                git_ref=info.commit_hash,
-                ci_branch=ci_branch,
-                is_ci=is_ci,
-                versiontimestamp=info.tag_stamp,
-                sourcename=info.sourcename,
-                buildstate="new",
-                buildtype="deb",
-                buildconfiguration=build_config,
-                parent_id=build.id,
-                sourcerepository=repo,
-                maintainer=maintainer,
-                projectversion_id=build_config.projectversions[0].id,
-                architecture=build_config.buildvariant.architecture.name
-            )
+                found = True
 
-            session.add(deb_build)
-            session.commit()
+                await write_log(parent_build_id, "I: creating build for projectversion '%s/%s'\n" % (
+                        projectversion.project.name,
+                        projectversion.name,
+                    ))
 
-            deb_build.log_state("created")
-            await deb_build.build_added()
+                deb_build = Build(
+                    version=info.version,
+                    git_ref=info.commit_hash,
+                    ci_branch=ci_branch,
+                    is_ci=is_ci,
+                    versiontimestamp=info.tag_stamp,
+                    sourcename=info.sourcename,
+                    buildstate="new",
+                    buildtype="deb",
+                    parent_id=build.id,
+                    sourcerepository=repo,
+                    maintainer=maintainer,
+                    projectversion_id=projectversion.id,
+                    architecture=architecture
+                )
+
+                session.add(deb_build)
+                session.commit()
+
+                deb_build.log_state("created")
+                await deb_build.build_added()
 
         if not found:
             await write_log(parent_build_id, "E: no projectversion found to build for")
@@ -340,9 +339,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await parent.set_nothing_done()
             session.commit()
             return
-
-        # make list unique, filter duplicates (multiple archs)
-        projectversion_ids = list(set(projectversion_ids))
 
         build.projectversions = "{" + ",".join([str(p) for p in projectversion_ids]) + "}"
 
@@ -395,21 +391,15 @@ def chroot_ready(build, session):
     Returns:
         bool: True if chroot ready, otherwise False.
     """
-    target_arch = get_target_arch(build, session)
-
-    buildvar = build.buildconfiguration.buildvariant
-    if buildvar.architecture.name == "all":
-        buildvar = (session.query(BuildVariant).join(Architecture)
-                    .filter(BuildVariant.base_mirror == buildvar.base_mirror)
-                    .filter(Architecture.name == target_arch).first())
-
-    chroot = session.query(Chroot).filter(Chroot.buildvariant == buildvar).first()
-    if chroot:
-        if chroot.ready:
-            return True
-
-    build.log_state("chroot not ready")
-    return False
+    target_arch = get_target_arch(build)
+    chroot = session.query(Chroot).filter(Chroot.basemirror_id == build.projectversion.basemirror_id,
+                                          Chroot.architecture == target_arch).first()
+    if not chroot:
+        return False
+    if not chroot.ready:
+        build.log_state("chroot not ready")
+        return False
+    return True
 
 
 async def schedule_build(build, session):
@@ -428,16 +418,14 @@ async def schedule_build(build, session):
     session.add(buildtask)
     session.commit()
 
-    arch = build.buildconfiguration.buildvariant.architecture.name
-    base_mirror_db = build.buildconfiguration.buildvariant.base_mirror
-    distrelease_name = base_mirror_db.project.name
-    distrelease_version = base_mirror_db.name
+    arch = build.architecture
+    distrelease_name = build.projectversion.basemirror.project.name
+    distrelease_version = build.projectversion.basemirror.name
 
-    # FIXME: why [0] ?
-    project_version = build.buildconfiguration.projectversions[0]
+    project_version = build.projectversion
     apt_urls = get_apt_repos(project_version, session, is_ci=build.is_ci)
 
-    arch_any_only = False if arch == get_target_arch(build, session) else True
+    arch_any_only = False if arch == get_target_arch(build) else True
 
     config = Configuration()
     apt_url = config.aptly.get("apt_url")

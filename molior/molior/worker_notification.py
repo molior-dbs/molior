@@ -79,15 +79,15 @@ class NotificationWorker:
             buildres.branch = build.ci_branch
 
             platform = ResultObject()
-            if build.buildconfiguration:
-                platform.distrelease = build.buildconfiguration.buildvariant.base_mirror.project.name
-                platform.version = build.buildconfiguration.buildvariant.base_mirror.name
-                platform.architecture = build.buildconfiguration.buildvariant.architecture.name
+            if build.projectversion.basemirror:
+                platform.distrelease = build.projectversion.basemirror.project.name
+                platform.version = build.projectversion.basemirror.name
+                platform.architecture = build.architecture
 
             project = ResultObject()
-            if build.buildconfiguration:
-                project.name = build.buildconfiguration.projectversions[0].project.name
-                project.version = build.buildconfiguration.projectversions[0].name
+            if build.projectversion:
+                project.name = build.projectversion.project.name
+                project.version = build.projectversion.name
 
             args = {
                 "repository": repository,

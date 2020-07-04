@@ -1,0 +1,21 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE projectversion ADD COLUMN basemirror_id integer REFERENCES projectversion(id);
+
+update projectversion set basemirror_id = (select base_mirror_id from projectversionbuildvariant join buildvariant on (buildvariant.id = buildvariant_id) where projectversion_id = projectversion.id);
+
+update projectversion set mirror_architectures = (select ARRAY( select name::architecture_enum from projectversionbuildvariant join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) where projectversion_id = projectversion.id)) where mirror_architectures = '{}';
+
+update build set projectversion_id = (select projectversion_id from buildconfiguration join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) join sourcerepositoryprojectversion on (sourcerepositoryprojectversion.id = sourcerepositoryprojectversion_id) where buildconfiguration.id = build.buildconfiguration_id) where buildtype = 'deb' and projectversion_id is null;
+
+update build set architecture = (select name from buildconfiguration join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) join sourcerepositoryprojectversion on (sourcerepositoryprojectversion.id = sourcerepositoryprojectversion_id) where buildconfiguration.id = build.buildconfiguration_id) where architecture is null;
+
+ALTER TABLE chroot ADD COLUMN architecture architecture_enum;
+ALTER TABLE chroot ADD COLUMN basemirror_id integer REFERENCES projectversion(id);
+
+update chroot set basemirror_id = (select base_mirror_id from buildvariant where  buildvariant.id = buildvariant_id);
+update chroot set architecture = (select name::architecture_enum from architecture, buildvariant where architecture.id = buildvariant.architecture_id and buildvariant.id = buildvariant_id);
+
+EOF

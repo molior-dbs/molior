@@ -177,6 +177,7 @@ class Worker:
         ok = False
         if build.buildtype == "deb":
             if build.buildstate == "build_failed":
+                ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 logger.info("removing %s", buildout)
                 try:
@@ -190,10 +191,10 @@ class Worker:
 
                 args = {"schedule": []}
                 await self.task_queue.put(args)
-                ok = True
 
         if build.buildtype == "source":
             if build.buildstate == "publish_failed":
+                ok = True
                 await build.set_needs_publish()
                 session.commit()
                 await write_log(build.parent.id, "I: publishing source package\n")
@@ -201,6 +202,7 @@ class Worker:
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
+                ok = True
                 chroot = session.query(Chroot).filter(Chroot.build_id == build_id).first()
                 if not chroot:
                     logger.error("rebuild: chroot not found")
@@ -208,11 +210,11 @@ class Worker:
                     args = {"buildenv": [
                             chroot.id,
                             build_id,
-                            chroot.buildvariant.base_mirror.mirror_distribution,
-                            chroot.buildvariant.base_mirror.project.name,
-                            chroot.buildvariant.base_mirror.name,
-                            chroot.buildvariant.architecture.name,
-                            chroot.buildvariant.base_mirror.mirror_components
+                            chroot.basemirror.mirror_distribution,
+                            chroot.basemirror.project.name,
+                            chroot.basemirror.name,
+                            chroot.architecture,
+                            chroot.basemirror.mirror_components
                             ]}
                     logger.info("queueing {}".format(args))
                     await self.task_queue.put(args)

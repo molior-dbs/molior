@@ -7,13 +7,10 @@ from sqlalchemy.orm import aliased
 
 from molior.app import app, logger
 from molior.model.build import Build, BUILD_STATES, DATETIME_FORMAT
-from molior.model.buildconfiguration import BuildConfiguration
-from molior.model.buildvariant import BuildVariant
 from molior.model.buildtask import BuildTask
 from molior.model.architecture import Architecture
 from molior.model.sourcerepository import SourceRepository
 from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
 from molior.model.maintainer import Maintainer
 from molior.tools import paginate
 
@@ -115,8 +112,8 @@ async def get_builds(request):
             description: internal server error
     """
     custom_filter = request
-    buildvariant = custom_filter.GET.getone("buildvariant", None)
-    buildvariant_id = custom_filter.GET.getone("buildvariant_id", None)
+    # buildvariant = custom_filter.GET.getone("buildvariant", None)
+    # buildvariant_id = custom_filter.GET.getone("buildvariant_id", None)
     architecture = custom_filter.GET.getone("architecture", None)
     distrelease = custom_filter.GET.getone("distrelease", None)
     project = custom_filter.GET.getone("project", None)
@@ -125,17 +122,16 @@ async def get_builds(request):
     sourcerepository_name = custom_filter.GET.getone("sourcerepository", None)
     startstamp = custom_filter.GET.getone("startstamp", None)
     buildstates = custom_filter.GET.getall("buildstate", [])
-    tree = custom_filter.GET.getone("tree", False)
 
     try:
         project_version_id = int(custom_filter.GET.getone("project_version_id"))
     except (ValueError, KeyError):
         project_version_id = None
 
-    try:
-        buildvariant_id = int(custom_filter.GET.getone("buildvariant_id"))
-    except (ValueError, KeyError):
-        buildvariant_id = None
+#    try:
+#        buildvariant_id = int(custom_filter.GET.getone("buildvariant_id"))
+#    except (ValueError, KeyError):
+#        buildvariant_id = None
 
     try:
         project_id = int(custom_filter.GET.getone("project_id"))
@@ -143,9 +139,7 @@ async def get_builds(request):
         project_id = None
 
     try:
-        from_date = datetime.strptime(
-            custom_filter.GET.getone("from"), "%Y-%m-%d %H:%M:%S"
-        )
+        from_date = datetime.strptime(custom_filter.GET.getone("from"), "%Y-%m-%d %H:%M:%S")
     except (ValueError, KeyError):
         from_date = None
 
@@ -160,250 +154,60 @@ async def get_builds(request):
         count_only = False
 
     try:
-        currently_failing = (
-            custom_filter.GET.getone("currently_failing").lower() == "true"
-        )
-    except (ValueError, KeyError):
-        currently_failing = False
-
-    try:
-        currently_failing = (
-            custom_filter.GET.getone("currently_failing").lower() == "true"
-        )
-    except (ValueError, KeyError):
-        currently_failing = False
-
-    try:
         sourcerepository_id = int(custom_filter.GET.getone("sourcerepository_id"))
     except (ValueError, KeyError):
         sourcerepository_id = None
 
-    # Create initial query
-    builds = (
-        request.cirrina.db_session.query(Build)
-        .outerjoin(Build.buildconfiguration)
-        .outerjoin(BuildConfiguration.buildvariant)
-        .outerjoin(BuildVariant.architecture)
-        .outerjoin(BuildVariant.base_mirror)
-        .outerjoin(Build.maintainer)
-    )
-
-    if tree:
-        data = {}
-
-        # FIXME: filter projectversion
-        query = """
-WITH RECURSIVE descendants AS (
-    SELECT id, parent_id, 0 depth
-    FROM build where parent_id is null
-UNION
-    SELECT p.id, p.parent_id, d.depth+ 1
-    FROM build p
-    INNER JOIN descendants d
-    ON p.parent_id = d.id
-)
-SELECT *
-FROM descendants order by id;
-"""
-        result = request.cirrina.db_session.execute(
-            query, {"project_version_id": project_version_id}
-        )
-        build_tree_ids = []
-        for row in result:
-            build_tree_ids.append((row[0], row[1], row[2]))
-
-        builds = (
-            request.cirrina.db_session.query(Build)
-            .filter(Build.id.in_([row[0] for row in build_tree_ids]))
-            .outerjoin(Build.buildconfiguration)
-            .outerjoin(BuildConfiguration.buildvariant)
-            .outerjoin(BuildVariant.architecture)
-            .outerjoin(BuildVariant.base_mirror)
-            .outerjoin(Build.maintainer)
-        )
-
-        toplevel = []
-        parents = {}
-        for row in build_tree_ids:
-            build_id = row[0]
-            depth = row[2]
-
-            build = (
-                request.cirrina.db_session.query(Build)
-                .filter(Build.id == build_id)
-                .outerjoin(Build.buildconfiguration)
-                .outerjoin(BuildConfiguration.buildvariant)
-                .outerjoin(BuildVariant.architecture)
-                .outerjoin(BuildVariant.base_mirror)
-                .outerjoin(Build.maintainer)
-                .first()
-            )
-
-            buildjson = build.data()
-            parents[build.id] = buildjson
-
-            if build.parent_id:
-                if build.parent_id in parents:
-                    parent = parents[build.parent_id]
-                    if "childs" not in parent:
-                        parent["childs"] = []
-                    parent["childs"].append(buildjson)
-                else:
-                    logger.info("build tree: parent {} not found".format(build.parent_id))
-
-            if depth == 0:
-                toplevel.append(build_id)
-
-        data["results"] = []
-        for pid in toplevel:
-            data["results"].append(parents[pid])
-
-        return web.json_response(data)
-
-    if currently_failing:
-        query = """
-            SELECT *
-            FROM sourcerepositoryprojectversion sp1
-            INNER JOIN buildconfiguration as bc1
-                ON sp1.id = bc1.sourcerepositoryprojectversion_id
-            INNER JOIN build  ON build.buildconfiguration_id = bc1.id
-            WHERE (build.buildstate = 'publish_failed'
-            OR build.buildstate = 'build_failed') AND
-        """
-        if project_version_id:
-            query += "sp1.projectversion_id = :project_version_id AND "
-        query += """
-            build.startstamp = (
-                SELECT max(startstamp)
-                FROM build
-                INNER JOIN buildconfiguration
-                ON build.buildconfiguration_id = buildconfiguration.id
-                INNER JOIN sourcerepositoryprojectversion
-                ON sourcerepositoryprojectversion.id =
-                buildconfiguration.sourcerepositoryprojectversion_id
-                WHERE buildvariant_id = bc1.buildvariant_id
-            );
-            """
-        failed_build_ids = []
-
-        result = request.cirrina.db_session.execute(
-            query, {"project_version_id": project_version_id}
-        )
-        for row in result:
-            # row[6] = build.id
-            failed_build_ids.append(row[6])
-        builds = builds.filter(Build.id.in_(failed_build_ids))
+    builds = request.cirrina.db_session.query(Build).outerjoin(Build.maintainer)
 
     if sourcerepository_id:
-        query = """
-        SELECT id FROM build WHERE buildconfiguration_id IN
-            (SELECT id FROM buildconfiguration
-            WHERE sourcerepositoryprojectversion_id =
-                (SELECT id FROM sourcerepositoryprojectversion WHERE
-                sourcerepository_id=:sourcerepository_id AND
-                projectversion_id = :project_version_id))
-        ORDER BY startstamp DESC;
-        """
-
-        selected_build_ids = []
-
-        result = request.cirrina.db_session.execute(
-            query,
-            {
-                "sourcerepository_id": sourcerepository_id,
-                "project_version_id": project_version_id,
-            },
-        )
-        for build_id in result:
-            selected_build_ids.append(build_id[0])
-        builds = builds.filter(Build.id.in_(selected_build_ids))
-
-    # Apply project filter
+        builds = builds.filter(Build.sourcerepository_id == sourcerepository_id)
     if project_id:
-        builds = builds.filter(
-            BuildConfiguration.projectversions.any(project_id=project_id)
-        )
-
-    # Apply project version filter
+        builds = builds.filter(Build.projectversion.project.id == project_id)
     if project_version_id:
-        builds = builds.filter(
-            BuildConfiguration.projectversions.any(id=project_version_id)
-        )
-
-    # Only builds between the given dates
+        builds = builds.filter(Build.projectversion.id == project_version_id)
     if from_date:
         builds = builds.filter(Build.startstamp > from_date)
-
     if to_date:
         builds = builds.filter(Build.startstamp < to_date)
-
     if distrelease:
         builds = builds.filter(Project.name.like("%{}%".format(distrelease)))
 
-    if buildvariant:
-        buildvariant_ids = [
-            b.id
-            for b in (
-                request.cirrina.db_session.query(BuildVariant.id)
-                .join(ProjectVersion)
-                .join(Project)
-                .join(Architecture)
-                .filter(
-                    BuildVariant.name.like("%{}%".format(buildvariant))
-                )
-                .distinct()
-            )
-        ]
-        builds = builds.filter(BuildVariant.id.in_(buildvariant_ids))
-
-    if buildvariant_id:
-        builds = builds.filter(BuildVariant.id == buildvariant_id)
+#    if buildvariant:
+#        buildvariant_ids = [
+#            b.id
+#            for b in (
+#                request.cirrina.db_session.query(BuildVariant.id)
+#                .join(ProjectVersion)
+#                .join(Project)
+#                .join(Architecture)
+#                .filter(
+#                    BuildVariant.name.like("%{}%".format(buildvariant))
+#                )
+#                .distinct()
+#            )
+#        ]
+#        builds = builds.filter(BuildVariant.id.in_(buildvariant_ids))
+#
+#    if buildvariant_id:
+#        builds = builds.filter(BuildVariant.id == buildvariant_id)
 
     if project:
-        builds = builds.filter(
-            BuildConfiguration.projectversions.any(
-                ProjectVersion.fullname.like(
-                    "%{}%".format(project)
-                )
-            )
-        )
-
+        builds = builds.filter(Build.projectversion.fullname.like("%{}%".format(project)))
     if version:
         builds = builds.filter(Build.version.like("%{}%".format(version)))
-
     if maintainer:
-        builds = builds.filter(
-            Maintainer.fullname.ilike("%{}%".format(maintainer))
-        )
-
+        builds = builds.filter(Maintainer.fullname.ilike("%{}%".format(maintainer)))
     if architecture:
         builds = builds.filter(Architecture.name.like("%{}%".format(architecture)))
-
     if sourcerepository_name:
-        # FIXME: use build.sourcename as well
-        # TODO: Better filtering using regular expression instead of like
-        builds = builds.filter(
-            BuildConfiguration.sourcerepositories.any(
-                or_(
-                    SourceRepository.url.like(
-                        "%/%{}%.git".format(sourcerepository_name)
-                    ),
-                    Build.version.like("%{}%".format(sourcerepository_name)),
-                )
-            )
-        )
-
+        builds = builds.filter(or_(Build.sourcename.like("%{}%.format(sourcerepository_name)"),
+                                   Build.sourcerepository.url.like("%/%{}%.git".format(sourcerepository_name))))
     if startstamp:
-        builds = builds.filter(
-            func.to_char(Build.startstamp, "YYYY-MM-DD HH24:MI:SS").contains(startstamp)
-        )
-
+        builds = builds.filter(func.to_char(Build.startstamp, "YYYY-MM-DD HH24:MI:SS").contains(startstamp))
     if buildstates and set(buildstates).issubset(set(BUILD_STATES)):
-        builds = builds.filter(
-            or_(*[Build.buildstate == buildstate for buildstate in buildstates])
-        )
+        builds = builds.filter(or_(*[Build.buildstate == buildstate for buildstate in buildstates]))
 
-    # Count builds
     nb_builds = builds.count()
 
     # sort hierarchically
@@ -415,12 +219,11 @@ FROM descendants order by id;
 
     parent = aliased(Build)
     builds = builds.outerjoin(parent, parent.id == Build.parent_id)
-
     builds = builds.order_by(func.coalesce(parent.parent_id, Build.parent_id, Build.id).desc(), Build.id)
+
     builds = paginate(request, builds)
 
     data = {"total_result_count": nb_builds, "results": []}
-
     if not count_only:
         for build in builds:
             data["results"].append(build.data())
@@ -459,17 +262,7 @@ async def get_build(request):
     except (ValueError, TypeError):
         return web.Response(text="Incorrect value for build_id", status=400)
 
-    build = (
-        request.cirrina.db_session.query(Build)
-        .outerjoin(Build.buildconfiguration)
-        .outerjoin(BuildConfiguration.buildvariant)
-        .outerjoin(BuildVariant.architecture)
-        .outerjoin(BuildVariant.base_mirror)
-        .outerjoin(Build.maintainer)
-        .filter(Build.id == build_id)
-        .first()
-    )
-
+    build = request.cirrina.db_session.query(Build).filter(Build.id == build_id).first()
     if not build:
         return web.Response(text="Build not found", status=400)
 
@@ -504,20 +297,20 @@ async def get_build(request):
             }
         )
 
-    if build.buildconfiguration:
+    if build.projectversion:
         data.update(
             {
                 "buildvariant": {
                     "architecture": {
-                        "name": build.buildconfiguration.buildvariant.architecture.name,
-                        "id": build.buildconfiguration.buildvariant.architecture.id,
+                        "name": build.architecture,
                     },
                     "base_mirror": {
-                        "name": build.buildconfiguration.buildvariant.base_mirror.project.name,
-                        "version": build.buildconfiguration.buildvariant.base_mirror.name,
-                        "id": build.buildconfiguration.buildvariant.base_mirror.id,
+                        "name": build.projectversion.basemirror.project.name,
+                        "version": build.projectversion.basemirror.name,
                     },
-                    "name": build.buildconfiguration.buildvariant.name,
+                    "name": build.projectversion.basemirror.project.name + "-" +
+                    build.projectversion.basemirror.name + "/" +
+                    build.architecture
                 }
             }
         )
@@ -646,7 +439,6 @@ async def trigger_build(request):
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )
@@ -721,16 +513,7 @@ FROM descendants order by id;
         build_id = row[0]
         depth = row[2]
 
-        build = (
-            request.cirrina.db_session.query(Build)
-            .filter(Build.id == build_id)
-            .outerjoin(Build.buildconfiguration)
-            .outerjoin(BuildConfiguration.buildvariant)
-            .outerjoin(BuildVariant.architecture)
-            .outerjoin(BuildVariant.base_mirror)
-            .outerjoin(Build.maintainer)
-            .first()
-        )
+        build = request.cirrina.db_session.query(Build).filter(Build.id == build_id).first()
 
         buildjson = build.data()
         parents[build.id] = buildjson

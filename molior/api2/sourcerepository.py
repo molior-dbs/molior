@@ -9,12 +9,9 @@ from molior.auth import req_role
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
-from molior.model.buildvariant import BuildVariant
-from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.project import Project
 from molior.model.projectversion import ProjectVersion, get_projectversion
 from molior.model.sourepprover import SouRepProVer
-from molior.model.architecture import Architecture
 from molior.tools import ErrorResponse, paginate
 
 # FIXME: move to tools/model:
@@ -238,24 +235,11 @@ async def add_repository(request):
         projectversion.sourcerepositories.append(repo)
         db.commit()
 
-    sourepprover_id = db.query(SouRepProVer).filter(
+    sourepprover = db.query(SouRepProVer).filter(
                           SouRepProVer.c.sourcerepository_id == repo.id,
-                          SouRepProVer.c.projectversion_id == projectversion.id).first().id
+                          SouRepProVer.c.projectversion_id == projectversion.id).first()
 
-    for architecture in architectures:
-        arch = db.query(Architecture).filter(Architecture.name == architecture).first()
-        if not arch:
-            # FIXME: delete new repo
-            return ErrorResponse(400, "Unknown architecture '{}'".format(arch))
-
-        base_mirror_id = projectversion.buildvariants[0].base_mirror_id
-        buildvar = db.query(BuildVariant).filter(
-                       BuildVariant.architecture_id == arch.id,
-                       BuildVariant.base_mirror_id == base_mirror_id).first()
-
-        buildconf = BuildConfiguration(buildvariant=buildvar, sourcerepositoryprojectversion_id=sourepprover_id)
-        db.add(buildconf)
-
+    sourepprover.architectures = architectures
     db.commit()
 
     if repo.state == "new":
@@ -268,7 +252,6 @@ async def add_repository(request):
             sourcename=repo.name,
             buildstate="new",
             buildtype="build",
-            buildconfiguration=None,
             sourcerepository=repo,
             maintainer=None
         )
@@ -286,3 +269,27 @@ async def add_repository(request):
         await request.cirrina.task_queue.put(args)
 
     return web.Response(status=200, text="SourceRepository added")
+
+
+@app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
+@req_role(["member", "owner"])
+async def edit_repository(request):
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    db = request.cirrina.db_session
+    params = await request.json()
+    url = params.get("url", "")
+    architectures = params.get("architectures", [])
+
+    if not url:
+        return ErrorResponse(400, "No URL recieved")
+    if not architectures:
+        return ErrorResponse(400, "No architectures recieved")
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Project not found")
+
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.c.projectversion_id == projectversion.id).first()
+
+    logger.info(buildconfig.architectures)

@@ -353,10 +353,9 @@ async def get_apt_sources(request):
         project_name, projectver_name
     )
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not project.is_basemirror and version.buildvariants:
+    if not project.is_basemirror and version.basemirror:
         sources_list += "# Base Mirror\n"
-        base_mirror = version.buildvariants[0].base_mirror
-        sources_list += "{}\n".format(base_mirror.get_apt_repo())
+        sources_list += "{}\n".format(version.basemirror.get_apt_repo())
 
     sources_list += "# Project Sources\n"
     for dep in deps:

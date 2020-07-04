@@ -4,11 +4,8 @@ from ..app import logger
 from ..tools import get_changelog_attr
 
 from ..model.project import Project
-from ..model.buildvariant import BuildVariant
-from ..model.architecture import Architecture
 from ..model.sourepprover import SouRepProVer
 from ..model.projectversion import ProjectVersion
-from ..model.buildconfiguration import BuildConfiguration
 from ..model.projectversion import get_projectversion_deps
 
 from .configuration import Configuration
@@ -140,18 +137,6 @@ def get_targets(plain_targets, repo, session):
     Args:
         repo (SourceRepository): Source repository model.
     """
-    project_version = get_projectversion(repo.src_path)
-
-    if project_version:
-        return (
-            session.query(SouRepProVer)
-            .join(ProjectVersion)
-            .join(Project)
-            .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-            .filter(ProjectVersion.name == project_version)
-            .all()
-        )
-
     targets = []
     for target in plain_targets:
         project, project_version = target
@@ -168,31 +153,7 @@ def get_targets(plain_targets, repo, session):
     return targets
 
 
-def get_buildconfigs(targets, session):
-    """
-    Gets all buildconfiguration models
-    for the given list of targets (sourcerepositoryprojectversion models).
-
-    Args:
-        targets (list): List of targets.
-
-    Returns:
-        list: List of build configurations.
-    """
-    build_configs = []
-    for target in targets:
-        build_configs += (
-            session.query(BuildConfiguration)
-            .join(BuildVariant)
-            .join(Architecture)
-            .filter(BuildConfiguration.sourcerepositoryprojectversion_id == target.id)
-            .filter(Architecture.name != "all")
-            .all()
-        )
-    return build_configs
-
-
-def get_target_arch(build, session):
+def get_target_arch(build):
     """
     Gets the best target architecture from TARGET_ARCH_ORDER
     for the given build for 'all' packages.
@@ -206,19 +167,10 @@ def get_target_arch(build, session):
     Returns:
         str: The target architecture
     """
-    buildconfigs = (
-        session.query(BuildConfiguration)
-        .filter(
-            BuildConfiguration.sourcerepositoryprojectversion_id
-            == build.buildconfiguration.sourcerepositoryprojectversion_id
-        )
-        .all()
-    )
-    repo_archs = [bcf.buildvariant.architecture.name for bcf in buildconfigs]
-
     for arch in TARGET_ARCH_ORDER:
-        if arch in repo_archs:
+        if arch in build.projectversion.mirror_architectures[1:-1].split(","):
             return arch
+    return None
 
 
 def get_apt_repos(project_version, session, is_ci=False):

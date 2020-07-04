@@ -112,7 +112,6 @@ async def bitbucket_trigger(request):
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )

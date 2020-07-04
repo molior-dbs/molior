@@ -222,12 +222,10 @@ async def get_mirrors(request):
         mirrorkeyids = ""
         mirrorkeyserver = ""
 
-        if not mirror.project.is_basemirror and mirror.buildvariants:
-            # FIXME: only one buildvariant supported
-            base_mirror = mirror.buildvariants[0].base_mirror
-            base_mirror_id = base_mirror.id
-            base_mirror_url = base_mirror.get_apt_repo(url_only=True)
-            base_mirror_name = "{}/{}".format(base_mirror.project.name, base_mirror.name)
+        if not mirror.project.is_basemirror and mirror.basemirror:
+            base_mirror_id = mirror.basemirror.id
+            base_mirror_url = mirror.basemirror.get_apt_repo(url_only=True)
+            base_mirror_name = "{}/{}".format(mirror.basemirror.project.name, mirror.basemirror.name)
             mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
             if mirrorkey:
                 mirrorkeyurl = mirrorkey.keyurl
@@ -303,10 +301,8 @@ async def get_mirror(request):
 
     apt_url = mirror.get_apt_repo(url_only=True)
     base_mirror_url = str()
-    if not mirror.project.is_basemirror and mirror.buildvariants:
-        # FIXME: only one buildvariant supported
-        base_mirror = mirror.buildvariants[0].base_mirror
-        base_mirror_url = base_mirror.get_apt_repo(url_only=True)
+    if not mirror.project.is_basemirror and mirror.basemirror:
+        base_mirror_url = mirror.basemirror.get_apt_repo(url_only=True)
 
     result = {
         "id": mirror.id,
@@ -380,9 +376,10 @@ async def delete_mirror(request):
     if mirror.sourcerepositories:
         logger.warning("error deleting mirror '%s': referenced by one or more source repositories", mirrorname)
         return ErrorResponse(412, "Error deleting mirror {}: still referenced from source repositories".format(mirrorname))
-    if mirror.buildconfiguration:
-        logger.warning("error deleting mirror '%s': referenced by one or more build configurations", mirrorname)
-        return ErrorResponse(412, "Error deleting mirror {}: still referenced from build configurations".format(mirrorname))
+    # FIXME: how to check build references
+    # if mirror.buildconfiguration:
+    #    logger.warning("error deleting mirror '%s': referenced by one or more build configurations", mirrorname)
+    #    return ErrorResponse(412, "Error deleting mirror {}: still referenced from build configurations".format(mirrorname))
     if mirror.dependents:
         logger.warning("error deleting mirror '%s': referenced by one or project versions", mirrorname)
         return ErrorResponse(412, "Error deleting mirror {}: still referenced from project versions".format(mirrorname))
