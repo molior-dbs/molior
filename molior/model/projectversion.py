@@ -2,17 +2,15 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func,
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from molior.app import logger
-from molior.molior.configuration import Configuration
+from ..molior.configuration import Configuration
 
 # reeded for relations:
-import molior.model.buildconfiguration  # noqa: F401
 import molior.model.sourcerepository    # noqa: F401
 
 from .project import Project
 from .sourepprover import SouRepProVer
 from .projectversiondependency import ProjectVersionDependency
-from .proverbuivar import ProVerBuiVar
+# from .proverbuivar import ProVerBuiVar
 from .database import Base
 
 MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
@@ -30,7 +28,10 @@ class ProjectVersion(Base):
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
     sourcerepositories = relationship("SourceRepository", secondary=SouRepProVer)
-    buildconfiguration = relationship("BuildConfiguration", secondary=SouRepProVer)
+    basemirror_id = Column(ForeignKey("projectversion.id"))
+    basemirror = relationship("ProjectVersion", uselist=False,
+                              remote_side=[id],
+                              foreign_keys=basemirror_id)
     dependencies = relationship("ProjectVersion",
                                 secondary=ProjectVersionDependency,
                                 primaryjoin=id == ProjectVersionDependency.c.projectversion_id,
@@ -41,7 +42,7 @@ class ProjectVersion(Base):
                               primaryjoin=id == ProjectVersionDependency.c.dependency_id,
                               secondaryjoin=id == ProjectVersionDependency.c.projectversion_id,
                               )
-    buildvariants = relationship("BuildVariant", secondary=ProVerBuiVar)
+    # buildvariants = relationship("BuildVariant", secondary=ProVerBuiVar)
     mirror_url = Column(String)
     mirror_distribution = Column(String)
     mirror_components = Column(String)
@@ -87,12 +88,7 @@ class ProjectVersion(Base):
                                             self.mirror_components.replace(",", " "))
             return url if url_only else full
 
-        if not self.buildvariants:
-            logger.error("project version '%s' has no basemirror", self.fullname)
-            return str()
-
-        b_mirror = self.buildvariants[0].base_mirror
-        base_mirror = "{}/{}".format(b_mirror.project.name, b_mirror.name)
+        base_mirror = "{}/{}".format(self.basemirror.project.name, self.basemirror.name)
 
         if self.project.is_mirror:
             url = "{0}/{1}/mirrors/{2}/{3}".format(base_url, base_mirror, self.project.name, self.name)

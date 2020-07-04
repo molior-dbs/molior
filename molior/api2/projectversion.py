@@ -5,8 +5,7 @@ from molior.app import app, logger
 from molior.auth import req_role
 from molior.model.projectversion import ProjectVersion
 from molior.model.project import Project
-from molior.model.buildvariant import BuildVariant
-from molior.tools import ErrorResponse, parse_int, get_buildvariants, is_name_valid, paginate
+from molior.tools import ErrorResponse, parse_int, is_name_valid, paginate
 
 from ..api.projectversion import projectversion_to_dict
 
@@ -67,7 +66,7 @@ async def get_projectversions2(request):
     if filter_name:
         query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
     if basemirror_id:
-        query = query.filter(ProjectVersion.buildvariants.any(BuildVariant.base_mirror_id == basemirror_id))
+        query = query.filter(ProjectVersion.basemirror_id == basemirror_id)
     elif is_basemirror:
         query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
 
@@ -203,29 +202,22 @@ async def create_projectversions(request):
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-        .filter(ProjectVersion.name == name)
-        .filter(Project.id == project.id)
-        .first()
-    )
+    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.name == name,
+                                                                             Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion already exists. {}".format(
                 "And is marked as deleted!" if projectversion.is_deleted else ""))
 
-    buildvariants = get_buildvariants(request.cirrina.db_session, basemirror_name, basemirror_version, architectures)
+    basemirror = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.parent.name == basemirror_name,
+                                                                         ProjectVersion.name == basemirror_version).first()
+    if not basemirror:
+        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion = ProjectVersion(name=name, project=project)
-    projectversion.buildvariants = buildvariants
+    projectversion = ProjectVersion(name=name, project=project, architectures=architectures, basemirror=basemirror)
     request.cirrina.db_session.add(projectversion)
     request.cirrina.db_session.commit()
 
-    logger.info("ProjectVersion '%s/%s' with id '%s' added",
-                projectversion.project.name,
-                projectversion.name,
-                projectversion.id,
-                )
+    logger.info("ProjectVersion '%s/%s' with id '%s' added", projectversion.project.name, projectversion.name, projectversion.id)
 
     project_name = projectversion.project.name
     project_version = projectversion.name

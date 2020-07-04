@@ -112,26 +112,20 @@ def send_mail_notification(build):
     r_name = build.maintainer.fullname
 
     version = build.version
-    arch = build.buildconfiguration.buildvariant.architecture.name
-    distrelease_version = build.buildconfiguration.buildvariant.base_mirror.name
-    distrelease = build.buildconfiguration.buildvariant.base_mirror.project.name
+    arch = build.architecture
+    distrelease_version = build.projectversion.basemirror.name
+    distrelease = build.projectversion.basemirror.project.name
     hostname = cfg.hostname if cfg.hostname else socket.getfqdn()
     link = "http://{}/#!/build/{}".format(hostname, build.id)
 
     if build.buildstate == "build_failed":
-        subject = "Build Failed: {pkg_name} {version} ({distrelease}-{arch})".format(
-            pkg_name=pkg_name, version=version, distrelease=distrelease, arch=arch
-        )
+        subject = "Build Failed: {} {} ({}-{})".format(pkg_name, version, distrelease, arch)
         message = "Unfortunately the build failed for:"
     elif build.buildstate == "successful":
-        subject = "Released: {pkg_name} {version} ({distrelease}-{arch})".format(
-            pkg_name=pkg_name, version=version, distrelease=distrelease, arch=arch
-        )
+        subject = "Released: {} {} ({}-{})".format(pkg_name, version, distrelease, arch)
         message = "I've just finished building the debian packages for:"
     else:
-        logger.warning(
-            "not sending notification: build has state '%s'", str(build.buildstate)
-        )
+        logger.warning("not sending notification: build has state '%s'", str(build.buildstate))
         return
 
     content = template.format(

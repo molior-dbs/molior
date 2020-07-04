@@ -182,19 +182,8 @@ def test_get_target_arch():
     Test get target architecture
     """
     build = MagicMock()
-    session = MagicMock()
-
-    buildconfig1 = MagicMock()
-    buildconfig1.buildvariant.architecture.name = "i386"
-
-    buildconfig2 = MagicMock()
-    buildconfig2.buildvariant.architecture.name = "armhf"
-    session.query.return_value.filter.return_value.all.return_value = [
-        buildconfig1,
-        buildconfig2,
-    ]
-
-    ret = get_target_arch(build, session)
+    build.projectversion.mirror_architectures = "{armhf,i386}"
+    ret = get_target_arch(build)
     assert ret == "i386"
 
 

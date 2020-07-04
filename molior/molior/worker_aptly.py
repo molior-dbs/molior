@@ -12,10 +12,8 @@ from .notifier import Subject, Event, notify
 
 from ..model.database import Session
 from ..model.build import Build
-from ..model.buildvariant import BuildVariant
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
-from ..model.architecture import Architecture
 from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
@@ -44,7 +42,6 @@ async def startup_mirror(task_queue):
         tasks = await aptly.get_tasks()
 
         for mirror in mirrors:
-            # FIXME: only one buildvariant supported
             base_mirror = ""
             base_mirror_version = ""
             tasknames = ["Update mirror", "Publish snapshot:"]
@@ -56,8 +53,8 @@ async def startup_mirror(task_queue):
                 for i in range(len(tasknames)):
                     taskname = tasknames[i]
                     if not mirror.project.is_basemirror:
-                        base_mirror = mirror.buildvariants[0].base_mirror.project.name
-                        base_mirror_version = mirror.buildvariants[0].base_mirror.name
+                        base_mirror = mirror.basemirror.project.name
+                        base_mirror_version = mirror.basemirror.name
                         task_name = "{} {}-{}-{}-{}-".format(taskname, base_mirror, base_mirror_version,
                                                              mirror.project.name, mirror.name)
                     else:
@@ -368,15 +365,6 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
             if entry.project.is_basemirror:
                 for arch_name in entry.mirror_architectures[1:-1].split(","):
-                    arch = session.query(Architecture).filter(Architecture.name == arch_name).first()
-                    if not arch:
-                        await build.set_publish_failed()
-                        logger.error("finalize mirror: architecture '%s' not found", arch_name)
-                        return
-
-                    buildvariant = BuildVariant(base_mirror=entry, architecture=arch)
-                    session.add(buildvariant)
-
                     await write_log(build.id, "I: starting chroot environments build\n")
 
                     chroot_build = Build(
@@ -389,7 +377,6 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         buildstate="new",
                         buildtype="chroot",
                         projectversion_id=build.projectversion_id,
-                        buildconfiguration=None,
                         parent_id=build.id,
                         sourcerepository=None,
                         maintainer=None,
@@ -407,7 +394,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     await chroot_build.set_scheduled()
                     session.commit()
 
-                    chroot = Chroot(buildvariant=buildvariant, build_id=chroot_build.id, ready=False)
+                    chroot = Chroot(basemirror_id=entry.id, architecture=arch_name, build_id=chroot_build.id, ready=False)
                     session.add(chroot)
                     session.commit()
 
@@ -415,11 +402,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     args = {"buildenv": [
                             chroot.id,
                             chroot_build.id,
-                            buildvariant.base_mirror.mirror_distribution,
-                            buildvariant.base_mirror.project.name,
-                            buildvariant.base_mirror.name,
-                            buildvariant.architecture.name,
-                            buildvariant.base_mirror.mirror_components
+                            entry.basemirror.mirror_distribution,
+                            entry.basemirror.project.name,
+                            entry.basemirror.name,
+                            arch_name,
+                            entry.basemirror.mirror_components
                             ]}
                     await task_queue.put(args)
 
@@ -483,17 +470,7 @@ class AptlyWorker:
             logger.error("mirror with name '%s' and version '%s' already exists", mirror_name, mirror_version)
             return
 
-        db_buildvariant = None
-        if not is_basemirror:
-            db_basemirror = session.query(ProjectVersion).filter(ProjectVersion.id == basemirror_id).first()
-            if not db_basemirror:
-                logger.error("could not find a basemirror with id '%d'", basemirror_id)
-                return
-            db_buildvariant = session.query(BuildVariant).filter(BuildVariant.base_mirror_id == basemirror_id).first()
-
-            if not db_buildvariant:
-                logger.error("could not find a buildvariant for basemirror with id '%d'", db_basemirror.id)
-                return
+        # FIXME: check basemirror exists
         # FIXME: until here, should be in api
 
         mirror = ProjectVersion(
@@ -505,11 +482,9 @@ class AptlyWorker:
             mirror_architectures="{" + ",".join(architectures) + "}",
             mirror_with_sources=download_sources,
             mirror_with_installer=download_installer,
-            mirror_state="new"
+            mirror_state="new",
+            basemirror_id=basemirror_id
         )
-
-        if db_buildvariant:
-            mirror.buildvariants.append(db_buildvariant)
 
         session.add(mirror)
         session.commit()
@@ -531,7 +506,6 @@ class AptlyWorker:
             sourcename=mirror_name,
             buildstate="new",
             buildtype="mirror",
-            buildconfiguration=None,
             sourcerepository=None,
             maintainer=None,
             projectversion_id=mirror.id
@@ -595,8 +569,8 @@ class AptlyWorker:
             await aptly.mirror_create(
                 mirror.project.name,
                 mirror.name,
-                mirror.buildvariants[0].base_mirror.project.name,
-                mirror.buildvariants[0].base_mirror.name,
+                mirror.basemirror.project.name,
+                mirror.basemirror.name,
                 mirror.mirror_url,
                 mirror.mirror_distribution,
                 mirror.mirror_components.split(" "),
@@ -663,8 +637,8 @@ class AptlyWorker:
             await update_mirror(
                 self.task_queue,
                 build.id,
-                mirror.buildvariants[0].base_mirror.project.name,
-                mirror.buildvariants[0].base_mirror.name,
+                mirror.basemirror.project.name,
+                mirror.basemirror.name,
                 mirror.project.name,
                 mirror.name,
                 mirror.mirror_components.split(","),
@@ -775,9 +749,8 @@ class AptlyWorker:
         base_mirror = ""
         base_mirror_version = ""
         if not mirror.project.is_basemirror:
-            basemirror = mirror.buildvariants[0].base_mirror
-            base_mirror = basemirror.project.name
-            base_mirror_version = basemirror.name
+            base_mirror = mirror.basemirror.project.name
+            base_mirror_version = mirror.basemirror.name
             # FIXME: cleanup chroot table, schroots, debootstrap,
 
         try:
@@ -788,22 +761,19 @@ class AptlyWorker:
             # mirror did not exist
             # FIXME: handle mirror has snapshots and cannot be deleted?
             logger.exception(exc)
-            pass
 
+        # remember for later
         project = mirror.project
 
-        bvs = session.query(BuildVariant).filter(BuildVariant.base_mirror_id == mirror.id).all()
-        for bvariant in bvs:
-            # FIXME: delete buildconfigurations
-            if mirror.project.is_basemirror:
-                chroot = session.query(Chroot).filter(Chroot.buildvariant == bvariant).first()
-                if chroot:
-                    session.delete(chroot)
-            session.delete(bvariant)
+        if mirror.project.is_basemirror:
+            chroots = session.query(Chroot).filter(Chroot.basemirror_id == mirror.id).all()
+            for chroot in chroots:
+                session.delete(chroot)
+                # FIXME: delete files
 
+        # FIXME: should this be Build.basemirror_id ?
         builds = session.query(Build) .filter(Build.projectversion_id == mirror.id).all()
         for build in builds:
-            # FIXME: delete buildconfigurations
             # FIXME: remove buildout dir
             session.delete(build)
 

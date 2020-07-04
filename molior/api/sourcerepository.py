@@ -7,8 +7,6 @@ from molior.app import app, logger
 from molior.model.sourcerepository import SourceRepository
 from molior.model.build import Build
 from molior.model.buildtask import BuildTask
-from molior.model.buildvariant import BuildVariant
-from molior.model.buildconfiguration import BuildConfiguration
 from molior.model.projectversion import ProjectVersion
 from molior.model.sourepprover import SouRepProVer
 from molior.tools import ErrorResponse, parse_int, get_hook_triggers, paginate
@@ -51,18 +49,14 @@ def get_dependencies_by_sourcerepository(db_session, repository_id):
     ]
 
 
-def get_architectures(db_session, repo, projectversion):
+def get_architectures(db, repo, projectversion):
     """
     Returns all architectures a repository is configured to build for
     """
-    buildconfigs = (
-        db_session.query(BuildConfiguration)
-        .join(SouRepProVer)
-        .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-        .filter(SouRepProVer.c.projectversion_id == projectversion.id)
-    ).all()
-    # remove multiple occurences of the same architecture
-    return list(set([b.buildvariant.architecture.name for b in buildconfigs]))
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == repo.id,
+                                                SouRepProVer.c.projectversion_id == projectversion.id).first()
+
+    return buildconfig.architectures[1:-1].split(",")
 
 
 @app.http_get("/api/repositories", threaded=True)
@@ -394,11 +388,9 @@ async def get_repository(request):
         return ErrorResponse(400, "Incorrect value for repository_id")
 
     repository = (
-        request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
+        request.cirrina.db_session.query(SourceRepository)
         .join(SouRepProVer)
         .join(ProjectVersion)
-        .join(BuildConfiguration)
-        .join(BuildVariant)
     )
 
     if repository_id:
@@ -525,7 +517,6 @@ async def trigger_clone(request):
         sourcename=repository.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repository,
         maintainer=None,
     )
@@ -599,7 +590,6 @@ async def trigger_build(request):
         sourcename=repository.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repository,
         maintainer=None,
     )

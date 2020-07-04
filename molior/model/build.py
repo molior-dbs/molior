@@ -45,8 +45,6 @@ class Build(Base):
     git_ref = Column(String)
     ci_branch = Column(String)
     sourcename = Column(String)
-    buildconfiguration_id = Column(ForeignKey("buildconfiguration.id"))
-    buildconfiguration = relationship("BuildConfiguration")
     maintainer_id = Column(ForeignKey("maintainer.id"))
     maintainer = relationship("Maintainer")
     sourcerepository_id = Column(ForeignKey("sourcerepository.id"))
@@ -207,9 +205,8 @@ class Build(Base):
         if not is_failed:
             return False
 
-        if self.buildconfiguration:
-            # project_id = self.buildconfiguration.projectversions[0].project.id
-            is_locked = self.buildconfiguration.projectversions[0].is_locked
+        if self.projectversion:
+            is_locked = self.projectversion.is_locked
         else:
             # project_id = None
             is_locked = None
@@ -244,16 +241,15 @@ class Build(Base):
             if self.projectversion.project.is_mirror:
                 if self.buildtype == "mirror":
                     data.update({"architectures": self.projectversion.mirror_architectures[1:-1].split(",")})
-                elif self.buildtype == "deb" or self.buildtype == "chroot":
-                    data.update({"architecture": self.architecture})
-
-        if self.buildconfiguration:
-            data.update({"project": {
-                            "name": self.buildconfiguration.projectversions[0].project.name,
-                            "version": self.buildconfiguration.projectversions[0].name,
-                            },
-                         "buildvariant": self.buildconfiguration.buildvariant.name
-                         })
+            elif self.buildtype == "deb" or self.buildtype == "chroot":
+                data.update({"architecture": self.architecture})
+                data.update({"project": {
+                                "name": self.projectversion.project.name,
+                                "version": self.projectversion.name,
+                                },
+                             "buildvariant": self.projectversion.basemirror.project.name + "-" +
+                             self.projectversion.basemirror.name + "/" + self.architecture
+                             })
         return data
 
     async def build_added(self):

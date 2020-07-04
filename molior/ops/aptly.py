@@ -78,11 +78,11 @@ async def DebSrcPublish(build):
                 continue
 
             await write_log(build.id, "I: publishing for %s\n" % projectversion.fullname)
-            basemirror_name = projectversion.buildvariants[0].base_mirror.project.name
-            basemirror_version = projectversion.buildvariants[0].base_mirror.name
+            basemirror_name = projectversion.basemirror.project.name
+            basemirror_version = projectversion.basemirror.name
             project_name = projectversion.project.name
             project_version = projectversion.name
-            archs = [bdv.architecture.name for bdv in projectversion.buildvariants]
+            archs = projectversion.mirror_architectures[1:-1].split(",")
 
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
@@ -122,8 +122,7 @@ async def publish_packages(build, out_path):
         bool: True if successful, otherwise False.
     """
 
-    arch = build.buildconfiguration.buildvariant.architecture.name
-    outfiles = await debchanges_get_files(out_path, build.sourcename, build.version, arch)
+    outfiles = await debchanges_get_files(out_path, build.sourcename, build.version, build.architecture)
 
     files2upload = []
     for f in outfiles:
@@ -151,7 +150,7 @@ async def publish_packages(build, out_path):
         await write_log(build.id, "%s\n" % line)
 
     v = strip_epoch_version(build.version)
-    changes_file = "{}_{}_{}.changes".format(build.sourcename, v, arch)
+    changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)
 
     cmd = "debsign -pgpg1 -k{} {}".format(key, changes_file)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(out_path))
@@ -162,13 +161,12 @@ async def publish_packages(build, out_path):
         return False
 
     logger.debug("publisher: uploading %d file%s", count_files, "" if count_files == 1 else "s")
-    projectversion = build.buildconfiguration.projectversions[0]
 
-    basemirror_name = projectversion.buildvariants[0].base_mirror.project.name
-    basemirror_version = projectversion.buildvariants[0].base_mirror.name
-    project_name = projectversion.project.name
-    project_version = projectversion.name
-    archs = [bdv.architecture.name for bdv in projectversion.buildvariants]
+    basemirror_name = build.projectversion.basemirror.project.name
+    basemirror_version = build.projectversion.basemirror.name
+    project_name = build.projectversion.project.name
+    project_version = build.projectversion.name
+    archs = build.projectversion.mirror_architectures[1:-1].split(",")
 
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
     await debian_repo.add_packages(files2upload, ci_build=build.is_ci)

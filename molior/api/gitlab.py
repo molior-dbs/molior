@@ -244,7 +244,6 @@ async def process_tag_push(request, data):
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )
@@ -377,7 +376,6 @@ async def process_push(request, data):
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )

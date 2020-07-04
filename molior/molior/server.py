@@ -34,7 +34,6 @@ import molior.api.sourcerepository   # noqa: F401
 import molior.api.projectuserrole    # noqa: F401
 import molior.api.projectversion     # noqa: F401
 import molior.api.info               # noqa: F401
-import molior.api.buildvariant       # noqa: F401
 import molior.api.status             # noqa: F401
 import molior.api.hook               # noqa: F401
 import molior.api.upload             # noqa: F401

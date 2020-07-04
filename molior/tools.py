@@ -13,10 +13,7 @@ from .app import logger
 from .aptly import AptlyApi
 from .molior.configuration import Configuration
 
-from .model.projectversion import ProjectVersion
 from .model.project import Project
-from .model.buildvariant import BuildVariant
-from .model.architecture import Architecture
 from .model.user import User
 from .model.userrole import UserRole
 
@@ -152,27 +149,6 @@ def check_user_role(web_session, db_session, project_id, role, allow_admin=True)
         return True
 
     return False
-
-
-def get_buildvariants(session, basemirror_name, basemirror_version, architectures):
-    """
-    Gets all buildvariants matching a specific basemirror and architectures
-
-    Args:
-        basemirror_name (str): Name of the basemirror (e.g. 'stretch', 'jessie')
-        basemirror_version (str): Version of the basemirror (e.g. '9.6', '8.10')
-        architectures (list): Architectures (e.g. ["amd64", "armhf"])
-    """
-    return (
-        session.query(BuildVariant)
-        .join(Architecture)
-        .join(ProjectVersion)
-        .join(Project)
-        .filter(Project.name == basemirror_name)
-        .filter(ProjectVersion.name == basemirror_version)
-        .filter(Architecture.name.in_(architectures))
-        .all()
-    )
 
 
 def get_hook_triggers(hook):

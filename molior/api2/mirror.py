@@ -7,7 +7,6 @@ from ..tools import OKResponse, ErrorResponse
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
 from ..model.mirrorkey import MirrorKey
-from ..model.buildvariant import BuildVariant
 
 
 @app.http_post("/api2/mirror")
@@ -214,16 +213,11 @@ async def edit_mirror(request):
     mirrorkeyserver  = params.get("mirrorkeyserver")   # noqa: E221
 
     basemirror_name, basemirror_version = basemirror.split("/")
-    bm = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
-                ProjectVersion.project_id == Project.id,
-                ProjectVersion.name == basemirror_version,
-                Project.name == basemirror_name).first()
+    bm = request.cirrina.db_session.query(ProjectVersion).filter(
+                ProjectVersion.project.name == basemirror_version,
+                ProjectVersion.name == basemirror_name).first()
     if not bm:
         return ErrorResponse(400, "could not find a basemirror with '%s'", basemirror)
-
-    buildvariant = request.cirrina.db_session.query(BuildVariant).filter(BuildVariant.base_mirror_id == bm.id).first()
-    if not buildvariant:
-        return ErrorResponse(400, "could not find a buildvariant for '%s'", basemirror)
 
     mirror.mirror_url = mirrorurl
     mirror.mirror_distribution = mirrordist
@@ -232,7 +226,7 @@ async def edit_mirror(request):
     mirror.mirror_with_sources = mirrorsrc
     mirror.mirror_with_installer = mirrorinst
     mirror.is_basemirror = mirrortype == "1"
-    mirror.buildvariants = [buildvariant]
+    mirror.basemirror = bm
 
     mirrorkey.keyurl = mirrorkeyurl
     mirrorkey.keyids = mirrorkeyids
