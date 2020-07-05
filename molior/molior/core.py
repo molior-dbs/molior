@@ -2,14 +2,13 @@ import re
 
 from ..app import logger
 from ..tools import get_changelog_attr
+from .configuration import Configuration
 
 from ..model.project import Project
 from ..model.sourepprover import SouRepProVer
 from ..model.projectversion import ProjectVersion
 from ..model.projectversion import get_projectversion_deps
 
-from .configuration import Configuration
-from .errors import MaintainerParseError
 
 TARGET_ARCH_ORDER = ["amd64", "i386", "arm64", "armhf"]
 
@@ -109,18 +108,15 @@ async def get_maintainer(path):
         path (Pathlib.Path): Path to git repository.
 
     Returns:
-        molior.model.maintainer.Maintainer: An instance of Maintainer
-            database model.
+        tuple (firstname, surname, email)
 
-    Raises:
-        MaintainerParseError: If the maintainer could not be parsed.
     """
     full = await get_changelog_attr("Maintainer", path)
     if not full:
-        raise MaintainerParseError("Maintainer not found.")
+        return None
     search = re.search("(.*)<([^>]*)", full)
     if not search:
-        raise MaintainerParseError("Maintainer could not be parsed.")
+        return None
     email = search.group(2)
     full_name = search.group(1)
     firstname = full_name.split(" ")[0]

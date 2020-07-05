@@ -2,10 +2,9 @@ import asyncio
 
 from datetime import datetime, timedelta
 
-from molior.app import logger
-from molior.tools import get_aptly_connection
-from molior.aptly import TaskState
-
+from ..app import logger
+from ..tools import get_aptly_connection
+from ..aptly import TaskState
 from .configuration import Configuration
 
 

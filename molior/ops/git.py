@@ -11,7 +11,6 @@ from ..tools import write_log, write_log_title, get_changelog_attr, validate_ver
 from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
-from ..molior.errors import MaintainerParseError
 from ..molior.core import get_maintainer, get_target_config
 
 
@@ -184,12 +183,12 @@ async def GetBuildInfo(repo_path, git_ref):
     info.tag_stamp = tag_dt.strftime("%Y-%m-%d %T%z")
     info.tag_dt = tag_dt
 
-    try:
-        info.firstname, info.lastname, info.email = await get_maintainer(repo_path)
-    except MaintainerParseError as exc:
-        logger.warning("could not get maintainer: %s" % str(exc))
+    maintainer = await get_maintainer(repo_path)
+    if not maintainer:
+        logger.warning("could not parse maintainer")
         return None
 
+    info.firstname, info.lastname, info.email = maintainer
     info.plain_targets = get_target_config(repo_path)
 
     return info

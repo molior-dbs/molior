@@ -4,7 +4,6 @@ import asyncio
 from pathlib import Path
 from mock import patch, MagicMock
 
-from molior.molior.errors import MaintainerParseError
 from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
 from molior.tools import is_name_valid, validate_version_format
@@ -159,9 +158,9 @@ def test_get_maintainer_none():
     with patch("molior.molior.core.get_changelog_attr",
                side_effect=asyncio.coroutine(lambda a, b: "")):
 
-        with pytest.raises(MaintainerParseError):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(get_maintainer(path))
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(get_maintainer(path))
+        assert res is None
 
 
 def test_get_maintainer_invalid():
@@ -172,9 +171,9 @@ def test_get_maintainer_invalid():
     with patch("molior.molior.core.get_changelog_attr",
                side_effect=asyncio.coroutine(lambda a, b: "Jon Doe")):
 
-        with pytest.raises(MaintainerParseError):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(get_maintainer(path))
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(get_maintainer(path))
+        assert res is None
 
 
 def test_get_target_arch():
