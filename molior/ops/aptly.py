@@ -169,7 +169,13 @@ async def publish_packages(build, out_path):
     archs = build.projectversion.mirror_architectures[1:-1].split(",")
 
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
-    await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
+    ret = False
+    try:
+        await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
+        ret = True
+    except Exception as exc:
+        await write_log(build.id, "E: error uploading files to repository\n")
+        logger.exception(exc)
 
     files2delete = files2upload
     files2delete.append("{}/{}".format(out_path, changes_file))
@@ -177,7 +183,7 @@ async def publish_packages(build, out_path):
         logger.debug("publisher: removing %s", f)
         os.remove(f)
 
-    return True
+    return ret
 
 
 async def DebPublish(task_queue, build_id):

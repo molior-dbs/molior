@@ -711,8 +711,23 @@ class AptlyWorker:
 
     async def _publish(self, args, session):
         build_id = args[0]
-        await asyncio.ensure_future(DebPublish(self.task_queue, build_id))
-        # FIXME Error handling
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("aptly worker: build with id %d not found", build_id)
+            return
+
+        ret = False
+        try:
+            ret = await asyncio.ensure_future(DebPublish(self.task_queue, build_id))
+        except Exception as exc:
+            logger.exception(exc)
+
+        if not ret:
+            await write_log(build.parent.id, "E: publishing package failed\n")
+            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=True)
+            await build.set_publish_failed()
+            session.commit()
+            return
 
     async def _drop_publish(self, args, _):
         base_mirror_name = args[0]
