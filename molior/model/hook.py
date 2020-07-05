@@ -1,7 +1,3 @@
-"""
-This module provides the molior Hook database
-model.
-"""
 from sqlalchemy import Column, String, Integer, Enum, Boolean
 from sqlalchemy.orm import relationship
 
@@ -12,10 +8,6 @@ HTTP_METHODS = ["post", "put", "get"]
 
 
 class Hook(Base):
-    """
-    Database model for a hook.
-    """
-
     __tablename__ = "hook"
 
     id = Column(Integer, primary_key=True)
