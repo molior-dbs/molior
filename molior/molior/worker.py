@@ -176,7 +176,8 @@ class Worker:
 
         ok = False
         if build.buildtype == "deb":
-            if build.buildstate == "build_failed":
+            if build.buildstate == "build_failed" or \
+               build.buildstate == "publish_failed":
                 ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 logger.info("removing %s", buildout)
@@ -191,12 +192,6 @@ class Worker:
 
                 args = {"schedule": []}
                 await self.task_queue.put(args)
-            elif build.buildstate == "publish_failed":
-                ok = True
-                await build.set_needs_publish()
-                session.commit()
-                await write_log(build.parent.id, "I: publishing packages\n")
-                await self.aptly_queue.put({"publish": [build.id]})
 
         if build.buildtype == "source":
             if build.buildstate == "publish_failed":
