@@ -3,12 +3,11 @@ import importlib
 from functools import wraps
 from aiohttp import web
 
-from molior.app import logger
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.tools import check_admin, check_user_role, parse_int
-
-from molior.molior.configuration import Configuration
+from ..app import logger
+from ..tools import check_admin, check_user_role, parse_int
+from ..molior.configuration import Configuration
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion
 
 auth_backend = None
 

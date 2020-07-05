@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.utils import COMMASPACE, formatdate
 from email.encoders import encode_base64
 
-from molior.app import logger
+from ..app import logger
 from .configuration import Configuration
 
 

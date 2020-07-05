@@ -5,10 +5,10 @@ import aiohttp
 from pathlib import Path
 from enum import Enum
 
-from molior.app import logger
+from ..app import logger
 from .emailer import send_mail
 from .configuration import Configuration
-from molior.molior.queues import notification_queue
+from .queues import notification_queue
 
 
 class Subject(Enum):

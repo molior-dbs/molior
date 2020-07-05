@@ -1,6 +1,7 @@
 from sqlalchemy import func
-from molior.model.user import User
-from molior.model.database import Session
+
+from ..model.database import Session
+from ..model.user import User
 
 
 class AuthBackend:

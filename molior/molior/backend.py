@@ -1,7 +1,7 @@
 import asyncio
 import importlib
 
-from molior.app import logger
+from ..app import logger
 from .configuration import Configuration
 
 
