@@ -1,8 +1,6 @@
-from aiohttp import web
-
-from molior.app import app
-from molior.model.project import Project
-from molior.tools import ErrorResponse
+from ..app import app
+from ..model.project import Project
+from ..tools import ErrorResponse, OKResponse
 
 
 @app.http_get("/api2/project/{project_name}")
@@ -43,4 +41,4 @@ async def get_project_byname(request):
         "description": project.description,
     }
 
-    return web.json_response(data)
+    return OKResponse(data)

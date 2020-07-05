@@ -1,13 +1,11 @@
-from aiohttp import web
 from sqlalchemy.sql import or_
 
-from molior.app import app, logger
-from molior.auth import req_role
-from molior.model.projectversion import ProjectVersion
-from molior.model.project import Project
-from molior.tools import ErrorResponse, parse_int, is_name_valid, paginate
-
+from ..app import app, logger
+from ..auth import req_role
+from ..tools import ErrorResponse, parse_int, is_name_valid, paginate, OKResponse
 from ..api.projectversion import projectversion_to_dict
+from ..model.projectversion import ProjectVersion
+from ..model.project import Project
 
 
 @app.http_get("/api2/project/{project_id}/versions")
@@ -84,7 +82,7 @@ async def get_projectversions2(request):
 
     data = {"total_result_count": nb_projectversions, "results": results}
 
-    return web.json_response(data)
+    return OKResponse(data)
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -127,7 +125,7 @@ async def get_projectversion_byname(request):
         return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
 
     data = projectversion_to_dict(projectversion)
-    return web.json_response(data)
+    return OKResponse(data)
 
 
 @app.http_post("/api2/project/{project_id}/versions")
@@ -230,4 +228,4 @@ async def create_projectversions(request):
                 project_version,
                 architectures]})
 
-    return web.json_response({"id": projectversion.id, "name": projectversion.name})
+    return OKResponse({"id": projectversion.id, "name": projectversion.name})

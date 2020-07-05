@@ -1,7 +1,6 @@
-from aiohttp import web
-
-from molior.app import app
-from molior.model.user import User
+from ..app import app
+from ..tools import ErrorResponse, OKResponse
+from ..model.user import User
 
 
 @app.http_get("/api2/user/{username}")
@@ -44,7 +43,7 @@ async def get_user_byname(request):
     )
 
     if not user:
-        return web.Response(status=404, text="User not found")
+        return ErrorResponse(404, "User not found")
 
     data = {"username": user.username, "user_id": user.id, "is_admin": user.is_admin}
-    return web.json_response(data)
+    return OKResponse(data)
