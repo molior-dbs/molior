@@ -250,6 +250,10 @@ class Build(Base):
                              "buildvariant": self.projectversion.basemirror.project.name + "-" +
                              self.projectversion.basemirror.name + "/" + self.architecture
                              })
+
+        if self.sourcerepository:
+            data.update({"sourcerepository_id": self.sourcerepository.id})
+
         return data
 
     async def build_added(self):
