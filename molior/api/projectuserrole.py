@@ -2,13 +2,13 @@ import sqlalchemy.exc
 
 from aiohttp import web
 
-from molior.app import app
-from molior.auth import req_role
-from molior.model.project import Project
-from molior.model.user import User
-from molior.model.userrole import UserRole, USER_ROLES
-from molior.tools import paginate
-from molior.molior.notifier import Subject, Event
+from ..app import app
+from ..auth import req_role
+from ..model.project import Project
+from ..model.user import User
+from ..model.userrole import UserRole, USER_ROLES
+from ..tools import paginate
+from ..molior.notifier import Subject, Event
 
 
 @app.http_get("/api/projects/{project_id}/users")

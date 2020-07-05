@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 from aiofile import AIOFile, Reader
 
-from molior.app import app, logger
-from molior.molior.notifier import Subject, Event, Action
-from molior.model.database import Session
-from molior.model.build import Build
+from ..app import app, logger
+from ..molior.notifier import Subject, Event, Action
+from ..model.database import Session
+from ..model.build import Build
 
 BUILD_OUT_PATH = Path("/var/lib/molior/buildout")
 

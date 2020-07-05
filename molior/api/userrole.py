@@ -1,7 +1,7 @@
 from aiohttp import web
 
-from molior.app import app
-from molior.model.userrole import USER_ROLES
+from ..app import app
+from ..model.userrole import USER_ROLES
 
 
 @app.http_get("/api/userroles")

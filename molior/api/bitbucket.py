@@ -4,10 +4,10 @@ import logging
 from aiohttp import web
 
 from .app import app
-from molior.molior.notifier import build_added
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.sourcerepository import SourceRepository
+from ..molior.notifier import build_added
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.sourcerepository import SourceRepository
 
 logger = logging.getLogger("molior-web")
 

@@ -5,13 +5,13 @@ from aiohttp import web
 from sqlalchemy.sql import func, or_
 from sqlalchemy.orm import aliased
 
-from molior.app import app, logger
-from molior.model.build import Build, BUILD_STATES, DATETIME_FORMAT
-from molior.model.buildtask import BuildTask
-from molior.model.sourcerepository import SourceRepository
-from molior.model.project import Project
-from molior.model.maintainer import Maintainer
-from molior.tools import paginate
+from ..app import app, logger
+from ..model.build import Build, BUILD_STATES, DATETIME_FORMAT
+from ..model.buildtask import BuildTask
+from ..model.sourcerepository import SourceRepository
+from ..model.project import Project
+from ..model.maintainer import Maintainer
+from ..tools import paginate
 
 
 @app.http_get("/api/builds", threaded=True)

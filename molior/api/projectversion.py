@@ -1,12 +1,12 @@
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.auth import req_role
-from molior.model.projectversion import ProjectVersion, get_projectversion_deps
-from molior.model.project import Project
-from molior.model.sourcerepository import SourceRepository
-from molior.model.sourepprover import SouRepProVer
-from molior.tools import ErrorResponse, parse_int, is_name_valid
+from ..app import app, logger
+from ..auth import req_role
+from ..tools import ErrorResponse, parse_int, is_name_valid
+from ..model.projectversion import ProjectVersion, get_projectversion_deps
+from ..model.project import Project
+from ..model.sourcerepository import SourceRepository
+from ..model.sourepprover import SouRepProVer
 
 
 def get_projectversion_deps_manually(projectversion, to_dict=True):

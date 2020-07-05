@@ -3,13 +3,13 @@ import uuid
 
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.projectversion import ProjectVersion
-from molior.model.sourepprover import SouRepProVer
-from molior.tools import ErrorResponse, parse_int, get_hook_triggers, paginate
+from ..app import app, logger
+from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.projectversion import ProjectVersion
+from ..model.sourepprover import SouRepProVer
 
 
 def get_last_gitref(repo, db_session):

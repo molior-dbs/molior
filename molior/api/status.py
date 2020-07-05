@@ -1,10 +1,10 @@
 from aiohttp import web
 from os.path import expanduser
 
-from molior.app import app
-from molior.auth import req_admin
-from molior.version import MOLIOR_VERSION
-from molior.molior.backend import Backend
+from ..app import app
+from ..auth import req_admin
+from ..version import MOLIOR_VERSION
+from ..molior.backend import Backend
 
 
 @app.http_get("/api/status")

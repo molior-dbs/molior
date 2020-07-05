@@ -2,11 +2,11 @@ import uuid
 
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.sourcerepository import SourceRepository
-from molior.molior.configuration import Configuration
+from ..app import app, logger
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.sourcerepository import SourceRepository
+from ..molior.configuration import Configuration
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 

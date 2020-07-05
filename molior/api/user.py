@@ -1,12 +1,12 @@
 from aiohttp import web
 from sqlalchemy.exc import IntegrityError
 
-from molior.app import app
-from molior.auth import Auth, req_admin
-from molior.model.user import User
-from molior.model.userrole import UserRole
-from molior.model.project import Project
-from molior.tools import paginate, ErrorResponse
+from ..app import app
+from ..auth import Auth, req_admin
+from ..model.user import User
+from ..model.userrole import UserRole
+from ..model.project import Project
+from ..tools import paginate, ErrorResponse
 
 
 @app.http_get("/api/users")
