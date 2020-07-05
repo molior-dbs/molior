@@ -191,6 +191,12 @@ class Worker:
 
                 args = {"schedule": []}
                 await self.task_queue.put(args)
+            elif build.buildstate == "publish_failed":
+                ok = True
+                await build.set_needs_publish()
+                session.commit()
+                await write_log(build.parent.id, "I: publishing packages\n")
+                await self.aptly_queue.put({"publish": [build.id]})
 
         if build.buildtype == "source":
             if build.buildstate == "publish_failed":
