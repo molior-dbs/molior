@@ -1,9 +1,9 @@
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.molior.configuration import Configuration
-from molior.model.user import User
-from molior.auth import Auth
+from ..app import app, logger
+from ..molior.configuration import Configuration
+from ..model.user import User
+from ..auth import Auth
 
 
 @app.auth_handler

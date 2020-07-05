@@ -1,7 +1,7 @@
 from aiohttp import web
 
-from molior.app import app
-from molior.model.build import BUILD_STATES
+from ..app import app
+from ..model.build import BUILD_STATES
 
 
 @app.http_get("/api/buildstates")

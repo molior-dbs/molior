@@ -1,9 +1,9 @@
 from aiohttp import web
 
-from molior.app import app
-from molior.model.hook import Hook
-from molior.model.sourcerepository import SourceRepository
-from molior.tools import parse_int, get_hook_triggers
+from ..app import app
+from ..model.hook import Hook
+from ..model.sourcerepository import SourceRepository
+from ..tools import parse_int, get_hook_triggers
 
 
 @app.http_get("/api/hooks")

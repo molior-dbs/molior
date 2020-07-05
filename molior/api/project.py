@@ -1,11 +1,11 @@
 from aiohttp import web
 
-from molior.app import app, logger
-from molior.auth import req_role, req_admin
-from molior.molior.configuration import Configuration
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.tools import ErrorResponse, paginate, is_name_valid
+from ..app import app, logger
+from ..auth import req_role, req_admin
+from ..molior.configuration import Configuration
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion
+from ..tools import ErrorResponse, paginate, is_name_valid
 
 from .projectversion import get_projectversion_deps_manually
 

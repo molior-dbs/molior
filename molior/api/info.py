@@ -1,7 +1,7 @@
 from aiohttp import web
 
-from molior.app import app
-from molior.molior.configuration import Configuration
+from ..app import app
+from ..molior.configuration import Configuration
 
 
 @app.http_get("/api/info/aptlyhostname")
