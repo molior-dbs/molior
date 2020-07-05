@@ -29,7 +29,6 @@ import molior.api.websocket          # noqa: F401
 import molior.api.auth               # noqa: F401
 import molior.api.user               # noqa: F401
 import molior.api.userrole           # noqa: F401
-import molior.api.architecture       # noqa: F401
 import molior.api.sourcerepository   # noqa: F401
 import molior.api.projectuserrole    # noqa: F401
 import molior.api.projectversion     # noqa: F401

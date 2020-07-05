@@ -8,7 +8,6 @@ from sqlalchemy.orm import aliased
 from molior.app import app, logger
 from molior.model.build import Build, BUILD_STATES, DATETIME_FORMAT
 from molior.model.buildtask import BuildTask
-from molior.model.architecture import Architecture
 from molior.model.sourcerepository import SourceRepository
 from molior.model.project import Project
 from molior.model.maintainer import Maintainer
@@ -199,7 +198,7 @@ async def get_builds(request):
     if maintainer:
         builds = builds.filter(Maintainer.fullname.ilike("%{}%".format(maintainer)))
     if architecture:
-        builds = builds.filter(Architecture.name.like("%{}%".format(architecture)))
+        builds = builds.filter(Build.architecture.like("%{}%".format(architecture)))
     if sourcerepository_name:
         builds = builds.filter(or_(Build.sourcename.like("%{}%.format(sourcerepository_name)"),
                                    Build.sourcerepository.url.like("%/%{}%.git".format(sourcerepository_name))))
