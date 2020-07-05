@@ -10,7 +10,6 @@ import molior.model.sourcerepository    # noqa: F401
 from .project import Project
 from .sourepprover import SouRepProVer
 from .projectversiondependency import ProjectVersionDependency
-# from .proverbuivar import ProVerBuiVar
 from .database import Base
 
 MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
