@@ -226,8 +226,9 @@ async def DebPublish(task_queue, build_id):
             return
         finally:
             buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-            session.delete(buildtask)
-            session.commit()
+            if buildtask:
+                session.delete(buildtask)
+                session.commit()
 
         await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await build.set_successful()
