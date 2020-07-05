@@ -1,8 +1,3 @@
-"""
-Provides a collection of aptly exceptions.
-"""
-
-
 class AptlyError(Exception):
     """Base exception for all aptly specific errors."""
 

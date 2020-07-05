@@ -5,7 +5,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from ..molior.configuration import Configuration
 
 # reeded for relations:
-import molior.model.sourcerepository    # noqa: F401
+from . import sourcerepository    # noqa: F401
 
 from .project import Project
 from .sourepprover import SouRepProVer
@@ -16,10 +16,6 @@ MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_
 
 
 class ProjectVersion(Base):
-    """
-    Database model for a ProjectVersion.
-    """
-
     __tablename__ = "projectversion"
 
     id = Column(Integer, primary_key=True)

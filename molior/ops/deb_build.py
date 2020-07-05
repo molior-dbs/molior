@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ..app import logger
 from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title
+from .git import GitCheckout, GetBuildInfo
 
 from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
@@ -21,7 +22,6 @@ from ..model.projectversion import ProjectVersion
 from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
 from ..molior.worker_backend import backend_queue
-from .git import GitCheckout, GetBuildInfo
 
 
 async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
