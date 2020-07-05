@@ -8,7 +8,6 @@ from ..molior.configuration import Configuration
 from . import sourcerepository    # noqa: F401
 
 from .project import Project
-from .sourepprover import SouRepProVer
 from .projectversiondependency import ProjectVersionDependency
 from .database import Base
 
@@ -22,7 +21,7 @@ class ProjectVersion(Base):
     project_id = Column(ForeignKey("project.id"))
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
-    sourcerepositories = relationship("SourceRepository", secondary=SouRepProVer)
+    sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion")
     basemirror_id = Column(ForeignKey("projectversion.id"))
     basemirror = relationship("ProjectVersion", uselist=False,
                               remote_side=[id],

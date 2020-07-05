@@ -437,8 +437,8 @@ async def delete_repository(request):
     # get the association of the projectversion and the sourcerepository
     sourcerepositoryprojectversion = (
         request.cirrina.db_session.query(SouRepProVer)  # pylint: disable=no-member
-        .filter(SouRepProVer.c.sourcerepository_id == sourcerepository_id)
-        .filter(SouRepProVer.c.projectversion_id == projectversion.id)
+        .filter(SouRepProVer.sourcerepository_id == sourcerepository_id)
+        .filter(SouRepProVer.projectversion_id == projectversion.id)
     ).first()
     if not sourcerepositoryprojectversion:
         return ErrorResponse(400, "Could not find the sourcerepository for the projectversion")
@@ -516,11 +516,11 @@ async def clone_projectversion(request):
 
     for repo in new_projectversion.sourcerepositories:
         sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
-                SouRepProVer.c.sourcerepository_id == repo.id,
-                SouRepProVer.c.projectversion_id == projectversion.id).first()
+                SouRepProVer.sourcerepository_id == repo.id,
+                SouRepProVer.projectversion_id == projectversion.id).first()
         new_sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
-                SouRepProVer.c.sourcerepository_id == repo.id,
-                SouRepProVer.c.projectversion_id == new_projectversion.id).first()
+                SouRepProVer.sourcerepository_id == repo.id,
+                SouRepProVer.projectversion_id == new_projectversion.id).first()
         new_sourepprover.architectures = sourepprover.architectures
 
     request.cirrina.db_session.add(new_projectversion)
