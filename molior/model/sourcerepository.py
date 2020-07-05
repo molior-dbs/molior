@@ -12,7 +12,6 @@ import molior.model.hook  # noqa: F401, pylint: disable=unused-import
 
 from molior.app import logger
 from .database import Base
-from .sourepprover import SouRepProVer
 from .sourcerepositoryhook import SourceRepositoryHook
 
 from molior.molior.configuration import Configuration
@@ -27,7 +26,7 @@ class SourceRepository(Base):
     id = Column(Integer, primary_key=True)
     url = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
-    projectversions = relationship("ProjectVersion", secondary=SouRepProVer)
+    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
     hooks = relationship("Hook", secondary=SourceRepositoryHook)
 
     def __init__(self, url):

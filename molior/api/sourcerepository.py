@@ -53,8 +53,8 @@ def get_architectures(db, repo, projectversion):
     """
     Returns all architectures a repository is configured to build for
     """
-    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == repo.id,
-                                                SouRepProVer.c.projectversion_id == projectversion.id).first()
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == repo.id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
 
     return buildconfig.architectures[1:-1].split(",")
 

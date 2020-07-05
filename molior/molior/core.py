@@ -140,7 +140,7 @@ def get_targets(plain_targets, repo, session):
             session.query(SouRepProVer)
             .join(ProjectVersion)
             .join(Project)
-            .filter(SouRepProVer.c.sourcerepository_id == repo.id)
+            .filter(SouRepProVer.sourcerepository_id == repo.id)
             .filter(ProjectVersion.name == project_version)
             .filter(Project.name == project)
             .all()

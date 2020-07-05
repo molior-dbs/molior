@@ -128,8 +128,8 @@ async def get_projectversion_repositories(request):
     if not projectversion:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_id))
 
-    query = db.query(SourceRepository, SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == SourceRepository.id,
-                                                            SouRepProVer.c.projectversion_id == projectversion.id)
+    query = db.query(SourceRepository, SouRepProVer).filter(SouRepProVer.sourcerepository_id == SourceRepository.id,
+                                                            SouRepProVer.projectversion_id == projectversion.id)
     query = query.filter(SourceRepository.projectversions.any(id=projectversion.id))
 
     if filter_url:
@@ -143,14 +143,14 @@ async def get_projectversion_repositories(request):
     data = {"total_result_count": count, "results": []}
     data["results"] = [
         {
-            "id": item.id,
-            "name": item.name,
-            "url": item.url,
-            "state": item.state,
-            "last_gitref": get_last_gitref(item, db),
-            "architectures": arch[1:-1].split(",")
+            "id": repo.id,
+            "name": repo.name,
+            "url": repo.url,
+            "state": repo.state,
+            "last_gitref": get_last_gitref(repo, db),
+            "architectures": srpv.architectures[1:-1].split(",")
         }
-        for item, _, _, _, arch in results
+        for repo, srpv in results
     ]
     return OKResponse(data)
 
@@ -231,8 +231,8 @@ async def add_repository(request):
         db.commit()
 
     sourepprover = db.query(SouRepProVer).filter(
-                          SouRepProVer.c.sourcerepository_id == repo.id,
-                          SouRepProVer.c.projectversion_id == projectversion.id).first()
+                          SouRepProVer.sourcerepository_id == repo.id,
+                          SouRepProVer.projectversion_id == projectversion.id).first()
 
     sourepprover.architectures = architectures
     db.commit()
@@ -281,8 +281,8 @@ async def edit_repository(request):
     if not projectversion:
         return ErrorResponse(400, "Project not found")
 
-    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == sourcerepository_id,
-                                                SouRepProVer.c.projectversion_id == projectversion.id).first()
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
 
     buildconfig.architectures = "{" + ",".join(architectures) + "}"
     db.commit()

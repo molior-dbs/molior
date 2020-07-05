@@ -1,13 +1,12 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey
+
 from .database import Base
 
-SouRepProVer = Table(
-    "sourcerepositoryprojectversion",
-    Base.metadata,
-    Column("id", Integer, primary_key=True),
-    Column("sourcerepository_id", Integer, ForeignKey("sourcerepository.id")),
-    Column("projectversion_id", Integer, ForeignKey("projectversion.id")),
-    UniqueConstraint("sourcerepository_id", "projectversion_id",
-                     name="unique_sourcerepositoryprojectversion"),
-    Column("architectures", String)
-)
+
+class SouRepProVer(Base):
+    __tablename__ = "sourcerepositoryprojectversion"
+
+    id = Column(Integer, primary_key=True)
+    sourcerepository_id = Column(ForeignKey("sourcerepository.id"))
+    projectversion_id = Column(ForeignKey("projectversion.id"))
+    architectures = Column(String)
