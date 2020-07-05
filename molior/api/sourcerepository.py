@@ -12,7 +12,7 @@ from molior.model.sourepprover import SouRepProVer
 from molior.tools import ErrorResponse, parse_int, get_hook_triggers, paginate
 
 
-def get_last_gitref(db_session, repo, projectversion):
+def get_last_gitref(repo, db_session):
     last_build = db_session.query(Build).filter(Build.sourcerepository_id == repo.id,
                                                 Build.buildtype == "source").order_by(Build.id.desc()).first()
     if last_build:
@@ -204,12 +204,8 @@ async def get_repositories(request):
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-                        "last_gitref": get_last_gitref(
-                            request.cirrina.db_session, repository, projectversion
-                            ),
-                        "architectures": get_architectures(
-                            request.cirrina.db_session, repository, projectversion
-                            ),
+                        "last_gitref": get_last_gitref(request.cirrina.db_session, repository),
+                        "architectures": get_architectures(request.cirrina.db_session, repository, projectversion),
                         }
                     })
             else:

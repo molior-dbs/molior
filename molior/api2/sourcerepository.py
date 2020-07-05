@@ -2,20 +2,17 @@ import uuid
 import giturlparse
 
 from sqlalchemy.sql import or_
-from aiohttp import web
 
-from molior.app import app, logger
-from molior.auth import req_role
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion, get_projectversion
-from molior.model.sourepprover import SouRepProVer
-from molior.tools import ErrorResponse, paginate
-
-# FIXME: move to tools/model:
+from ..app import app, logger
+from ..auth import req_role
+from ..tools import ErrorResponse, OKResponse, paginate
 from ..api.sourcerepository import get_last_gitref
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion, get_projectversion
+from ..model.sourepprover import SouRepProVer
 
 
 @app.http_get("/api2/repositories")
@@ -68,7 +65,7 @@ async def get_repositories2(request):
             "url": repository.url,
             "state": repository.state,
         })
-    return web.json_response(data)
+    return OKResponse(data)
 
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/repositories")
@@ -150,14 +147,12 @@ async def get_projectversion_repositories(request):
             "name": item.name,
             "url": item.url,
             "state": item.state,
-            "last_gitref": get_last_gitref(
-                    db, item, projectversion
-            ),
+            "last_gitref": get_last_gitref(item, db),
             "architectures": arch[1:-1].split(",")
         }
         for item, _, _, _, arch in results
     ]
-    return web.json_response(data)
+    return OKResponse(data)
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/repositories")
@@ -268,7 +263,7 @@ async def add_repository(request):
         args = {"clone": [build.id, repo.id]}
         await request.cirrina.task_queue.put(args)
 
-    return web.Response(status=200, text="SourceRepository added")
+    return OKResponse("SourceRepository added")
 
 
 @app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
@@ -277,11 +272,8 @@ async def edit_repository(request):
     sourcerepository_id = request.match_info["sourcerepository_id"]
     db = request.cirrina.db_session
     params = await request.json()
-    url = params.get("url", "")
     architectures = params.get("architectures", [])
 
-    if not url:
-        return ErrorResponse(400, "No URL recieved")
     if not architectures:
         return ErrorResponse(400, "No architectures recieved")
 
@@ -292,4 +284,6 @@ async def edit_repository(request):
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.c.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.c.projectversion_id == projectversion.id).first()
 
-    logger.info(buildconfig.architectures)
+    buildconfig.architectures = "{" + ",".join(architectures) + "}"
+    db.commit()
+    return OKResponse("SourceRepository changed")
