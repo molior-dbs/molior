@@ -4,14 +4,13 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..molior.configuration import Configuration
 
+from .database import Base
+from .project import Project
+from .projectversiondependency import ProjectVersionDependency
 # reeded for relations:
 from . import sourcerepository    # noqa: F401
 
-from .project import Project
-from .projectversiondependency import ProjectVersionDependency
-from .database import Base
-
-MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
+MIRROR_STATES = ["new", "created", "updating", "publishing", "init_error", "error", "ready"]
 
 
 class ProjectVersion(Base):
@@ -41,7 +40,7 @@ class ProjectVersion(Base):
     mirror_distribution = Column(String)
     mirror_components = Column(String)
     mirror_architectures = Column(String)
-    mirror_state = Column(Enum(*MIRROR_STATES, name="mirror_stateenum"), default="undefined")
+    mirror_state = Column(Enum(*MIRROR_STATES, name="mirror_stateenum"), default=None)
     mirror_with_sources = Column(Boolean, default=False)
     mirror_with_installer = Column(Boolean, default=False)
     is_locked = Column(Boolean, default=False)
@@ -140,10 +139,8 @@ def get_projectversion_deps(projectversion_id, session):
     result = session.execute(query, {"projectversion_id": projectversion_id})
 
     projectversion_ids = []
-
     for row in result:
         projectversion_ids.append(row[1])
-
     return projectversion_ids
 
 
@@ -155,3 +152,11 @@ def get_projectversion(request):
             ProjectVersion.name == projectversion_id,
             Project.name == project_id
         ).first()
+
+
+def get_projectversion_byname(fullname, session):
+    parts = fullname.split('/')
+    if len(parts) != 2:
+        return None
+    name, version = parts
+    return session.query(ProjectVersion).join(Project).filter(Project.name == name, ProjectVersion.name == version).first()

@@ -307,3 +307,11 @@ async def write_log_title(build_id, line, no_footer_newline=False, no_header_new
     await write_log(build_id, "{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
     await write_log(build_id, "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
     await write_log(build_id, "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
+
+
+def array2db(array):
+    return "{{{}}}".format(",".join(array))
+
+
+def db2array(val):
+    return val[1:-1].split(",")
