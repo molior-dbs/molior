@@ -10,7 +10,6 @@ from ..api.sourcerepository import get_last_gitref
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion
 from ..model.sourepprover import SouRepProVer
 
@@ -118,15 +117,11 @@ async def get_projectversion_repositories(request):
             description: internal server error
     """
     db = request.cirrina.db_session
-    project_id = request.match_info["project_id"]
-    projectversion_id = request.match_info["projectversion_id"]
     filter_url = request.GET.getone("filter_url", "")
 
-    projectversion = db.query(ProjectVersion).filter(
-            ProjectVersion.name == projectversion_id).join(Project).filter(
-            Project.name == project_id).first()
+    projectversion = get_projectversion(request)
     if not projectversion:
-        return ErrorResponse(404, "Project with name {} could not be found".format(project_id))
+        return ErrorResponse(400, "Projectversion not found")
 
     query = db.query(SourceRepository, SouRepProVer).filter(SouRepProVer.sourcerepository_id == SourceRepository.id,
                                                             SouRepProVer.projectversion_id == projectversion.id)

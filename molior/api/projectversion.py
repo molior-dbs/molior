@@ -1,50 +1,10 @@
-from aiohttp import web
-
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
-
-
-def get_projectversion_deps_manually(projectversion, to_dict=True):
-    """
-    Returns all dependencies of given projectversion (recursive).
-
-    Args:
-        projectversion (ProjectVersion): The ProjectVersion model instance.
-        to_dict (bool): If True output will be dict.
-    """
-
-    deps = []
-
-    def get_deps(projectv):
-        """
-        Returns a list of dependencies
-        of the given projectversion.
-        Recursively calls this function until
-        all subdependencies are appended to
-        the "deps" list.
-
-        Args:
-            projectv (ProjectVersion): The ProjectVersion model instance.
-        """
-        if not projectv:
-            return
-
-        if projectv not in deps and projectversion.id != projectv.id:
-            dep = projectversion_to_dict(projectv) if to_dict else projectv
-            if dep not in deps:
-                deps.append(dep)
-
-        for dep in projectv.dependencies:
-            get_deps(dep)
-
-    get_deps(projectversion)
-
-    return deps
 
 
 def projectversion_to_dict(projectversion):
@@ -60,7 +20,7 @@ def projectversion_to_dict(projectversion):
         dict: The dict which can be processed by json_response
 
     """
-    return {
+    data = {
         "id": projectversion.id,
         "name": projectversion.name,
         "project_name": projectversion.project.name,
@@ -70,11 +30,14 @@ def projectversion_to_dict(projectversion):
             "name": projectversion.project.name,
             "description": projectversion.project.description,
         },
-        "basemirror": projectversion.basemirror.fullname,
         "architectures": projectversion.mirror_architectures[1:-1].split(","),
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
     }
+    if projectversion.basemirror:
+        data.update({"basemirror": projectversion.basemirror.fullname})
+
+    return data
 
 
 @app.http_get("/api/projectversions")
@@ -122,6 +85,7 @@ async def get_projectversions(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     project_id = request.GET.getone("project_id", None)
     project_name = request.GET.getone("project_name", None)
     exclude_id = request.GET.getone("exclude_id", None)
@@ -129,11 +93,7 @@ async def get_projectversions(request):
     is_basemirror = request.GET.getone("isbasemirror", False)
     dependant_id = request.GET.getone("dependant_id", None)
 
-    query = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-        .filter(ProjectVersion.is_deleted == False)  # noqa: E712
-    )
+    query = db.query(ProjectVersion).filter(ProjectVersion.is_deleted == False)  # noqa: E712
 
     exclude_id = parse_int(exclude_id)
     if exclude_id:
@@ -153,7 +113,7 @@ async def get_projectversions(request):
 
     if dependant_id:
         logger.info("dependant_id")
-        p_version = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == dependant_id).first()
+        p_version = db.query(ProjectVersion).filter(ProjectVersion.id == dependant_id).first()
         projectversions = []
         if p_version:
             projectversions = [p_version.basemirror]
@@ -167,12 +127,17 @@ async def get_projectversions(request):
 
     for projectversion in projectversions:
         projectversion_dict = projectversion_to_dict(projectversion)
-        projectversion_dict["dependencies"] = get_projectversion_deps_manually(projectversion)
+        dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+        projectversion_dict["dependencies"] = []
+        for dep_id in dep_ids:
+            dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+            if dep:
+                projectversion_dict["dependencies"].append(projectversion_to_dict(dep))
         results.append(projectversion_dict)
 
     data = {"total_result_count": nb_projectversions, "results": results}
 
-    return web.json_response(data)
+    return OKResponse(data)
 
 
 @app.http_get("/api/projectversions/{projectversion_id}")
@@ -200,18 +165,14 @@ async def get_projectversion(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     projectversion_id = request.match_info["projectversion_id"]
     try:
         projectversion_id = int(projectversion_id)
     except (ValueError, TypeError):
         return ErrorResponse(400, "Incorrect value for projectversion_id")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)  # pylint: disable=no-member
-        .first()
-    )
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion %d not found" % projectversion_id)
 
@@ -219,13 +180,18 @@ async def get_projectversion(request):
         return ErrorResponse(404, "Projectversion {} deleted".format(projectversion_id))
 
     projectversion_dict = projectversion_to_dict(projectversion)
-    projectversion_dict["dependencies"] = get_projectversion_deps_manually(projectversion)
+    dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+    projectversion_dict["dependencies"] = []
+    for dep_id in dep_ids:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+        if dep:
+            projectversion_dict["dependencies"].append(projectversion_to_dict(dep))
 
     projectversion_dict["basemirror_url"] = str()
     if projectversion.basemirror:
         projectversion_dict["basemirror_url"] = projectversion.basemirror.get_apt_repo()
 
-    return web.json_response(projectversion_dict)
+    return OKResponse(projectversion_dict)
 
 
 @app.http_post("/api/projects/{project_id}/versions")
@@ -271,6 +237,7 @@ async def create_projectversions(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -294,20 +261,19 @@ async def create_projectversions(request):
 
     # FIXME: verify valid architectures
 
-    project = request.cirrina.db_session.query(Project).filter(Project.name == project_id).first()
+    project = db.query(Project).filter(Project.name == project_id).first()
     if not project:
-        project = request.cirrina.db_session.query(Project).filter(Project.id == project_id).first()
+        project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.name == name,
-                                                                             Project.id == project.id).first()
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.name == name, Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion already exists. {}".format(
                 "And is marked as deleted!" if projectversion.is_deleted else ""))
 
-    basemirror = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.parent.name == basemirror_name,
-                                                                         ProjectVersion.name == basemirror_version).first()
+    basemirror = db.query(ProjectVersion).filter(ProjectVersion.project.name == basemirror_name,
+                                                 ProjectVersion.name == basemirror_version).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
@@ -315,11 +281,7 @@ async def create_projectversions(request):
     request.cirrina.db_session.add(projectversion)
     request.cirrina.db_session.commit()
 
-    logger.info("ProjectVersion '%s/%s' with id '%s' added",
-                projectversion.project.name,
-                projectversion.name,
-                projectversion.id,
-                )
+    logger.info("ProjectVersion '%s/%s' with id '%s' added", projectversion.project.name, projectversion.name, projectversion.id)
 
     project_name = projectversion.project.name
     project_version = projectversion.name
@@ -332,49 +294,7 @@ async def create_projectversions(request):
                 project_version,
                 architectures]})
 
-    return web.json_response({"id": projectversion.id, "name": projectversion.name})
-
-
-@app.http_post("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
-@req_role(["member", "owner"])
-async def post_add_repository(request):
-    """
-    Adds given sourcerepositories to the given
-    projectversion.
-
-    ---
-    description: Adds given sourcerepositories to given projectversion.
-    tags:
-        - ProjectVersions
-    consumes:
-        - application/json
-    parameters:
-        - name: projectversion_id
-          in: path
-          required: true
-          type: integer
-        - name: sourcerepository_id
-          in: path
-          required: true
-          type: integer
-        - name: body
-          in: body
-          required: true
-          schema:
-            type: object
-            properties:
-                buildvariants:
-                    type: array
-                    example: [1, 2]
-    produces:
-        - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid data received.
-    """
-    return ErrorResponse(400, "API obsolete")
+    return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
 
 @app.http_delete("/api/projectversions/{projectversion_id}/repositories/{sourcerepository_id}")
@@ -407,46 +327,34 @@ async def delete_repository(request):
         "400":
             description: Invalid data received.
     """
+    db = request.cirrina.db_session
     projectversion_id = parse_int(request.match_info["projectversion_id"])
     sourcerepository_id = parse_int(request.match_info["sourcerepository_id"])
     projectversion_id = parse_int(projectversion_id)
     if not projectversion_id:
         return ErrorResponse(400, "No valid projectversion_id received")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)  # pylint: disable=no-member
-        .filter(ProjectVersion.id == projectversion_id)
-        .first()
-    )
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion {} could not been found.".format(projectversion_id))
 
     if not sourcerepository_id:
         return ErrorResponse(400, "No valid sourcerepository_id received")
 
-    sourcerepository = (
-        request.cirrina.db_session.query(SourceRepository)
-        .filter(SourceRepository.id == sourcerepository_id)
-        .first()
-    )
-
+    sourcerepository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
     if not sourcerepository:
         return ErrorResponse(400, "Sourcerepository {} could not been found".format(sourcerepository_id))
 
     # get the association of the projectversion and the sourcerepository
-    sourcerepositoryprojectversion = (
-        request.cirrina.db_session.query(SouRepProVer)  # pylint: disable=no-member
-        .filter(SouRepProVer.sourcerepository_id == sourcerepository_id)
-        .filter(SouRepProVer.projectversion_id == projectversion.id)
-    ).first()
+    sourcerepositoryprojectversion = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                                   SouRepProVer.projectversion_id == projectversion.id).first()
     if not sourcerepositoryprojectversion:
         return ErrorResponse(400, "Could not find the sourcerepository for the projectversion")
 
     projectversion.sourcerepositories.remove(sourcerepository)
     request.cirrina.db_session.commit()
 
-    return web.Response(status=200, text="Sourcerepository removed from projectversion")
+    return OKResponse("Sourcerepository removed from projectversion")
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/clone")
@@ -485,6 +393,7 @@ async def clone_projectversion(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -497,9 +406,9 @@ async def clone_projectversion(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
 
-    if request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+    if db.query(ProjectVersion).join(Project).filter(
             ProjectVersion.name == name,
             Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
@@ -515,10 +424,10 @@ async def clone_projectversion(request):
     )
 
     for repo in new_projectversion.sourcerepositories:
-        sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
+        sourepprover = db.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == repo.id,
                 SouRepProVer.projectversion_id == projectversion.id).first()
-        new_sourepprover = request.cirrina.db_session.query(SouRepProVer).filter(
+        new_sourepprover = db.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == repo.id,
                 SouRepProVer.projectversion_id == new_projectversion.id).first()
         new_sourepprover.architectures = sourepprover.architectures
@@ -539,9 +448,7 @@ async def clone_projectversion(request):
         }
     )
 
-    return web.json_response(
-        {"id": new_projectversion.id, "name": new_projectversion.name}
-    )
+    return OKResponse({"id": new_projectversion.id, "name": new_projectversion.name})
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/overlay")
@@ -579,6 +486,7 @@ async def create_projectversion_overlay(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -589,24 +497,17 @@ async def create_projectversion_overlay(request):
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
     if not is_name_valid(name):
-        return ErrorResponse(400, "Invalid project name!")
+        return ErrorResponse(400, "Invalid project name")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)
-        .first()
-    )
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
 
-    if (
-        request.cirrina.db_session.query(ProjectVersion)
-        .join(Project)
-        .filter(ProjectVersion.name == name)
-        .filter(Project.id == projectversion.project_id)
-        .first()
-    ):
-        return ErrorResponse(400, "Projectversion already exists.")
+    overlay_projectversion = db.query(ProjectVersion).filter(ProjectVersion.name == name,
+                                                             ProjectVersion.project_id == projectversion.project_id).first()
+    if overlay_projectversion:
+        return ErrorResponse(400, "Overlay already exists")
 
-    # remove association from database
     overlay_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
@@ -635,9 +536,7 @@ async def create_projectversion_overlay(request):
         }
     )
 
-    return web.json_response(
-        {"id": overlay_projectversion.id, "name": overlay_projectversion.name}
-    )
+    return OKResponse({"id": overlay_projectversion.id, "name": overlay_projectversion.name})
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/toggleci")
@@ -665,35 +564,29 @@ async def post_projectversion_toggle_ci(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     projectversion_id = request.match_info["projectversion_id"]
     try:
         projectversion_id = int(projectversion_id)
     except (ValueError, TypeError):
         return ErrorResponse(400, "Incorrect value for projectversion_id")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)  # pylint: disable=no-member
-        .first()
-    )
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
                 projectversion_id=projectversion_id))
 
     projectversion.ci_builds_enabled = not projectversion.ci_builds_enabled
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
 
     result = "enabled" if projectversion.ci_builds_enabled else "disabled"
 
-    logger.info(
-        "continuous integration builds %s on ProjectVersion '%s/%s'",
-        result,
-        projectversion.project.name,
-        projectversion.name,
-    )
+    logger.info("continuous integration builds %s on ProjectVersion '%s/%s'",
+                result,
+                projectversion.project.name,
+                projectversion.name)
 
-    return web.Response(text="Ci builds are now {}.".format(result), status=200)
+    return OKResponse("Ci builds are now {}.".format(result))
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/lock")
@@ -721,38 +614,30 @@ async def post_projectversion_lock(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     projectversion_id = request.match_info["projectversion_id"]
     try:
         projectversion_id = int(projectversion_id)
     except (ValueError, TypeError):
         return ErrorResponse(400, "Incorrect value for projectversion_id")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)  # pylint: disable=no-member
-        .first()
-    )
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
                 projectversion_id=projectversion_id))
 
-    deps = get_projectversion_deps_manually(projectversion, to_dict=False)
-    for dep in deps:
-        if not dep.is_locked:
+    dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+    for dep_id in dep_ids:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+        if dep and not dep.is_locked:
             return ErrorResponse(400, "Dependencies of given projectversion must be locked")
 
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
 
-    logger.info(
-        "ProjectVersion '%s/%s' locked",
-        projectversion.project.name,
-        projectversion.name,
-    )
-
-    return web.Response(text="Locked Project Version", status=200)
+    logger.info("ProjectVersion '%s/%s' locked", projectversion.project.name, projectversion.name)
+    return OKResponse("Locked Project Version")
 
 
 @app.http_put("/api/projectversions/{projectversion_id}/mark-delete")
@@ -780,29 +665,18 @@ async def mark_delete_projectversion(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     projectversion_id = request.match_info["projectversion_id"]
     try:
         projectversion_id = int(projectversion_id)
     except (ValueError, TypeError):
-        logger.error(
-            "projectversion mark delete: invalid projectversion_id %s",
-            projectversion_id,
-        )
+        logger.error("projectversion mark delete: invalid projectversion_id %s", projectversion_id)
         return ErrorResponse(400, "invalid projectversion_id")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)  # pylint: disable=no-member
-        .first()
-    )
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
-        logger.error(
-            "projectversion mark delete: projectversion_id %d not found",
-            projectversion_id,
-        )
-        return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
-                projectversion_id=projectversion_id))
+        logger.error("projectversion mark delete: projectversion_id %d not found", projectversion_id)
+        return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(projectversion_id=projectversion_id))
 
     if projectversion.dependents:
         blocking_dependants = []
@@ -810,13 +684,8 @@ async def mark_delete_projectversion(request):
             if not d.is_deleted:
                 blocking_dependants.append("{}/{}".format(d.project.name, d.name))
         if blocking_dependants:
-            logger.error(
-                "projectversion mark delete: projectversion_id %d still has dependency %d",
-                projectversion_id,
-                d.id,
-            )
-            return ErrorResponse(400,
-                                 "Projectversions '{}' are still depending on this version, you can not delete it!".format(
+            logger.error("projectversion mark delete: projectversion_id %d still has dependency %d", projectversion_id, d.id)
+            return ErrorResponse(400, "Projectversions '{}' are still depending on this version, cannot delete it".format(
                                   ", ".join(blocking_dependants)))
 
     base_mirror_name = projectversion.basemirror.project.name
@@ -847,15 +716,10 @@ async def mark_delete_projectversion(request):
     # lock the projectversion so no packages can be published in this repository
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
 
-    logger.info(
-        "ProjectVersion '%s/%s' deleted",
-        projectversion.project.name,
-        projectversion.name,
-    )
-
-    return web.Response(text="Deleted Project Version", status=200)
+    logger.info("ProjectVersion '%s/%s' deleted", projectversion.project.name, projectversion.name)
+    return OKResponse("Deleted Project Version")
 
 
 @app.http_delete("/api/projectversions/{projectversion_id}/dependency")
@@ -891,6 +755,7 @@ async def delete_projectversion_dependency(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     projectversion_id = parse_int(request.match_info["projectversion_id"])
@@ -901,43 +766,25 @@ async def delete_projectversion_dependency(request):
     if not dependency_id:
         return ErrorResponse(400, "Incorrect value for dependency_id")
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(
-            ProjectVersion.id == projectversion_id).first()
-
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
-        return ErrorResponse(400,
-                             "Could not find projectversion with id: {}".format(projectversion_id)
-                             )
+        return ErrorResponse(400, "Could not find projectversion with id: {}".format(projectversion_id))
 
     if projectversion.is_locked:
-        return ErrorResponse(400,
-                             "You can not delete dependencies on a locked projectversion!"
-                             )
+        return ErrorResponse(400, "You can not delete dependencies on a locked projectversion")
 
-    dependency = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == dependency_id)
-        .first()
-    )
-
+    dependency = db.query(ProjectVersion).filter(ProjectVersion.id == dependency_id).first()
     if not dependency:
-        return ErrorResponse(400,
-                             "Could not find projectversion dependency with id: {}".format(
-                                dependency_id
-                                )
-                             )
+        return ErrorResponse(400, "Could not find projectversion dependency with id: {}".format(dependency_id))
 
     projectversion.dependencies.remove(dependency)
 
     pv_name = "{}/{}".format(projectversion.project.name, projectversion.name)
     dep_name = "{}/{}".format(dependency.project.name, dependency.name)
 
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
+    request.cirrina.db_session.commit()
     logger.info("ProjectVersionDependency '%s -> %s' deleted", pv_name, dep_name)
-
-    return web.Response(
-        text="Deleted dependency from {} to {}".format(pv_name, dep_name), status=200
-    )
+    return OKResponse("Deleted dependency from {} to {}".format(pv_name, dep_name))
 
 
 @app.http_post("/api/projectversions/{projectversion_id}/dependency")
@@ -974,6 +821,7 @@ async def post_projectversion_dependency(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     projectversion_id = parse_int(request.match_info["projectversion_id"])
@@ -984,34 +832,26 @@ async def post_projectversion_dependency(request):
     if not dependency_id:
         return ErrorResponse(400, "Incorrect value for dependency_id")
 
-    projectversion = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == projectversion_id)  # pylint: disable=no-member
-        .first()
-    )
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
-        return ErrorResponse(400, "Invalid data received.")
+        return ErrorResponse(400, "Invalid data received")
 
     if projectversion.is_locked:
-        return ErrorResponse(400, "You can not add dependencies on a locked projectversion!")
+        return ErrorResponse(400, "You can not add dependencies on a locked projectversion")
 
     if dependency_id == projectversion_id:
-        return ErrorResponse(400, "You can not add a dependency of the same projectversion to itself!")
+        return ErrorResponse(400, "You can not add a dependency of the same projectversion to itself")
+
+    dependency = db.query(ProjectVersion).filter(ProjectVersion.id == dependency_id).first()
+    if not dependency:
+        return ErrorResponse(400, "Invalid data received")
 
     # check for dependency loops
     dep_ids = get_projectversion_deps(dependency_id, request.cirrina.db_session)
     if projectversion_id in dep_ids:
-        return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion!")
-
-    dependency = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter(ProjectVersion.id == dependency_id)  # pylint: disable=no-member
-        .first()
-    )
-    if not dependency:
-        return ErrorResponse(400, "Invalid data received.")
+        return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
     request.cirrina.db_session.commit()
 
-    return web.Response(status=200, text="Dependency added")
+    return OKResponse("Dependency added")

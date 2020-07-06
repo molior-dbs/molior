@@ -2,10 +2,10 @@ from sqlalchemy.sql import or_
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, paginate, OKResponse
+from ..tools import ErrorResponse, parse_int, is_name_valid, paginate, OKResponse, array2db
 from ..api.projectversion import projectversion_to_dict
-from ..model.projectversion import ProjectVersion
 from ..model.project import Project
+from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 
 
 @app.http_get("/api2/project/{project_id}/versions")
@@ -75,7 +75,6 @@ async def get_projectversions2(request):
     nb_projectversions = query.count()
 
     results = []
-
     for projectversion in projectversions:
         projectversion_dict = projectversion_to_dict(projectversion)
         results.append(projectversion_dict)
@@ -87,7 +86,7 @@ async def get_projectversions2(request):
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
 @app.authenticated
-async def get_projectversion_byname(request):
+async def get_dependencies(request):
     """
     Returns a project with version information.
 
@@ -206,26 +205,138 @@ async def create_projectversions(request):
         return ErrorResponse(400, "Projectversion already exists. {}".format(
                 "And is marked as deleted!" if projectversion.is_deleted else ""))
 
-    basemirror = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.parent.name == basemirror_name,
-                                                                         ProjectVersion.name == basemirror_version).first()
+    basemirror = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+                                    Project.id == ProjectVersion.project_id,
+                                    Project.name == basemirror_name,
+                                    ProjectVersion.name == basemirror_version).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion = ProjectVersion(name=name, project=project, architectures=architectures, basemirror=basemirror)
+    projectversion = ProjectVersion(
+            name=name,
+            project=project,
+            mirror_architectures=array2db(architectures),
+            basemirror=basemirror,
+            mirror_state=None)
     request.cirrina.db_session.add(projectversion)
     request.cirrina.db_session.commit()
 
     logger.info("ProjectVersion '%s/%s' with id '%s' added", projectversion.project.name, projectversion.name, projectversion.id)
 
-    project_name = projectversion.project.name
-    project_version = projectversion.name
-
     await request.cirrina.aptly_queue.put({"init_repository": [
                 projectversion.id,
                 basemirror_name,
                 basemirror_version,
-                project_name,
-                project_version,
+                projectversion.project.name,
+                projectversion.name,
                 architectures]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
+
+
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/dependencies")
+@app.authenticated
+async def get_projectversion_dependencies(request):
+    """
+    Returns a list of projectversions.
+
+    ---
+    description: Returns a list of projectversions.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: basemirror_id
+          in: query
+          required: false
+          type: integer
+        - name: is_basemirror
+          in: query
+          required: false
+          type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    db = request.cirrina.db_session
+    candidates = request.GET.getone("candidates", None)
+    # filter_name = request.GET.getone("q", None)
+
+    if candidates:
+        candidates = candidates == "true"
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    # get existing dependencies
+    dep_ids = get_projectversion_deps(projectversion.id, db)
+
+    results = []
+    if candidates:  # return candidate dependencies
+        cands = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
+                                                ProjectVersion.id != projectversion.id,
+                                                ProjectVersion.id.notin_(dep_ids)).all()
+        for cand in cands:
+            results.append(projectversion_to_dict(cand))
+
+    else:  # return existing dependencies
+        deps = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids)).all()
+        for dep in deps:
+            if dep:
+                results.append(projectversion_to_dict(dep))
+
+    data = {"total_result_count": len(results), "results": results}
+    return OKResponse(data)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/dependencies")
+@req_role("owner")
+async def add_projectversion_dependency(request):
+    db = request.cirrina.db_session
+    params = await request.json()
+    dependency_name = params.get("dependency")
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.is_locked:
+        return ErrorResponse(400, "You can not add dependencies on a locked projectversion")
+
+    dependency = get_projectversion_byname(dependency_name, db)
+    if not dependency:
+        return ErrorResponse(400, "Dependency not found")
+
+    if dependency.id == projectversion.id:
+        return ErrorResponse(400, "You can not add a dependency of the same projectversion to itself")
+
+    # check for dependency loops
+    dep_ids = get_projectversion_deps(dependency.id, db)
+    if projectversion.id in dep_ids:
+        return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
+
+    projectversion.dependencies.append(dependency)
+    request.cirrina.db_session.commit()
+    return OKResponse("Dependency added")

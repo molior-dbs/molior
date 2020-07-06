@@ -191,11 +191,11 @@ async def edit_mirror(request):
                 ProjectVersion.name == mirror_version,
                 Project.name == mirror_name).first()
     if not mirror:
-        return ErrorResponse(400, "Mirror not found")
+        return ErrorResponse(400, "Mirror not found {}/{}".format(mirror_name, mirror_version))
 
     mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
     if not mirrorkey:
-        return ErrorResponse(400, "Mirror not found")
+        return ErrorResponse(400, "Mirror keys not found for mirror {}".format(mirror.id))
 
     if mirror.is_locked:
         return ErrorResponse(400, "Mirror is locked")
@@ -214,8 +214,8 @@ async def edit_mirror(request):
 
     basemirror_name, basemirror_version = basemirror.split("/")
     bm = request.cirrina.db_session.query(ProjectVersion).filter(
-                ProjectVersion.project.name == basemirror_version,
-                ProjectVersion.name == basemirror_name).first()
+                ProjectVersion.project.name == basemirror_name,
+                ProjectVersion.name == basemirror_version).first()
     if not bm:
         return ErrorResponse(400, "could not find a basemirror with '%s'", basemirror)
 
