@@ -10,7 +10,7 @@ from .projectversiondependency import ProjectVersionDependency
 # reeded for relations:
 from . import sourcerepository    # noqa: F401
 
-MIRROR_STATES = ["new", "created", "updating", "publishing", "init_error", "error", "ready"]
+MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
 
 
 class ProjectVersion(Base):
