@@ -135,9 +135,11 @@ async def get_latest_tag(path, build_id):
 
         async def outh2(line):
             nonlocal timestamp
-            timestamp = line.strip()
+            line = line.strip()
+            if line:
+                timestamp = line
 
-        process = Launchy(shlex.split("git show -s --format=%ct {}".format(tag)), outh2, outh2, cwd=str(path))
+        process = Launchy(shlex.split("git log -1 --format=%ct {}".format(tag)), outh2, outh2, cwd=str(path))
         await process.launch()
         await process.wait()
 
