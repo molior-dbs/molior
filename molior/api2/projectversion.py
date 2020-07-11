@@ -340,3 +340,26 @@ async def add_projectversion_dependency(request):
     projectversion.dependencies.append(dependency)
     request.cirrina.db_session.commit()
     return OKResponse("Dependency added")
+
+
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}/dependency/{dependency_name}/{dependency_version}")
+@req_role("owner")
+async def delete_projectversion_dependency(request):
+    db = request.cirrina.db_session
+    dependency_name = request.match_info["dependency_name"]
+    dependency_version = request.match_info["dependency_version"]
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+
+    dependency = get_projectversion_byname(dependency_name + "/" + dependency_version, db)
+    if not dependency:
+        return ErrorResponse(400, "Dependency not found")
+
+    projectversion.dependencies.remove(dependency)
+    request.cirrina.db_session.commit()
+    return OKResponse("Dependency deleted")
