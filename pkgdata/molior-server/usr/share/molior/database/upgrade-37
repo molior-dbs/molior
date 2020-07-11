@@ -1,0 +1,30 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE TABLE debianpackage (
+    id integer NOT NULL,
+    name character varying,
+    suffix character varying
+);
+ALTER TABLE debianpackage OWNER TO molior;
+
+ALTER TABLE ONLY debianpackage ADD CONSTRAINT debianpackage_pkey PRIMARY KEY (id);
+
+CREATE SEQUENCE debianpackage_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+ALTER TABLE debianpackage_id_seq OWNER TO molior;
+ALTER SEQUENCE debianpackage_id_seq OWNED BY debianpackage.id;
+ALTER TABLE ONLY debianpackage ALTER COLUMN id SET DEFAULT nextval('debianpackage_id_seq'::regclass);
+
+CREATE TABLE build_debianpackage (
+    build_id integer REFERENCES build(id),
+    debianpackage_id integer REFERENCES debianpackage(id)
+);
+ALTER TABLE build_debianpackage OWNER TO molior;
+
+EOF

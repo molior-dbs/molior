@@ -9,10 +9,8 @@ from ..app import logger
 from ..tools import strip_epoch_version, write_log, write_log_title
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
-from ..molior.notifier import send_mail_notification
 
 from ..model.database import Session
-from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 
@@ -41,7 +39,7 @@ async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
     return files
 
 
-async def DebSrcPublish(build):
+async def DebSrcPublish(session, build):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -60,6 +58,8 @@ async def DebSrcPublish(build):
     if not srcfiles:
         logger.error("no source files found")
         return False
+
+    build.add_files(session, srcfiles)
 
     publish_files = []
     for f in srcfiles:
@@ -94,7 +94,7 @@ async def DebSrcPublish(build):
 
     await write_log(build.id, "\n")
 
-    if ret:
+    if ret:  # only delete if published, allow republish
         files2delete = publish_files
         v = strip_epoch_version(build.version)
         changes_file = "{}_{}_{}.changes".format(build.sourcename, v, "source")
@@ -109,7 +109,7 @@ async def DebSrcPublish(build):
     return ret
 
 
-async def publish_packages(build, out_path):
+async def publish_packages(session, build, out_path):
     """
     Publishes given packages to given
     publish point.
@@ -123,6 +123,8 @@ async def publish_packages(build, out_path):
     """
 
     outfiles = await debchanges_get_files(out_path, build.sourcename, build.version, build.architecture)
+    build.add_files(session, outfiles)
+    # FIXME: commit
 
     files2upload = []
     for f in outfiles:
@@ -186,7 +188,7 @@ async def publish_packages(build, out_path):
     return ret
 
 
-async def DebPublish(task_queue, build_id):
+async def DebPublish(session, build):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -199,50 +201,19 @@ async def DebPublish(task_queue, build_id):
         bool: True if successful, otherwise False.
     """
 
-    with Session() as session:
-
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("build_succeeded: no build found for %d", build_id)
-            return
-        await build.set_needs_publish()
-        session.commit()
-
-        build.log_state("publishing")
-        await build.set_publishing()
-        session.commit()
-        try:
-            out_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
-            await write_log(build.parent.parent.id, "I: publishing build %d\n" % build.id)
-            await write_log_title(build_id, "Publishing", no_header_newline=False)
-            if not await publish_packages(build, out_path):
-                logger.error("publisher: error publishing build %d" % build_id)
-                await write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
-                await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
-                await build.set_publish_failed()
-                session.commit()
-                return
-        except Exception as exc:
-            logger.error("publisher: error publishing build %d" % build_id)
-            await write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
-            await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
-            logger.exception(exc)
-            await build.set_publish_failed()
-            session.commit()
-            return
-        finally:
-            buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-            if buildtask:
-                session.delete(buildtask)
-                session.commit()
-
-        await write_log_title(build_id, "Done", no_footer_newline=True, no_header_newline=False)
-        await build.set_successful()
-        session.commit()
-
-        if not build.is_ci:
-            send_mail_notification(build)
-
-        # Schedule builds
-        args = {"schedule": []}
-        await task_queue.put(args)
+    try:
+        out_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
+        await write_log(build.parent.parent.id, "I: publishing build %d\n" % build.id)
+        await write_log_title(build.id, "Publishing", no_header_newline=False)
+        if not await publish_packages(session, build, out_path):
+            logger.error("publisher: error publishing build %d" % build.id)
+            return False
+    except Exception as exc:
+        logger.error("publisher: error publishing build %d" % build.id)
+        logger.exception(exc)
+        return False
+    finally:
+        buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
+        if buildtask:
+            session.delete(buildtask)
+    return True

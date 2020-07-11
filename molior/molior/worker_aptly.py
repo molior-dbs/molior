@@ -8,7 +8,7 @@ from ..tools import get_aptly_connection, write_log, write_log_title
 from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
-from .notifier import Subject, Event, notify
+from .notifier import Subject, Event, notify, send_mail_notification
 
 from ..model.database import Session
 from ..model.build import Build
@@ -674,7 +674,7 @@ class AptlyWorker:
 
         ret = False
         try:
-            ret = await DebSrcPublish(build)
+            ret = await DebSrcPublish(session, build)
         except Exception as exc:
             logger.exception(exc)
 
@@ -699,7 +699,7 @@ class AptlyWorker:
             await write_log_title(build.parent.id, "Done", no_footer_newline=True, no_header_newline=True)
             await build.parent.set_failed()
             session.commit()
-            return False
+            return
 
         for child in childs:
             await child.set_needs_build()
@@ -716,18 +716,32 @@ class AptlyWorker:
             logger.error("aptly worker: build with id %d not found", build_id)
             return
 
+        await build.set_needs_publish()
+        await build.set_publishing()
+        session.commit()
+
         ret = False
         try:
-            ret = await asyncio.ensure_future(DebPublish(self.task_queue, build_id))
+            ret = await DebPublish(session, build)
         except Exception as exc:
             logger.exception(exc)
 
-        if not ret:
-            await write_log(build.parent.id, "E: publishing package failed\n")
-            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=True)
+        if ret:
+            await build.set_successful()
+        else:
             await build.set_publish_failed()
-            session.commit()
-            return
+            await write_log(build.parent.parent.id, "E: publishing build %d failed\n" % build.id)
+            await write_log(build.parent.id, "E: publishing build failed\n")
+            await write_log(build.id, "E: publishing build failed\n")
+        await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
+        session.commit()
+
+        if not build.is_ci:
+            send_mail_notification(build)
+
+        # Schedule builds
+        args = {"schedule": []}
+        await self.task_queue.put(args)
 
     async def _drop_publish(self, args, _):
         base_mirror_name = args[0]
