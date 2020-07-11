@@ -53,12 +53,13 @@ async def get_projectversions2(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     project_id = request.match_info["project_id"]
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     filter_name = request.GET.getone("q", None)
 
-    query = request.cirrina.db_session.query(ProjectVersion).join(Project)
+    query = db.query(ProjectVersion).join(Project)
     if project_id:
         query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
     if filter_name:
@@ -66,13 +67,13 @@ async def get_projectversions2(request):
     if basemirror_id:
         query = query.filter(ProjectVersion.basemirror_id == basemirror_id)
     elif is_basemirror:
-        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")  # pylint: disable=no-member
+        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
 
-    query = query.order_by(Project.name, ProjectVersion.name)
-    query = paginate(request, query)
+    query = query.order_by(ProjectVersion.id.desc())
 
-    projectversions = query.all()
     nb_projectversions = query.count()
+    query = paginate(request, query)
+    projectversions = query.all()
 
     results = []
     for projectversion in projectversions:
@@ -86,7 +87,7 @@ async def get_projectversions2(request):
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
 @app.authenticated
-async def get_dependencies(request):
+async def get_projectversion2(request):
     """
     Returns a project with version information.
 
@@ -113,11 +114,12 @@ async def get_dependencies(request):
         "404":
             description: no entry found
     """
+    db = request.cirrina.db_session
 
     project_name = request.match_info["project_name"]
     project_version = request.match_info["project_version"]
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(
+    projectversion = db.query(ProjectVersion).filter(
             ProjectVersion.name == project_version).join(Project).filter(
             Project.name == project_name).first()
     if not projectversion:
@@ -129,7 +131,7 @@ async def get_dependencies(request):
 
 @app.http_post("/api2/project/{project_id}/versions")
 @req_role("owner")
-async def create_projectversions(request):
+async def create_projectversion(request):
     """
     Creates a new projectversion.
 
@@ -170,6 +172,7 @@ async def create_projectversions(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -193,19 +196,19 @@ async def create_projectversions(request):
 
     # FIXME: verify valid architectures
 
-    project = request.cirrina.db_session.query(Project).filter(Project.name == project_id).first()
+    project = db.query(Project).filter(Project.name == project_id).first()
     if not project:
-        project = request.cirrina.db_session.query(Project).filter(Project.id == project_id).first()
+        project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.name == name,
-                                                                             Project.id == project.id).first()
+    projectversion = db.query(ProjectVersion).join(Project).filter(
+            ProjectVersion.name == name, Project.id == project.id).first()
     if projectversion:
-        return ErrorResponse(400, "Projectversion already exists. {}".format(
-                "And is marked as deleted!" if projectversion.is_deleted else ""))
+        return ErrorResponse(400, "Projectversion already exists{}".format(
+                ", and is marked as deleted" if projectversion.is_deleted else ""))
 
-    basemirror = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+    basemirror = db.query(ProjectVersion).join(Project).filter(
                                     Project.id == ProjectVersion.project_id,
                                     Project.name == basemirror_name,
                                     ProjectVersion.name == basemirror_version).first()
@@ -218,8 +221,8 @@ async def create_projectversions(request):
             mirror_architectures=array2db(architectures),
             basemirror=basemirror,
             mirror_state=None)
-    request.cirrina.db_session.add(projectversion)
-    request.cirrina.db_session.commit()
+    db.add(projectversion)
+    db.commit()
 
     logger.info("ProjectVersion '%s/%s' with id '%s' added", projectversion.project.name, projectversion.name, projectversion.id)
 
@@ -338,7 +341,7 @@ async def add_projectversion_dependency(request):
         return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
-    request.cirrina.db_session.commit()
+    db.commit()
     return OKResponse("Dependency added")
 
 
@@ -361,5 +364,5 @@ async def delete_projectversion_dependency(request):
         return ErrorResponse(400, "Dependency not found")
 
     projectversion.dependencies.remove(dependency)
-    request.cirrina.db_session.commit()
+    db.commit()
     return OKResponse("Dependency deleted")
