@@ -315,5 +315,5 @@ def array2db(array):
 
 def db2array(val):
     if not val:
-        return ""
+        return []
     return val[1:-1].split(",")
