@@ -1,10 +1,6 @@
-import re
-import os
-
 from pathlib import Path
 from sqlalchemy import Column, String, Integer, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.hybrid import hybrid_property
 
 # Needed imports for relatioships
 import molior.model.projectversion  # pylint: disable=unused-import
@@ -24,6 +20,7 @@ class SourceRepository(Base):
     __tablename__ = "sourcerepository"
 
     id = Column(Integer, primary_key=True)
+    name = Column(String)
     url = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
     projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
@@ -31,22 +28,6 @@ class SourceRepository(Base):
 
     def __init__(self, url):
         self.url = url
-
-    @hybrid_property
-    def name(self):
-        """
-        Returns the name of the Repository by parsing
-        the url.
-
-        Returns:
-            name (str): The name of the repository
-        """
-        url = str(self.url)
-        if url.endswith(".git"):
-            search = re.search(r"([0-9a-zA-Z_\-.]+).git$", url)
-            if search:
-                return search.group(1)
-        return os.path.basename(url)
 
     @property
     def path(self):
