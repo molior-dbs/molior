@@ -10,6 +10,8 @@ from ..molior.notifier import Subject, Event, notify, run_hooks
 from .database import Base
 from .sourcerepository import SourceRepository
 from .buildtask import BuildTask
+from .debianpackage import Debianpackage
+from .build_debianpackage import BuildDebianpackage
 
 BUILD_STATES = [
     "new",
@@ -33,7 +35,7 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 class Build(Base):
     __tablename__ = "build"
 
-    id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    id = Column(Integer, primary_key=True)
     createdstamp = Column(DateTime(timezone=True), nullable=True, default="now()")
     startstamp = Column(DateTime(timezone=True), nullable=True)
     buildendstamp = Column(DateTime(timezone=True), nullable=True)
@@ -58,6 +60,7 @@ class Build(Base):
     builddeps = Column(String)
     buildtask = relationship(BuildTask, uselist=False)
     architecture = Column(String)
+    debianpackages = relationship(Debianpackage, secondary=BuildDebianpackage)
 
     def log_state(self, statemsg):
         prefix = ""
@@ -288,3 +291,46 @@ class Build(Base):
             return
 
         await run_hooks(self.id)
+
+    def add_files(self, session, files):
+        for f in files:
+            name = ""
+            version = ""
+            arch = ""
+            ext = ""
+            suffix = ""
+
+            p = f.split("_")
+
+            if self.buildtype == "deb":
+                if len(p) != 3:
+                    logger.error("build: unknown file: {}".format(f))
+                    continue
+                name, version, suffix = p
+                s = suffix.split(".", 2)
+                if len(s) != 2:
+                    logger.error("build: cannot add file: {}".format(f))
+                    continue
+                arch, ext = s
+                suffix = arch
+                if ext != "deb":
+                    continue
+
+            elif self.buildtype == "source":
+                if len(p) == 3:  # $pkg_$ver_source.buildinfo
+                    continue
+                if len(p) != 2:
+                    logger.error("build: unknown file: {}".format(f))
+                    continue
+
+                name, suffix = p
+                suffix = suffix.replace(self.version, "")
+                suffix = suffix[1:]  # remove dot
+                if suffix.endswith("dsc") or suffix.endswith("source.buildinfo"):
+                    continue
+
+            pkg = session.query(Debianpackage).filter_by(name=name, suffix=suffix).first()
+            if not pkg:
+                pkg = Debianpackage(name=name, suffix=suffix)
+            if pkg not in self.debianpackages:
+                self.debianpackages.append(pkg)
