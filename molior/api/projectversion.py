@@ -127,7 +127,7 @@ async def get_projectversions(request):
 
     for projectversion in projectversions:
         projectversion_dict = projectversion_to_dict(projectversion)
-        dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+        dep_ids = get_projectversion_deps(projectversion.id, db)
         projectversion_dict["dependencies"] = []
         for dep_id in dep_ids:
             dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
@@ -180,7 +180,7 @@ async def get_projectversion(request):
         return ErrorResponse(404, "Projectversion {} deleted".format(projectversion_id))
 
     projectversion_dict = projectversion_to_dict(projectversion)
-    dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+    dep_ids = get_projectversion_deps(projectversion.id, db)
     projectversion_dict["dependencies"] = []
     for dep_id in dep_ids:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
@@ -269,8 +269,8 @@ async def create_projectversions(request):
 
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.name == name, Project.id == project.id).first()
     if projectversion:
-        return ErrorResponse(400, "Projectversion already exists. {}".format(
-                "And is marked as deleted!" if projectversion.is_deleted else ""))
+        return ErrorResponse(400, "Projectversion already exists{}".format(
+                ", and is marked as deleted!" if projectversion.is_deleted else ""))
 
     basemirror = db.query(ProjectVersion).filter(ProjectVersion.project.name == basemirror_name,
                                                  ProjectVersion.name == basemirror_version).first()
@@ -278,8 +278,8 @@ async def create_projectversions(request):
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
     projectversion = ProjectVersion(name=name, project=project, architectures=architectures, basemirror=basemirror)
-    request.cirrina.db_session.add(projectversion)
-    request.cirrina.db_session.commit()
+    db.add(projectversion)
+    db.commit()
 
     logger.info("ProjectVersion '%s/%s' with id '%s' added", projectversion.project.name, projectversion.name, projectversion.id)
 
@@ -352,7 +352,7 @@ async def delete_repository(request):
         return ErrorResponse(400, "Could not find the sourcerepository for the projectversion")
 
     projectversion.sourcerepositories.remove(sourcerepository)
-    request.cirrina.db_session.commit()
+    db.commit()
 
     return OKResponse("Sourcerepository removed from projectversion")
 
@@ -432,8 +432,8 @@ async def clone_projectversion(request):
                 SouRepProVer.projectversion_id == new_projectversion.id).first()
         new_sourepprover.architectures = sourepprover.architectures
 
-    request.cirrina.db_session.add(new_projectversion)
-    request.cirrina.db_session.commit()
+    db.add(new_projectversion)
+    db.commit()
 
     await request.cirrina.aptly_queue.put(
         {
@@ -517,8 +517,8 @@ async def create_projectversion_overlay(request):
         basemirror=projectversion.basemirror
     )
 
-    request.cirrina.db_session.add(overlay_projectversion)
-    request.cirrina.db_session.commit()
+    db.add(overlay_projectversion)
+    db.commit()
 
     basemirror = overlay_projectversion.basemirror
     architectures = overlay_projectversion.architectures[1:-1].split(",")
@@ -577,7 +577,7 @@ async def post_projectversion_toggle_ci(request):
                 projectversion_id=projectversion_id))
 
     projectversion.ci_builds_enabled = not projectversion.ci_builds_enabled
-    request.cirrina.db_session.commit()
+    db.commit()
 
     result = "enabled" if projectversion.ci_builds_enabled else "disabled"
 
@@ -626,7 +626,7 @@ async def post_projectversion_lock(request):
         return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
                 projectversion_id=projectversion_id))
 
-    dep_ids = get_projectversion_deps(projectversion.id, request.cirrina.db_session)
+    dep_ids = get_projectversion_deps(projectversion.id, db)
     for dep_id in dep_ids:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
         if dep and not dep.is_locked:
@@ -634,7 +634,7 @@ async def post_projectversion_lock(request):
 
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    request.cirrina.db_session.commit()
+    db.commit()
 
     logger.info("ProjectVersion '%s/%s' locked", projectversion.project.name, projectversion.name)
     return OKResponse("Locked Project Version")
@@ -716,7 +716,7 @@ async def mark_delete_projectversion(request):
     # lock the projectversion so no packages can be published in this repository
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    request.cirrina.db_session.commit()
+    db.commit()
 
     logger.info("ProjectVersion '%s/%s' deleted", projectversion.project.name, projectversion.name)
     return OKResponse("Deleted Project Version")
@@ -782,7 +782,7 @@ async def delete_projectversion_dependency(request):
     pv_name = "{}/{}".format(projectversion.project.name, projectversion.name)
     dep_name = "{}/{}".format(dependency.project.name, dependency.name)
 
-    request.cirrina.db_session.commit()
+    db.commit()
     logger.info("ProjectVersionDependency '%s -> %s' deleted", pv_name, dep_name)
     return OKResponse("Deleted dependency from {} to {}".format(pv_name, dep_name))
 
@@ -847,11 +847,11 @@ async def post_projectversion_dependency(request):
         return ErrorResponse(400, "Invalid data received")
 
     # check for dependency loops
-    dep_ids = get_projectversion_deps(dependency_id, request.cirrina.db_session)
+    dep_ids = get_projectversion_deps(dependency_id, db)
     if projectversion_id in dep_ids:
         return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
-    request.cirrina.db_session.commit()
+    db.commit()
 
     return OKResponse("Dependency added")
