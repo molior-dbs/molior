@@ -5,7 +5,7 @@ from sqlalchemy.sql import or_
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, OKResponse, paginate
+from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
@@ -143,7 +143,7 @@ async def get_projectversion_repositories(request):
             "url": repo.url,
             "state": repo.state,
             "last_gitref": get_last_gitref(repo, db),
-            "architectures": srpv.architectures[1:-1].split(",")
+            "architectures": db2array(srpv.architectures)
         }
         for repo, srpv in results
     ]
@@ -229,7 +229,7 @@ async def add_repository(request):
                           SouRepProVer.sourcerepository_id == repo.id,
                           SouRepProVer.projectversion_id == projectversion.id).first()
 
-    sourepprover.architectures = architectures
+    sourepprover.architectures = array2db(architectures)
     db.commit()
 
     if repo.state == "new":
@@ -279,6 +279,6 @@ async def edit_repository(request):
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
 
-    buildconfig.architectures = "{" + ",".join(architectures) + "}"
+    buildconfig.architectures = array2db(architectures)
     db.commit()
     return OKResponse("SourceRepository changed")
