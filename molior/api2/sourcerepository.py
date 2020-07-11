@@ -219,8 +219,7 @@ async def add_repository(request):
             projectversion.sourcerepositories.append(repo)
             db.commit()
     else:
-        repo = SourceRepository(url=url)
-        repo.state = "new"
+        repo = SourceRepository(url=url, name=repoinfo.name, state="new")
         db.add(repo)
         projectversion.sourcerepositories.append(repo)
         db.commit()

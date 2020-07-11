@@ -1,5 +1,6 @@
 import shutil
 import asyncio
+import giturlparse
 
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
@@ -37,9 +38,28 @@ async def cleanup_builds():
             session.commit()
 
 
+def cleanup_repos():
+    """
+    Cleanup existing repos on startup
+    """
+
+    with Session() as session:
+        repos = session.query(SourceRepository).filter(SourceRepository.name.is_(None)).all()
+        for repo in repos:
+            try:
+                repoinfo = giturlparse.parse(repo.url)
+            except giturlparse.parser.ParserError:
+                logger.warning("error parsing git url: {}".format(repo.url))
+                continue
+            repo.name = repoinfo.name
+
+        if repos:
+            session.commit()
+
+
 class Worker:
     """
-    Source Packaging worker task
+    Main worker task
 
     """
 
@@ -243,8 +263,14 @@ class Worker:
         Run the worker task.
         """
 
+        # Cleanup
         try:
             await cleanup_builds()
+        except Exception as exc:
+            logger.exception(exc)
+
+        try:
+            cleanup_repos()
         except Exception as exc:
             logger.exception(exc)
 
