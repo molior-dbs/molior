@@ -2,6 +2,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func,
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
+from ..app import logger
 from ..molior.configuration import Configuration
 
 from .database import Base
@@ -80,6 +81,10 @@ class ProjectVersion(Base):
             full = "deb {0} {1} {2}".format(url, self.mirror_distribution.replace("/", "_-"),
                                             self.mirror_components.replace(",", " "))
             return url if url_only else full
+
+        if not self.basemirror:
+            logger.error("projectversion without basemirror: {}".format(self.id))
+            return ""
 
         base_mirror = "{}/{}".format(self.basemirror.project.name, self.basemirror.name)
 
