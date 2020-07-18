@@ -6,7 +6,7 @@ from sqlalchemy.sql import or_
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
-from ..api.sourcerepository import get_last_gitref
+from ..api.sourcerepository import get_last_gitref, get_last_build
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -136,17 +136,26 @@ async def get_projectversion_repositories(request):
     results = query.all()
 
     data = {"total_result_count": count, "results": []}
-    data["results"] = [
-        {
+    for repo, srpv in results:
+        result = {
             "id": repo.id,
             "name": repo.name,
             "url": repo.url,
             "state": repo.state,
             "last_gitref": get_last_gitref(repo, db),
-            "architectures": db2array(srpv.architectures)
+            "architectures": db2array(srpv.architectures),
         }
-        for repo, srpv in results
-    ]
+        build = get_last_build(request.cirrina.db_session, projectversion, repo)
+        if build:
+            result.update({
+                "last_build": {
+                    "id": build.id,
+                    "version": build.version,
+                    "buildstate": build.buildstate
+                }
+            })
+        data["results"].append(result)
+
     return OKResponse(data)
 
 
@@ -260,6 +269,30 @@ async def add_repository(request):
     return OKResponse("SourceRepository added")
 
 
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
+@req_role(["member", "owner"])
+async def get_repository(request):
+    db = request.cirrina.db_session
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(404, "Project not found")
+
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    repository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
+    data = {
+        "id": repository.id,
+        "name": repository.name,
+        "url": repository.url,
+        "state": repository.state,
+    }
+    return OKResponse(data)
+
+
 @app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
 async def edit_repository(request):
@@ -273,10 +306,12 @@ async def edit_repository(request):
 
     projectversion = get_projectversion(request)
     if not projectversion:
-        return ErrorResponse(400, "Project not found")
+        return ErrorResponse(404, "Project not found")
 
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
 
     buildconfig.architectures = array2db(architectures)
     db.commit()
