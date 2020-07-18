@@ -12,12 +12,19 @@ from ..model.projectversion import ProjectVersion
 from ..model.sourepprover import SouRepProVer
 
 
-def get_last_gitref(repo, db_session):
-    last_build = db_session.query(Build).filter(Build.sourcerepository_id == repo.id,
-                                                Build.buildtype == "source").order_by(Build.id.desc()).first()
+def get_last_gitref(repo, db):
+    last_build = db.query(Build).filter(Build.sourcerepository_id == repo.id,
+                                        Build.buildtype == "source").order_by(Build.id.desc()).first()
     if last_build:
         return last_build.git_ref
     return None
+
+
+def get_last_build(db, projectversion, repository):
+    last_build = db.query(Build).filter(Build.sourcerepository_id == repository.id,
+                                        Build.projectversion_id == projectversion.id,
+                                        Build.buildtype == "deb").order_by(Build.id.desc()).first()
+    return last_build
 
 
 def get_dependencies_by_sourcerepository(db_session, repository_id):
@@ -191,14 +198,13 @@ async def get_repositories(request):
                         "id": dependency.id,
                         "name": dependency.name,
                         "url": dependency.url,
-                        "dependencies": get_dependencies_by_sourcerepository(
-                            request.cirrina.db_session, dependency.id
-                        ),
+                        "dependencies": get_dependencies_by_sourcerepository(request.cirrina.db_session, dependency.id),
                     }
                     for dependency in repository.dependencies
                 ],
             }
             if projectversion:
+                build = get_last_build(request.cirrina.db_session, projectversion, repository)
                 repoinfo.update({
                     "projectversion": {
                         "id": projectversion.id,
@@ -206,8 +212,13 @@ async def get_repositories(request):
                         "version": projectversion.name,
                         "last_gitref": get_last_gitref(request.cirrina.db_session, repository),
                         "architectures": get_architectures(request.cirrina.db_session, repository, projectversion),
+                        "last_build": {
+                            "id": build.id,
+                            "version": build.version,
+                            "buildstate": build.buildstate
                         }
-                    })
+                    }
+                })
             else:
                 repoinfo.update({"projectversions": [{
                             "id": projectversion.id,
