@@ -84,10 +84,10 @@ async def get_users(request):
         query = query.filter(User.email.like("%{}%".format(email)))
 
     query = query.order_by(User.username)
+    data = {"total_result_count": query.count()}
+
     query = paginate(request, query)
     users = query.all()
-
-    data = {"total_result_count": query.count()}
     data["results"] = [
         {"id": user.id, "username": user.username, "email": user.email, "is_admin": user.is_admin}
         for user in users
