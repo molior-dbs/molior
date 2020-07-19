@@ -59,7 +59,7 @@ async def get_projectversions2(request):
     is_basemirror = request.GET.getone("isbasemirror", False)
     filter_name = request.GET.getone("q", None)
 
-    query = db.query(ProjectVersion).join(Project)
+    query = db.query(ProjectVersion).join(Project).filter(Project.is_mirror is False)
     if project_id:
         query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
     if filter_name:
@@ -114,16 +114,12 @@ async def get_projectversion2(request):
         "404":
             description: no entry found
     """
-    db = request.cirrina.db_session
-
-    project_name = request.match_info["project_name"]
-    project_version = request.match_info["project_version"]
-
-    projectversion = db.query(ProjectVersion).filter(
-            ProjectVersion.name == project_version).join(Project).filter(
-            Project.name == project_name).first()
+    projectversion = get_projectversion(request)
     if not projectversion:
-        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
+        return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Projectversion not found")
 
     data = projectversion_to_dict(projectversion)
     return OKResponse(data)
