@@ -45,5 +45,8 @@ async def get_user_byname(request):
     if not user:
         return ErrorResponse(404, "User not found")
 
-    data = {"username": user.username, "user_id": user.id, "is_admin": user.is_admin}
+    data = {"username": user.username,
+            "email": user.email,
+            "user_id": user.id,
+            "is_admin": user.is_admin}
     return OKResponse(data)
