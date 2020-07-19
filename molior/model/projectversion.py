@@ -150,12 +150,17 @@ def get_projectversion_deps(projectversion_id, session):
 
 
 def get_projectversion(request):
-    project_id = request.match_info["project_id"]
-    projectversion_id = request.match_info["projectversion_id"]
+    if "project_name" in request.match_info:
+        project_name = request.match_info["project_name"]
+    elif "project_id" in request.match_info:
+        project_name = request.match_info["project_id"]
+    if "project_version" in request.match_info:
+        project_version = request.match_info["project_version"]
+    elif "projectversion_id" in request.match_info:
+        project_version = request.match_info["projectversion_id"]
     return request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.project_id == Project.id,
-            ProjectVersion.name == projectversion_id,
-            Project.name == project_id
+            ProjectVersion.name == project_version,
+            Project.name == project_name,
         ).first()
 
 
@@ -164,4 +169,7 @@ def get_projectversion_byname(fullname, session):
     if len(parts) != 2:
         return None
     name, version = parts
-    return session.query(ProjectVersion).join(Project).filter(Project.name == name, ProjectVersion.name == version).first()
+    return session.query(ProjectVersion).join(Project).filter(
+            Project.name == name,
+            ProjectVersion.name == version,
+        ).first()
