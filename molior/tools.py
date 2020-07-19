@@ -304,9 +304,15 @@ async def write_log_title(build_id, line, no_footer_newline=False, no_header_new
         color = 31
 
     BORDER = 80 * "+"
-    await write_log(build_id, "{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
-    await write_log(build_id, "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
-    await write_log(build_id, "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
+
+    path = Path(Configuration().working_dir) / "buildout" / str(build_id) / "build.log"
+    if not path.parent.exists():
+        path.parent.mkdir()
+    async with AIOFile(path, "a+") as afp:
+        writer = Writer(afp)
+        await writer("{}\x1b[{}m\x1b[1m{}\x1b[0m\n".format(header_newline, color, BORDER))
+        await writer("\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, line, date))
+        await writer("\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline))
 
 
 def array2db(array):

@@ -152,7 +152,7 @@ class Worker:
             await build.set_building()
 
         repo.set_busy()
-        session.commit()  # pylint: disable=no-member
+        session.commit()
 
         await write_log_title(build.id, "Checking Repository")
 
@@ -167,18 +167,18 @@ class Worker:
             logger.exception(exc)
             await build.set_failed()
             repo.set_ready()
-            session.commit()  # pylint: disable=no-member
+            session.commit()
             return
 
         repo.set_ready()
-        session.commit()  # pylint: disable=no-member
+        session.commit()
 
         if not latest_tag:
             logger.error("sourcerepository '%s' has no release tag", repo.url)
             await write_log(build.id, "E: no git tags found\n")
             await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
             await build.set_failed()
-            session.commit()  # pylint: disable=no-member
+            session.commit()
             return
 
         await write_log(build.id, "\n")

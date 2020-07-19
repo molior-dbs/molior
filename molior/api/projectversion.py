@@ -771,7 +771,7 @@ async def delete_projectversion_dependency(request):
         return ErrorResponse(400, "Could not find projectversion with id: {}".format(projectversion_id))
 
     if projectversion.is_locked:
-        return ErrorResponse(400, "You can not delete dependencies on a locked projectversion")
+        return ErrorResponse(400, "Cannot delete dependencies on a locked projectversion")
 
     dependency = db.query(ProjectVersion).filter(ProjectVersion.id == dependency_id).first()
     if not dependency:
@@ -837,10 +837,10 @@ async def post_projectversion_dependency(request):
         return ErrorResponse(400, "Invalid data received")
 
     if projectversion.is_locked:
-        return ErrorResponse(400, "You can not add dependencies on a locked projectversion")
+        return ErrorResponse(400, "Cannot add dependencies on a locked projectversion")
 
     if dependency_id == projectversion_id:
-        return ErrorResponse(400, "You can not add a dependency of the same projectversion to itself")
+        return ErrorResponse(400, "Cannot add a dependency of the same projectversion to itself")
 
     dependency = db.query(ProjectVersion).filter(ProjectVersion.id == dependency_id).first()
     if not dependency:
@@ -849,7 +849,7 @@ async def post_projectversion_dependency(request):
     # check for dependency loops
     dep_ids = get_projectversion_deps(dependency_id, db)
     if projectversion_id in dep_ids:
-        return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
+        return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
     db.commit()
