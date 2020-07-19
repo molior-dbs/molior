@@ -25,11 +25,7 @@ def projectversion_to_dict(projectversion):
         "name": projectversion.name,
         "project_name": projectversion.project.name,
         "apt_url": projectversion.get_apt_repo(url_only=True),
-        "project": {
-            "id": projectversion.project.id,
-            "name": projectversion.project.name,
-            "description": projectversion.project.description,
-        },
+        "is_mirror": projectversion.project.is_mirror,
         "architectures": projectversion.mirror_architectures[1:-1].split(","),
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
