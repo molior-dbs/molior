@@ -24,25 +24,6 @@ class BackendWorker:
         self.logging_done = []
         self.build_outcome = {}  # build_id: outcome
 
-    async def startup_scheduling(self):
-        with Session() as session:
-
-            scheduled_builds = session.query(Build).filter(Build.buildstate == "scheduled", Build.buildtype == "deb").all()
-            if scheduled_builds:
-                for build in scheduled_builds:
-                    buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-                    session.delete(buildtask)
-                    await build.set_needs_build()
-                session.commit()
-
-            building_builds = session.query(Build).filter(Build.buildstate == "building", Build.buildtype == "deb").all()
-            if building_builds:
-                for build in building_builds:
-                    buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-                    session.delete(buildtask)
-                    await build.set_failed()
-                session.commit()
-
     async def _schedule(self, job):
         b = Backend()
         backend = b.get_backend()
@@ -99,8 +80,6 @@ class BackendWorker:
         """
         Run the worker task.
         """
-
-        await self.startup_scheduling()
 
         while True:
             try:
