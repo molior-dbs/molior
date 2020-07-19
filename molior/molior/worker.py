@@ -20,6 +20,7 @@ async def cleanup_builds():
 
     cleaned_up = False
     with Session() as session:
+        # FIXME: set schedules to needs build and delete buildtask
         builds = session.query(Build).filter(Build.buildtype != "build", Build.buildstate == "building").all()
         for build in builds:
             await build.set_failed()
