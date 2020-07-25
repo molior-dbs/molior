@@ -300,16 +300,19 @@ async def get_mirror(request):
         return ErrorResponse(404, "Mirror not found")
 
     apt_url = mirror.get_apt_repo(url_only=True)
-    base_mirror_url = str()
+    basemirror_url = ""
+    basemirror_name = ""
     if not mirror.project.is_basemirror and mirror.basemirror:
-        base_mirror_url = mirror.basemirror.get_apt_repo(url_only=True)
+        basemirror_url = mirror.basemirror.get_apt_repo(url_only=True)
+        basemirror_name = mirror.basemirror.project.name + "/" + mirror.basemirror.name
 
     result = {
         "id": mirror.id,
         "name": mirror.project.name,
         "version": mirror.name,
         "url": mirror.mirror_url,
-        "base_mirror": base_mirror_url,
+        "basemirror_url": basemirror_url,
+        "basemirror_name": basemirror_name,
         "distribution": mirror.mirror_distribution,
         "components": mirror.mirror_components,
         "is_basemirror": mirror.project.is_basemirror,
