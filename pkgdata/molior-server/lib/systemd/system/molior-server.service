@@ -12,7 +12,7 @@ ExecStart=/usr/bin/python3 -m molior.molior.server --host=localhost --port=8888
 Type=simple
 KillSignal=SIGTERM
 KillMode=process
-TimeoutStopSec=60s
+TimeoutSec=900
 
 [Install]
 WantedBy=multi-user.target
