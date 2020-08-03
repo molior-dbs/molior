@@ -50,8 +50,7 @@ Host *
 EOF
         fi
 
-        # make writable (including buildout, repositories and upload dirs)
-        chown -R $MOLIOR_USER $MOLIOR_HOME
+        chown $MOLIOR_USER $MOLIOR_HOME $MOLIOR_HOME/buildout $MOLIOR_HOME/repositories $MOLIOR_HOME/upload
     ;;
     abort-upgrade|abort-remove|abort-deconfigure) exit 0;;
 esac
