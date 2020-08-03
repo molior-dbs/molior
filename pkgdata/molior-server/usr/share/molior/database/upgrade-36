@@ -6,7 +6,7 @@ ALTER TABLE projectversion ADD COLUMN basemirror_id integer REFERENCES projectve
 
 update projectversion set basemirror_id = (select distinct base_mirror_id from projectversionbuildvariant join buildvariant on (buildvariant.id = buildvariant_id) where projectversion_id = projectversion.id);
 
-update projectversion set mirror_architectures = (select ARRAY( select distinct name::architecture_enum from projectversionbuildvariant join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) where projectversion_id = projectversion.id)) where mirror_architectures is null;
+update projectversion set mirror_architectures = (select ARRAY( select distinct name::architecture_enum from projectversionbuildvariant join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) where projectversion_id = projectversion.id and name != 'all')) where mirror_architectures is null;
 
 update build set projectversion_id = (select distinct projectversion_id from buildconfiguration join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) join sourcerepositoryprojectversion on (sourcerepositoryprojectversion.id = sourcerepositoryprojectversion_id) where buildconfiguration.id = build.buildconfiguration_id) where buildtype = 'deb' and projectversion_id is null;
 
