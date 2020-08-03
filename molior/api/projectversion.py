@@ -1,6 +1,6 @@
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
@@ -26,7 +26,7 @@ def projectversion_to_dict(projectversion):
         "project_name": projectversion.project.name,
         "apt_url": projectversion.get_apt_repo(url_only=True),
         "is_mirror": projectversion.project.is_mirror,
-        "architectures": projectversion.mirror_architectures[1:-1].split(","),
+        "architectures": db2array(projectversion.mirror_architectures),
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
     }
