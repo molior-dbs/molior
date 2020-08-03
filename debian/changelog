@@ -1,3 +1,9 @@
+molior (1.4.0~alpha112) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha112
+
+ -- André Roth <neolynx@gmail.com>  Mon, 03 Aug 2020 14:34:50 +0000
+
 molior (1.4.0~alpha111) stretch; urgency=medium
 
   * service: allow enough time for db upgrades
