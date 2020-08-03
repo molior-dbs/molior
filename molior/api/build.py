@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from datetime import datetime
@@ -10,11 +11,12 @@ from ..model.build import Build, BUILD_STATES, DATETIME_FORMAT
 from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository
 from ..model.project import Project
+from ..model.projectversion import ProjectVersion
 from ..model.maintainer import Maintainer
 from ..tools import paginate
 
 
-@app.http_get("/api/builds", threaded=True)
+@app.http_get("/api/builds")
 async def get_builds(request):
     """
     Gets builds from the database.
@@ -192,7 +194,16 @@ async def get_builds(request):
 #        builds = builds.filter(BuildVariant.id == buildvariant_id)
 
     if project:
-        builds = builds.filter(Build.projectversion.fullname.like("%{}%".format(project)))
+        builds = builds.join(ProjectVersion).join(Project)
+        terms = re.split("[/ ]", project)
+        for term in terms:
+            if not term:
+                continue
+            logger.info("filtering {}".format(term))
+            builds = builds.filter(or_(
+                ProjectVersion.name.like("%{}%".format(term)),
+                Project.name.like("%{}%".format(term)),
+                ))
     if version:
         builds = builds.filter(Build.version.like("%{}%".format(version)))
     if maintainer:
