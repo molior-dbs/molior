@@ -112,50 +112,52 @@ async def get_builds(request):
         "500":
             description: internal server error
     """
-    custom_filter = request
-    # buildvariant = custom_filter.GET.getone("buildvariant", None)
-    # buildvariant_id = custom_filter.GET.getone("buildvariant_id", None)
-    architecture = custom_filter.GET.getone("architecture", None)
-    distrelease = custom_filter.GET.getone("distrelease", None)
-    project = custom_filter.GET.getone("project", None)
-    version = custom_filter.GET.getone("version", None)
-    maintainer = custom_filter.GET.getone("maintainer", None)
-    sourcerepository_name = custom_filter.GET.getone("sourcerepository", None)
-    startstamp = custom_filter.GET.getone("startstamp", None)
-    buildstates = custom_filter.GET.getall("buildstate", [])
+    search = request.GET.getone("search", None)
+    project = request.GET.getone("project", None)
+    maintainer = request.GET.getone("maintainer", None)
+
+    # FIXME:
+    # buildvariant = request.GET.getone("buildvariant", None)
+    # buildvariant_id = request.GET.getone("buildvariant_id", None)
+    architecture = request.GET.getone("architecture", None)
+    distrelease = request.GET.getone("distrelease", None)
+    version = request.GET.getone("version", None)
+    sourcerepository_name = request.GET.getone("sourcerepository", None)
+    startstamp = request.GET.getone("startstamp", None)
+    buildstates = request.GET.getall("buildstate", [])
 
     try:
-        project_version_id = int(custom_filter.GET.getone("project_version_id"))
+        project_version_id = int(request.GET.getone("project_version_id"))
     except (ValueError, KeyError):
         project_version_id = None
 
 #    try:
-#        buildvariant_id = int(custom_filter.GET.getone("buildvariant_id"))
+#        buildvariant_id = int(request.GET.getone("buildvariant_id"))
 #    except (ValueError, KeyError):
 #        buildvariant_id = None
 
     try:
-        project_id = int(custom_filter.GET.getone("project_id"))
+        project_id = int(request.GET.getone("project_id"))
     except (ValueError, KeyError):
         project_id = None
 
     try:
-        from_date = datetime.strptime(custom_filter.GET.getone("from"), "%Y-%m-%d %H:%M:%S")
+        from_date = datetime.strptime(request.GET.getone("from"), "%Y-%m-%d %H:%M:%S")
     except (ValueError, KeyError):
         from_date = None
 
     try:
-        to_date = datetime.strptime(custom_filter.GET.getone("to"), "%Y-%m-%d %H:%M:%S")
+        to_date = datetime.strptime(request.GET.getone("to"), "%Y-%m-%d %H:%M:%S")
     except (ValueError, KeyError):
         to_date = None
 
     try:
-        count_only = custom_filter.GET.getone("count_only").lower() == "true"
+        count_only = request.GET.getone("count_only").lower() == "true"
     except (ValueError, KeyError):
         count_only = False
 
     try:
-        sourcerepository_id = int(custom_filter.GET.getone("sourcerepository_id"))
+        sourcerepository_id = int(request.GET.getone("sourcerepository_id"))
     except (ValueError, KeyError):
         sourcerepository_id = None
 
@@ -193,17 +195,28 @@ async def get_builds(request):
 #    if buildvariant_id:
 #        builds = builds.filter(BuildVariant.id == buildvariant_id)
 
+    if search:
+        terms = re.split("[/ ]", search)
+        for term in terms:
+            if not term:
+                continue
+            builds = builds.filter(or_(
+                Build.sourcename.like("%{}%".format(term)),
+                Build.version.like("%{}%".format(term)),
+                Build.architecture.like("%{}%".format(term)),
+                ))
+
     if project:
         builds = builds.join(ProjectVersion).join(Project)
         terms = re.split("[/ ]", project)
         for term in terms:
             if not term:
                 continue
-            logger.info("filtering {}".format(term))
-            builds = builds.filter(or_(
+            builds = builds.filter(Project.is_mirror.is_(False), or_(
                 ProjectVersion.name.like("%{}%".format(term)),
                 Project.name.like("%{}%".format(term)),
                 ))
+    # FIXME:
     if version:
         builds = builds.filter(Build.version.like("%{}%".format(version)))
     if maintainer:
