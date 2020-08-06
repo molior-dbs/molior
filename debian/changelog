@@ -1,3 +1,9 @@
+molior (1.4.0~alpha115) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha115
+
+ -- André Roth <neolynx@gmail.com>  Thu, 06 Aug 2020 22:08:09 +0000
+
 molior (1.4.0~alpha114) stretch; urgency=medium
 
   * build: make sure parent builds are not filtered away
