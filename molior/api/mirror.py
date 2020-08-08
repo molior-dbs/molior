@@ -1,4 +1,5 @@
 from aiohttp import web
+from sqlalchemy.sql import or_
 
 from ..app import app, logger
 from ..auth import req_admin
@@ -190,16 +191,19 @@ async def get_mirrors(request):
         "400":
             description: bad request
     """
-    filter_name = request.GET.getone("q", "")
+    search = request.GET.getone("q", "")
     basemirror = request.GET.getone("basemirror", False)
     is_basemirror = request.GET.getone("is_basemirror", False)
+    url = request.GET.getone("url", "")
 
-    query = request.cirrina.db_session.query(ProjectVersion)
-    query = query.join(Project, Project.id == ProjectVersion.project_id)
+    query = request.cirrina.db_session.query(ProjectVersion).join(Project)
     query = query.filter(Project.is_mirror == "true")
 
-    if filter_name:
-        query = query.filter(Project.name.like("%{}%".format(filter_name)))
+    if search:
+        query = query.filter(or_(Project.name.like("%{}%".format(search)), ProjectVersion.name.like("%{}%".format(search))))
+
+    if url:
+        query = query.filter(ProjectVersion.mirror_url.like("%{}%".format(url)))
 
     if basemirror:
         query = query.filter(Project.is_basemirror == "true", ProjectVersion.mirror_state == "ready")
