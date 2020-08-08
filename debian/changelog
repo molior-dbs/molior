@@ -1,3 +1,9 @@
+molior (1.4.0~alpha116) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha116
+
+ -- André Roth <neolynx@gmail.com>  Sat, 08 Aug 2020 16:26:21 +0000
+
 molior (1.4.0~alpha115) stretch; urgency=medium
 
   * bump version 1.4.0~alpha115
