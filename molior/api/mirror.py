@@ -1,3 +1,5 @@
+import re
+
 from aiohttp import web
 from sqlalchemy.sql import or_
 
@@ -200,7 +202,13 @@ async def get_mirrors(request):
     query = query.filter(Project.is_mirror == "true")
 
     if search:
-        query = query.filter(or_(Project.name.like("%{}%".format(search)), ProjectVersion.name.like("%{}%".format(search))))
+        terms = re.split("[/ ]", search)
+        for term in terms:
+            if not term:
+                continue
+            query = query.filter(or_(
+                 Project.name.like("%{}%".format(term)),
+                 ProjectVersion.name.like("%{}%".format(term))))
 
     if url:
         query = query.filter(ProjectVersion.mirror_url.like("%{}%".format(url)))
