@@ -4,6 +4,6 @@ psql molior <<EOF
 
 ALTER TABLE sourcerepositoryprojectversion ADD COLUMN architectures architecture_enum[];
 
-update sourcerepositoryprojectversion set architectures = (select array(select name::architecture_enum from buildconfiguration join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) where sourcerepositoryprojectversion_id = sourcerepositoryprojectversion.id));
+update sourcerepositoryprojectversion set architectures = (select array(select name::architecture_enum from buildconfiguration join buildvariant on (buildvariant.id = buildvariant_id) join architecture on (architecture.id = architecture_id) where sourcerepositoryprojectversion_id = sourcerepositoryprojectversion.id and name != 'all'));
 
 EOF
