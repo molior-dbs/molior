@@ -12,6 +12,8 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion, get_projectversion
 from ..model.sourepprover import SouRepProVer
+from ..model.postbuildhook import PostBuildHook
+from ..model.hook import Hook
 
 
 @app.http_get("/api2/repositories")
@@ -53,10 +55,9 @@ async def get_repositories2(request):
     if exclude_projectversion_id != -1:
         repositories = repositories.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
 
-    count = repositories.count()
     repositories = repositories.order_by(SourceRepository.name)
 
-    data = {"total_result_count": count, "results": []}
+    data = {"total_result_count": repositories.count(), "results": []}
     for repository in repositories:
         data["results"].append({
             "id": repository.id,
@@ -316,3 +317,95 @@ async def edit_repository(request):
     buildconfig.architectures = array2db(architectures)
     db.commit()
     return OKResponse("SourceRepository changed")
+
+
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hooks")
+@req_role(["member", "owner"])
+async def get_repository_hooks(request):
+    db = request.cirrina.db_session
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(404, "Project not found")
+
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    postbuildhooks = db.query(PostBuildHook).join(Hook).filter(PostBuildHook.sourcerepositoryprojectversion_id == buildconfig.id)
+    data = {"total_result_count": postbuildhooks.count(), "results": []}
+    for postbuildhook in postbuildhooks:
+        data["results"].append({
+            "id": postbuildhook.id,
+            "method": postbuildhook.hook.method,
+            "url": postbuildhook.hook.url,
+            "enabled": postbuildhook.hook.enabled,
+        })
+    return OKResponse(data)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hook")
+@req_role(["member", "owner"])
+async def add_repository_hook(request):
+    """
+    Adds given sourcerepositories to the given
+    projectversion.
+
+    ---
+    description: Adds given sourcerepositories to given projectversion.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/json
+    parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: sourcerepository_id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                buildvariants:
+                    type: array
+                    example: [1, 2]
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid data received.
+    """
+    db = request.cirrina.db_session
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    params = await request.json()
+    url = params.get("url", "")
+
+    if not url:
+        return ErrorResponse(400, "No URL recieved")
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Project not found")
+
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    hook = Hook(url=url, method="post")
+    db.add(hook)
+    db.commit()
+    postbuildhook = PostBuildHook(sourcerepositoryprojectversion_id=buildconfig.id, hook_id=hook.id)
+    db.add(postbuildhook)
+    db.commit()
+
+    return OKResponse("Hook added")

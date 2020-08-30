@@ -2,15 +2,10 @@ from pathlib import Path
 from sqlalchemy import Column, String, Integer, Enum
 from sqlalchemy.orm import relationship
 
-# Needed imports for relatioships
-import molior.model.projectversion  # pylint: disable=unused-import
-import molior.model.hook  # noqa: F401, pylint: disable=unused-import
-
-from molior.app import logger
+from ..app import logger
+from ..molior.configuration import Configuration
 from .database import Base
-from .sourcerepositoryhook import SourceRepositoryHook
-
-from molior.molior.configuration import Configuration
+from .projectversion import ProjectVersion
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
 DEFAULT_CWD = "/var/lib/molior"
@@ -23,8 +18,7 @@ class SourceRepository(Base):
     name = Column(String)
     url = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
-    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
-    hooks = relationship("Hook", secondary=SourceRepositoryHook)
+    projectversions = relationship(ProjectVersion, secondary="sourcerepositoryprojectversion")
 
     def __init__(self, url):
         self.url = url
