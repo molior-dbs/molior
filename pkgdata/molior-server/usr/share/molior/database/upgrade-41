@@ -1,0 +1,18 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+alter table sourcerepositoryhook rename to postbuildhook;
+alter index sourcerepositoryhook_pkey rename to postbuildhook_pkey;
+alter index unique_sourcerepositoryhook rename to unique_postbuildhook_pkey;
+alter sequence sourcerepositoryhook_id_seq rename to postbuildhook_id_seq;
+
+alter table postbuildhook add column sourcerepositoryprojectversion_id integer references sourcerepositoryprojectversion(id);
+insert into postbuildhook (sourcerepositoryprojectversion_id) select id from sourcerepositoryprojectversion where sourcerepository_id in (select sourcerepository_id from postbuildhook);
+
+update postbuildhook set hook_id = (select hook_id from postbuildhook p2 where p2.sourcerepository_id = (select sourcerepository_id from sourcerepositoryprojectversion where sourcerepositoryprojectversion.id = postbuildhook.sourcerepositoryprojectversion_id) limit 1) where hook_id is null;
+
+alter table postbuildhook drop column sourcerepository_id;
+delete from postbuildhook where sourcerepositoryprojectversion_id is null;
+
+EOF
