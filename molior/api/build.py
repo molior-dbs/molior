@@ -231,12 +231,13 @@ async def get_builds(request):
     if buildstates and set(buildstates).issubset(set(BUILD_STATES)):
         builds = builds.filter(or_(*[Build.buildstate == buildstate for buildstate in buildstates]))
 
-    # make sure parents and grandparents are invited
-    child_cte = builds.cte(name='childs')
-    parentbuilds = request.cirrina.db_session.query(Build).filter(Build.id == child_cte.c.parent_id)
-    parent_cte = parentbuilds.cte(name='parents')
-    grandparentbuilds = request.cirrina.db_session.query(Build).filter(Build.id == parent_cte.c.parent_id)
-    builds = builds.union(parentbuilds, grandparentbuilds)
+    if search or project:
+        # make sure parents and grandparents are invited
+        child_cte = builds.cte(name='childs')
+        parentbuilds = request.cirrina.db_session.query(Build).filter(Build.id == child_cte.c.parent_id)
+        parent_cte = parentbuilds.cte(name='parents')
+        grandparentbuilds = request.cirrina.db_session.query(Build).filter(Build.id == parent_cte.c.parent_id)
+        builds = builds.union(parentbuilds, grandparentbuilds)
 
     nb_builds = builds.count()
 
