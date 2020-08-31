@@ -388,9 +388,15 @@ async def add_repository_hook(request):
     sourcerepository_id = request.match_info["sourcerepository_id"]
     params = await request.json()
     url = params.get("url", "")
+    body = params.get("body", "")
+    method = params.get("method", "")
 
     if not url:
         return ErrorResponse(400, "No URL recieved")
+    if not body:
+        return ErrorResponse(400, "No Body recieved")
+    if method not in ["post", "get"]:
+        return ErrorResponse(400, "Invalid method recieved")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -401,7 +407,7 @@ async def add_repository_hook(request):
     if not buildconfig:
         return ErrorResponse(404, "SourceRepository not found in project")
 
-    hook = Hook(url=url, method="post")
+    hook = Hook(url=url, method=method, body=body)
     db.add(hook)
     db.commit()
     postbuildhook = PostBuildHook(sourcerepositoryprojectversion_id=buildconfig.id, hook_id=hook.id)
