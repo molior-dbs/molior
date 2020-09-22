@@ -16,6 +16,58 @@ from ..model.postbuildhook import PostBuildHook
 from ..model.hook import Hook
 
 
+@app.http_get("/api2/repositories/byid")
+@app.authenticated
+async def get_repositories_byid(request):
+    """
+    Returns source repositories with the given filters applied.
+
+    ---
+    description: Returns a repository.
+    tags:
+        - SourceRepositories
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: id
+          in: query
+          required: true
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+    """
+    db = request.cirrina.db_session
+    repository_id = request.GET.getone("id", None)
+    exclude_projectversion_id = request.GET.getone("exclude_projectversion_id", "")
+    try:
+        exclude_projectversion_id = int(exclude_projectversion_id)
+    except Exception:
+        exclude_projectversion_id = -1
+
+    repositories = db.query(SourceRepository)
+
+    if repository_id:
+        repositories = repositories.filter(SourceRepository.id == repository_id)
+
+    if exclude_projectversion_id != -1:
+        repositories = repositories.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
+
+    repositories = repositories.order_by(SourceRepository.name)
+
+    data = {"total_result_count": repositories.count(), "results": []}
+    for repository in repositories:
+        data["results"].append({
+            "id": repository.id,
+            "name": repository.name,
+            "url": repository.url,
+            "state": repository.state,
+        })
+    return OKResponse(data)
+
+
 @app.http_get("/api2/repositories")
 @app.authenticated
 async def get_repositories2(request):
