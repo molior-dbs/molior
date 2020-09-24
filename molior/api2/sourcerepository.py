@@ -16,9 +16,9 @@ from ..model.postbuildhook import PostBuildHook
 from ..model.hook import Hook
 
 
-@app.http_get("/api2/repositories/byid")
+@app.http_get("/api2/repository/{repository_id}")
 @app.authenticated
-async def get_repositories_byid(request):
+async def get_repository(request):
     """
     Returns source repositories with the given filters applied.
 
@@ -29,7 +29,7 @@ async def get_repositories_byid(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: id
+        - name: repository_id
           in: query
           required: true
           type: integer
@@ -39,32 +39,19 @@ async def get_repositories_byid(request):
         "200":
             description: successful
     """
-    db = request.cirrina.db_session
-    repository_id = request.GET.getone("id", None)
-    exclude_projectversion_id = request.GET.getone("exclude_projectversion_id", "")
-    try:
-        exclude_projectversion_id = int(exclude_projectversion_id)
-    except Exception:
-        exclude_projectversion_id = -1
+    repository_id = request.match_info["repository_id"]
 
-    repositories = db.query(SourceRepository)
+    repo = request.cirrina.db_session.query(SourceRepository).filter_by(id=repository_id).first()
+    if not repo:
+        return ErrorResponse(404, "Repository with id {} could not be found!".format(repository_id))
 
-    if repository_id:
-        repositories = repositories.filter(SourceRepository.id == repository_id)
+    data = {
+        "id": repo.id,
+        "name": repo.name,
+        "url": repo.url,
+        "state": repo.state,
+    }
 
-    if exclude_projectversion_id != -1:
-        repositories = repositories.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
-
-    repositories = repositories.order_by(SourceRepository.name)
-
-    data = {"total_result_count": repositories.count(), "results": []}
-    for repository in repositories:
-        data["results"].append({
-            "id": repository.id,
-            "name": repository.name,
-            "url": repository.url,
-            "state": repository.state,
-        })
     return OKResponse(data)
 
 
@@ -99,23 +86,27 @@ async def get_repositories2(request):
     except Exception:
         exclude_projectversion_id = -1
 
-    repositories = db.query(SourceRepository)
+    query = db.query(SourceRepository)
 
     if url:
-        repositories = repositories.filter(SourceRepository.url.like("%{}%".format(url)))
+        query = query.filter(SourceRepository.url.like("%{}%".format(url)))
 
     if exclude_projectversion_id != -1:
-        repositories = repositories.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
+        query = query.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
 
-    repositories = repositories.order_by(SourceRepository.name)
+    query = query.order_by(SourceRepository.name)
+    nb_results = query.count()
 
-    data = {"total_result_count": repositories.count(), "results": []}
-    for repository in repositories:
+    query = paginate(request, query)
+    results = query.all()
+
+    data = {"total_result_count": nb_results, "results": []}
+    for repo in results:
         data["results"].append({
-            "id": repository.id,
-            "name": repository.name,
-            "url": repository.url,
-            "state": repository.state,
+            "id": repo.id,
+            "name": repo.name,
+            "url": repo.url,
+            "state": repo.state,
         })
     return OKResponse(data)
 
@@ -324,7 +315,7 @@ async def add_repository(request):
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
-async def get_repository(request):
+async def get_projectversion_repository(request):
     db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
     projectversion = get_projectversion(request)
