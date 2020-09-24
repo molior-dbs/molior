@@ -389,7 +389,6 @@ async def clone_projectversion(request):
         "500":
             description: internal server error
     """
-    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -402,6 +401,11 @@ async def clone_projectversion(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
+    return await do_clone(request, projectversion_id, name)
+
+
+async def do_clone(request, projectversion_id, name):
+    db = request.cirrina.db_session
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
 
     if db.query(ProjectVersion).join(Project).filter(
@@ -439,7 +443,7 @@ async def clone_projectversion(request):
                 new_projectversion.basemirror.name,
                 new_projectversion.project.name,
                 new_projectversion.name,
-                new_projectversion.architectures[1:-1].split(","),
+                db2array(new_projectversion.mirror_architectures),
             ]
         }
     )
