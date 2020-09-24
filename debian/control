@@ -18,6 +18,7 @@ Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf
     python3-giturlparse, python3-aiofile,
     debootstrap (>= 1.0.110~bpo9+1)
 Conflicts: molior-backend-http
+Tag: devel::buildtools
 Description: debian package auto builder
  Debian Build System based on sbuild, schroot and aptly
  .
