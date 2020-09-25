@@ -85,8 +85,8 @@ class DebianRepository:
 
             logger.debug("creating empty snapshot: '%s'", snapshot_name)
 
-            package_refs = await self.__get_packages(dist == "unstable")
-            task_id = await self.__api.snapshot_create(snapshot_name, package_refs)
+            # package_refs = await self.__get_packages(dist == "unstable")
+            task_id = await self.__api.snapshot_create(self.name, snapshot_name)
             await self.__api.wait_task(task_id)
 
             # Add source and all archs per default
@@ -219,10 +219,10 @@ class DebianRepository:
         snapshot_dist = "unstable" if ci_build else "stable"
         snapshot_name_tmp = self.__generate_snapshot_name(snapshot_dist, temporary=True)
 
-        package_refs = await self.__get_packages(ci_build)
-        logger.debug("creating snapshot with name '%s' and the packages: '%s'", snapshot_name, str(package_refs))
+        # package_refs = await self.__get_packages(ci_build)
+        # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
 
-        task_id = await self.__api.snapshot_create(snapshot_name_tmp, package_refs)
+        task_id = await self.__api.snapshot_create(self.name, snapshot_name_tmp)
         await self.__await_task(task_id)
 
         logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
@@ -235,5 +235,6 @@ class DebianRepository:
 
         snapshot_name = self.__generate_snapshot_name(snapshot_dist, temporary=False)
         logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
+        await self.__api.snapshot_delete(snapshot_name)
         await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)
         await self.__api.snapshot_delete(snapshot_name_tmp)

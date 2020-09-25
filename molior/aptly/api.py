@@ -460,23 +460,32 @@ class AptlyApi:
                 data = json.loads(await resp.text())
         return data["ID"]
 
-    async def snapshot_create(self, name, package_refs):
+    async def snapshot_create(self, repo_name, snapshot_name, package_refs=None):
         """
-        Creates a snapshot with given package_refs.
+        Creates a complete snapshot of a repo or a snapshot with given package_refs.
 
         Args:
             name (str): Name of the snapshot.
             package_refs (list): Packages to create snapshot from.
                 e.g. ["Pamd64 my-package 1.0.3 863efd9e94da9fbc"]
         """
-        data = {"Name": name, "PackageRefs": package_refs}
-        async with aiohttp.ClientSession() as http:
-            async with http.post(self.url + "/snapshots", headers=self.headers,
-                                 data=json.dumps(data), auth=self.auth) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+        if package_refs:
+            data = {"Name": snapshot_name, "PackageRefs": package_refs}
+            async with aiohttp.ClientSession() as http:
+                async with http.post(self.url + "/snapshots", headers=self.headers,
+                                     data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    ret = json.loads(await resp.text())
+        else:
+            data = {"Name": snapshot_name}
+            async with aiohttp.ClientSession() as http:
+                async with http.post(self.url + "/repos/" + repo_name, headers=self.headers,
+                                     data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    ret = json.loads(await resp.text())
+        return ret["ID"]
 
     async def snapshot_delete(self, name):
         """
