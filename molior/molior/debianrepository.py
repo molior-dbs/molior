@@ -223,7 +223,7 @@ class DebianRepository:
         logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
                      self.publish_name,
                      snapshot_dist,
-                     snapshot_name)
+                     snapshot_name_tmp)
 
         task_id = await self.__api.snapshot_publish_update(snapshot_name_tmp, "main", snapshot_dist, self.publish_name)
         await self.__await_task(task_id)
