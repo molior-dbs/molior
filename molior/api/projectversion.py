@@ -614,13 +614,17 @@ async def post_projectversion_lock(request):
         "500":
             description: internal server error
     """
-    db = request.cirrina.db_session
     projectversion_id = request.match_info["projectversion_id"]
     try:
         projectversion_id = int(projectversion_id)
     except (ValueError, TypeError):
         return ErrorResponse(400, "Incorrect value for projectversion_id")
 
+    return do_lock(request, projectversion_id)
+
+
+def do_lock(request, projectversion_id):
+    db = request.cirrina.db_session
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
