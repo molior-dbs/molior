@@ -480,7 +480,7 @@ class AptlyApi:
         else:
             data = {"Name": snapshot_name}
             async with aiohttp.ClientSession() as http:
-                async with http.post(self.url + "/repos/" + repo_name, headers=self.headers,
+                async with http.post(self.url + "/repos/" + repo_name + "/snapshots", headers=self.headers,
                                      data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
