@@ -96,7 +96,28 @@ class DebianRepository:
             task_id = await self.__api.snapshot_publish(snapshot_name, "main", archs, dist, self.publish_name)
             await self.__api.wait_task(task_id)
 
-    def __generate_snapshot_name(self, dist, without_timestamp=False):
+    async def delete(self):
+        """
+        Creates stable and unstable snapshots and publish points
+        if they don't already exist.
+        """
+        logger.warning("delete repository called for '%s'", self.name)
+
+#  * [buster_10.4-all_repos_asd_1a-stable-20200711200841]: Created as empty
+#  * [buster_10.4-all_repos_asd_1a-unstable-20200711200843]: Created as empty
+
+        for dist in ["unstable", "stable"]:
+            await self.__api.publish_drop(self.basemirror_name,
+                                          self.basemirror_version,
+                                          self.project_name,
+                                          self.project_version, dist)
+
+            snapshot_name = self.__generate_snapshot_name(dist)
+            logger.warning("delete snapshot %s" % snapshot_name)
+            await self.__api.snapshot_delete(snapshot_name)
+        await self.__api.repo_delete("{}/{}".format(self.project_name, self.project_version))
+
+    def __generate_snapshot_name(self, dist, temporary=False):
         """
             Generates a snapshot name for the repository.
 
@@ -167,32 +188,6 @@ class DebianRepository:
             logger.exception(exc)
 
         return list(set(packages) - set(old_packages))
-
-    async def __get_packages(self, ci_build=False):
-        """
-        Gets all packages from the current local
-        repo.
-
-        Args:
-            ci_build (bool): Gets ci packages if set to True.
-
-        Returns:
-            list: List of package refs.
-        """
-        pkgs = await self.__api.repo_packages_get(self.name)
-
-        logger.debug("got '%s' packages from the '%s' repository", len(pkgs), self.name)
-
-        ci_packages = [pkg for pkg in pkgs if "+git" in pkg]
-        non_ci_packages = [pkg for pkg in pkgs if "+git" not in pkg]
-        package_refs = ci_packages if ci_build else non_ci_packages
-
-        # ci_packages = await self.__remove_old_packages(ci_packages)
-
-        logger.debug("non-ci packages: %s", str(non_ci_packages))
-        logger.debug("ci packages: %s", str(ci_packages))
-
-        return package_refs
 
     async def add_packages(self, files, ci_build=False):
         """
