@@ -701,6 +701,26 @@ class AptlyApi:
                     self.__raise_aptly_error(resp)
         return True
 
+    async def repo_delete(self, name):
+        """
+        Deletes an aptly repository.
+
+        Args:
+            name (str): The repository's name.
+
+        Returns:
+            bool: True if creation was successful, otherwise False.
+
+        Raises:
+            molior.aptly.errors.AptlyError: If a known error occurs while
+                communicating with the aptly api.
+        """
+        async with aiohttp.ClientSession() as http:
+            async with http.delete(self.url + "/repos/" + name, headers=self.headers, auth=self.auth) as resp:
+                if not self.__check_status_code(resp.status):
+                    self.__raise_aptly_error(resp)
+        return True
+
     async def delete_directory(self, directory_name):
         """
         Deletes the given directory on the aptly server.
