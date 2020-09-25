@@ -101,7 +101,7 @@ async def get_projectversions2(request):
     is_basemirror = request.GET.getone("isbasemirror", False)
     filter_name = request.GET.getone("q", None)
 
-    query = db.query(ProjectVersion).join(Project).filter(Project.is_mirror.is_(False))
+    query = db.query(ProjectVersion).join(Project).filter(Project.is_mirror.is_(False), ProjectVersion.is_deleted.is_(False))
     if project_id:
         query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
     if filter_name:

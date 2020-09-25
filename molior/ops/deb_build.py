@@ -9,7 +9,7 @@ from sqlalchemy import or_
 from pathlib import Path
 
 from ..app import logger
-from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title
+from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title, db2array
 from .git import GitCheckout, GetBuildInfo
 
 from ..model.database import Session
@@ -193,7 +193,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         # Check if source build already exists
         build = session.query(Build).filter(Build.buildtype == "source",
                                             Build.sourcerepository == repo,
-                                            Build.version == info.version).first()
+                                            Build.version == info.version,
+                                            Build.buildstate == "successful").first()
         if build:
             repo.log_state("source package already built for version {}".format(info.version))
             await write_log(parent_build_id, "E: source package already built for version {}\n".format(info.version))
@@ -291,7 +292,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
 
             projectversion_ids.append(projectversion.id)
 
-            architectures = target.architectures[1:-1].split(",")
+            architectures = db2array(target.architectures)
             for architecture in architectures:
                 deb_build = session.query(Build).filter(
                                 Build.projectversion == projectversion,
@@ -300,6 +301,11 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                                 Build.buildtype == "deb",
                                 Build.architecture == architecture).first()
                 if deb_build:
+                    if deb_build.buildstate != "successful":
+                        deb_build.buildstate = "needs_build"
+                        session.commit()
+                        found = True
+                        continue
                     logger.warning("already built %s", repo.name)
                     await write_log(parent_build_id, "E: already built {}\n".format(repo.name))
                     continue
@@ -337,6 +343,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await write_log(parent_build_id, "E: no projectversion found to build for")
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_nothing_done()
+            repo.set_ready()
             session.commit()
             return
 

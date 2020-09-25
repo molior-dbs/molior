@@ -62,7 +62,7 @@ def test_generate_snapshot_nm_nots():
         publish_name.return_value = "test"
 
         res = repo._DebianRepository__generate_snapshot_name("stable", True)
-        assert res == "test-stable-"
+        assert res == "test-stable-tmp"
 
 
 def test_generate_snapshot_name():
@@ -72,8 +72,7 @@ def test_generate_snapshot_name():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection"), patch.object(
-            DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name, patch(
-            "molior.molior.debianrepository.datetime") as date_time_mock:
+            DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name:
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"
@@ -83,11 +82,10 @@ def test_generate_snapshot_name():
 
         repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
 
-        date_time_mock.now.return_value = datetime(2018, 1, 1, 12, 0, 0)
         publish_name.return_value = "test"
 
-        res = repo._DebianRepository__generate_snapshot_name("stable")
-        assert res == "test-stable-20180101120000"
+        res = repo._DebianRepository__generate_snapshot_name("stable", temporary=False)
+        assert res == "test-stable"
 
 
 def test_await_task_exception():
@@ -350,6 +348,7 @@ def test_add_packages():
         )
         aptly_connection.snapshot_delete = Mock(side_effect=asyncio.coroutine(lambda a: 100))
         aptly_connection.snapshot_publish_update = Mock(side_effect=asyncio.coroutine(lambda a, b, c, d: 1340))
+        aptly_connection.snapshot_rename = Mock(side_effect=asyncio.coroutine(lambda a, b: None))
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"

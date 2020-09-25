@@ -71,7 +71,7 @@ class DebianRepository:
             logger.debug("repository '%s' already exists", self.name)
 
         for dist in self.DISTS:
-            snapshot_base_name = self.__generate_snapshot_name(dist, without_timestamp=True)
+            snapshot_base_name = self.__generate_snapshot_name(dist)
             exists = [
                 sst
                 for sst in snapshots
@@ -105,11 +105,7 @@ class DebianRepository:
                     e.g. stable, unstable
                 without_timestamp (bool): Excludes timestamp if True.
         """
-        if without_timestamp:
-            return "{}-{}-".format(self.publish_name, dist)
-
-        timestamp = datetime.now().strftime(self.DATETIME_FORMAT)
-        return "{}-{}-{}".format(self.publish_name, dist, timestamp)
+        return "{}-{}{}".format(self.publish_name, dist, "-tmp" if temporary else "")
 
     async def __await_task(self, task_id):
         while True:
@@ -221,13 +217,12 @@ class DebianRepository:
         await self.__api.delete_directory(upload_dir)
 
         snapshot_dist = "unstable" if ci_build else "stable"
-        snapshot_name = self.__generate_snapshot_name(snapshot_dist)
-        snapshot_base_name = "{}-{}-".format(self.publish_name, snapshot_dist)
+        snapshot_name_tmp = self.__generate_snapshot_name(snapshot_dist, temporary=True)
 
         package_refs = await self.__get_packages(ci_build)
         logger.debug("creating snapshot with name '%s' and the packages: '%s'", snapshot_name, str(package_refs))
 
-        task_id = await self.__api.snapshot_create(snapshot_name, package_refs)
+        task_id = await self.__api.snapshot_create(snapshot_name_tmp, package_refs)
         await self.__await_task(task_id)
 
         logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
@@ -235,13 +230,10 @@ class DebianRepository:
                      snapshot_dist,
                      snapshot_name)
 
-        task_id = await self.__api.snapshot_publish_update(snapshot_name, "main", snapshot_dist, self.publish_name)
+        task_id = await self.__api.snapshot_publish_update(snapshot_name_tmp, "main", snapshot_dist, self.publish_name)
         await self.__await_task(task_id)
 
-        snapshots = await self.__api.snapshot_get()
-        for snapshot in snapshots:
-            if "Name" not in snapshot:
-                continue
-            name = snapshot.get("Name")
-            if name.startswith(snapshot_base_name) and name != snapshot_name:
-                await self.__api.snapshot_delete(snapshot.get("Name"))
+        snapshot_name = self.__generate_snapshot_name(snapshot_dist, temporary=False)
+        logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
+        await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)
+        await self.__api.snapshot_delete(snapshot_name_tmp)
