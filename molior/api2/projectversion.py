@@ -1,4 +1,4 @@
-from ..app import app
+from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
 from ..api.projectversion import projectversion_to_dict, do_clone, do_lock, do_overlay
@@ -275,3 +275,48 @@ async def snapshot_projectversion(request):
     # re publich latest build
 
     return OKResponse({"id": new_projectversion.id, "name": new_projectversion.name})
+
+
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}")
+@req_role("owner")
+async def delete_projectversion(request):
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+
+    if projectversion.dependents:
+        blocking_dependants = []
+        for d in projectversion.dependents:
+            if not d.is_deleted:
+                blocking_dependants.append("{}/{}".format(d.project.name, d.name))
+                logger.error("projectversion delete: projectversion_id %d still has dependency %d", projectversion.id, d.id)
+        if blocking_dependants:
+            return ErrorResponse(400, "Projectversions '{}' are still depending on this version, cannot delete it".format(
+                                  ", ".join(blocking_dependants)))
+
+    projectversion.is_deleted = True
+    projectversion.is_locked = True
+    projectversion.ci_builds_enabled = False
+    request.cirrina.db_session.commit()
+
+    # FIXME
+    # delete builds
+    # delete hooks
+    # delete sourcerepos
+    # delete projectversion
+
+    await request.cirrina.aptly_queue.put(
+        {
+            "delete_repository": [
+                projectversion.basemirror.project.name,
+                projectversion.basemirror.name,
+                projectversion.project.name,
+                projectversion.name,
+                db2array(projectversion.mirror_architectures),
+            ]
+        }
+    )
+    logger.info("ProjectVersion '%s/%s' deleted", projectversion.project.name, projectversion.name)
+    return OKResponse("Deleted Project Version")

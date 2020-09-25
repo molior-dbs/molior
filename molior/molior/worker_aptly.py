@@ -761,6 +761,14 @@ class AptlyWorker:
         architectures = args[4]
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
 
+    async def _delete_repository(self, args, session):
+        basemirror_name = args[0]
+        basemirror_version = args[1]
+        project_name = args[2]
+        project_version = args[3]
+        architectures = args[4]
+        await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).delete()
+
     async def _cleanup(self, args, session):
         logger.info("aptly worker: running cleanup")
         aptly = get_aptly_connection()
@@ -876,6 +884,12 @@ class AptlyWorker:
                         if args:
                             handled = True
                             await self._init_repository(args, session)
+
+                    if not handled:
+                        args = task.get("delete_repository")
+                        if args:
+                            handled = True
+                            await self._delete_repository(args, session)
 
                     if not handled:
                         args = task.get("delete_mirror")

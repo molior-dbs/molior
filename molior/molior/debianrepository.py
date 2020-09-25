@@ -98,24 +98,26 @@ class DebianRepository:
 
     async def delete(self):
         """
-        Creates stable and unstable snapshots and publish points
-        if they don't already exist.
+        Delete a repository including publish point amd snapshots
         """
-        logger.warning("delete repository called for '%s'", self.name)
-
-#  * [buster_10.4-all_repos_asd_1a-stable-20200711200841]: Created as empty
-#  * [buster_10.4-all_repos_asd_1a-unstable-20200711200843]: Created as empty
-
         for dist in ["unstable", "stable"]:
-            await self.__api.publish_drop(self.basemirror_name,
-                                          self.basemirror_version,
-                                          self.project_name,
-                                          self.project_version, dist)
+            try:
+                await self.__api.publish_drop(self.basemirror_name,
+                                              self.basemirror_version,
+                                              self.project_name,
+                                              self.project_version, dist)
+            except Exception:
+                logger.warning("Error deleting publish point of repo '%s'" % self.name)
 
             snapshot_name = self.__generate_snapshot_name(dist)
-            logger.warning("delete snapshot %s" % snapshot_name)
-            await self.__api.snapshot_delete(snapshot_name)
-        await self.__api.repo_delete("{}/{}".format(self.project_name, self.project_version))
+            try:
+                await self.__api.snapshot_delete(snapshot_name)
+            except Exception:
+                logger.warning("Error deleting snapshot '%s'" % snapshot_name)
+        try:
+            await self.__api.repo_delete(self.name)
+        except Exception:
+            logger.warning("Error deleting repo '%s'" % self.name)
 
     def __generate_snapshot_name(self, dist, temporary=False):
         """
