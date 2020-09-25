@@ -390,21 +390,19 @@ async def clone_projectversion(request):
             description: internal server error
     """
     params = await request.json()
-
     name = params.get("name")
     projectversion_id = parse_int(request.match_info["projectversion_id"])
-
     if not projectversion_id:
         return ErrorResponse(400, "No valid project id received")
+    return await do_clone(request, projectversion_id, name)
+
+
+async def do_clone(request, projectversion_id, name):
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
-    return await do_clone(request, projectversion_id, name)
-
-
-async def do_clone(request, projectversion_id, name):
     db = request.cirrina.db_session
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
 
@@ -486,19 +484,21 @@ async def create_projectversion_overlay(request):
         "500":
             description: internal server error
     """
-    db = request.cirrina.db_session
     params = await request.json()
-
     name = params.get("name")
     projectversion_id = parse_int(request.match_info["projectversion_id"])
-
     if not projectversion_id:
         return ErrorResponse(400, "No valid project id received")
+    return await do_overlay(request, projectversion_id, name)
+
+
+async def do_overlay(request, projectversion_id, name):
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 
+    db = request.cirrina.db_session
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -513,7 +513,7 @@ async def create_projectversion_overlay(request):
         project=projectversion.project,
         # add the projectversion where the overlay is created from as a dependency
         dependencies=[projectversion],
-        architectures=projectversion.architectures,
+        mirror_architectures=projectversion.mirror_architectures,
         basemirror=projectversion.basemirror
     )
 
@@ -521,7 +521,6 @@ async def create_projectversion_overlay(request):
     db.commit()
 
     basemirror = overlay_projectversion.basemirror
-    architectures = overlay_projectversion.architectures[1:-1].split(",")
 
     await request.cirrina.aptly_queue.put(
         {
@@ -531,7 +530,7 @@ async def create_projectversion_overlay(request):
                 basemirror.name,
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
-                architectures,
+                db2array(overlay_projectversion.mirror_architectures)
             ]
         }
     )
