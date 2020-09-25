@@ -1,9 +1,11 @@
 from ..app import app
 from ..auth import req_role
-from ..tools import ErrorResponse, OKResponse
+from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
 from ..api.projectversion import projectversion_to_dict, do_clone, do_lock, do_overlay
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
+from ..model.project import Project
+from ..model.sourepprover import SouRepProVer
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -211,3 +213,66 @@ async def overlay_projectversion(request):
         return ErrorResponse(400, "Projectversion not found")
 
     return await do_overlay(request, projectversion.id, name)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/snapshot")
+@req_role("owner")
+async def snapshot_projectversion(request):
+    params = await request.json()
+
+    name = params.get("name")
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    if not name:
+        return ErrorResponse(400, "No valid name for the projectversion recieived")
+    if not is_name_valid(name):
+        return ErrorResponse(400, "Invalid project name")
+
+    db = request.cirrina.db_session
+    if db.query(ProjectVersion).join(Project).filter(
+            ProjectVersion.name == name,
+            Project.id == projectversion.project_id).first():
+        return ErrorResponse(400, "Projectversion already exists.")
+
+    new_projectversion = ProjectVersion(
+        name=name,
+        project=projectversion.project,
+        dependencies=projectversion.dependencies,
+        mirror_architectures=projectversion.mirror_architectures,
+        basemirror_id=projectversion.basemirror_id,
+        sourcerepositories=projectversion.sourcerepositories,
+        ci_builds_enabled=False,
+        is_locked=True,
+    )
+
+    for repo in new_projectversion.sourcerepositories:
+        sourepprover = db.query(SouRepProVer).filter(
+                SouRepProVer.sourcerepository_id == repo.id,
+                SouRepProVer.projectversion_id == projectversion.id).first()
+        new_sourepprover = db.query(SouRepProVer).filter(
+                SouRepProVer.sourcerepository_id == repo.id,
+                SouRepProVer.projectversion_id == new_projectversion.id).first()
+        new_sourepprover.architectures = sourepprover.architectures
+
+    db.add(new_projectversion)
+    db.commit()
+
+    await request.cirrina.aptly_queue.put(
+        {
+            "init_repository": [
+                new_projectversion.id,
+                new_projectversion.basemirror.project.name,
+                new_projectversion.basemirror.name,
+                new_projectversion.project.name,
+                new_projectversion.name,
+                db2array(new_projectversion.mirror_architectures),
+            ]
+        }
+    )
+
+    # FIXME:
+    # re publich latest build
+
+    return OKResponse({"id": new_projectversion.id, "name": new_projectversion.name})
