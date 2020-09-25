@@ -1,7 +1,7 @@
 from ..app import app
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid
-from ..api.projectversion import projectversion_to_dict, do_clone
+from ..api.projectversion import projectversion_to_dict, do_clone, do_lock
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 
@@ -193,3 +193,13 @@ async def clone_projectversion(request):
         return ErrorResponse(400, "Invalid project name!")
 
     return await do_clone(request, projectversion.id, name)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
+@req_role("owner")
+async def lock_projectversion(request):
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    return do_lock(request, projectversion.id)
