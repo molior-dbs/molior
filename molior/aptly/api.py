@@ -574,6 +574,21 @@ class AptlyApi:
                 data = json.loads(await resp.text())
         return data["ID"]
 
+    async def snapshot_rename(self, name, new_name):
+        """
+        Rename a snapshot
+
+        Args:
+            name (str): Original name
+            new_name (str): New name
+        """
+        data = {"Name": new_name}
+        async with aiohttp.ClientSession() as http:
+            async with http.put(self.url + "/snapshots/" + name, headers=self.headers,
+                                data=json.dumps(data), auth=self.auth) as resp:
+                if not self.__check_status_code(resp.status):
+                    self.__raise_aptly_error(resp)
+
     async def repo_packages_get(self, repo_name):
         """
         Gets a list of all packages from a local repository.

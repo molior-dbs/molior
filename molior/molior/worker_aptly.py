@@ -754,11 +754,11 @@ class AptlyWorker:
         await aptly.publish_drop(base_mirror_name, base_mirror_version, projectname, projectversion, dist)
 
     async def _init_repository(self, args, session):
-        basemirror_name = args[1]
-        basemirror_version = args[2]
-        project_name = args[3]
-        project_version = args[4]
-        architectures = args[5]
+        basemirror_name = args[0]
+        basemirror_version = args[1]
+        project_name = args[2]
+        project_version = args[3]
+        architectures = args[4]
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
 
     async def _cleanup(self, args, session):

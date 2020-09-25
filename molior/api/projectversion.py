@@ -172,9 +172,6 @@ async def get_projectversion(request):
     if not projectversion:
         return ErrorResponse(400, "Projectversion %d not found" % projectversion_id)
 
-    if projectversion.is_deleted:
-        return ErrorResponse(404, "Projectversion {} deleted".format(projectversion_id))
-
     projectversion_dict = projectversion_to_dict(projectversion)
     dep_ids = get_projectversion_deps(projectversion.id, db)
     projectversion_dict["dependencies"] = []

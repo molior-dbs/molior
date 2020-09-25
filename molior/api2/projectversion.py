@@ -262,7 +262,6 @@ async def snapshot_projectversion(request):
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
-                new_projectversion.id,
                 new_projectversion.basemirror.project.name,
                 new_projectversion.basemirror.name,
                 new_projectversion.project.name,
