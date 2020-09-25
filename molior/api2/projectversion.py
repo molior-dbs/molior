@@ -137,19 +137,19 @@ async def add_projectversion_dependency(request):
         return ErrorResponse(400, "Projectversion not found")
 
     if projectversion.is_locked:
-        return ErrorResponse(400, "You can not add dependencies on a locked projectversion")
+        return ErrorResponse(400, "Cannot add dependencies on a locked projectversion")
 
     dependency = get_projectversion_byname(dependency_name, db)
     if not dependency:
         return ErrorResponse(400, "Dependency not found")
 
     if dependency.id == projectversion.id:
-        return ErrorResponse(400, "You can not add a dependency of the same projectversion to itself")
+        return ErrorResponse(400, "Cannot add a dependency of the same projectversion to itself")
 
     # check for dependency loops
     dep_ids = get_projectversion_deps(dependency.id, db)
     if projectversion.id in dep_ids:
-        return ErrorResponse(400, "You can not add a dependency of a projectversion depending itself on this projectversion")
+        return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
     db.commit()

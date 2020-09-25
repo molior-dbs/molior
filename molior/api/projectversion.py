@@ -333,6 +333,8 @@ async def delete_repository(request):
     projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
     if not projectversion:
         return ErrorResponse(400, "Projectversion {} could not been found.".format(projectversion_id))
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
 
     if not sourcerepository_id:
         return ErrorResponse(400, "No valid sourcerepository_id received")
