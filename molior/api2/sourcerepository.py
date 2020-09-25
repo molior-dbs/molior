@@ -254,7 +254,10 @@ async def add_repository(request):
 
     projectversion = get_projectversion(request)
     if not projectversion:
-        return ErrorResponse(400, "Project not found")
+        return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
 
     try:
         repoinfo = giturlparse.parse(url)
@@ -351,6 +354,8 @@ async def edit_repository(request):
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(404, "Project not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
 
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
@@ -444,6 +449,8 @@ async def add_repository_hook(request):
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Project not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
 
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
