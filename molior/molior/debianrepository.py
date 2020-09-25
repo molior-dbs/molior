@@ -237,4 +237,3 @@ class DebianRepository:
         logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
         await self.__api.snapshot_delete(snapshot_name)
         await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)
-        await self.__api.snapshot_delete(snapshot_name_tmp)
