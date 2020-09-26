@@ -223,7 +223,6 @@ async def create_projectversion(request):
     db.commit()
 
     await request.cirrina.aptly_queue.put({"init_repository": [
-                projectversion.id,
                 basemirror_name,
                 basemirror_version,
                 projectversion.project.name,

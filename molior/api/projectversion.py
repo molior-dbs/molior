@@ -280,7 +280,6 @@ async def create_projectversions(request):
     project_version = projectversion.name
 
     await request.cirrina.aptly_queue.put({"init_repository": [
-                projectversion.id,
                 basemirror_name,
                 basemirror_version,
                 project_name,
@@ -435,7 +434,6 @@ async def do_clone(request, projectversion_id, name):
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
-                new_projectversion.id,
                 new_projectversion.basemirror.project.name,
                 new_projectversion.basemirror.name,
                 new_projectversion.project.name,
@@ -524,7 +522,6 @@ async def do_overlay(request, projectversion_id, name):
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
-                overlay_projectversion.id,
                 basemirror.project.name,
                 basemirror.name,
                 overlay_projectversion.project.name,
