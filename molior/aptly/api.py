@@ -715,8 +715,9 @@ class AptlyApi:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
+        data = json.dumps({"force": "1"})
         async with aiohttp.ClientSession() as http:
-            async with http.delete(self.url + "/repos/" + name, headers=self.headers, auth=self.auth) as resp:
+            async with http.delete(self.url + "/repos/" + name, headers=self.headers, data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
