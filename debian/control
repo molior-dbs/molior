@@ -62,7 +62,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
 # add some tools:
   tree, bzip2, wget, telnet, man, psmisc,
 # molior:
-  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7)
+  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy10.molior4)
 Description: molior ISO installer for testing
  Testing setup for molior
 
@@ -80,7 +80,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
 # add some tools:
   htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xauth,
 # molior:
-  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
+  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy10.molior4),
   molior-tools,
 # development tools:
   npm, python3-all, dh-python, debhelper, dh-exec, python3-sphinx,
