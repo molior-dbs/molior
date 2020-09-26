@@ -336,12 +336,14 @@ async def get_build(request):
                         "name": build.architecture,
                     },
                     "base_mirror": {
-                        "name": build.projectversion.basemirror.project.name,
-                        "version": build.projectversion.basemirror.name,
+                        "name": build.projectversion.basemirror.project.name
+                        if build.projectversion.basemirror else "",
+                        "version": build.projectversion.basemirror.name
+                        if build.projectversion.basemirror else "",
                     },
                     "name": build.projectversion.basemirror.project.name + "-" +
-                    build.projectversion.basemirror.name + "/" +
-                    build.architecture
+                    build.projectversion.basemirror.name + "/" + build.architecture
+                    if build.projectversion.basemirror else "",
                 }
             }
         )
