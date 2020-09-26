@@ -1,0 +1,20 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE TYPE dependencylevel_enum AS ENUM (
+    'strict',
+    'distribution',
+    'any'
+);
+ALTER TYPE dependencylevel_enum OWNER TO molior;
+
+ALTER TABLE projectversion ADD COLUMN dependency_level dependencylevel_enum;
+
+ALTER TABLE build DROP COLUMN buildconfiguration_id;
+ALTER TABLE chroot DROP COLUMN buildvariant_id;
+DROP TABLE projectversionbuildvariant;
+DROP TABLE buildvariant;
+DROP TABLE buildconfiguration;
+
+EOF

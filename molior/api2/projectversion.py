@@ -6,6 +6,7 @@ from ..api.projectversion import projectversion_to_dict, do_clone, do_lock, do_o
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 from ..model.project import Project
 from ..model.sourepprover import SouRepProVer
+from ..model.build import Build
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -301,22 +302,43 @@ async def delete_projectversion(request):
     projectversion.ci_builds_enabled = False
     request.cirrina.db_session.commit()
 
-    # FIXME
+    basemirror_name = projectversion.basemirror.project.name
+    basemirror_version = projectversion.basemirror.name
+    project_name = projectversion.project.name
+    project_version = projectversion.name
+    architectures = db2array(projectversion.mirror_architectures)
+
+    db = request.cirrina.db_session
+
     # delete builds
+    builds = db.query(Build).filter(Build.projectversion_id == projectversion.id).all()
+    for build in builds:
+        parent = None
+        if len(build.parent.children) == 1:
+            parent = build.parent
+        db.delete(build)
+        if parent:
+            db.delete(parent.parent)
+            db.delete(parent)
+
     # delete hooks
     # delete sourcerepos
+
     # delete projectversion
+    db.delete(projectversion)
+
+    db.commit()
 
     await request.cirrina.aptly_queue.put(
         {
             "delete_repository": [
-                projectversion.basemirror.project.name,
-                projectversion.basemirror.name,
-                projectversion.project.name,
-                projectversion.name,
-                db2array(projectversion.mirror_architectures),
+                basemirror_name,
+                basemirror_version,
+                project_name,
+                project_version,
+                architectures
             ]
         }
     )
-    logger.info("ProjectVersion '%s/%s' deleted", projectversion.project.name, projectversion.name)
+    logger.info("ProjectVersion '%s/%s' deleted", project_name, project_version)
     return OKResponse("Deleted Project Version")

@@ -22,7 +22,6 @@ async def startup_migration(task_queue):
     """
     Migrate old aptly repos
     """
-    # loop = asyncio.get_event_loop()
     aptly = get_aptly_connection()
 
     with Session() as session:
@@ -33,10 +32,31 @@ async def startup_migration(task_queue):
         if not query.count():
             return
 
-        repos = query.all()
-        for repo in repos:
-            repo_name = "%s-%s-%s-%s" % (repo.basemirror.project.name, repo.basemirror.name,
-                                         repo.project.name, repo.name)
+        aptly_repos = await aptly.repo_get()
+        projectversions = query.all()
+        for projectversion in projectversions:
+            repo_name = "%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
+                                         projectversion.project.name, projectversion.name)
+
+            aptly_snapshots = await aptly.snapshot_get()
+            for aptly_snapshot in aptly_snapshots:
+                aptly_snapshot_name = aptly_snapshot.get("Name")
+                publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
+                                                          projectversion.basemirror.name,
+                                                          projectversion.project.name,
+                                                          projectversion.name)
+                for dist in ["stable", "unstable"]:
+                    snapshot_name = "{}-{}-".format(publish_name, dist)
+                    if aptly_snapshot_name.startswith(snapshot_name):
+                        await aptly.snapshot_delete(aptly_snapshot_name)
+
+            found = False
+            for a in aptly_repos:
+                if a.get("Name") == repo_name:
+                    found = True
+                    break
+            if not found:
+                continue
             logger.warning("renaming repo %s" % repo_name)
             try:
                 await aptly.repo_rename(repo_name, repo_name + "-stable")

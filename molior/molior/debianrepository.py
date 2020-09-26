@@ -65,21 +65,20 @@ class DebianRepository:
 
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
-            exists = [repo for repo in repos if repo.get("Name") == repo_name]
-            if not exists:
-                logger.info("creating repository '%s'", repo_name)
-                await self.__api.repo_create(repo_name)
-            else:
-                logger.debug("repository '%s' already exists", self.name)
-            snapshot_base_name = self.__get_snapshot_name(dist)
-            exists = [
-                sst
-                for sst in snapshots
-                if sst.get("Name").startswith(snapshot_base_name)
-            ]
-            if exists:
-                logger.debug("publish point based on '%s' already exists", snapshot_base_name)
-                continue
+            for repo in repos:
+                if repo.get("Name") == repo_name:
+                    logger.error("repository '%s' already exists", repo_name)
+                    return False
+            snapshot_name = self.__get_snapshot_name(dist)
+            for snapshot in snapshots:
+                if snapshot.get("Name") == snapshot_name:
+                    logger.error("publish point for '%s' already exists", snapshot_name)
+                    return False
+
+        for dist in self.DISTS:
+            repo_name = self.name + "-%s" % dist
+            logger.info("creating repository '%s'", repo_name)
+            await self.__api.repo_create(repo_name)
 
             snapshot_name = self.__get_snapshot_name(dist)
 
@@ -95,19 +94,21 @@ class DebianRepository:
             logger.debug("publishing snapshot: '%s' archs: '%s'", snapshot_name, str(archs))
             task_id = await self.__api.snapshot_publish(snapshot_name, "main", archs, dist, self.publish_name)
             await self.__api.wait_task(task_id)
+        return True
 
     async def delete(self):
         """
         Delete a repository including publish point amd snapshots
         """
         for dist in self.DISTS:
+            repo_name = self.name + "-%s" % dist
             try:
                 await self.__api.publish_drop(self.basemirror_name,
                                               self.basemirror_version,
                                               self.project_name,
                                               self.project_version, dist)
             except Exception:
-                logger.warning("Error deleting publish point of repo '%s'" % self.name)
+                logger.warning("Error deleting publish point of repo '%s'" % repo_name)
 
             # FIXME: delete also old timestamped snapshots
             snapshot_name = self.__get_snapshot_name(dist)
@@ -115,7 +116,6 @@ class DebianRepository:
                 await self.__api.snapshot_delete(snapshot_name)
             except Exception:
                 logger.warning("Error deleting snapshot '%s'" % snapshot_name)
-            repo_name = self.name + "-%s" % dist
             try:
                 await self.__api.repo_delete(repo_name)
             except Exception:
