@@ -609,7 +609,7 @@ class AptlyApi:
         Returns:
             list: List of package refs.
         """
-        data = None
+        data = None  # q: package query
         async with aiohttp.ClientSession() as http:
             async with http.get(self.url + "/repos/{}/packages".format(repo_name), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
@@ -717,6 +717,27 @@ class AptlyApi:
         """
         async with aiohttp.ClientSession() as http:
             async with http.delete(self.url + "/repos/" + name, headers=self.headers, auth=self.auth) as resp:
+                if not self.__check_status_code(resp.status):
+                    self.__raise_aptly_error(resp)
+        return True
+
+    async def repo_rename(self, name, new_name):
+        """
+        Rename an aptly repository.
+
+        Args:
+            name (str): The repository's name.
+
+        Returns:
+            bool: True if creation was successful, otherwise False.
+
+        Raises:
+            molior.aptly.errors.AptlyError: If a known error occurs while
+                communicating with the aptly api.
+        """
+        data = {"Name": new_name}
+        async with aiohttp.ClientSession() as http:
+            async with http.put(self.url + "/repos/" + name, headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True

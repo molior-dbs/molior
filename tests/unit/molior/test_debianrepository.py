@@ -61,11 +61,11 @@ def test_generate_snapshot_nm_nots():
 
         publish_name.return_value = "test"
 
-        res = repo._DebianRepository__generate_snapshot_name("stable", True)
+        res = repo._DebianRepository__get_snapshot_name("stable", True)
         assert res == "test-stable-tmp"
 
 
-def test_generate_snapshot_name():
+def test_get_snapshot_name():
     """
     Test generate snapshot name
     """
@@ -84,7 +84,7 @@ def test_generate_snapshot_name():
 
         publish_name.return_value = "test"
 
-        res = repo._DebianRepository__generate_snapshot_name("stable", temporary=False)
+        res = repo._DebianRepository__get_snapshot_name("stable", temporary=False)
         assert res == "test-stable"
 
 
@@ -324,11 +324,11 @@ def test_add_packages():
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch.object(
             DebianRepository, "_DebianRepository__await_task",
             side_effect=asyncio.coroutine(lambda a: True),) as await_task_mock, patch.object(
-            DebianRepository, "_DebianRepository__generate_snapshot_name") as generate_snapshot_name, patch.object(
+            DebianRepository, "_DebianRepository__get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name, patch(
             "molior.molior.debianrepository.logger"):
 
-        generate_snapshot_name.return_value = "jessie_8.8_repos_test_1-stable-20180101120000"
+        get_snapshot_name.return_value = "jessie_8.8_repos_test_1-stable"
         publish_name.return_value = "jessie_8.8_repos_test_1"
 
         aptly_connection = MagicMock()
@@ -339,7 +339,7 @@ def test_add_packages():
         aptly_connection.snapshot_get = Mock(
             side_effect=asyncio.coroutine(
                 lambda: [
-                    {"Name": "jessie_8.8_repos_test_1-stable-20180101120099"},
+                    {"Name": "jessie_8.8_repos_test_1-stable"},
                     {"Invalid": 1},
                 ]
             )
@@ -358,7 +358,7 @@ def test_add_packages():
         loop = asyncio.get_event_loop()
         loop.run_until_complete(repo.add_packages(files))
         aptly_connection.snapshot_publish_update.assert_called_with(
-            "jessie_8.8_repos_test_1-stable-20180101120000",
+            "jessie_8.8_repos_test_1-stable",
             "main",
             "stable",
             "jessie_8.8_repos_test_1",
@@ -376,12 +376,12 @@ def test_init():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch.object(
-            DebianRepository, "_DebianRepository__generate_snapshot_name") as generate_snapshot_name, patch.object(
+            DebianRepository, "_DebianRepository__get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):
 
-        generate_snapshot_name.return_value = "stretch_9.2_test_2-stable-20180101120000"
+        get_snapshot_name.return_value = "stretch_9.2_test_2-stable"
         name_mock.return_value = "stretch-9.2-test-2"
         publish_name_mock.return_value = "stretch_9.2_repos_test_2"
 
@@ -417,9 +417,9 @@ def test_init():
 
         loop.run_until_complete(repo.init())
 
-        aptly_connection.repo_create.assert_called_with("stretch-9.2-test-2")
+        aptly_connection.repo_create.assert_called_with("stretch-9.2-test-2-stable")
         aptly_connection.snapshot_publish.assert_called_with(
-            "stretch_9.2_test_2-stable-20180101120000",
+            "stretch_9.2_test_2-stable",
             "main",
             ["source", "all"],
             "stable",
@@ -436,7 +436,7 @@ def test_init_exists():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch.object(
-            DebianRepository, "_DebianRepository__generate_snapshot_name") as generate_snapshot_name, patch.object(
+            DebianRepository, "_DebianRepository__get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):
@@ -444,17 +444,20 @@ def test_init_exists():
         name_mock.return_value = "stretch-9.2-test-2"
         publish_name_mock.return_value = "stretch_9.2_repos_test_2"
 
-        generate_snapshot_name.return_value = "stretch_9.2_test_2-stable-20180101120000"
+        get_snapshot_name.return_value = "stretch_9.2_test_2-stable"
 
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
         aptly_connection.snapshot_get = Mock(
             side_effect=asyncio.coroutine(
-                lambda: [{"Name": "stretch_9.2_test_2-stable-20180101120000"}]
+                lambda: [{"Name": "stretch_9.2_test_2-stable"}]
             )
         )
         aptly_connection.repo_get = Mock(
-            side_effect=asyncio.coroutine(lambda: [{"Name": "stretch-9.2-test-2"}])
+            side_effect=asyncio.coroutine(lambda: [{"Name": "stretch-9.2-test-2-stable"}])
+        )
+        aptly_connection.repo_create = Mock(
+            side_effect=asyncio.coroutine(lambda a: None)
         )
 
         async def wait_task_mock(_):
