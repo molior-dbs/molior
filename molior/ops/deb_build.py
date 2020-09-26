@@ -185,7 +185,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                 repo.log_state("CI builds not enabled in specified projectversions, not building...")
                 await write_log(parent_build_id, "E: CI builds not enabled in specified projectversions, not building...\n")
                 await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-                await parent.set_successful()
+                await parent.set_nothing_done()
                 repo.set_ready()
                 session.commit()
                 return
