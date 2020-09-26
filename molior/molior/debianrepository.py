@@ -86,7 +86,7 @@ class DebianRepository:
             logger.debug("creating empty snapshot: '%s'", snapshot_name)
 
             # package_refs = await self.__get_packages(dist == "unstable")
-            task_id = await self.__api.snapshot_create(self.name, snapshot_name)
+            task_id = await self.__api.snapshot_create(repo_name, snapshot_name)
             await self.__api.wait_task(task_id)
 
             # Add source and all archs per default
@@ -181,10 +181,11 @@ class DebianRepository:
         if not old_packages:
             return packages
 
+        repo_name = self.name + "-unstable"
         try:
             for old_package in old_packages[:1]:
                 logger.info("removing old package from aptly: '%s'", old_package)
-                task_id = await self.__api.repo_packages_delete(self.name, [old_package])
+                task_id = await self.__api.repo_packages_delete(repo_name, [old_package])
                 ret = await self.__await_task(task_id)
                 if not ret:
                     logger.error("Error deleting package: %s (task %d)", old_package, task_id)
