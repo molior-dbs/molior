@@ -63,15 +63,15 @@ class DebianRepository:
         snapshots = await self.__api.snapshot_get()
         repos = await self.__api.repo_get()
 
-        exists = [repo for repo in repos if repo.get("Name") == self.name]
-        if not exists:
-            logger.info("creating repository '%s'", self.name)
-            await self.__api.repo_create(self.name)
-        else:
-            logger.debug("repository '%s' already exists", self.name)
-
         for dist in self.DISTS:
-            snapshot_base_name = self.__generate_snapshot_name(dist)
+            repo_name = self.name + "-%s" % dist
+            exists = [repo for repo in repos if repo.get("Name") == repo_name]
+            if not exists:
+                logger.info("creating repository '%s'", repo_name)
+                await self.__api.repo_create(repo_name)
+            else:
+                logger.debug("repository '%s' already exists", self.name)
+            snapshot_base_name = self.__get_snapshot_name(dist)
             exists = [
                 sst
                 for sst in snapshots
@@ -81,7 +81,7 @@ class DebianRepository:
                 logger.debug("publish point based on '%s' already exists", snapshot_base_name)
                 continue
 
-            snapshot_name = self.__generate_snapshot_name(dist)
+            snapshot_name = self.__get_snapshot_name(dist)
 
             logger.debug("creating empty snapshot: '%s'", snapshot_name)
 
@@ -100,7 +100,7 @@ class DebianRepository:
         """
         Delete a repository including publish point amd snapshots
         """
-        for dist in ["unstable", "stable"]:
+        for dist in self.DISTS:
             try:
                 await self.__api.publish_drop(self.basemirror_name,
                                               self.basemirror_version,
@@ -109,17 +109,19 @@ class DebianRepository:
             except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % self.name)
 
-            snapshot_name = self.__generate_snapshot_name(dist)
+            # FIXME: delete also old timestamped snapshots
+            snapshot_name = self.__get_snapshot_name(dist)
             try:
                 await self.__api.snapshot_delete(snapshot_name)
             except Exception:
                 logger.warning("Error deleting snapshot '%s'" % snapshot_name)
-        try:
-            await self.__api.repo_delete(self.name)
-        except Exception:
-            logger.warning("Error deleting repo '%s'" % self.name)
+            repo_name = self.name + "-%s" % dist
+            try:
+                await self.__api.repo_delete(repo_name)
+            except Exception:
+                logger.warning("Error deleting repo '%s'" % repo_name)
 
-    def __generate_snapshot_name(self, dist, temporary=False):
+    def __get_snapshot_name(self, dist, temporary=False):
         """
             Generates a snapshot name for the repository.
 
@@ -201,7 +203,9 @@ class DebianRepository:
             ci_build (bool): Packages will be pushed to the unstable
                 publish point if set to True.
         """
-        task_id, upload_dir = await self.__api.repo_add(self.name, files)
+        dist = "unstable" if ci_build else "stable"
+        repo_name = self.name + "-%s" % dist
+        task_id, upload_dir = await self.__api.repo_add(repo_name, files)
 
         logger.debug("repo add returned aptly task id '%s' and upload dir '%s'", task_id, upload_dir)
         logger.debug("waiting for repo add task with id '%s' to finish", task_id)
@@ -213,24 +217,23 @@ class DebianRepository:
 
         await self.__api.delete_directory(upload_dir)
 
-        snapshot_dist = "unstable" if ci_build else "stable"
-        snapshot_name_tmp = self.__generate_snapshot_name(snapshot_dist, temporary=True)
+        snapshot_name_tmp = self.__get_snapshot_name(dist, temporary=True)
 
         # package_refs = await self.__get_packages(ci_build)
         # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
 
-        task_id = await self.__api.snapshot_create(self.name, snapshot_name_tmp)
+        task_id = await self.__api.snapshot_create(repo_name, snapshot_name_tmp)
         await self.__await_task(task_id)
 
         logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
                      self.publish_name,
-                     snapshot_dist,
+                     dist,
                      snapshot_name_tmp)
 
-        task_id = await self.__api.snapshot_publish_update(snapshot_name_tmp, "main", snapshot_dist, self.publish_name)
+        task_id = await self.__api.snapshot_publish_update(snapshot_name_tmp, "main", dist, self.publish_name)
         await self.__await_task(task_id)
 
-        snapshot_name = self.__generate_snapshot_name(snapshot_dist, temporary=False)
+        snapshot_name = self.__get_snapshot_name(dist, temporary=False)
         logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
         await self.__api.snapshot_delete(snapshot_name)
         await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)

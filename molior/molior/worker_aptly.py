@@ -18,6 +18,33 @@ from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
 
+async def startup_migration(task_queue):
+    """
+    Migrate old aptly repos
+    """
+    # loop = asyncio.get_event_loop()
+    aptly = get_aptly_connection()
+
+    with Session() as session:
+        # get mirrors in updating state
+        query = session.query(ProjectVersion).join(Project, Project.id == ProjectVersion.project_id)
+        query = query.filter(Project.is_mirror.is_(False))
+
+        if not query.count():
+            return
+
+        repos = query.all()
+        for repo in repos:
+            repo_name = "%s-%s-%s-%s" % (repo.basemirror.project.name, repo.basemirror.name,
+                                         repo.project.name, repo.name)
+            logger.warning("renaming repo %s" % repo_name)
+            try:
+                await aptly.repo_rename(repo_name, repo_name + "-stable")
+                await aptly.repo_create(repo_name + "-unstable")
+            except Exception:
+                pass
+
+
 async def startup_mirror(task_queue):
     """
     Starts a finalize_mirror task in the asyncio event loop
@@ -832,6 +859,7 @@ class AptlyWorker:
         """
 
         await startup_mirror(self.task_queue)
+        await startup_migration(self.task_queue)
 
         while True:
             try:
