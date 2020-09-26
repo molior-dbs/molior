@@ -616,8 +616,8 @@ class AptlyWorker:
             await aptly.mirror_create(
                 mirror.project.name,
                 mirror.name,
-                mirror.basemirror.project.name,
-                mirror.basemirror.name,
+                mirror.basemirror.project.name if mirror.basemirror else "",
+                mirror.basemirror.name if mirror.basemirror else "",
                 mirror.mirror_url,
                 mirror.mirror_distribution,
                 mirror.mirror_components.split(" "),
@@ -684,8 +684,8 @@ class AptlyWorker:
             await update_mirror(
                 self.task_queue,
                 build.id,
-                mirror.basemirror.project.name,
-                mirror.basemirror.name,
+                mirror.basemirror.project.name if mirror.basemirror else "",
+                mirror.basemirror.name if mirror.basemirror else "",
                 mirror.project.name,
                 mirror.name,
                 mirror.mirror_components.split(","),
@@ -858,16 +858,18 @@ class AptlyWorker:
         # FIXME: should this be Build.basemirror_id ?
         builds = session.query(Build) .filter(Build.projectversion_id == mirror.id).all()
         for build in builds:
-            # FIXME: remove buildout dir
+            # FIXME: remove buildout dir / debootstrap
             session.delete(build)
 
-        mirrorkey = session.query(MirrorKey) .filter(MirrorKey.projectversion_id == mirror.id).first()
+        mirrorkey = session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
         if mirrorkey:
             session.delete(mirrorkey)
+        session.commit()
 
         session.delete(mirror)
         session.commit()
 
+        # delete parent project if no mirror versions left
         if not project.projectversions:
             session.delete(project)
 
