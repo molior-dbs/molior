@@ -199,7 +199,7 @@ async def get_mirrors(request):
     url = request.GET.getone("url", "")
 
     query = request.cirrina.db_session.query(ProjectVersion).join(Project)
-    query = query.filter(Project.is_mirror == "true")
+    query = query.filter(Project.is_mirror == "true", ProjectVersion.is_deleted.is_(False))
 
     if search:
         terms = re.split("[/ ]", search)
@@ -399,6 +399,8 @@ async def delete_mirror(request):
         logger.warning("error deleting mirror '%s': referenced by one or project versions", mirrorname)
         return ErrorResponse(412, "Error deleting mirror {}: still referenced from project versions".format(mirrorname))
 
+    mirror.is_deleted = True
+    request.cirrina.db_session.commit()
     args = {"delete_mirror": [mirror.id]}
     await request.cirrina.aptly_queue.put(args)
 

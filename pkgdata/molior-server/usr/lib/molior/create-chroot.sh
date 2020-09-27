@@ -54,16 +54,13 @@ set -e
 
 build_chroot()
 {
-  if [ -e "$target.tar.xz" ]; then
-    echo "E: $target.tar.xz already exists; aborting" >&2
-    exit 1
-  fi
+  rm -f $target.tar.xz
   mkdir -p "$target"
 
   echo
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-  message="Creating schroot for $DIST_RELEASE $CHROOT_NAME"
-  printf "| %-44s %s |" "molior: $message" "`date -R`"
+  message="Creating schroot $CHROOT_NAME"
+  printf "| %-44s %s |\n" "$message" "`date -R`"
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   echo
 
@@ -155,10 +152,7 @@ EOM
 
 publish_chroot()
 {
-  if [ -e "$target.tar.xz" ]; then
-    echo "E: $target.tar.xz already exists; aborting" >&2
-    exit 1
-  fi
+  rm -f $target.tar.xz
 
   echo I: Creating schroot tar
   cd $target

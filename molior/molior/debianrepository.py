@@ -96,6 +96,23 @@ class DebianRepository:
             await self.__api.wait_task(task_id)
         return True
 
+    async def snapshot(self, snapshot_name):
+        """
+        Create a snapshot of a reporitory with latest builds.
+        """
+        logger.debug("snapshot repository called for '%s'", self.name)
+
+        dist = "stable"
+        # repo_name = self.name + "-%s" % dist
+
+        publish_name = "{}_{}_repos_{}_{}".format(self.basemirror_name, self.basemirror_version,
+                                                  self.project_name, self.project_version)
+        snapshot_name = "{}-{}".format(publish_name, dist)
+
+        logger.debug("creating empty snapshot: '%s'", snapshot_name)
+
+        return True
+
     async def delete(self):
         """
         Delete a repository including publish point amd snapshots

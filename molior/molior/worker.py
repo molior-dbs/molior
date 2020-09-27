@@ -256,7 +256,6 @@ class Worker:
         version = args[4]
         arch = args[5]
         components = args[6]
-        logger.info("asyncio.ensure_future(CreateBuildEnv")
         asyncio.ensure_future(CreateBuildEnv(self.task_queue, chroot_id, build_id, dist, name, version, arch, components))
 
     async def run(self):

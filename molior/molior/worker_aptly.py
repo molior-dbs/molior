@@ -449,11 +449,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     args = {"buildenv": [
                             chroot.id,
                             chroot_build.id,
-                            entry.basemirror.mirror_distribution,
-                            entry.basemirror.project.name,
-                            entry.basemirror.name,
+                            entry.mirror_distribution,
+                            entry.project.name,
+                            entry.name,
                             arch_name,
-                            entry.basemirror.mirror_components
+                            entry.mirror_components
                             ]}
                     await task_queue.put(args)
 
@@ -808,6 +808,16 @@ class AptlyWorker:
         architectures = args[4]
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
 
+    async def _snapshot_repository(self, args, session):
+        basemirror_name = args[0]
+        basemirror_version = args[1]
+        project_name = args[2]
+        project_version = args[3]
+        architectures = args[4]
+        snapshot_name = args[5]
+        await DebianRepository(basemirror_name, basemirror_version, project_name,
+                               project_version, architectures).snapshot(snapshot_name)
+
     async def _delete_repository(self, args, session):
         basemirror_name = args[0]
         basemirror_version = args[1]
@@ -934,6 +944,12 @@ class AptlyWorker:
                         if args:
                             handled = True
                             await self._init_repository(args, session)
+
+                    if not handled:
+                        args = task.get("snapshot_repository")
+                        if args:
+                            handled = True
+                            await self._snapshot_repository(args, session)
 
                     if not handled:
                         args = task.get("delete_repository")
