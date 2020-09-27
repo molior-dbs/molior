@@ -315,6 +315,7 @@ async def get_build(request):
         # "can_rebuild": build.can_rebuild(request.cirrina.web_session, request.cirrina.db_session),
         "branch": build.ci_branch,
         "git_ref": build.git_ref,
+        "architecture": build.architecture
     }
 
     if build.sourcerepository:

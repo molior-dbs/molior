@@ -246,6 +246,7 @@ async def snapshot_projectversion(request):
         sourcerepositories=projectversion.sourcerepositories,
         ci_builds_enabled=False,
         is_locked=True,
+        # FIXME: is_snapshot=True, snapshot origin
     )
 
     for repo in new_projectversion.sourcerepositories:
@@ -262,18 +263,19 @@ async def snapshot_projectversion(request):
 
     await request.cirrina.aptly_queue.put(
         {
-            "init_repository": [
-                new_projectversion.basemirror.project.name,
-                new_projectversion.basemirror.name,
-                new_projectversion.project.name,
-                new_projectversion.name,
-                db2array(new_projectversion.mirror_architectures),
+            "snapshot_repository": [
+                projectversion.basemirror.project.name,
+                projectversion.basemirror.name,
+                projectversion.project.name,
+                projectversion.name,
+                db2array(projectversion.mirror_architectures),
+                new_projectversion.name
             ]
         }
     )
 
     # FIXME:
-    # re publich latest build
+    # re publish latest builds
 
     return OKResponse({"id": new_projectversion.id, "name": new_projectversion.name})
 

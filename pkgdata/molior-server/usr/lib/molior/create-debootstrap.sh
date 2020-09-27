@@ -60,8 +60,8 @@ build_debootstrap()
 
   echo
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-  message="Creating debootstrap for $DIST_RELEASE $DEBOOTSTRAP_NAME"
-  printf "| %-44s %s |" "molior: $message" "`date -R`"
+  message="Creating debootstrap $DEBOOTSTRAP_NAME"
+  printf "| %-44s %s |\n" "$message" "`date -R`"
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   echo
 
@@ -122,10 +122,7 @@ build_debootstrap()
 
 publish_debootstrap()
 {
-  if [ -e "$DEBOOTSTRAP.tar.xz" ]; then
-    echo "E: $DEBOOTSTRAP.tar.xz already exists; aborting" >&2
-    exit 1
-  fi
+  rm -f $DEBOOTSTRAP.tar.xz
 
   echo I: Creating debootstrap tar
   cd $DEBOOTSTRAP
