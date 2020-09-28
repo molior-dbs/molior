@@ -4,4 +4,9 @@ psql molior <<EOF
 
 ALTER TABLE projectversion ADD COLUMN description character varying;
 
+ALTER TABLE projectversion RENAME COLUMN dependency_level TO dependency_policy;
+ALTER TYPE dependencylevel_enum RENAME TO dependencypolicy_enum;
+
+
+
 EOF
