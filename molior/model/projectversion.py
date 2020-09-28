@@ -12,6 +12,7 @@ from .projectversiondependency import ProjectVersionDependency
 from . import sourcerepository    # noqa: F401
 
 MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
+DEPENDENCY_POLICIES = ["strict", "distribution", "any"]
 
 
 class ProjectVersion(Base):
@@ -48,6 +49,7 @@ class ProjectVersion(Base):
     is_locked = Column(Boolean, default=False)
     ci_builds_enabled = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
+    dependency_policy = Column(Enum(*DEPENDENCY_POLICIES, name="dependencypolicy_enum"), default="strict")
 
     @hybrid_property
     def fullname(self):

@@ -30,6 +30,7 @@ def projectversion_to_dict(projectversion):
         "architectures": db2array(projectversion.mirror_architectures),
         "is_locked": projectversion.is_locked,
         "ci_builds_enabled": projectversion.ci_builds_enabled,
+        "dependency_policy": projectversion.dependency_policy
     }
     if projectversion.basemirror:
         data.update({"basemirror": projectversion.basemirror.fullname})
@@ -236,6 +237,7 @@ async def create_projectversions(request):
 
     name = params.get("name")
     description = params.get("description")
+    dependency_policy = params.get("dependency_policy")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
     project_id = request.match_info["project_id"]
@@ -287,6 +289,7 @@ async def create_projectversions(request):
                 project_name,
                 project_version,
                 description,
+                dependency_policy,
                 architectures]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
@@ -416,6 +419,7 @@ async def do_clone(request, projectversion_id, name):
         name=name,
         project=projectversion.project,
         description=projectversion.description,
+        dependency_policy=projectversion.dependency_policy,
         dependencies=projectversion.dependencies,
         mirror_architectures=projectversion.mirror_architectures,
         basemirror_id=projectversion.basemirror_id,
@@ -443,6 +447,7 @@ async def do_clone(request, projectversion_id, name):
                 new_projectversion.project.name,
                 new_projectversion.name,
                 new_projectversion.description,
+                new_projectversion.dependency_policy,
                 db2array(new_projectversion.mirror_architectures),
             ]
         }
@@ -517,7 +522,8 @@ async def do_overlay(request, projectversion_id, name):
         dependencies=[projectversion],
         mirror_architectures=projectversion.mirror_architectures,
         basemirror=projectversion.basemirror,
-        description=projectversion.description
+        description=projectversion.description,
+        dependency_policy=projectversion.dependency_policy
     )
 
     db.add(overlay_projectversion)
@@ -533,6 +539,7 @@ async def do_overlay(request, projectversion_id, name):
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
                 overlay_projectversion.description,
+                overlay_projectversion.dependency_policy,
                 db2array(overlay_projectversion.mirror_architectures)
             ]
         }

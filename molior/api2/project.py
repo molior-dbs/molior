@@ -272,9 +272,11 @@ async def edit_projectversion(request):
     """
     params = await request.json()
     description = params.get("description")
+    dependency_policy = params.get("depdendency_level")
     projectversion = get_projectversion(request)
     db = request.cirrina.db_session
     projectversion.description = description
+    projectversion.dependency_policy = dependency_policy
     db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
