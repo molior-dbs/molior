@@ -6,7 +6,7 @@ from ..auth import req_role
 from ..api.projectversion import projectversion_to_dict
 
 from ..model.project import Project
-from ..model.projectversion import ProjectVersion
+from ..model.projectversion import ProjectVersion, get_projectversion
 
 
 @app.http_get("/api2/project/{project_name}")
@@ -174,6 +174,7 @@ async def create_projectversion(request):
     params = await request.json()
 
     name = params.get("name")
+    description = params.get("description")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
     project_id = request.match_info["project_id"]
@@ -216,6 +217,7 @@ async def create_projectversion(request):
     projectversion = ProjectVersion(
             name=name,
             project=project,
+            description=description,
             mirror_architectures=array2db(architectures),
             basemirror=basemirror,
             mirror_state=None)
@@ -228,5 +230,51 @@ async def create_projectversion(request):
                 projectversion.project.name,
                 projectversion.name,
                 architectures]})
+
+    return OKResponse({"id": projectversion.id, "name": projectversion.name})
+
+
+@app.http_put("/api2/project/{project_id}/{projectversion_id}")
+@req_role("owner")
+async def edit_projectversion(request):
+    """
+    Modify a Projectversion
+
+    ---
+    description: Modify a Projectversion
+    tags:
+        - Projectversion
+    consumes:
+        - application/json
+    parameters:
+        - name: project
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                name:
+                    type: string
+                    example: "1.0.0"
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: invalid data received
+        "500":
+            description: internal server error
+    """
+    params = await request.json()
+    description = params.get("description")
+    projectversion = get_projectversion(request)
+    db = request.cirrina.db_session
+    projectversion.description = description
+    db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})

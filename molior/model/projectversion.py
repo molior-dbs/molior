@@ -21,6 +21,7 @@ class ProjectVersion(Base):
     project_id = Column(ForeignKey("project.id"))
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
+    description = Column(String)
     sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion")
     basemirror_id = Column(ForeignKey("projectversion.id"))
     basemirror = relationship("ProjectVersion", uselist=False,
