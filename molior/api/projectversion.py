@@ -23,6 +23,7 @@ def projectversion_to_dict(projectversion):
     data = {
         "id": projectversion.id,
         "name": projectversion.name,
+        "description": projectversion.description,
         "project_name": projectversion.project.name,
         "apt_url": projectversion.get_apt_repo(url_only=True),
         "is_mirror": projectversion.project.is_mirror,
@@ -234,6 +235,7 @@ async def create_projectversions(request):
     params = await request.json()
 
     name = params.get("name")
+    description = params.get("description")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
     project_id = request.match_info["project_id"]
@@ -284,6 +286,7 @@ async def create_projectversions(request):
                 basemirror_version,
                 project_name,
                 project_version,
+                description,
                 architectures]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
@@ -412,6 +415,7 @@ async def do_clone(request, projectversion_id, name):
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
+        description=projectversion.description,
         dependencies=projectversion.dependencies,
         mirror_architectures=projectversion.mirror_architectures,
         basemirror_id=projectversion.basemirror_id,
@@ -438,6 +442,7 @@ async def do_clone(request, projectversion_id, name):
                 new_projectversion.basemirror.name,
                 new_projectversion.project.name,
                 new_projectversion.name,
+                new_projectversion.description,
                 db2array(new_projectversion.mirror_architectures),
             ]
         }
@@ -511,7 +516,8 @@ async def do_overlay(request, projectversion_id, name):
         # add the projectversion where the overlay is created from as a dependency
         dependencies=[projectversion],
         mirror_architectures=projectversion.mirror_architectures,
-        basemirror=projectversion.basemirror
+        basemirror=projectversion.basemirror,
+        description=projectversion.description
     )
 
     db.add(overlay_projectversion)
@@ -526,6 +532,7 @@ async def do_overlay(request, projectversion_id, name):
                 basemirror.name,
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
+                overlay_projectversion.description,
                 db2array(overlay_projectversion.mirror_architectures)
             ]
         }
