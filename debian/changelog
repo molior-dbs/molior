@@ -1,3 +1,9 @@
+molior (1.4.0~alpha142) stretch; urgency=medium
+
+  * mirror: add search_basemirror
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Tue, 29 Sep 2020 13:08:07 +0000
+
 molior (1.4.0~alpha141) stretch; urgency=medium
 
   * rename dependency level
