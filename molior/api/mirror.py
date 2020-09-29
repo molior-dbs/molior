@@ -194,8 +194,9 @@ async def get_mirrors(request):
             description: bad request
     """
     search = request.GET.getone("q", "")
-    basemirror = request.GET.getone("basemirror", False)
-    is_basemirror = request.GET.getone("is_basemirror", False)
+    basemirror = request.GET.getone("basemirror", False)         # True returns mirrors usable for a base mirror
+    is_basemirror = request.GET.getone("is_basemirror", False)   # True returns all base mirror entries
+    search_basemirror = request.GET.getone("q_basemirror", "")   # Return mirrors based on search_basemirror
     url = request.GET.getone("url", "")
 
     query = request.cirrina.db_session.query(ProjectVersion).join(Project)
@@ -209,6 +210,24 @@ async def get_mirrors(request):
             query = query.filter(or_(
                  Project.name.like("%{}%".format(term)),
                  ProjectVersion.name.like("%{}%".format(term))))
+
+    basemirror_ids = []
+    if search_basemirror:
+        query2 = request.cirrina.db_session.query(ProjectVersion).join(Project)
+        query2 = query2.filter(Project.is_basemirror == "true", ProjectVersion.is_deleted.is_(False))
+        terms = re.split("[/ ]", search_basemirror)
+        for term in terms:
+            if not term:
+                continue
+            query2 = query2.filter(or_(
+                 Project.name.like("%{}%".format(term)),
+                 ProjectVersion.name.like("%{}%".format(term))))
+        basemirrors = query2.all()
+        for b in basemirrors:
+            if b.id not in basemirror_ids:
+                basemirror_ids.append(b.id)
+
+        query = query.filter(ProjectVersion.basemirror_id.in_(basemirror_ids))
 
     if url:
         query = query.filter(ProjectVersion.mirror_url.like("%{}%".format(url)))
