@@ -72,6 +72,10 @@ async def get_repositories2(request):
           in: query
           required: false
           type: string
+        - name: filter_name
+          in: query
+          required: false
+          type: string
     produces:
         - text/json
     responses:
@@ -80,6 +84,7 @@ async def get_repositories2(request):
     """
     db = request.cirrina.db_session
     url = request.GET.getone("url", "")
+    name = request.GET.getone("filter_name", "")
     exclude_projectversion_id = request.GET.getone("exclude_projectversion_id", "")
     try:
         exclude_projectversion_id = int(exclude_projectversion_id)
@@ -90,6 +95,9 @@ async def get_repositories2(request):
 
     if url:
         query = query.filter(SourceRepository.url.like("%{}%".format(url)))
+
+    if name:
+        query = query.filter(SourceRepository.name.like("%{}%".format(name)))
 
     if exclude_projectversion_id != -1:
         query = query.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
