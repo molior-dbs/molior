@@ -282,3 +282,43 @@ async def edit_projectversion(request):
     db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
+
+
+@app.http_delete("/api2/project/{project_id}")
+@req_role("owner")
+async def delete_project2(request):
+    """
+    Removes a project from the database.
+
+    ---
+    description: Deletes a project with the given id.
+    tags:
+        - Projects
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: project name could not be found
+    """
+    db = request.cirrina.db_session
+    project_name = request.match_info["project_id"]
+    project = db.query(Project).filter_by(name=project_name).first()
+
+    if not project:
+        return ErrorResponse(400, "Project not found")
+
+    if project.projectversions:
+        return ErrorResponse(400, "Cannot delete project containing projectversions")
+
+    db.delete(project)
+    db.commit()
+    return OKResponse("project {} deleted".format(project_name))
