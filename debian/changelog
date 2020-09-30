@@ -1,3 +1,9 @@
+molior (1.4.0~alpha144) stretch; urgency=medium
+
+  * add dependency policy
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Wed, 30 Sep 2020 08:17:59 +0000
+
 molior (1.4.0~alpha143) stretch; urgency=medium
 
   * repository: filter by name
