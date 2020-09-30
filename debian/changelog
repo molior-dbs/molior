@@ -1,3 +1,10 @@
+molior (1.4.0~alpha145) stretch; urgency=medium
+
+  * repositories: merge api
+  * project: add delete
+
+ -- André Roth <neolynx@gmail.com>  Wed, 30 Sep 2020 19:26:55 +0200
+
 molior (1.4.0~alpha144) stretch; urgency=medium
 
   * add dependency policy
