@@ -258,6 +258,38 @@ class Worker:
         components = args[6]
         asyncio.ensure_future(CreateBuildEnv(self.task_queue, chroot_id, build_id, dist, name, version, arch, components))
 
+    async def _merge_duplicate_repo(self, args, session):
+        repository_id = args[0]
+        duplicate_id = args[1]
+
+        original = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+        if not original:
+            logger.error("merge: repo %d not found", repository_id)
+            return
+        if original.state != "ready":
+            logger.info("worker: repo %d not ready, requeueing", repository_id)
+            await self.task_queue.put({"merge_duplicate_repo": args})
+            await asyncio.sleep(2)
+            return
+
+        duplicate = session.query(SourceRepository).filter(SourceRepository.id == duplicate_id).first()
+        if not duplicate:
+            logger.error("merge: duplicate %d not found", duplicate_id)
+            return
+        if duplicate.state != "ready":
+            logger.info("worker: repo %d not ready, requeueing", duplicate_id)
+            await self.task_queue.put({"merge_duplicate_repo": args})
+            await asyncio.sleep(2)
+            return
+
+        # original.set_busy()
+        # duplicate.set_busy()
+        # session.commit()
+        # FIXME change each occurence of duplicate in any table to original
+        # delete duplicate from db
+        # delete duplicate from disk
+        # set ready original and commit db
+
     async def run(self):
         """
         Run the worker task.
@@ -320,6 +352,12 @@ class Worker:
                         if args:
                             handled = True
                             await self._buildenv(args)
+
+                    if not handled:
+                        args = task.get("merge_duplicate_repo")
+                        if args:
+                            handled = True
+                            await self._merge_duplicate_repo(args, session)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))

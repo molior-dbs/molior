@@ -4,7 +4,7 @@ import giturlparse
 from sqlalchemy.sql import or_
 
 from ..app import app, logger
-from ..auth import req_role
+from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref, get_last_build
 from ..model.sourcerepository import SourceRepository
@@ -256,9 +256,9 @@ async def add_repository(request):
     architectures = params.get("architectures", [])
 
     if not url:
-        return ErrorResponse(400, "No URL recieved")
+        return ErrorResponse(400, "No URL received")
     if not architectures:
-        return ErrorResponse(400, "No architectures recieved")
+        return ErrorResponse(400, "No architectures received")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -357,7 +357,7 @@ async def edit_repository(request):
     architectures = params.get("architectures", [])
 
     if not architectures:
-        return ErrorResponse(400, "No architectures recieved")
+        return ErrorResponse(400, "No architectures received")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -448,11 +448,11 @@ async def add_repository_hook(request):
     method = params.get("method", "")
 
     if not url:
-        return ErrorResponse(400, "No URL recieved")
+        return ErrorResponse(400, "No URL received")
     if not body:
-        return ErrorResponse(400, "No Body recieved")
+        return ErrorResponse(400, "No Body received")
     if method not in ["post", "get"]:
-        return ErrorResponse(400, "Invalid method recieved")
+        return ErrorResponse(400, "Invalid method received")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -473,3 +473,29 @@ async def add_repository_hook(request):
     db.commit()
 
     return OKResponse("Hook added")
+
+
+@app.http_put("/api2/repository/{repository_id}/merge")
+@req_admin
+async def merge_repository(request):
+    repository_id = request.match_info["repository_id"]
+    try:
+        repository_id = int(repository_id)
+    except Exception:
+        return ErrorResponse(400, "Invalid parameter received")
+
+    params = await request.json()
+    duplicate_id = params.get("duplicate")
+    try:
+        duplicate_id = int(duplicate_id)
+    except Exception:
+        return ErrorResponse(400, "Invalid parameter received")
+
+    # FIXME get repo id from db
+    # get duplicate from db
+    # verify stuff (if there is repo behnd those numbers)
+
+    args = {"merge_duplicate_repo": [repository_id, duplicate_id]}
+    await request.cirrina.task_queue.put(args)
+
+    return OKResponse("SourceRepository changed")
