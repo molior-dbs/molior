@@ -1,3 +1,5 @@
+from sqlalchemy.orm import aliased
+
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
@@ -110,9 +112,24 @@ async def get_projectversion_dependencies(request):
 
     results = []
     if candidates:  # return candidate dependencies
-        cands = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
-                                                ProjectVersion.id != projectversion.id,
-                                                ProjectVersion.id.notin_(dep_ids)).all()
+        cands_query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
+                                                      ProjectVersion.id != projectversion.id,
+                                                      ProjectVersion.id.notin_(dep_ids))
+        BaseMirror = aliased(ProjectVersion)
+        dist_query = db.query(ProjectVersion).join(BaseMirror, BaseMirror.id == ProjectVersion.basemirror_id).filter(
+                                                   ProjectVersion.dependency_policy == "distribution",
+                                                   BaseMirror.project_id == projectversion.basemirror.project_id,
+                                                   BaseMirror.id != projectversion.basemirror_id,
+                                                   ProjectVersion.id.notin_(dep_ids))
+
+        any_query = db.query(ProjectVersion).filter(
+                                                   ProjectVersion.dependency_policy == "any",
+                                                   ProjectVersion.id != projectversion.id,
+                                                   ProjectVersion.id.notin_(dep_ids))
+        cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
+                                                                                Project.name,
+                                                                                ProjectVersion.name.asc()).all()
+
         for cand in cands:
             results.append(projectversion_to_dict(cand))
 
