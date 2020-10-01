@@ -185,7 +185,7 @@ class Worker:
 
         await write_log(build.id, "\n")
         git_ref = str(latest_tag)
-        args = {"build": [build_id, repo_id, git_ref, None]}
+        args = {"build": [build_id, repo_id, git_ref, None, None]}
         await self.task_queue.put(args)
 
     async def _rebuild(self, args, session):

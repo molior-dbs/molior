@@ -259,7 +259,7 @@ async def process_tag_push(request, data):
 
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if git_ref and repo.id:
-        args = {"build": [build.id, repo.id, git_ref, ui_branch]}
+        args = {"build": [build.id, repo.id, git_ref, ui_branch, None]}
 
         # Queue new build job
         if await request.cirrina.task_queue.put(args):
@@ -391,7 +391,7 @@ async def process_push(request, data):
 
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if checkout_sha and repo.id:
-        args = {"build": [build.id, repo.id, checkout_sha, ci_branch]}
+        args = {"build": [build.id, repo.id, checkout_sha, ci_branch, None]}
 
         # Queue new build job
         if await request.cirrina.task_queue.put(args):
