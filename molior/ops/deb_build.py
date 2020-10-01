@@ -77,7 +77,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     return True
 
 
-async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_ref, ci_branch):
+async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_ref, ci_branch, custom_targets):
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
@@ -122,7 +122,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             session.commit()
             return
 
-        targets = get_targets(info.plain_targets, repo, session)
+        targets = get_targets(info.plain_targets, repo, custom_targets, session)
+
         if not targets:
             repo.log_state("unknown target projectversions in debian/molior.yml")
             await write_log(parent_build_id, "E: the repository is not added to any projectversions from debian/molior.yml\n")

@@ -439,6 +439,7 @@ async def trigger_build(request):
     repository = data.get("repository")
     git_ref = data.get("git_ref")
     git_branch = data.get("git_branch")
+    targets = data.get("targets")
 
     maintenance_mode = False
     query = "SELECT value from metadata where name = :key"
@@ -489,7 +490,7 @@ async def trigger_build(request):
     if git_ref == "":
         args = {"buildlatest": [repo.id, build.id]}
     else:
-        args = {"build": [build.id, repo.id, git_ref, git_branch]}
+        args = {"build": [build.id, repo.id, git_ref, git_branch, targets]}
     await request.cirrina.task_queue.put(args)
 
     return web.json_response({"build_token": str(token)})

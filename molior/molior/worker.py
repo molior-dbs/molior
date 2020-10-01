@@ -105,6 +105,7 @@ class Worker:
         repo_id = args[1]
         git_ref = args[2]
         ci_branch = args[3]
+        targets = args[4]
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
@@ -127,7 +128,7 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        asyncio.ensure_future(BuildProcess(self.task_queue, self.aptly_queue, build_id, repo.id, git_ref, ci_branch))
+        asyncio.ensure_future(BuildProcess(self.task_queue, self.aptly_queue, build_id, repo.id, git_ref, ci_branch, targets))
 
     async def _buildlatest(self, args, session):
         logger.debug("worker: got buildlatest task")
