@@ -11,6 +11,7 @@ from ..model.database import Session
 from ..model.build import Build
 from ..model.chroot import Chroot
 from ..model.sourcerepository import SourceRepository
+from ..model.sourepprover import SouRepProVer
 
 
 async def cleanup_builds():
@@ -264,32 +265,46 @@ class Worker:
         duplicate_id = args[1]
 
         original = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+        duplicate = session.query(SourceRepository).filter(SourceRepository.id == duplicate_id).first()
+
         if not original:
             logger.error("merge: repo %d not found", repository_id)
             return
+
+        if not duplicate:
+            logger.error("merge: duplicate %d not found", duplicate_id)
+            return
+
         if original.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
             await self.task_queue.put({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
-        duplicate = session.query(SourceRepository).filter(SourceRepository.id == duplicate_id).first()
-        if not duplicate:
-            logger.error("merge: duplicate %d not found", duplicate_id)
-            return
         if duplicate.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", duplicate_id)
             await self.task_queue.put({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
-        # original.set_busy()
-        # duplicate.set_busy()
-        # session.commit()
-        # FIXME change each occurence of duplicate in any table to original
-        # delete duplicate from db
-        # delete duplicate from disk
-        # set ready original and commit db
+        original.set_busy()
+        duplicate.set_busy()
+        session.commit()
+
+        sourepprover = session.query(SouRepProVer).filter(
+                SouRepProVer.sourcerepository_id == duplicate.id).all()
+        for idx in range(len(sourepprover)):
+            sourepprover[idx].sourcerepository_id = original.id
+
+        builds = session.query(Build).filter(
+                Build.sourcerepository_id == duplicate.id).all()
+        for idx in range(len(builds)):
+            builds[idx].sourcerepository_id = original.id
+
+        session.delete(duplicate)
+        shutil.rmtree("/var/lib/molior/repositories/%d" % duplicate_id, ignore_errors=True)  # not fail on read-only files
+        original.set_ready()
+        session.commit()
 
     async def run(self):
         """
