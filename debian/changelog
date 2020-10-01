@@ -1,3 +1,9 @@
+molior (1.4.0~alpha146) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha146
+
+ -- André Roth <neolynx@gmail.com>  Thu, 01 Oct 2020 19:12:45 +0000
+
 molior (1.4.0~alpha145) stretch; urgency=medium
 
   * repositories: merge api
