@@ -125,7 +125,7 @@ async def get_maintainer(path):
     return (firstname, surname, email)
 
 
-def get_targets(plain_targets, repo, session):
+def get_targets(plain_targets, repo, custom_targets, session):
     """
     Gets the target repo versions and returns them as
     sourcerepositoryprojectversion model objects.
@@ -134,17 +134,35 @@ def get_targets(plain_targets, repo, session):
         repo (SourceRepository): Source repository model.
     """
     targets = []
-    for target in plain_targets:
-        project, project_version = target
-        targets += (
-            session.query(SouRepProVer)
-            .join(ProjectVersion)
-            .join(Project)
-            .filter(SouRepProVer.sourcerepository_id == repo.id)
-            .filter(ProjectVersion.name == project_version)
-            .filter(Project.name == project)
-            .all()
-        )
+    if custom_targets:
+        for t in custom_targets:
+            try:
+                project_name, project_version = t.split("/")
+            except Exception as exc:
+                logger.exception(exc)
+                continue
+            targets += (
+                session.query(SouRepProVer)
+                .join(ProjectVersion)
+                .join(Project)
+                .filter(SouRepProVer.sourcerepository_id == repo.id)
+                .filter(ProjectVersion.name == project_version)
+                .filter(Project.name == project_name)
+                .all()
+            )
+
+    else:
+        for target in plain_targets:
+            project_name, project_version = target
+            targets += (
+                session.query(SouRepProVer)
+                .join(ProjectVersion)
+                .join(Project)
+                .filter(SouRepProVer.sourcerepository_id == repo.id)
+                .filter(ProjectVersion.name == project_version)
+                .filter(Project.name == project_name)
+                .all()
+            )
 
     return targets
 
