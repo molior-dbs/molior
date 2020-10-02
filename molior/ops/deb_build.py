@@ -78,7 +78,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     return True
 
 
-async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_ref, ci_branch, custom_targets):
+async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
@@ -134,24 +134,27 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             session.commit()
             return
 
-        # check if it is a CI build
-        # i.e. if gittag does not match version in debian/changelog
         is_ci = False
-        gittag = ""
-
-        async def outh(line):
-            nonlocal gittag
-            gittag += line
-
-        process = Launchy(shlex.split("git describe --tags --abbrev=40"), outh, outh, cwd=str(repo.src_path))
-        await process.launch()
-        ret = await process.wait()
-        if ret != 0:
-            logger.error("error running git describe")
+        if force_ci:
+            is_ci = True
         else:
-            v = strip_epoch_version(info.version)
-            if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
-                is_ci = True
+            # check if it is a CI build
+            # i.e. if gittag does not match version in debian/changelog
+            gittag = ""
+
+            async def outh(line):
+                nonlocal gittag
+                gittag += line
+
+            process = Launchy(shlex.split("git describe --tags --abbrev=40"), outh, outh, cwd=str(repo.src_path))
+            await process.launch()
+            ret = await process.wait()
+            if ret != 0:
+                logger.error("error running git describe")
+            else:
+                v = strip_epoch_version(info.version)
+                if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
+                    is_ci = True
 
         ci_cfg = Configuration().ci_builds
         ci_enabled = ci_cfg.get("enabled") if ci_cfg else False

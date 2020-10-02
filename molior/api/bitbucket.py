@@ -124,7 +124,7 @@ async def bitbucket_trigger(request):
     request.cirrina.db_session.add(build_task)
     request.cirrina.db_session.commit()
 
-    args = {"build": [build.id, repo.id, git_ref, branch, None]}
+    args = {"build": [build.id, repo.id, git_ref, branch, None, False]}
     await request.cirrina.task_queue.put(args)
 
     return web.Response(status=200, text="OK")
