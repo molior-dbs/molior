@@ -1,3 +1,9 @@
+molior (1.4.0~alpha149) stretch; urgency=medium
+
+  * repo merge: fix
+
+ -- André Roth <neolynx@gmail.com>  Fri, 02 Oct 2020 19:35:08 +0000
+
 molior (1.4.0~alpha148) stretch; urgency=medium
 
   * repo: rm duplicate
