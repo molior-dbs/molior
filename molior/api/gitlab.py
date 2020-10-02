@@ -240,7 +240,6 @@ async def process_tag_push(request, data):
         git_ref=git_ref,
         ci_branch=ui_branch,
         is_ci=False,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
@@ -372,7 +371,6 @@ async def process_push(request, data):
         git_ref=checkout_sha,       # Use pure hash for CI-builds, instead of git_ref/branch
         ci_branch=ci_branch,
         is_ci=False,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",

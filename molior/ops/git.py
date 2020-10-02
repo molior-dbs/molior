@@ -4,7 +4,6 @@ import operator
 import os
 
 from launchy import Launchy
-from datetime import datetime
 
 from ..app import logger
 from ..tools import write_log, write_log_title, get_changelog_attr, validate_version_format
@@ -165,7 +164,7 @@ async def GetBuildInfo(repo_path, git_ref):
         nonlocal gitinfo
         gitinfo = line.strip()
 
-    process = Launchy(shlex.split("git show -s --format='%H %cI %ae %an'"), outh, outh, cwd=str(repo_path))
+    process = Launchy(shlex.split("git show -s --format='%H %ae %an'"), outh, outh, cwd=str(repo_path))
     await process.launch()
     await process.wait()
 
@@ -175,15 +174,8 @@ async def GetBuildInfo(repo_path, git_ref):
         return None
 
     info.commit_hash = gitinfos[0]
-    d = gitinfos[1]
-    info.author_email = gitinfos[2]
-    info.author_name = gitinfos[3]
-
-    ts = d[0:19] + d[19:25].replace(":", "")
-    tag_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z")
-
-    info.tag_stamp = tag_dt.strftime("%Y-%m-%d %T%z")
-    info.tag_dt = tag_dt
+    info.author_email = gitinfos[1]
+    info.author_name = gitinfos[2]
 
     maintainer = await get_maintainer(repo_path)
     if not maintainer:

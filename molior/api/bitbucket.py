@@ -108,7 +108,6 @@ async def bitbucket_trigger(request):
         git_ref=git_ref,
         ci_branch=branch,
         is_ci=False,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
