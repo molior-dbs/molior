@@ -301,7 +301,6 @@ async def add_repository(request):
             git_ref=None,
             ci_branch=None,
             is_ci=None,
-            versiontimestamp=None,
             sourcename=repo.name,
             buildstate="new",
             buildtype="build",

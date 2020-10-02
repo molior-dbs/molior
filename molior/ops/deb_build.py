@@ -7,6 +7,7 @@ import re
 from launchy import Launchy
 from sqlalchemy import or_
 from pathlib import Path
+from datetime import datetime
 
 from ..app import logger
 from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title, db2array
@@ -170,8 +171,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         if is_ci:
             # create CI version with git hash suffix
             info.origversion = info.version
-            if is_ci:
-                info.version += "+git{}.{}".format(info.tag_dt.strftime("%Y%m%d%H%M%S"), git_ref[:6])
+            info.version += "+git{}.{}".format(datetime.now().strftime("%Y%m%d%H%M%S"), info.commit_hash[:6])
 
             # check if CI builds enabled in any project version
             found = False
@@ -237,7 +237,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             git_ref=info.commit_hash,
             ci_branch=ci_branch,
             is_ci=is_ci,
-            versiontimestamp=info.tag_stamp,
             sourcename=info.sourcename,
             buildstate="new",
             buildtype="source",
@@ -297,7 +296,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             for architecture in architectures:
                 deb_build = session.query(Build).filter(
                                 Build.projectversion == projectversion,
-                                Build.versiontimestamp == info.tag_stamp,
                                 Build.version == info.version,
                                 Build.buildtype == "deb",
                                 Build.architecture == architecture).first()
@@ -323,7 +321,6 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
                     git_ref=info.commit_hash,
                     ci_branch=ci_branch,
                     is_ci=is_ci,
-                    versiontimestamp=info.tag_stamp,
                     sourcename=info.sourcename,
                     buildstate="new",
                     buildtype="deb",

@@ -470,7 +470,6 @@ async def trigger_build(request):
         git_ref=git_ref,
         ci_branch=git_branch,
         is_ci=None,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",

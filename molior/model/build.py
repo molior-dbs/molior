@@ -42,7 +42,6 @@ class Build(Base):
     endstamp = Column(DateTime(timezone=True), nullable=True)
     buildstate = Column("buildstate", Enum(*BUILD_STATES, name="buildstate_enum"), default="new")
     buildtype = Column("buildtype", Enum(*BUILD_TYPES, name="buildtype_enum"), default="deb")
-    versiontimestamp = Column(DateTime(timezone=True))
     version = Column(String)
     git_ref = Column(String)
     ci_branch = Column(String)
