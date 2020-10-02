@@ -291,17 +291,27 @@ class Worker:
         duplicate.set_busy()
         session.commit()
 
-        sourepprover = session.query(SouRepProVer).filter(
+        # find all source repository project versions with duplicates
+        sourepprovers = session.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == duplicate.id).all()
-        for idx in range(len(sourepprover)):
-            sourepprover[idx].sourcerepository_id = original.id
+        delete_duplicate = True
+        for sourepprover in sourepprovers:
+            t = session.query(SouRepProVer).filter(
+                SouRepProVer.sourcerepository_id == original.id,
+                SouRepProVer.projectversion_id == sourepprover.projectversion_id).first()
+            if t:
+                # replace duplicate with original
+                delete_duplicate = False
+                sourepprover.sourcerepository_id = original.id
 
         builds = session.query(Build).filter(
                 Build.sourcerepository_id == duplicate.id).all()
         for idx in range(len(builds)):
             builds[idx].sourcerepository_id = original.id
 
-        session.delete(duplicate)
+        if delete_duplicate:
+            session.delete(duplicate)
+
         shutil.rmtree("/var/lib/molior/repositories/%d" % duplicate_id, ignore_errors=True)  # not fail on read-only files
         original.set_ready()
         session.commit()
