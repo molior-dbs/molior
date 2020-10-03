@@ -116,7 +116,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             logger.exception(exc)
 
         if not info:
-            await write_log(parent_build_id, "E: Error getting build information from debian/changelog\n")
+            await write_log(parent_build_id, "E: Error getting build information\n")
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_failed()
             repo.set_ready()
