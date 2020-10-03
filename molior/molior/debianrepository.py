@@ -120,6 +120,8 @@ class DebianRepository:
             logger.info("pkg ref %s" % pkgs)
             package_refs += pkgs
 
+        task_id = await self.__api.snapshot_create(repo_name, snapshot_name)
+        await self.__api.wait_task(task_id)
 
         return True
 
