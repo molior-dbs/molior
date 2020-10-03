@@ -169,8 +169,8 @@ async def GetBuildInfo(repo_path, git_ref):
     await process.launch()
     await process.wait()
 
-    gitinfos = gitinfo.split(" ", 3)
-    if len(gitinfos) != 4:
+    gitinfos = gitinfo.split(" ", 2)
+    if len(gitinfos) != 3:
         logger.error("Error parsing git info '%s'", gitinfos)
         return None
 

@@ -65,6 +65,15 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
             logger.error("Error running dch for CI build")
             return False
 
+        if (repo_path / ".git").exists():
+            await write_log(build_id, "I: this is a git repo\n")
+            process = Launchy(shlex.split("git commit -a -m 'ci build'"), outh, outh, cwd=str(repo_path))
+            await process.launch()
+            ret = await process.wait()
+            if ret != 0:
+                logger.error("Error creating ci build commit")
+                return False
+
     cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
     await process.launch()
