@@ -1,4 +1,5 @@
 from sqlalchemy.orm import aliased
+from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_role
@@ -254,6 +255,30 @@ async def snapshot_projectversion(request):
             Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
+    # find latest builds
+    latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
+            Build.projectversion_id == projectversion.id,
+            Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
+
+    builds = db.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
+            Build.sourcename, Build.id.desc()).all()
+
+    packages = []
+    build_source_names = []
+    for build in builds:
+        logger.info("snapshot: found latest build: %s/%s (%s)" % (build.sourcename, build.version, build.buildstate))
+        if build.buildstate != "successful":
+            return ErrorResponse(400, "Not all latest builds are successful")
+        if build.sourcename in build_source_names:
+            logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
+            continue
+        build_source_names.append(build.sourcename)
+        if not build.debianpackages:
+            return ErrorResponse(400, "No debian packages found for %s/%s" % (build.sourcename, build.version))
+        for deb in build.debianpackages:
+            logger.info("deb %s_%s_%s.deb" % (deb.name, build.version, deb.suffix))
+            packages.append((deb.name, build.version, deb.suffix))
+
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
@@ -286,13 +311,11 @@ async def snapshot_projectversion(request):
                 projectversion.project.name,
                 projectversion.name,
                 db2array(projectversion.mirror_architectures),
-                new_projectversion.name
+                new_projectversion.name,
+                packages
             ]
         }
     )
-
-    # FIXME:
-    # re publish latest builds
 
     return OKResponse({"id": new_projectversion.id, "name": new_projectversion.name})
 

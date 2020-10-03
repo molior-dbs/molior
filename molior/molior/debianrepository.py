@@ -96,11 +96,11 @@ class DebianRepository:
             await self.__api.wait_task(task_id)
         return True
 
-    async def snapshot(self, snapshot_name):
+    async def snapshot(self, snapshot_name, packages):
         """
         Create a snapshot of a reporitory with latest builds.
         """
-        logger.debug("snapshot repository called for '%s'", self.name)
+        logger.info("snapshotting '%s' to '%s'", self.name, snapshot_name)
 
         dist = "stable"
         # repo_name = self.name + "-%s" % dist
@@ -109,7 +109,17 @@ class DebianRepository:
                                                   self.project_name, self.project_version)
         snapshot_name = "{}-{}".format(publish_name, dist)
 
-        logger.debug("creating empty snapshot: '%s'", snapshot_name)
+        logger.info("creating release snapshot: '%s'", snapshot_name)
+
+        package_refs = []
+        for package in packages:
+            logger.info("pkg %s" % str(package))
+            pkgs = await self.__api.repo_packages_get(self.name + "-stable", "%s (= %s) {%s}" % (package[0],
+                                                                                                 package[1],
+                                                                                                 package[2]))
+            logger.info("pkg ref %s" % pkgs)
+            package_refs += pkgs
+
 
         return True
 
