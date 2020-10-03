@@ -1,3 +1,9 @@
+molior (1.4.0~alpha150) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha150
+
+ -- André Roth <neolynx@gmail.com>  Sat, 03 Oct 2020 20:58:38 +0000
+
 molior (1.4.0~alpha149) stretch; urgency=medium
 
   * repo merge: fix
