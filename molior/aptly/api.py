@@ -598,7 +598,7 @@ class AptlyApi:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
 
-    async def repo_packages_get(self, repo_name):
+    async def repo_packages_get(self, repo_name, search=None):
         """
         Gets a list of all packages from a local repository.
 
@@ -609,13 +609,16 @@ class AptlyApi:
         Returns:
             list: List of package refs.
         """
-        data = None  # q: package query
+        ret = None
+        params = None
+        if search:
+            params = {"q": search}
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.url + "/repos/{}/packages".format(repo_name), auth=self.auth) as resp:
+            async with http.get(self.url + "/repos/{}/packages".format(repo_name), params=params, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data
+                ret = json.loads(await resp.text())
+        return ret
 
     async def repo_packages_delete(self, repo_name, package_refs):
         """

@@ -813,8 +813,9 @@ class AptlyWorker:
         project_version = args[3]
         architectures = args[4]
         snapshot_name = args[5]
+        packages = args[6]
         await DebianRepository(basemirror_name, basemirror_version, project_name,
-                               project_version, architectures).snapshot(snapshot_name)
+                               project_version, architectures).snapshot(snapshot_name, packages)
 
     async def _delete_repository(self, args, session):
         basemirror_name = args[0]
