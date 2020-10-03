@@ -96,33 +96,32 @@ class DebianRepository:
             await self.__api.wait_task(task_id)
         return True
 
-    async def snapshot(self, snapshot_name, packages):
+    async def snapshot(self, snapshot_version, packages):
         """
         Create a snapshot of a reporitory with latest builds.
         """
-        logger.info("snapshotting '%s' to '%s'", self.name, snapshot_name)
-
         dist = "stable"
-        # repo_name = self.name + "-%s" % dist
+        repo_name = self.name + "-%s" % dist
 
         publish_name = "{}_{}_repos_{}_{}".format(self.basemirror_name, self.basemirror_version,
-                                                  self.project_name, self.project_version)
+                                                  self.project_name, snapshot_version)
         snapshot_name = "{}-{}".format(publish_name, dist)
 
         logger.info("creating release snapshot: '%s'", snapshot_name)
 
         package_refs = []
         for package in packages:
-            logger.info("pkg %s" % str(package))
-            pkgs = await self.__api.repo_packages_get(self.name + "-stable", "%s (= %s) {%s}" % (package[0],
-                                                                                                 package[1],
-                                                                                                 package[2]))
-            logger.info("pkg ref %s" % pkgs)
+            pkgs = await self.__api.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],
+                                                                                     package[1],
+                                                                                     package[2]))
             package_refs += pkgs
 
-        task_id = await self.__api.snapshot_create(repo_name, snapshot_name)
+        logger.info("snapshot: pkg refs %s" % package_refs)
+        task_id = await self.__api.snapshot_create(repo_name, snapshot_name, package_refs)
         await self.__api.wait_task(task_id)
 
+        task_id = await self.__api.snapshot_publish(snapshot_name, "main", self.archs, dist, publish_name)
+        await self.__api.wait_task(task_id)
         return True
 
     async def delete(self):
