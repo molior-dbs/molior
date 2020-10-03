@@ -66,8 +66,8 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
             return False
 
         if (repo_path / ".git").exists():
-            await write_log(build_id, "I: this is a git repo\n")
-            process = Launchy(shlex.split("git commit -a -m 'ci build'"), outh, outh, cwd=str(repo_path))
+            process = Launchy(shlex.split("git commit -a --author '{} <{}>' -m 'ci build'".format(author, email)),
+                              outh, outh, cwd=str(repo_path))
             await process.launch()
             ret = await process.wait()
             if ret != 0:
