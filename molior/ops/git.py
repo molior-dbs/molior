@@ -86,7 +86,7 @@ async def GitCheckout(src_repo_path, git_ref, build_id):
                     "git reset --hard",
                     "git clean -dffx",
                     "git checkout --force {}".format(git_ref),
-                    "git pull --force",
+                    "git reset --hard origin/{}".format(git_ref),
                     "git submodule sync --recursive",
                     "git submodule update --init --recursive",
                     "git clean -dffx",
