@@ -308,6 +308,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             architectures = db2array(target.architectures)
             for architecture in architectures:
                 deb_build = session.query(Build).filter(
+                                Build.sourcerepository_id == repo.id,
                                 Build.projectversion == projectversion,
                                 Build.version == info.version,
                                 Build.buildtype == "deb",
