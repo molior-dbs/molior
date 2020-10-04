@@ -88,7 +88,7 @@ async def GitClone(build_id, repo_id, task_queue):
 
 
 async def GitCleanLocal(repo_path, build_id):
-    if not run_git_cmds(["git reset --hard", "git clean -dffx"], repo_path, build_id, write_output_log=False):
+    if not await run_git_cmds(["git reset --hard", "git clean -dffx"], repo_path, build_id, write_output_log=False):
         return False
 
     githash = None
@@ -169,13 +169,14 @@ async def GitCheckout(repo_path, git_ref, build_id):
     if not await GitCleanLocal(repo_path, build_id):
         return False
 
-    git_commands = ["git fetch --tags --prune --prune-tags --force",
-                    "git checkout --force {}".format(git_ref),
+    if not await run_git("git fetch --tags --prune --prune-tags --force", repo_path, build_id, write_output_log=False):
+        return False
+
+    git_commands = ["git checkout --force {}".format(git_ref),
                     "git submodule sync --recursive",
                     "git submodule update --init --recursive",
                     "git clean -dffx",
                     "git lfs pull"]
-
     if not await run_git_cmds(git_commands, repo_path, build_id):
         logger.error("Error checking out git ref '%s'" % git_ref)
         return False
