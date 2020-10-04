@@ -159,7 +159,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await process.launch()
             ret = await process.wait()
             if ret != 0:
-                logger.error("error running git describe")
+                logger.error("error running git describe: %s" % gittag.strip())
             else:
                 v = strip_epoch_version(info.version)
                 if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
