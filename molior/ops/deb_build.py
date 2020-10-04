@@ -38,9 +38,6 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
         logger.error("Signing key not defined in configuration")
         return False
 
-    logger.debug("%s: creating source package", src_package_name)
-    await write_log(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
-
     async def outh(line):
         line = line.strip()
         if line:
@@ -66,13 +63,17 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
             return False
 
         if (repo_path / ".git").exists():
-            process = Launchy(shlex.split("git commit -a --author '{} <{}>' -m 'ci build'".format(author, email)),
+            process = Launchy(shlex.split(
+                              "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
                               outh, outh, cwd=str(repo_path))
             await process.launch()
             ret = await process.wait()
             if ret != 0:
                 logger.error("Error creating ci build commit")
                 return False
+
+    logger.debug("%s: creating source package", src_package_name)
+    await write_log(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
 
     cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
