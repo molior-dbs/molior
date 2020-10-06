@@ -57,7 +57,9 @@ class BuildLogger:
                     retries = 0
                     while self.__up:
                         async for data in reader:
-                            message = {"event": Event.added.value, "subject": Subject.buildlog.value, "data": str(data, 'utf-8')}
+                            message = {"event": Event.added.value,
+                                       "subject": Subject.buildlog.value,
+                                       "data": str(data, 'utf-8', errors="ignore")}
                             await self.__sender(json.dumps(message))
 
                         # EOF
