@@ -338,4 +338,4 @@ async def get_apt_sources(request):
     for dep in deps:
         sources_list += "{}\n".format(dep.get_apt_repo())
 
-    return OKResponse(sources_list)
+    return web.Response(status=200, text=sources_list)
