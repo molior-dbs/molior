@@ -27,6 +27,9 @@ backend: 'http'
 backend_http:
     ping_timeout: 5
 
+# Molior server settings
+max_parallel_chroots: 2
+
 # Aptly settings
 aptly:
     apt_url: 'http://molior:3142'

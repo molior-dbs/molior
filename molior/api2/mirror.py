@@ -114,6 +114,7 @@ async def create_mirror2(request):
     mirrorversion    = params.get("mirrorversion")     # noqa: E221
     mirrortype       = params.get("mirrortype")        # noqa: E221
     basemirror       = params.get("basemirror")        # noqa: E221
+    external_repo    = params.get("external_repo")     # noqa: E221
     mirrorurl        = params.get("mirrorurl")         # noqa: E221
     mirrordist       = params.get("mirrordist")        # noqa: E221
     mirrorcomponents = params.get("mirrorcomponents")  # noqa: E221
@@ -172,6 +173,7 @@ async def create_mirror2(request):
             basemirror_id,
             mirrorsrc,
             mirrorinst,
+            external_repo,
         ]
     }
     await request.cirrina.aptly_queue.put(args)
