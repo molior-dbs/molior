@@ -21,8 +21,6 @@ CONFIG_FILE=/etc/molior/molior.yml
 
 # Reads the config yaml and sets env variables
 eval $(parse_yaml $CONFIG_FILE)
-APTLY=$aptly__apt_url
-APTLY_KEY=$aptly__key
 DEBSIGN_GPG_EMAIL=$debsign_gpg_email
 
 # Workaround obsolete pxz package on buster
@@ -46,6 +44,8 @@ DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
 COMPONENTS=$6
+REPO_URL=$7
+KEYS=$8
 
 CHROOT_NAME="${DIST_NAME}-$DIST_VERSION-${ARCH}"
 target="/var/lib/schroot/chroots/${CHROOT_NAME}"
@@ -58,29 +58,35 @@ build_chroot()
   mkdir -p "$target"
 
   echo
-  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   message="Creating schroot $CHROOT_NAME"
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   printf "| %-44s %s |\n" "$message" "`date -R`"
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   echo
 
-  REPO="$APTLY/$DIST_NAME/$DIST_VERSION/"
-  echo I: Using APT repository $REPO
+  echo I: Using APT repository $REPO_URL
 
   if [ -n "$COMPONENTS" ]; then
       COMPONENTS="--components main,$COMPONENTS"
   fi
   INCLUDE="--include=gnupg1"
-  KEY_URL=`echo $APTLY/$APTLY_KEY | sed 's/ //g'`
-  echo I: Downloading gpg public key: $KEY_URL
-  keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
-  wget -q $KEY_URL -O $keyfile
-  cat $keyfile | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
+
+  if echo $KEYS | grep -q '#'; then
+      keyserver=`echo $KEYS | cut -d# -f1`
+      keyids=`echo $KEYS | cut -d# -f2 | tr ',' ' '`
+      echo I: Downloading gpg public key: $keyserver $keyids
+      flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
+  else
+      echo I: Downloading gpg public key: $KEYS
+      keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
+      wget -q $KEYS -O $keyfile
+      cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  fi
 
   rm -rf $target/
-  echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO
+  echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO_URL
   if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
-    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO
+    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     if [ "$ARCH" = "armhf" ]; then
       cp /usr/bin/qemu-arm-static $target/usr/bin/
     else
@@ -88,7 +94,7 @@ build_chroot()
     fi
     chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
   else
-    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO
+    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
   fi
 
   echo I: Configuring chroot
@@ -121,10 +127,16 @@ EOM
 
   echo I: Adding gpg public key to chroot
   # Add APT Repo signing key
-  cat $keyfile | chroot $target apt-key add - >/dev/null
-  cat $keyfile | chroot $target gpg1 -q --import --no-default-keyring --keyring=trustedkeys.gpg
+  if [ -n "$keyfile" ]; then
+    cat $keyfile | chroot $target apt-key add - >/dev/null
+    # cat $keyfile | chroot $target gpg1 -q --import --no-default-keyring --keyring=trustedkeys.gpg
+  else
+    gpg1 --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids | chroot $target apt-key add -
+    # gpg1 --export --armor $keyids | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  fi
   # Add Molior Source signing key
-  su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target apt-key add -
 
   echo I: Installing build environment
   chroot $target apt-get update

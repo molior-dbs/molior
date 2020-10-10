@@ -36,6 +36,8 @@ DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
 COMPONENTS=$6
+REPO_URL=$7
+KEYS=$8
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
 DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
@@ -59,28 +61,35 @@ build_debootstrap()
   fi
 
   echo
-  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   message="Creating debootstrap $DEBOOTSTRAP_NAME"
+  echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   printf "| %-44s %s |\n" "$message" "`date -R`"
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   echo
 
-  MIRROR="$APTLY/$DIST_NAME/$DIST_VERSION/"
-
   echo " * running debootstrap for $DIST_NAME/$DIST_VERSION $ARCH"
 
-  echo I: Using APT repository $MIRROR
+  echo I: Using APT repository $REPO_URL
 
   if [ -n "$COMPONENTS" ]; then
       COMPONENTS="--components main,$COMPONENTS"
   fi
   INCLUDE="--include=gnupg1"
-  KEY_URL=`echo $APTLY/$APTLY_KEY | sed 's/ //g'`
-  echo I: Downloading gpg public key: $KEY_URL
-  wget -q $KEY_URL -O- | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
+
+  if echo $KEYS | grep -q '#'; then
+      keyserver=`echo $KEYS | cut -d# -f1`
+      keyids=`echo $KEYS | cut -d# -f2 | tr ',' ' '`
+      echo I: Downloading gpg public key: $keyserver $keyids
+      flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
+  else
+      echo I: Downloading gpg public key: $KEYS
+      keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
+      wget -q $KEYS -O $keyfile
+      cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  fi
 
   if echo $ARCH | grep -q arm; then
-    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $MIRROR
+    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     if [ $? -ne 0 ]; then
       echo "debootstrap failed"
       exit 1
@@ -96,7 +105,7 @@ build_debootstrap()
       exit 2
     fi
   else
-    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $MIRROR
+    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     if [ $? -ne 0 ]; then
       echo "debootstrap failed"
       exit 3

@@ -7,7 +7,8 @@ from ..model.build import Build
 from ..model.chroot import Chroot
 
 
-async def CreateBuildEnv(task_queue, chroot_id, build_id, dist, name, version, arch, components):
+async def CreateBuildEnv(task_queue, chroot_id, build_id, dist,
+                         name, version, arch, components, repo_url, mirror_keys):
     """
     Creates a sbuild chroot and other build environments.
 
@@ -38,7 +39,8 @@ async def CreateBuildEnv(task_queue, chroot_id, build_id, dist, name, version, a
             await write_log(build_id, "%s\n" % line)
 
         process = Launchy(["sudo", "run-parts", "-a", "build", "-a", dist, "-a", name,
-                           "-a", version, "-a", arch, "-a", components,
+                           "-a", version, "-a", arch, "-a", components, "-a", repo_url,
+                           "-a", mirror_keys,
                            "/etc/molior/mirror-hooks.d"], outh, outh)
         await process.launch()
         ret = await process.wait()

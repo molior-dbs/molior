@@ -10,6 +10,7 @@ from .project import Project
 from .projectversiondependency import ProjectVersionDependency
 # reeded for relations:
 from . import sourcerepository    # noqa: F401
+from . import mirrorkey    # noqa: F401
 
 MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
 DEPENDENCY_POLICIES = ["strict", "distribution", "any"]
@@ -28,6 +29,7 @@ class ProjectVersion(Base):
     basemirror = relationship("ProjectVersion", uselist=False,
                               remote_side=[id],
                               foreign_keys=basemirror_id)
+    external_repo = Column(Boolean, default=False)
     dependencies = relationship("ProjectVersion",
                                 secondary=ProjectVersionDependency,
                                 primaryjoin=id == ProjectVersionDependency.c.projectversion_id,
@@ -46,6 +48,7 @@ class ProjectVersion(Base):
     mirror_state = Column(Enum(*MIRROR_STATES, name="mirror_stateenum"), default=None)
     mirror_with_sources = Column(Boolean, default=False)
     mirror_with_installer = Column(Boolean, default=False)
+    mirror_keys = relationship("MirrorKey", back_populates="mirrors")
     is_locked = Column(Boolean, default=False)
     ci_builds_enabled = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
@@ -75,6 +78,12 @@ class ProjectVersion(Base):
         """
         Returns the apt sources url string of the projectversion.
         """
+        if self.project.is_mirror and self.external_repo:
+            url = self.mirror_url
+            full = "deb {0} {1} {2}".format(url, self.mirror_distribution,
+                                            self.mirror_components.replace(",", " "))
+            return url if url_only else full
+
         cfg = Configuration()
         base_url = cfg.aptly.get("apt_url")
 

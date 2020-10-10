@@ -4,11 +4,12 @@ import operator
 from sqlalchemy import or_
 
 from ..app import logger
-from ..tools import get_aptly_connection, write_log, write_log_title
+from ..tools import get_aptly_connection, write_log, write_log_title, db2array, array2db
 from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
+from ..molior.configuration import Configuration
 
 from ..model.database import Session
 from ..model.build import Build
@@ -188,11 +189,10 @@ async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, 
                                      mirror, version, components, task_ids))
 
 
-async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version, mirror, version, components, task_ids):
-    """
-    """
+async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version,
+                          mirror_project, mirror_version, components, task_ids):
     try:
-        mirrorname = "{}-{}".format(mirror, version)
+        mirrorname = "{}-{}".format(mirror_project, mirror_version)
         logger.debug("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
 
         with Session() as session:
@@ -202,14 +202,14 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 logger.error("aptly worker: mirror build with id %d not found", build_id)
                 return
 
-            # FIXME: get entry from build.projectversion_id
+            # FIXME: get mirror from build.projectversion_id
             query = session.query(ProjectVersion)
             query = query.join(Project, Project.id == ProjectVersion.project_id)
             query = query.filter(Project.is_mirror.is_(True))
-            query = query.filter(ProjectVersion.name == version)
-            entry = query.filter(Project.name == mirror).first()
+            query = query.filter(ProjectVersion.name == mirror_version)
+            mirror = query.filter(Project.name == mirror_project).first()
 
-            if not entry:
+            if not mirror:
                 logger.error("finalize mirror: mirror '%s' not found", mirrorname)
                 await write_log(build.id, "E: error mirror not found\n")
                 return
@@ -224,7 +224,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
             fields = ["TotalNumberOfPackages", "RemainingNumberOfPackages",
                       "TotalDownloadSize", "RemainingDownloadSize"]
 
-            if entry.mirror_state == "updating":
+            if mirror.mirror_state == "updating":
                 while True:
                     for task_id in task_ids:
                         if progress[task_id]["State"] == 1:  # task is running
@@ -247,7 +247,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     if not running and failed:
                         logger.error("Error updating mirror %s", mirrorname)
                         await write_log(build.id, "E: error updating mirror\n")
-                        entry.mirror_state = "error"
+                        mirror.mirror_state = "error"
                         await build.set_failed()
                         session.commit()
                         # FIXME: delete all tasks
@@ -293,7 +293,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         await notify(Subject.build.value, Event.changed.value,
                                      {"id": build.id, "progress": total_progress["PercentSize"]})
                         await notify(Subject.mirror.value, Event.changed.value,
-                                     {"id": entry.id, "progress": total_progress["PercentSize"]})
+                                     {"id": mirror.id, "progress": total_progress["PercentSize"]})
                     await asyncio.sleep(10)
 
                 await write_log(build.id, "I: creating snapshot\n")
@@ -304,10 +304,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 # snapshot after initial download
                 logger.debug("creating snapshot for: %s", mirrorname)
                 try:
-                    task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version, mirror, version, components)
+                    task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version,
+                                                           mirror_project, mirror_version, components)
                 except AptlyError as exc:
                     logger.error("error creating mirror %s snapshot: %s", mirrorname, exc)
-                    entry.mirror_state = "error"
+                    mirror.mirror_state = "error"
                     await build.set_publish_failed()
                     session.commit()
                     return
@@ -329,7 +330,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
                     if not running and failed:
                         logger.error("creating mirror %s snapshot failed", mirrorname)
-                        entry.mirror_state = "error"
+                        mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
                         return
@@ -341,25 +342,25 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                 # FIXME: delete all tasksk
                 # await aptly.delete_task(task_id)
 
-                entry.mirror_state = "publishing"
+                mirror.mirror_state = "publishing"
                 session.commit()
 
                 # publish new snapshot
                 await write_log(build.id, "I: publishing mirror\n")
                 logger.debug("publishing snapshot: %s", mirrorname)
                 try:
-                    task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror, version,
-                                                         entry.mirror_distribution, components)
+                    task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror_project, mirror_version,
+                                                         mirror.mirror_distribution, components)
                 except Exception as exc:
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
-                    entry.mirror_state = "error"
+                    mirror.mirror_state = "error"
                     await build.set_publish_failed()
                     session.commit()
-                    await aptly.mirror_delete(base_mirror, base_mirror_version, mirror, version,
-                                              entry.mirror_distribution, components)
+                    await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_project, mirror_version,
+                                              mirror.mirror_distribution, components)
                     return
 
-            if entry.mirror_state == "publishing":
+            if mirror.mirror_state == "publishing":
                 while True:
                     upd_progress = None
                     try:
@@ -367,11 +368,11 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     except Exception as exc:
                         logger.error("error publishing mirror %s: %s", mirrorname, str(exc))
 
-                        entry.mirror_state = "error"
+                        mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
 
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
                         return
 
                     # States:
@@ -380,10 +381,10 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         break
                     if upd_progress["State"] == 3:
                         logger.error("error publishing mirror %s snapshot", mirrorname)
-                        entry.mirror_state = "error"
+                        mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
                         return
 
                     if upd_progress["TotalNumberOfPackages"] > 0:
@@ -407,57 +408,14 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     await notify(Subject.build.value, Event.changed.value,
                                  {"id": build.id, "progress": upd_progress["PercentPackages"]})
                     await notify(Subject.mirror.value, Event.changed.value,
-                                 {"id": entry.id, "progress": upd_progress["PercentPackages"]})
+                                 {"id": mirror.id, "progress": upd_progress["PercentPackages"]})
                     await asyncio.sleep(10)
 
-            if entry.project.is_basemirror:
-                for arch_name in entry.mirror_architectures[1:-1].split(","):
-                    await write_log(build.id, "I: starting chroot environments build\n")
+            if mirror.project.is_basemirror:
+                await create_chroots(mirror, build, mirror_project, mirror_version, task_queue, session)
 
-                    chroot_build = Build(
-                        version=version,
-                        git_ref=None,
-                        ci_branch=None,
-                        is_ci=None,
-                        sourcename=mirror,
-                        buildstate="new",
-                        buildtype="chroot",
-                        projectversion_id=build.projectversion_id,
-                        parent_id=build.id,
-                        sourcerepository=None,
-                        maintainer=None,
-                        architecture=arch_name
-                    )
-
-                    session.add(chroot_build)
-                    session.commit()
-                    chroot_build.log_state("created")
-                    await chroot_build.build_added()
-
-                    await chroot_build.set_needs_build()
-                    session.commit()
-
-                    await chroot_build.set_scheduled()
-                    session.commit()
-
-                    chroot = Chroot(basemirror_id=entry.id, architecture=arch_name, build_id=chroot_build.id, ready=False)
-                    session.add(chroot)
-                    session.commit()
-
-                    # create chroot build envs
-                    args = {"buildenv": [
-                            chroot.id,
-                            chroot_build.id,
-                            entry.mirror_distribution,
-                            entry.project.name,
-                            entry.name,
-                            arch_name,
-                            entry.mirror_components
-                            ]}
-                    await task_queue.put(args)
-
-            entry.is_locked = True
-            entry.mirror_state = "ready"
+            mirror.is_locked = True
+            mirror.mirror_state = "ready"
             session.commit()
 
             await build.set_successful()
@@ -469,6 +427,70 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
 
     except Exception as exc:
         logger.exception(exc)
+
+
+async def create_chroots(mirror, build, mirror_project, mirror_version, task_queue, session):
+    for arch_name in db2array(mirror.mirror_architectures):
+        await write_log(build.id, "I: starting chroot environments build\n")
+
+        chroot_build = Build(
+            version=mirror_version,
+            git_ref=None,
+            ci_branch=None,
+            is_ci=None,
+            sourcename=mirror_project,
+            buildstate="new",
+            buildtype="chroot",
+            projectversion_id=build.projectversion_id,
+            parent_id=build.id,
+            sourcerepository=None,
+            maintainer=None,
+            architecture=arch_name
+        )
+
+        session.add(chroot_build)
+        session.commit()
+        chroot_build.log_state("created")
+        await chroot_build.build_added()
+
+        await chroot_build.set_needs_build()
+        session.commit()
+
+        await chroot_build.set_scheduled()
+        session.commit()
+
+        chroot = Chroot(basemirror_id=mirror.id, architecture=arch_name, build_id=chroot_build.id, ready=False)
+        session.add(chroot)
+        session.commit()
+
+        mirror_keys = ""
+        if not mirror.external_repo:
+            cfg = Configuration()
+            apt_url = cfg.aptly.get("apt_url")
+            keyfile = cfg.aptly.get("key")
+            repo_url = apt_url + "/" + chroot.basemirror.project.name + "/" + chroot.basemirror.name
+            mirror_keys = repo_url + "/" + keyfile
+        else:
+            repo_url = mirror.mirror_url
+            if mirror.mirror_keys:
+                if mirror.mirror_keys[0].keyurl:
+                    mirror_keys = mirror.mirror_keys[0].keyurl
+                elif mirror.mirror_keys[0].keyids:
+                    mirror_keys = mirror.mirror_keys[0].keyserver + "#" + ",".join(db2array(mirror.mirror_keys[0].keyids))
+
+        # create chroot build envs
+        args = {"buildenv": [
+                chroot.id,
+                chroot_build.id,
+                mirror.mirror_distribution,
+                mirror.project.name,
+                mirror.name,
+                arch_name,
+                mirror.mirror_components,
+                repo_url,
+                mirror_keys,
+                ]}
+        await task_queue.put(args)
 
 
 class AptlyWorker:
@@ -496,6 +518,7 @@ class AptlyWorker:
             basemirror_id,
             download_sources,
             download_installer,
+            external_repo
         ) = args
 
         # FIXME: the following db checking should happen in api
@@ -525,11 +548,12 @@ class AptlyWorker:
             mirror_url=url,
             mirror_distribution=mirror_distribution,
             mirror_components=",".join(components),
-            mirror_architectures="{" + ",".join(architectures) + "}",
+            mirror_architectures=array2db(architectures),
             mirror_with_sources=download_sources,
             mirror_with_installer=download_installer,
             mirror_state="new",
-            basemirror_id=basemirror_id
+            basemirror_id=basemirror_id,
+            external_repo=external_repo
         )
 
         session.add(mirror)
@@ -538,7 +562,7 @@ class AptlyWorker:
         mirrorkey = MirrorKey(
                 projectversion_id=mirror.id,
                 keyurl=key_url,
-                keyids="{" + ",".join(keys) + "}",
+                keyids=array2db(keys),
                 keyserver=keyserver)
 
         session.add(mirrorkey)
@@ -585,61 +609,62 @@ class AptlyWorker:
             keyids = mirrorkey.keyids[1:-1]
             keyserver = mirrorkey.keyserver
 
-        aptly = get_aptly_connection()
-        if key_url:
-            await write_log(build.id, "I: adding GPG keys from {}\n".format(key_url))
+        if not mirror.external_repo:
+            aptly = get_aptly_connection()
+            if key_url:
+                await write_log(build.id, "I: adding GPG keys from {}\n".format(key_url))
+                try:
+                    await aptly.gpg_add_key(key_url=key_url)
+                except AptlyError as exc:
+                    await write_log(build.id, "E: Error adding keys from '%s'\n" % key_url)
+                    logger.error("key error: %s", exc)
+                    await build.set_failed()
+                    mirror.mirror_state = "init_error"
+                    session.commit()
+                    return False
+            elif keyserver and keyids:
+                await write_log(build.id, "I: adding GPG keys {} from {}\n".format(keyids, keyserver))
+                try:
+                    await aptly.gpg_add_key(key_server=keyserver, keys=keyids)
+                except AptlyError as exc:
+                    await write_log(build.id, "E: Error adding keys %s\n" % str(keyids))
+                    logger.error("key error: %s", exc)
+                    await build.set_failed()
+                    mirror.mirror_state = "init_error"
+                    session.commit()
+                    return False
+
+            await write_log(build.id, "I: creating mirror\n")
             try:
-                await aptly.gpg_add_key(key_url=key_url)
-            except AptlyError as exc:
-                await write_log(build.id, "E: Error adding keys from '%s'\n" % key_url)
-                logger.error("key error: %s", exc)
+                await aptly.mirror_create(
+                    mirror.project.name,
+                    mirror.name,
+                    mirror.basemirror.project.name if mirror.basemirror else "",
+                    mirror.basemirror.name if mirror.basemirror else "",
+                    mirror.mirror_url,
+                    mirror.mirror_distribution,
+                    mirror.mirror_components.split(" "),
+                    db2array(mirror.mirror_architectures),
+                    download_sources=mirror.mirror_with_sources,
+                    download_udebs=mirror.mirror_with_installer,
+                    download_installer=mirror.mirror_with_installer,
+                )
+
+            except NotFoundError as exc:
+                await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
+                logger.error("aptly seems to be not available: %s", str(exc))
                 await build.set_failed()
                 mirror.mirror_state = "init_error"
                 session.commit()
                 return False
-        elif keyserver and keyids:
-            await write_log(build.id, "I: adding GPG keys {} from {}\n".format(keyids, keyserver))
-            try:
-                await aptly.gpg_add_key(key_server=keyserver, keys=keyids)
+
             except AptlyError as exc:
-                await write_log(build.id, "E: Error adding keys %s\n" % str(keyids))
-                logger.error("key error: %s", exc)
+                await write_log(build.id, "E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
+                logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
                 await build.set_failed()
                 mirror.mirror_state = "init_error"
                 session.commit()
                 return False
-
-        await write_log(build.id, "I: creating mirror\n")
-        try:
-            await aptly.mirror_create(
-                mirror.project.name,
-                mirror.name,
-                mirror.basemirror.project.name if mirror.basemirror else "",
-                mirror.basemirror.name if mirror.basemirror else "",
-                mirror.mirror_url,
-                mirror.mirror_distribution,
-                mirror.mirror_components.split(" "),
-                mirror.mirror_architectures[1:-1].split(","),
-                download_sources=mirror.mirror_with_sources,
-                download_udebs=mirror.mirror_with_installer,
-                download_installer=mirror.mirror_with_installer,
-            )
-
-        except NotFoundError as exc:
-            await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
-            logger.error("aptly seems to be not available: %s", str(exc))
-            await build.set_failed()
-            mirror.mirror_state = "init_error"
-            session.commit()
-            return False
-
-        except AptlyError as exc:
-            await write_log(build.id, "E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
-            logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
-            await build.set_failed()
-            mirror.mirror_state = "init_error"
-            session.commit()
-            return False
 
         mirror.mirror_state = "created"
         session.commit()
@@ -674,37 +699,52 @@ class AptlyWorker:
             logger.error("aptly worker: no build found for mirror with id %d", str(mirror_id))
             return
 
-        await build.set_building()
-        session.commit()
-
-        mirror_name = "{}/{}".format(mirror.project.name, mirror.name)
-        try:
-            await update_mirror(
-                self.task_queue,
-                build.id,
-                mirror.basemirror.project.name if mirror.basemirror else "",
-                mirror.basemirror.name if mirror.basemirror else "",
-                mirror.project.name,
-                mirror.name,
-                mirror.mirror_components.split(","),
-            )
-        except NotFoundError as exc:
-            await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
-            logger.error("aptly seems to be not available: %s", str(exc))
-            # FIXME: remove from db
-            await build.set_failed()
+        if not mirror.external_repo:
+            await build.set_building()
             session.commit()
-            return
-        except AptlyError as exc:
-            await write_log(build.id, "E: failed to update mirror %s on aptly: %s\n" % (mirror_name, str(exc)))
-            logger.error("failed to update mirror %s on aptly: %s", mirror_name, str(exc))
-            # FIXME: remove from db
-            await build.set_failed()
-            session.commit()
-            return
 
-        mirror.mirror_state = "updating"
-        session.commit()
+            mirror_name = "{}/{}".format(mirror.project.name, mirror.name)
+            try:
+                await update_mirror(
+                    self.task_queue,
+                    build.id,
+                    mirror.basemirror.project.name if mirror.basemirror else "",
+                    mirror.basemirror.name if mirror.basemirror else "",
+                    mirror.project.name,
+                    mirror.name,
+                    mirror.mirror_components.split(","),
+                )
+            except NotFoundError as exc:
+                await write_log(build.id, "E: aptly seems to be not available: %s\n" % str(exc))
+                logger.error("aptly seems to be not available: %s", str(exc))
+                # FIXME: remove from db
+                await build.set_failed()
+                session.commit()
+                return
+            except AptlyError as exc:
+                await write_log(build.id, "E: failed to update mirror %s on aptly: %s\n" % (mirror_name, str(exc)))
+                logger.error("failed to update mirror %s on aptly: %s", mirror_name, str(exc))
+                # FIXME: remove from db
+                await build.set_failed()
+                session.commit()
+                return
+
+            mirror.mirror_state = "updating"
+            session.commit()
+
+        else:  # external repo
+            if mirror.project.is_basemirror:
+                await create_chroots(mirror, build, mirror.project.name, mirror.name, self.task_queue, session)
+
+            mirror.is_locked = True
+            mirror.mirror_state = "ready"
+            session.commit()
+
+            await build.set_successful()
+            session.commit()
+
+            await write_log(build.id, "\n")
+            await write_log_title(build.id, "Done", no_footer_newline=True)
 
     async def _src_publish(self, args, session):
         build_id = args[0]
