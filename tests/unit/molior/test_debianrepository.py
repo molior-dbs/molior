@@ -344,9 +344,10 @@ def test_add_packages():
                 ]
             )
         )
-        aptly_connection.snapshot_delete = Mock(side_effect=asyncio.coroutine(lambda a: 100))
+        aptly_connection.snapshot_delete = Mock(side_effect=asyncio.coroutine(lambda a: 1339))
         aptly_connection.snapshot_publish_update = Mock(side_effect=asyncio.coroutine(lambda a, b, c, d: 1340))
-        aptly_connection.snapshot_rename = Mock(side_effect=asyncio.coroutine(lambda a, b: None))
+        aptly_connection.snapshot_rename = Mock(side_effect=asyncio.coroutine(lambda a, b: 1341))
+        aptly_connection.wait_task = Mock(side_effect=asyncio.coroutine(lambda a, b: 1342))
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"
