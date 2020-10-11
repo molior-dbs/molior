@@ -415,8 +415,16 @@ async def delete_mirror(request):
     #    logger.warning("error deleting mirror '%s': referenced by one or more build configurations", mirrorname)
     #    return ErrorResponse(412, "Error deleting mirror {}: still referenced from build configurations".format(mirrorname))
     if mirror.dependents:
-        logger.warning("error deleting mirror '%s': referenced by one or project versions", mirrorname)
+        logger.warning("error deleting mirror '%s': referenced by one or more project versions", mirrorname)
         return ErrorResponse(412, "Error deleting mirror {}: still referenced from project versions".format(mirrorname))
+
+    if mirror.project.is_basemirror:
+        dependents = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror_id).all()
+        if dependents:
+            logger.warning("error deleting mirror '%s': used as basemirror by one or more project versions", mirrorname)
+            return ErrorResponse(412,
+                                 "Error deleting mirror {}: still used as base mirror by one or more project versions".format(
+                                     mirrorname))
 
     mirror.is_deleted = True
     request.cirrina.db_session.commit()
