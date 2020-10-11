@@ -9,7 +9,6 @@ from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
-from ..molior.configuration import Configuration
 
 from ..model.database import Session
 from ..model.build import Build
@@ -463,21 +462,6 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, task_que
         session.add(chroot)
         session.commit()
 
-        mirror_keys = ""
-        if not mirror.external_repo:
-            cfg = Configuration()
-            apt_url = cfg.aptly.get("apt_url")
-            keyfile = cfg.aptly.get("key")
-            repo_url = apt_url + "/" + chroot.basemirror.project.name + "/" + chroot.basemirror.name
-            mirror_keys = repo_url + "/" + keyfile
-        else:
-            repo_url = mirror.mirror_url
-            if mirror.mirror_keys:
-                if mirror.mirror_keys[0].keyurl:
-                    mirror_keys = mirror.mirror_keys[0].keyurl
-                elif mirror.mirror_keys[0].keyids:
-                    mirror_keys = mirror.mirror_keys[0].keyserver + "#" + ",".join(db2array(mirror.mirror_keys[0].keyids))
-
         # create chroot build envs
         args = {"buildenv": [
                 chroot.id,
@@ -487,8 +471,8 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, task_que
                 mirror.name,
                 arch_name,
                 mirror.mirror_components,
-                repo_url,
-                mirror_keys,
+                chroot.get_mirror_url(),
+                chroot.get_mirror_keys(),
                 ]}
         await task_queue.put(args)
 

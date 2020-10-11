@@ -1,27 +1,27 @@
 #!/bin/bash
 
-function parse_yaml {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\):|\1|" \
-        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
+#function parse_yaml {
+   #local prefix=$2
+   #local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   #sed -ne "s|^\($s\):|\1|" \
+        #-e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        #-e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   #awk -F$fs '{
+      #indent = length($1)/2;
+      #vname[indent] = $2;
+      #for (i in vname) {if (i > indent) {delete vname[i]}}
+      #if (length($3) > 0) {
+         #vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         #printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      #}
+   #}'
+#}
 
-CONFIG_FILE=/etc/molior/molior.yml
+#CONFIG_FILE=/etc/molior/molior.yml
 
-# Reads the config yaml and sets env variables
-eval $(parse_yaml $CONFIG_FILE)
-DEBSIGN_GPG_EMAIL=$debsign_gpg_email
+## Reads the config yaml and sets env variables
+#eval $(parse_yaml $CONFIG_FILE)
+#DEBSIGN_GPG_EMAIL=$debsign_gpg_email
 
 # Workaround obsolete pxz package on buster
 xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
@@ -45,7 +45,7 @@ DIST_VERSION=$4
 ARCH=$5
 COMPONENTS=$6
 REPO_URL=$7
-KEYS=$8
+KEYS="$8"  # separated by space
 
 CHROOT_NAME="${DIST_NAME}-$DIST_VERSION-${ARCH}"
 target="/var/lib/schroot/chroots/${CHROOT_NAME}"
@@ -55,7 +55,8 @@ set -e
 build_chroot()
 {
   rm -f $target.tar.xz
-  mkdir -p "$target"
+  rm -rf $target
+  mkdir $target
 
   echo
   message="Creating schroot $CHROOT_NAME"
@@ -71,17 +72,24 @@ build_chroot()
   fi
   INCLUDE="--include=gnupg1"
 
-  if echo $KEYS | grep -q '#'; then
-      keyserver=`echo $KEYS | cut -d# -f1`
-      keyids=`echo $KEYS | cut -d# -f2 | tr ',' ' '`
-      echo I: Downloading gpg public key: $keyserver $keyids
-      flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
-  else
-      echo I: Downloading gpg public key: $KEYS
-      keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
-      wget -q $KEYS -O $keyfile
-      cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
-  fi
+  keydir=`mktemp -d /tmp/molior-chrootkeys.XXXXXX`
+  i=1
+  for KEY in $KEYS
+  do
+      if echo $KEY | grep -q '#'; then
+          keyserver=`echo $KEY | cut -d# -f1`
+          keyids=`echo $KEY | cut -d# -f2 | tr ',' ' '`
+          echo I: Downloading gpg public key: $keyserver $keyids
+          flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
+          gpg1 --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids > "$keydir/$i.asc"
+      else
+          echo I: Downloading gpg public key: $KEY
+          keyfile="$keydir/$i.asc"
+          wget -q $KEY -O $keyfile
+          cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+      fi
+      i=$((i + 1))
+  done
 
   rm -rf $target/
   echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO_URL
@@ -125,18 +133,16 @@ EOM
   if [ ! -r $target/dev/stdout ]; then ln -s /proc/self/fd/1 $target/dev/stdout; fi
   if [ ! -r $target/dev/stderr ]; then ln -s /proc/self/fd/2 $target/dev/stderr; fi
 
-  echo I: Adding gpg public key to chroot
-  # Add APT Repo signing key
-  if [ -n "$keyfile" ]; then
+  echo I: Adding gpg public keys to chroot
+  for keyfile in $keydir/*
+  do
     cat $keyfile | chroot $target apt-key add - >/dev/null
-    # cat $keyfile | chroot $target gpg1 -q --import --no-default-keyring --keyring=trustedkeys.gpg
-  else
-    gpg1 --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids | chroot $target apt-key add -
-    # gpg1 --export --armor $keyids | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
-  fi
+  done
+  rm -rf $keydir
+
   # Add Molior Source signing key
   # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
-  su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target apt-key add -
+  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target apt-key add -
 
   echo I: Installing build environment
   chroot $target apt-get update

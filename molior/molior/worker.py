@@ -5,7 +5,7 @@ import giturlparse
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
 from ..ops import BuildProcess, ScheduleBuilds, CreateBuildEnv
-from ..tools import write_log, write_log_title, db2array
+from ..tools import write_log, write_log_title
 from ..molior.configuration import Configuration
 
 from ..model.database import Session
@@ -233,21 +233,6 @@ class Worker:
                 ok = True
                 chroot = session.query(Chroot).filter(Chroot.build_id == build_id).first()
                 if chroot:
-                    mirror_keys = ""
-                    if not chroot.basemirror.external_repo:
-                        cfg = Configuration()
-                        apt_url = cfg.aptly.get("apt_url")
-                        keyfile = cfg.aptly.get("key")
-                        repo_url = apt_url + "/" + chroot.basemirror.project.name + "/" + chroot.basemirror.name
-                        mirror_keys = repo_url + "/" + keyfile
-                    else:
-                        repo_url = chroot.basemirror.mirror_url
-                        if chroot.basemirror.mirror_keys:
-                            if chroot.basemirror.mirror_keys[0].keyurl:
-                                mirror_keys = chroot.basemirror.mirror_keys[0].keyurl
-                            elif chroot.basemirror.mirror_keys[0].keyids:
-                                mirror_keys = chroot.basemirror.mirror_keys[0].keyserver + "#" \
-                                              + ",".join(db2array(chroot.basemirror.mirror_keys[0].keyids))
                     args = {"buildenv": [
                             chroot.id,
                             build_id,
@@ -256,8 +241,8 @@ class Worker:
                             chroot.basemirror.name,
                             chroot.architecture,
                             chroot.basemirror.mirror_components,
-                            repo_url,
-                            mirror_keys,
+                            chroot.get_mirror_url(),
+                            chroot.get_mirror_keys(),
                             ]}
                     logger.info("queueing {}".format(args))
                     await self.task_queue.put(args)

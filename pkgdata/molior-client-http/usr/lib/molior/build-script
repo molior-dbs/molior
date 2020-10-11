@@ -12,6 +12,7 @@
 : ${PROJECT?"set PROJECT before running this script"}
 : ${PROJECTVERSION?"set PROJECTVERSION before running this script"}
 : ${APT_SERVER?"set APT_SERVER before running this script"}
+: ${APT_URLS?"set APT_URLS before running this script"}
 
 if [ -f /etc/default/molior-client ]; then
   . /etc/default/molior-client
@@ -201,7 +202,16 @@ fi
 
 # FIXME: signature verification inside sbuild schroot
 
-eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --build-dep-resolver=aptitude $SBUILD_ARCH_ARGS $APT_URLS ${REPO_NAME}_$VERSION.dsc
+APT_KEYS=""
+# FIXME: add extra keys from external repositories
+# --extra-repository-key=
+
+eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION \
+            --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --build-dep-resolver=aptitude \
+            $SBUILD_ARCH_ARGS \
+            $APT_URLS \
+            $APT_KEYS \
+            ${REPO_NAME}_$VERSION.dsc
 RET=$?
 
 if [ "$RET" -ne 0 ]; then

@@ -1,29 +1,5 @@
 #!/bin/bash
 
-function parse_yaml {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\):|\1|" \
-        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
-
-CONFIG_FILE=/etc/molior/molior.yml
-
-# Reads the config yaml and sets env variables
-eval $(parse_yaml $CONFIG_FILE)
-APTLY=$aptly__apt_url
-APTLY_KEY=$aptly__key
-
 if [ "$1" != "info" -a "$#" -lt 5 ]; then
   echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> [components,]" >&2
   echo "       $0 info" 1>&2
@@ -37,7 +13,7 @@ DIST_VERSION=$4
 ARCH=$5
 COMPONENTS=$6
 REPO_URL=$7
-KEYS=$8
+KEYS="$8"  # separated by space
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
 DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
@@ -76,17 +52,24 @@ build_debootstrap()
   fi
   INCLUDE="--include=gnupg1"
 
-  if echo $KEYS | grep -q '#'; then
-      keyserver=`echo $KEYS | cut -d# -f1`
-      keyids=`echo $KEYS | cut -d# -f2 | tr ',' ' '`
-      echo I: Downloading gpg public key: $keyserver $keyids
-      flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
-  else
-      echo I: Downloading gpg public key: $KEYS
-      keyfile=`mktemp /tmp/molior-repo.asc.XXXXXX`
-      wget -q $KEYS -O $keyfile
-      cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
-  fi
+  keydir=`mktemp -d /tmp/molior-chrootkeys.XXXXXX`
+  i=1
+  for KEY in $KEYS
+  do
+      if echo $KEY | grep -q '#'; then
+          keyserver=`echo $KEY | cut -d# -f1`
+          keyids=`echo $KEY | cut -d# -f2 | tr ',' ' '`
+          echo I: Downloading gpg public key: $keyserver $keyids
+          flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
+          gpg1 --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids > "$keydir/$i.asc"
+      else
+          echo I: Downloading gpg public key: $KEY
+          keyfile="$keydir/$i.asc"
+          wget -q $KEY -O $keyfile
+          cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+      fi
+      i=$((i + 1))
+  done
 
   if echo $ARCH | grep -q arm; then
     debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
@@ -125,6 +108,13 @@ build_debootstrap()
   chroot $target apt-get clean
 
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
+
+  echo I: Adding gpg public keys to chroot
+  for keyfile in $keydir/*
+  do
+    cat $keyfile | chroot $target apt-key add - >/dev/null
+  done
+  rm -rf $keydir
 
   echo I: Created debootstrap successfully
 }
