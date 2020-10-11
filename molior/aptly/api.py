@@ -434,8 +434,8 @@ class AptlyApi:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
+        ret = None
         name, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
-
         data = {
             # Workaround for aptly ('/' not supported as mirror dist)
             "Distribution": mirror_distribution.replace("/", "_-"),
@@ -456,8 +456,8 @@ class AptlyApi:
                                  data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def snapshot_create(self, repo_name, snapshot_name, package_refs=None):
         """
@@ -483,8 +483,8 @@ class AptlyApi:
                                      data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
-                    ret = json.loads(await resp.text())
-        return ret["ID"]
+                    ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def snapshot_delete(self, name):
         """
@@ -496,14 +496,14 @@ class AptlyApi:
         Returns:
             int: Aptly's task id.
         """
-        data = {"force": "1"}
+        ret = None
         async with aiohttp.ClientSession() as http:
             async with http.delete(self.url + "/snapshots/{}".format(name),
-                                   headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
+                                   headers=self.headers, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def snapshot_get(self):
         """
@@ -532,6 +532,7 @@ class AptlyApi:
             destination (str): Publish point destination name.
                 e.g. jessie_8.8_repos_test_1
         """
+        ret = None
         data = {
             "SourceKind": "snapshot",
             "Sources": [{"Name": name, "Component": component}],
@@ -550,8 +551,8 @@ class AptlyApi:
                                  headers=self.headers, data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def snapshot_publish_update(self, name, component, dist, destination):
         """
@@ -564,6 +565,7 @@ class AptlyApi:
             destination (str): Publish point destination name.
                 e.g. jessie_8.8_repos_test_1
         """
+        ret = None
         data = json.dumps({
             "Snapshots": [{"Name": name, "Component": component}],
             "Signing": {
@@ -579,8 +581,8 @@ class AptlyApi:
                                 headers=self.headers, data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def snapshot_rename(self, name, new_name):
         """
@@ -590,12 +592,15 @@ class AptlyApi:
             name (str): Original name
             new_name (str): New name
         """
+        ret = None
         data = {"Name": new_name}
         async with aiohttp.ClientSession() as http:
             async with http.put(self.url + "/snapshots/" + name, headers=self.headers,
                                 data=json.dumps(data), auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def repo_packages_get(self, repo_name, search=None):
         """
@@ -627,13 +632,14 @@ class AptlyApi:
             repo_name (str): The repository's name.
             package_refs (list): Packages to be removed.
         """
+        ret = None
         data = json.dumps({"PackageRefs": package_refs})
         async with aiohttp.ClientSession() as http:
             async with http.delete("{}/repos/{}/packages".format(self.url, repo_name), data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-        return data["ID"]
+                ret = json.loads(await resp.text())["ID"]
+        return ret
 
     async def repo_get(self):
         """
@@ -717,9 +723,8 @@ class AptlyApi:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
-        data = json.dumps({"force": "1"})
         async with aiohttp.ClientSession() as http:
-            async with http.delete(self.url + "/repos/" + name, headers=self.headers, data=data, auth=self.auth) as resp:
+            async with http.delete(self.url + "/repos/" + name, headers=self.headers, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
         return True
