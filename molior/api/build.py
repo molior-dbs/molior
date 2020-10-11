@@ -1,5 +1,4 @@
 import re
-import uuid
 
 from datetime import datetime
 from aiohttp import web
@@ -8,7 +7,6 @@ from sqlalchemy.orm import aliased
 
 from ..app import app, logger
 from ..model.build import Build, BUILD_STATES, DATETIME_FORMAT
-from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
@@ -482,21 +480,16 @@ async def trigger_build(request):
     request.cirrina.db_session.commit()
     await build.build_added()
 
-    token = uuid.uuid4()
-    buildtask = BuildTask(build=build, task_id=str(token))
-    request.cirrina.db_session.add(buildtask)
-    request.cirrina.db_session.commit()
-
     if git_ref == "":
         args = {"buildlatest": [repo.id, build.id]}
     else:
         args = {"build": [build.id, repo.id, git_ref, git_branch, targets, force_ci]}
     await request.cirrina.task_queue.put(args)
 
-    return web.json_response({"build_token": str(token)})
+    return web.json_response({"build_id": str(build.id)})
 
 
-@app.http_get("/api/build/{token}")
+@app.http_get("/api/build/{build_id}")
 async def get_build_by_token(request):
     """
     Gets build task info.
@@ -508,7 +501,7 @@ async def get_build_by_token(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: token
+        - name: build_id
           in: query
           required: true
           type: string
@@ -520,14 +513,14 @@ async def get_build_by_token(request):
         "500":
             description: internal server error
     """
-    token = request.match_info["token"]
+    build_id = request.match_info["build_id"]
 
     data = {}
 
     query = """
 WITH RECURSIVE descendants AS (
     SELECT build.id, build.parent_id, 0 depth
-    FROM build, buildtask where buildtask.task_id = :token and build.id =  buildtask.build_id
+    FROM build where build.id = :build_id
 UNION
     SELECT p.id, p.parent_id, d.depth+1
     FROM build p
@@ -537,7 +530,7 @@ UNION
 SELECT *
 FROM descendants order by id;
 """
-    result = request.cirrina.db_session.execute(query, {"token": token})
+    result = request.cirrina.db_session.execute(query, {"build_id": build_id})
     build_tree_ids = []
     for row in result:
         build_tree_ids.append((row[0], row[1], row[2]))
