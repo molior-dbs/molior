@@ -414,6 +414,7 @@ def chroot_ready(build, session):
     chroot = session.query(Chroot).filter(Chroot.basemirror_id == build.projectversion.basemirror_id,
                                           Chroot.architecture == target_arch).first()
     if not chroot:
+        build.log_state("chroot not found")
         return False
     if not chroot.ready:
         build.log_state("chroot not ready")
