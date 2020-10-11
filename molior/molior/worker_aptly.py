@@ -280,14 +280,14 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                         else:
                             total_progress["PercentSize"] = 0.0
 
-                        logger.debug("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
-                                     total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"],
-                                     total_progress["TotalNumberOfPackages"], total_progress["PercentPackages"],
-                                     (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
-                                     / 1024.0 / 1024.0 / 1024.0,
-                                     total_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
-                                     total_progress["PercentSize"],
-                                     )
+                        logger.info("mirrored %d/%d files (%.02f%%), %.02f/%.02fGB (%.02f%%)",
+                                    total_progress["TotalNumberOfPackages"] - total_progress["RemainingNumberOfPackages"],
+                                    total_progress["TotalNumberOfPackages"], total_progress["PercentPackages"],
+                                    (total_progress["TotalDownloadSize"] - total_progress["RemainingDownloadSize"])
+                                    / 1024.0 / 1024.0 / 1024.0,
+                                    total_progress["TotalDownloadSize"] / 1024.0 / 1024.0 / 1024.0,
+                                    total_progress["PercentSize"],
+                                    )
 
                         await notify(Subject.build.value, Event.changed.value,
                                      {"id": build.id, "progress": total_progress["PercentSize"]})
@@ -400,9 +400,9 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     else:
                         upd_progress["PercentSize"] = 0.0
 
-                    logger.debug("published %d/%d packages (%.02f%%)",
-                                 upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
-                                 upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
+                    logger.info("published %d/%d packages (%.02f%%)",
+                                upd_progress["TotalNumberOfPackages"] - upd_progress["RemainingNumberOfPackages"],
+                                upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
 
                     await notify(Subject.build.value, Event.changed.value,
                                  {"id": build.id, "progress": upd_progress["PercentPackages"]})
@@ -856,7 +856,8 @@ class AptlyWorker:
 
     async def _delete_mirror(self, args, session):
         mirror_id = args[0]
-        mirror = session.query(ProjectVersion).filter(ProjectVersion.id == mirror_id).first()
+        mirror = session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == mirror_id,
+                                                                    Project.is_mirror.is_(True)).first()
         if not mirror:
             logger.error("aptly worker: mirror with id %d not found", mirror_id)
             return
