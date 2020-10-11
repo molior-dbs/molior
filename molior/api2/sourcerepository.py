@@ -1,4 +1,3 @@
-import uuid
 import giturlparse
 
 from sqlalchemy.sql import or_
@@ -9,7 +8,6 @@ from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref, get_last_build
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
-from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion, get_projectversion
 from ..model.sourepprover import SouRepProVer
 from ..model.postbuildhook import PostBuildHook
@@ -312,12 +310,27 @@ async def add_repository(request):
         db.commit()
         await build.build_added()
 
-        token = uuid.uuid4()
-        buildtask = BuildTask(build=build, task_id=str(token))
-        db.add(buildtask)
-        db.commit()
-
         args = {"clone": [build.id, repo.id]}
+        await request.cirrina.task_queue.put(args)
+
+    else:  # existing repo
+        build = Build(
+            version=None,
+            git_ref=None,
+            ci_branch=None,
+            is_ci=None,
+            sourcename=repo.name,
+            buildstate="new",
+            buildtype="build",
+            sourcerepository=repo,
+            maintainer=None,
+        )
+
+        request.cirrina.db_session.add(build)
+        request.cirrina.db_session.commit()
+        await build.build_added()
+
+        args = {"buildlatest": [repo.id, build.id]}
         await request.cirrina.task_queue.put(args)
 
     return OKResponse("SourceRepository added")
