@@ -10,6 +10,7 @@ from ..model.projectversion import ProjectVersion, get_projectversion, get_proje
 from ..model.project import Project
 from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
+from ..model.postbuildhook import PostBuildHook
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -364,6 +365,13 @@ async def delete_projectversion(request):
             db.delete(parent)
 
     # delete hooks
+    sourcerepositoryprojectversions = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion.id).all()
+    for sourcerepositoryprojectversion in sourcerepositoryprojectversions:
+        hooks = db.query(PostBuildHook).filter(PostBuildHook.sourcerepositoryprojectversion_id ==
+                                               sourcerepositoryprojectversion.id).all()
+        for hook in hooks:
+            db.delete(hook)
+
     # delete sourcerepos
 
     # delete projectversion
