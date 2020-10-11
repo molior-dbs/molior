@@ -488,6 +488,15 @@ async def ScheduleBuilds():
             if not chroot_ready(build, session):
                 continue
 
+            projectversion = session.query(ProjectVersion).filter(
+                    ProjectVersion.id == build.projectversion_id).first()
+            if not projectversion:
+                logger.warning("scheduler: projectversion %d not found", build.projectversion_id)
+                continue
+
+            pvname = projectversion.fullname
+
+            ready = True
             repo_deps = []
             if build.parent.builddeps:
                 builddeps = build.parent.builddeps
@@ -501,20 +510,22 @@ async def ScheduleBuilds():
                     if not repo_dep:
                         logger.error("build-{}: dependency {} not found in projectversion {}".format(build.id,
                                      builddep, build.projectversion_id))
-                        repo_deps.append(-1)
+                        await write_log(build.id,
+                                        "W: waiting for build order dependency {} to be built in projectversion {}\n".format(
+                                             builddep, pvname))
+                        ready = False
                         break
                     repo_deps.append(repo_dep.id)
+
+            if not ready:
+                continue
 
             if not repo_deps:
                 # build.log_state("scheduler: no build order dependencies, scheduling...")
                 await schedule_build(build, session)
-                break
+                continue
 
-            ready = True
             for dep_repo_id in repo_deps:
-                if dep_repo_id == -1:
-                    return  # build order dependency not found
-
                 dep_repo = session.query(SourceRepository).filter(SourceRepository.id == dep_repo_id).first()
                 if not dep_repo:
                     logger.warning("scheduler: repo %d not found", dep_repo_id)
@@ -523,7 +534,6 @@ async def ScheduleBuilds():
                 # FIXME: buildconfig arch dependent!
 
                 # find running builds in the same projectversion
-                found_running = False
 
                 # check no build order dep is needs_build, building, publishing, ...
                 # FIXME: this needs maybe checking of source packages as well?
@@ -539,23 +549,11 @@ async def ScheduleBuilds():
                         Build.projectversion_id == build.projectversion_id).all()
 
                 if running_builds:
-                    found_running = True
-
-                    projectversion = session.query(ProjectVersion).filter(
-                            ProjectVersion.id == build.projectversion_id).first()
-                    if not projectversion:
-                        pvname = "unknown"
-                        logger.warning("scheduler: projectversion %d not found", build.projectversion_id)
-                    else:
-                        pvname = projectversion.fullname
+                    ready = False
                     builds = [str(b.id) for b in running_builds]
                     await write_log(build.id, "W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
                                          dep_repo.name, ", ".join(builds), pvname))
-                    break
-
-                if found_running:
-                    ready = False
-                    break
+                    continue
 
                 # find successful builds in the same and dependent projectversions
                 # FIXME: search same architecture as well
@@ -581,7 +579,7 @@ async def ScheduleBuilds():
 
                     await write_log(build.id, "W: waiting for repo {} to be built in projectversion {}\n".format(
                                          dep_repo.name, pvname))
-                    break
+                    continue
 
             if ready:
                 # build.log_state("scheduler: found all required build order dependencies, scheduling...")
