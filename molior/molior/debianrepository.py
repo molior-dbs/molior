@@ -78,7 +78,7 @@ class DebianRepository:
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
             logger.info("creating repository '%s'", repo_name)
-            await self.__api.repo_create(repo_name)
+            await self.__api.repo_create(repo_name)  # not a background task
 
             snapshot_name = self.__get_snapshot_name(dist)
 
@@ -86,14 +86,14 @@ class DebianRepository:
 
             # package_refs = await self.__get_packages(dist == "unstable")
             task_id = await self.__api.snapshot_create(repo_name, snapshot_name)
-            await self.__api.wait_task(task_id)
+            await self.__await_task(task_id)
 
             # Add source and all archs per default
             archs = self.archs + ["source", "all"]
 
             logger.debug("publishing snapshot: '%s' archs: '%s'", snapshot_name, str(archs))
             task_id = await self.__api.snapshot_publish(snapshot_name, "main", archs, dist, self.publish_name)
-            await self.__api.wait_task(task_id)
+            await self.__await_task(task_id)
         return True
 
     async def snapshot(self, snapshot_version, packages):
@@ -118,10 +118,10 @@ class DebianRepository:
 
         logger.info("snapshot: pkg refs %s" % package_refs)
         task_id = await self.__api.snapshot_create(repo_name, snapshot_name, package_refs)
-        await self.__api.wait_task(task_id)
+        await self.__await_task(task_id)
 
         task_id = await self.__api.snapshot_publish(snapshot_name, "main", self.archs, dist, publish_name)
-        await self.__api.wait_task(task_id)
+        await self.__await_task(task_id)
         return True
 
     async def delete(self):
@@ -131,23 +131,29 @@ class DebianRepository:
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
             try:
+                # FIXME: should this aptly task run in background?
                 await self.__api.publish_drop(self.basemirror_name,
                                               self.basemirror_version,
                                               self.project_name,
                                               self.project_version, dist)
-            except Exception:
+            except Exception as exc:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
+                logger.exception(exc)
 
             # FIXME: delete also old timestamped snapshots
             snapshot_name = self.__get_snapshot_name(dist)
             try:
-                await self.__api.snapshot_delete(snapshot_name)
-            except Exception:
+                task_id = await self.__api.snapshot_delete(snapshot_name)
+                await self.__await_task(task_id)
+            except Exception as exc:
                 logger.warning("Error deleting snapshot '%s'" % snapshot_name)
+                logger.exception(exc)
             try:
+                # FIXME: should this aptly task run in background?
                 await self.__api.repo_delete(repo_name)
-            except Exception:
+            except Exception as exc:
                 logger.warning("Error deleting repo '%s'" % repo_name)
+                logger.exception(exc)
 
     def __get_snapshot_name(self, dist, temporary=False):
         """
@@ -161,11 +167,14 @@ class DebianRepository:
         return "{}-{}{}".format(self.publish_name, dist, "-tmp" if temporary else "")
 
     async def __await_task(self, task_id):
+        if type(task_id) is not int:
+            raise Exception("task_id '%s' must be int" % str(task_id))
+
         while True:
             try:
                 task_state = await self.__api.get_task_state(task_id)
             except Exception as exc:
-                logger.error("error awaiting aptly task: '%s'", str(exc))
+                logger.exception(exc)
                 return False
 
             if task_state.get("State") == TaskState.SUCCESSFUL.value:
@@ -265,7 +274,9 @@ class DebianRepository:
         snapshot_name = self.__get_snapshot_name(dist, temporary=False)
         logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
         try:
-            await self.__api.snapshot_delete(snapshot_name)
+            task_id = await self.__api.snapshot_delete(snapshot_name)
+            await self.__await_task(task_id)
         except Exception:
             pass
-        await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)
+        task_id = await self.__api.snapshot_rename(snapshot_name_tmp, snapshot_name)
+        await self.__await_task(task_id)

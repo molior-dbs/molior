@@ -48,7 +48,9 @@ async def startup_migration(task_queue):
                 for dist in ["stable", "unstable"]:
                     snapshot_name = "{}-{}-".format(publish_name, dist)
                     if aptly_snapshot_name.startswith(snapshot_name):
-                        await aptly.snapshot_delete(aptly_snapshot_name)
+                        task_id = await aptly.snapshot_delete(aptly_snapshot_name)
+                        await aptly.wait_task(task_id)
+                        # FIXME: delete task
 
             found = False
             for a in aptly_repos:
@@ -59,10 +61,14 @@ async def startup_migration(task_queue):
                 continue
             logger.warning("renaming repo %s" % repo_name)
             try:
-                await aptly.repo_rename(repo_name, repo_name + "-stable")
-                await aptly.repo_create(repo_name + "-unstable")
-            except Exception:
-                pass
+                task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")
+                await aptly.wait_task(task_id)
+                # FIXME: delete task
+                task_id = await aptly.repo_create(repo_name + "-unstable")
+                await aptly.wait_task(task_id)
+                # FIXME: delete task
+            except Exception as exc:
+                logger.exception(exc)
 
 
 async def startup_mirror(task_queue):
