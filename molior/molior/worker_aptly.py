@@ -590,7 +590,7 @@ class AptlyWorker:
         mirrorkey = session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
         if mirrorkey:
             key_url = mirrorkey.keyurl
-            keyids = mirrorkey.keyids[1:-1]
+            keyids = db2array(mirrorkey.keyids)
             keyserver = mirrorkey.keyserver
 
         if not mirror.external_repo:

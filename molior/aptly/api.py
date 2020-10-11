@@ -215,13 +215,12 @@ class AptlyApi:
                         self.__raise_aptly_error(resp)
         else:
             data["Keyserver"] = key_server
-            for key in keys:
-                data["GpgKeyID"] = key
-                async with aiohttp.ClientSession() as http:
-                    async with http.post(self.url + "/gpg/key", headers=self.headers,
-                                         data=json.dumps(data), auth=self.auth) as resp:
-                        if not self.__check_status_code(resp.status):
-                            self.__raise_aptly_error(resp)
+            data["GpgKeyID"] = " ".join(keys)
+            async with aiohttp.ClientSession() as http:
+                async with http.post(self.url + "/gpg/key", headers=self.headers,
+                                     data=json.dumps(data), auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
 
     async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
                             components, architectures, download_sources=True, download_udebs=True, download_installer=True):
