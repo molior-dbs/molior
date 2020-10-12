@@ -4,6 +4,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..app import logger
 from ..molior.configuration import Configuration
+from ..tools import db2array
 
 from .database import Base
 from .project import Project
@@ -121,6 +122,36 @@ class ProjectVersion(Base):
         #    }
         # )
 
+    def data(self):
+        """
+        Returns the given projectversion object
+        as dist, which can be processed by
+        json_response
+        ---
+        Args:
+            projectversion (object): The projectversion from the database
+                provided by SQLAlchemy.
+        Returns:
+            dict: The dict which can be processed by json_response
+
+        """
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "project_name": self.project.name,
+            "apt_url": self.get_apt_repo(url_only=True),
+            "is_mirror": self.project.is_mirror,
+            "architectures": db2array(self.mirror_architectures),
+            "is_locked": self.is_locked,
+            "ci_builds_enabled": self.ci_builds_enabled,
+            "dependency_policy": self.dependency_policy
+        }
+        if self.basemirror:
+            data.update({"basemirror": self.basemirror.fullname})
+
+        return data
+
 
 def get_projectversion_deps(projectversion_id, session):
     """
@@ -184,4 +215,20 @@ def get_projectversion_byname(fullname, session):
     return session.query(ProjectVersion).join(Project).filter(
             Project.name == name,
             ProjectVersion.name == version,
+        ).first()
+
+
+def get_mirror(request):
+    if "mirror_name" not in request.match_info:
+        return None
+    if "mirror_version" not in request.match_info:
+        return None
+    mirror_name = request.match_info["mirror_name"]
+    mirror_version = request.match_info["mirror_version"]
+
+    return request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+            ProjectVersion.name == mirror_version,
+            Project.name == mirror_name,
+            Project.is_mirror.is_(True),
+            ProjectVersion.is_deleted.is_(False)
         ).first()

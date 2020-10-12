@@ -328,6 +328,16 @@ async def get_build(request):
         )
 
     if build.projectversion:
+        basemirror_name = ""
+        basemirror_version = ""
+        buildvariant = ""
+        arch = ""
+        if build.projectversion.basemirror:
+            basemirror_name = build.projectversion.basemirror.project.name
+            basemirror_version = build.projectversion.basemirror.name
+            if build.architecture:
+                arch = build.architecture
+            buildvariant = basemirror_name + "-" + basemirror_version + "/" + arch
         data.update(
             {
                 "buildvariant": {
@@ -335,14 +345,10 @@ async def get_build(request):
                         "name": build.architecture,
                     },
                     "base_mirror": {
-                        "name": build.projectversion.basemirror.project.name
-                        if build.projectversion.basemirror else "",
-                        "version": build.projectversion.basemirror.name
-                        if build.projectversion.basemirror else "",
+                        "name": basemirror_name,
+                        "version": basemirror_version
                     },
-                    "name": build.projectversion.basemirror.project.name + "-" +
-                    build.projectversion.basemirror.name + "/" + build.architecture
-                    if build.projectversion.basemirror else "",
+                    "name": buildvariant
                 }
             }
         )
