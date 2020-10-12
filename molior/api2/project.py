@@ -176,6 +176,7 @@ async def create_projectversion(request):
     name = params.get("name")
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
+    cibuilds = params.get("cibuilds")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
     project_id = request.match_info["project_id"]
@@ -220,6 +221,7 @@ async def create_projectversion(request):
             project=project,
             description=description,
             dependency_policy=dependency_policy,
+            ci_builds_enabled=cibuilds,
             mirror_architectures=array2db(architectures),
             basemirror=basemirror,
             mirror_state=None)
@@ -275,10 +277,12 @@ async def edit_projectversion(request):
     params = await request.json()
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
+    cibuilds = params.get("cibuilds")
     projectversion = get_projectversion(request)
     db = request.cirrina.db_session
     projectversion.description = description
     projectversion.dependency_policy = dependency_policy
+    projectversion.ci_builds_enabled = cibuilds
     db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
