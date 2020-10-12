@@ -1,3 +1,9 @@
+molior (1.4.0~alpha159) stretch; urgency=medium
+
+  * projectversion: add ci builds
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Mon, 12 Oct 2020 10:08:19 +0000
+
 molior (1.4.0~alpha158) stretch; urgency=medium
 
   * bump version 1.4.0~alpha158
