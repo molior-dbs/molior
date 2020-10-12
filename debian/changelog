@@ -1,3 +1,9 @@
+molior (1.4.0~alpha160) stretch; urgency=medium
+
+  * mirror: get dependents
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Mon, 12 Oct 2020 14:15:04 +0000
+
 molior (1.4.0~alpha159) stretch; urgency=medium
 
   * projectversion: add ci builds
