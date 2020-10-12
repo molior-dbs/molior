@@ -111,7 +111,7 @@ Architecture: all
 Pre-Depends: molior-os-config
 Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
   iputils-ping, openssh-server,
-  linux-image-amd64, grub-efi-amd64,
+  linux-image-amd64, grub-efi-amd64, efibootmgr,
   acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
