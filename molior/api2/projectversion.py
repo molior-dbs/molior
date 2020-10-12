@@ -4,7 +4,7 @@ from sqlalchemy import func
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
-from ..api.projectversion import projectversion_to_dict, do_clone, do_lock, do_overlay
+from ..api.projectversion import do_clone, do_lock, do_overlay
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 from ..model.project import Project
@@ -49,8 +49,7 @@ async def get_projectversion2(request):
     if projectversion.project.is_mirror:
         return ErrorResponse(400, "Projectversion not found")
 
-    data = projectversion_to_dict(projectversion)
-    return OKResponse(data)
+    return OKResponse(projectversion.data())
 
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/dependencies")
@@ -100,6 +99,7 @@ async def get_projectversion_dependencies(request):
     """
     db = request.cirrina.db_session
     candidates = request.GET.getone("candidates", None)
+    # FIXME filter by dependency name
     # filter_name = request.GET.getone("q", None)
 
     if candidates:
@@ -133,13 +133,13 @@ async def get_projectversion_dependencies(request):
                                                                                 ProjectVersion.name.asc()).all()
 
         for cand in cands:
-            results.append(projectversion_to_dict(cand))
+            results.append(cand.data())
 
     else:  # return existing dependencies
         deps = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids)).all()
         for dep in deps:
             if dep:
-                results.append(projectversion_to_dict(dep))
+                results.append(dep.data())
 
     data = {"total_result_count": len(results), "results": results}
     return OKResponse(data)

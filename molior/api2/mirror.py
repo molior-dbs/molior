@@ -5,8 +5,73 @@ from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse
 
 from ..model.project import Project
-from ..model.projectversion import ProjectVersion
+from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
+
+
+@app.http_get("/api2/mirror/{mirror_name}/{mirror_version}/dependents")
+@app.authenticated
+async def get_projectversion_dependents(request):
+    """
+    Returns a list of projectversions.
+
+    ---
+    description: Returns a list of projectversions.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: basemirror_id
+          in: query
+          required: false
+          type: integer
+        - name: is_basemirror
+          in: query
+          required: false
+          type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    db = request.cirrina.db_session
+    # filter_name = request.GET.getone("filter_name", None)
+
+    mirror = get_mirror(request)
+    if not mirror:
+        return ErrorResponse(400, "Mirror not found")
+
+    dependents = []
+    if mirror.project.is_basemirror:
+        dependents = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id).all()
+
+    dependents += mirror.dependents
+    results = []
+    for dependent in dependents:
+        results.append(dependent.data())
+
+    data = {"total_result_count": len(results), "results": results}
+    return OKResponse(data)
 
 
 @app.http_post("/api2/mirror")
@@ -108,6 +173,7 @@ async def create_mirror2(request):
         "501":
             description: database error occurred.
     """
+    db = request.cirrina.db_session
     params = await request.json()
 
     mirrorname       = params.get("mirrorname")        # noqa: E221
@@ -130,7 +196,7 @@ async def create_mirror2(request):
     basemirror_id = None
     if mirrortype == "2":
         base_project, base_version = basemirror.split("/")
-        query = request.cirrina.db_session.query(ProjectVersion)
+        query = db.query(ProjectVersion)
         query = query.join(Project, Project.id == ProjectVersion.project_id)
         query = query.filter(Project.is_mirror.is_(True))
         query = query.filter(Project.name == base_project)
@@ -184,18 +250,19 @@ async def create_mirror2(request):
 @req_admin
 # FIXME: req_role
 async def edit_mirror(request):
+    db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
     mirror_version = request.match_info["version"]
     params = await request.json()
 
-    mirror = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+    mirror = db.query(ProjectVersion).join(Project).filter(
                 ProjectVersion.project_id == Project.id,
                 ProjectVersion.name == mirror_version,
                 Project.name == mirror_name).first()
     if not mirror:
         return ErrorResponse(400, "Mirror not found {}/{}".format(mirror_name, mirror_version))
 
-    mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
+    mirrorkey = db.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
     if not mirrorkey:
         return ErrorResponse(400, "Mirror keys not found for mirror {}".format(mirror.id))
 
@@ -215,7 +282,7 @@ async def edit_mirror(request):
     mirrorkeyserver  = params.get("mirrorkeyserver")   # noqa: E221
 
     basemirror_name, basemirror_version = basemirror.split("/")
-    bm = request.cirrina.db_session.query(ProjectVersion).filter(
+    bm = db.query(ProjectVersion).filter(
                 ProjectVersion.project.name == basemirror_name,
                 ProjectVersion.name == basemirror_version).first()
     if not bm:
@@ -234,7 +301,7 @@ async def edit_mirror(request):
     mirrorkey.keyids = mirrorkeyids
     mirrorkey.keyserver = mirrorkeyserver
 
-    request.cirrina.db_session.commit()
+    db.commit()
 
     if mirror.mirror_state == "init_error":
         args = {"init_mirror": [mirror.id]}

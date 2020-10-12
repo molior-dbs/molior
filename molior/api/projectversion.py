@@ -7,37 +7,6 @@ from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
 
 
-def projectversion_to_dict(projectversion):
-    """
-    Returns the given projectversion object
-    as dist, which can be processed by
-    json_response
-    ---
-    Args:
-        projectversion (object): The projectversion from the database
-            provided by SQLAlchemy.
-    Returns:
-        dict: The dict which can be processed by json_response
-
-    """
-    data = {
-        "id": projectversion.id,
-        "name": projectversion.name,
-        "description": projectversion.description,
-        "project_name": projectversion.project.name,
-        "apt_url": projectversion.get_apt_repo(url_only=True),
-        "is_mirror": projectversion.project.is_mirror,
-        "architectures": db2array(projectversion.mirror_architectures),
-        "is_locked": projectversion.is_locked,
-        "ci_builds_enabled": projectversion.ci_builds_enabled,
-        "dependency_policy": projectversion.dependency_policy
-    }
-    if projectversion.basemirror:
-        data.update({"basemirror": projectversion.basemirror.fullname})
-
-    return data
-
-
 @app.http_get("/api/projectversions")
 @app.authenticated
 async def get_projectversions(request):
@@ -124,13 +93,13 @@ async def get_projectversions(request):
     results = []
 
     for projectversion in projectversions:
-        projectversion_dict = projectversion_to_dict(projectversion)
+        projectversion_dict = projectversion.data()
         dep_ids = get_projectversion_deps(projectversion.id, db)
         projectversion_dict["dependencies"] = []
         for dep_id in dep_ids:
             dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
             if dep:
-                projectversion_dict["dependencies"].append(projectversion_to_dict(dep))
+                projectversion_dict["dependencies"].append(dep.data())
         results.append(projectversion_dict)
 
     data = {"total_result_count": nb_projectversions, "results": results}
@@ -174,13 +143,13 @@ async def get_projectversion(request):
     if not projectversion:
         return ErrorResponse(400, "Projectversion %d not found" % projectversion_id)
 
-    projectversion_dict = projectversion_to_dict(projectversion)
+    projectversion_dict = projectversion.data()
     dep_ids = get_projectversion_deps(projectversion.id, db)
     projectversion_dict["dependencies"] = []
     for dep_id in dep_ids:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
         if dep:
-            projectversion_dict["dependencies"].append(projectversion_to_dict(dep))
+            projectversion_dict["dependencies"].append(dep.data())
 
     projectversion_dict["basemirror_url"] = str()
     if projectversion.basemirror:
