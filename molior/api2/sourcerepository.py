@@ -53,6 +53,80 @@ async def get_repository(request):
     return OKResponse(data)
 
 
+@app.http_get("/api2/repository/{repository_id}/dependents")
+@app.authenticated
+async def get_projectversion_dependents(request):
+    """
+    Returns a list of projectversions.
+
+    ---
+    description: Returns a list of projectversions.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: basemirror_id
+          in: query
+          required: false
+          type: integer
+        - name: is_basemirror
+          in: query
+          required: false
+          type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    repository_id = request.match_info["repository_id"]
+    filter_name = request.GET.getone("q", "")
+
+    db = request.cirrina.db_session
+    repo = db.query(SourceRepository).filter_by(id=repository_id).first()
+    if not repo:
+        return ErrorResponse(404, "Repository with id {} could not be found!".format(repository_id))
+
+    dependents = repo.projectversions
+
+    if filter_name:
+        dependents_old = dependents
+        dependents = []
+        for dependent in dependents_old:
+            if filter_name in dependent.fullname:
+                dependents.append(dependent)
+
+    nb_results = len(dependents)
+
+    # FIXME use query for paginate
+    # dependents = paginate(request, dependents)
+    results = []
+    for dependent in dependents:
+        results.append(dependent.data())
+
+    data = {"total_result_count": nb_results, "results": results}
+    return OKResponse(data)
+
+
 @app.http_get("/api2/repositories")
 @app.authenticated
 async def get_repositories2(request):
