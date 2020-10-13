@@ -55,7 +55,7 @@ async def get_projectversion_dependents(request):
             description: internal server error
     """
     db = request.cirrina.db_session
-    # filter_name = request.GET.getone("filter_name", None)
+    filter_name = request.GET.getone("q", None)
 
     mirror = get_mirror(request)
     if not mirror:
@@ -63,9 +63,13 @@ async def get_projectversion_dependents(request):
 
     dependents = []
     if mirror.project.is_basemirror:
-        dependents = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id).all()
+        query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id)
+        if filter_name:
+            query = query.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        dependents = query.all()
 
     dependents += mirror.dependents
+
     results = []
     for dependent in dependents:
         results.append(dependent.data())

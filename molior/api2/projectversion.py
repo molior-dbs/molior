@@ -99,8 +99,7 @@ async def get_projectversion_dependencies(request):
     """
     db = request.cirrina.db_session
     candidates = request.GET.getone("candidates", None)
-    # FIXME filter by dependency name
-    # filter_name = request.GET.getone("q", None)
+    filter_name = request.GET.getone("q", None)
 
     if candidates:
         candidates = candidates == "true"
@@ -130,14 +129,18 @@ async def get_projectversion_dependencies(request):
                                                    ProjectVersion.id.notin_(dep_ids))
         cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
                                                                                 Project.name,
-                                                                                ProjectVersion.name.asc()).all()
+                                                                                ProjectVersion.name.asc())
+        if filter_name:
+            cands = cands.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
 
-        for cand in cands:
+        for cand in cands.all():
             results.append(cand.data())
 
     else:  # return existing dependencies
-        deps = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids)).all()
-        for dep in deps:
+        deps = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids))
+        if filter_name:
+            deps = deps.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        for dep in deps.all():
             if dep:
                 results.append(dep.data())
 
