@@ -7,6 +7,7 @@ from ..tools import OKResponse, ErrorResponse
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
+from ..tools import paginate
 
 
 @app.http_get("/api2/mirror/{mirror_name}/{mirror_version}/dependents")
@@ -62,19 +63,23 @@ async def get_projectversion_dependents(request):
         return ErrorResponse(400, "Mirror not found")
 
     dependents = []
+    nb_results = 0
     if mirror.project.is_basemirror:
         query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id)
         if filter_name:
             query = query.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        nb_results = query.count()
+        query = paginate(request, query)
         dependents = query.all()
 
     dependents += mirror.dependents
+    nb_results += len(mirror.dependents)
 
     results = []
     for dependent in dependents:
         results.append(dependent.data())
 
-    data = {"total_result_count": len(results), "results": results}
+    data = {"total_result_count": nb_results, "results": results}
     return OKResponse(data)
 
 
