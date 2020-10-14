@@ -339,6 +339,37 @@ class Worker:
         original.set_ready()
         session.commit()
 
+    async def _delete_repo(self, args, session):
+        repository_id = args[0]
+
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+
+        if not repo:
+            logger.error("merge: repo %d not found", repository_id)
+            return
+
+        if repo.state != "ready":
+            logger.info("worker: repo %d not ready, requeueing", repository_id)
+            await self.task_queue.put({"delete_repo": args})
+            await asyncio.sleep(2)
+            return
+
+        builds = session.query(Build).filter(
+                Build.sourcerepository_id == repository_id).all()
+
+        if not repo.projectversions:
+            repo.set_busy()
+            session.commit()
+            logger.info("worker: deleting repo %d", repository_id)
+            for build in builds:
+                session.delete(build)
+            session.commit()
+            session.delete(repo)
+            shutil.rmtree("/var/lib/molior/repositories/%d" % repository_id, ignore_errors=True)  # not fail on read-only files
+            session.commit()
+        else:
+            logger.info("worker: cannot delete repo %d", repository_id)
+
     async def run(self):
         """
         Run the worker task.
@@ -407,6 +438,12 @@ class Worker:
                         if args:
                             handled = True
                             await self._merge_duplicate_repo(args, session)
+
+                    if not handled:
+                        args = task.get("delete_repo")
+                        if args:
+                            handled = True
+                            await self._delete_repo(args, session)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))
