@@ -288,12 +288,11 @@ class Worker:
         duplicate_id = args[1]
 
         original = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
-        duplicate = session.query(SourceRepository).filter(SourceRepository.id == duplicate_id).first()
-
         if not original:
             logger.error("merge: repo %d not found", repository_id)
             return
 
+        duplicate = session.query(SourceRepository).filter(SourceRepository.id == duplicate_id).first()
         if not duplicate:
             logger.error("merge: duplicate %d not found", duplicate_id)
             return
@@ -314,28 +313,32 @@ class Worker:
         duplicate.set_busy()
         session.commit()
 
-        # find all source repository project versions with duplicates
+        builds = session.query(Build).filter(Build.sourcerepository_id == duplicate.id).all()
+        for build in builds:
+            build.sourcerepository_id = original.id
+
+        # find all projectversion contaning duplicate
         sourepprovers = session.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == duplicate.id).all()
-        delete_duplicate = True
         for sourepprover in sourepprovers:
+            # we check if original is in the projectversion already
             t = session.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == original.id,
                 SouRepProVer.projectversion_id == sourepprover.projectversion_id).first()
             if t:
+                # delete duplicate from projectversion
+                session.delete(sourepprover)
+            else:
                 # replace duplicate with original
-                delete_duplicate = False
                 sourepprover.sourcerepository_id = original.id
 
-        builds = session.query(Build).filter(
-                Build.sourcerepository_id == duplicate.id).all()
-        for idx in range(len(builds)):
-            builds[idx].sourcerepository_id = original.id
+        session.delete(duplicate)
 
-        if delete_duplicate:
-            session.delete(duplicate)
+        try:
+            shutil.rmtree("/var/lib/molior/repositories/%d" % duplicate_id)
+        except Exception as exc:
+            logger.exception(exc)
 
-        shutil.rmtree("/var/lib/molior/repositories/%d" % duplicate_id, ignore_errors=True)  # not fail on read-only files
         original.set_ready()
         session.commit()
 
@@ -354,19 +357,13 @@ class Worker:
             await asyncio.sleep(2)
             return
 
-        builds = session.query(Build).filter(
-                Build.sourcerepository_id == repository_id).all()
-
-        if not repo.projectversions and not builds:
-            repo.set_busy()
-            session.commit()
-            logger.info("worker: deleting repo %d", repository_id)
-            session.commit()
-            session.delete(repo)
-            shutil.rmtree("/var/lib/molior/repositories/%d" % repository_id, ignore_errors=True)  # not fail on read-only files
-            session.commit()
-        else:
-            logger.info("worker: cannot delete repo %d", repository_id)
+        repo.set_busy()
+        session.commit()
+        logger.info("worker: deleting repo %d", repository_id)
+        session.commit()
+        session.delete(repo)
+        shutil.rmtree("/var/lib/molior/repositories/%d" % repository_id, ignore_errors=True)  # not fail on read-only files
+        session.commit()
 
     async def run(self):
         """

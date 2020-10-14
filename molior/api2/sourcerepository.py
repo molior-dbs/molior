@@ -588,7 +588,16 @@ async def delete_repository(request):
     except Exception:
         return ErrorResponse(400, "Invalid parameter received")
 
+    db = request.cirrina.db_session
+    repo = db.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+    if not repo:
+        return ErrorResponse(404, "Repository not found")
+
+    builds = db.query(Build).filter(Build.sourcerepository_id == repository_id).all()
+
+    if repo.projectversions or builds:
+        return ErrorResponse(400, "Repository cannot be deleted")
+
     args = {"delete_repo": [repository_id]}
     await request.cirrina.task_queue.put(args)
-
     return OKResponse("Repository deleted")
