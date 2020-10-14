@@ -81,19 +81,13 @@ class Worker:
             logger.error("clone: build %d not found", build_id)
             return
 
-        repo = (
-            session.query(SourceRepository)
-            .filter(SourceRepository.id == repo_id)
-            .first()
-        )
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
             logger.error("buildlatest: repo %d not found", repo_id)
             return
 
         if repo.state != "new" and repo.state != "error":
-            logger.error(
-                "Repository with id '%d' not ready for clone, ignoring request", repo_id
-            )
+            logger.error("Repository with id '%d' not ready for clone, ignoring request", repo_id)
             return
 
         repo.set_cloning()
@@ -116,18 +110,24 @@ class Worker:
             logger.error("build: build %d not found", build_id)
             return
 
-        if build.buildstate != "building":
-            await build.set_building()
-
         repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
             logger.error("build: repo %d not found", repo_id)
             return
+
+        if repo.state == "error":
+            await write_log(build.id, "E: git repo is in error state\n")
+            await build.set_failed()
+            return
+
         if repo.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repo_id)
             await self.task_queue.put({"build": args})
             await asyncio.sleep(2)
             return
+
+        if build.buildstate != "building":
+            await build.set_building()
 
         repo.set_busy()
         session.commit()
@@ -149,6 +149,12 @@ class Worker:
         if not repo:
             logger.error("buildlatest: repo %d not found", repo_id)
             return
+
+        if repo.state == "error":
+            await write_log(build.id, "E: git repo is in error state\n")
+            await build.set_failed()
+            return
+
         if repo.state != "ready":
             await self.task_queue.put({"buildlatest": args})
             logger.info("worker: repo %d not ready, requeueing", repo_id)
@@ -351,6 +357,7 @@ class Worker:
             logger.error("merge: repo %d not found", repository_id)
             return
 
+        # FIXME: delete also repos in error state
         if repo.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
             await self.task_queue.put({"delete_repo": args})
