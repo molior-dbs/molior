@@ -1,3 +1,9 @@
+molior (1.4.0~alpha163) stretch; urgency=medium
+
+  * repository: improve delete
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Wed, 14 Oct 2020 14:49:33 +0000
+
 molior (1.4.0~alpha162) stretch; urgency=medium
 
   * repository: dont remove builds
