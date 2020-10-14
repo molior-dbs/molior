@@ -1,3 +1,13 @@
+molior (1.4.0~alpha161) stretch; urgency=medium
+
+  * repository: delete
+  * sourcerepository: use query for finding dependents
+  * repository: get dependents
+  * mirror: fix dependants pagination
+  * fix filter for mirror dependents and repo dependencies
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Wed, 14 Oct 2020 12:25:40 +0000
+
 molior (1.4.0~alpha160) stretch; urgency=medium
 
   * mirror: get dependents
