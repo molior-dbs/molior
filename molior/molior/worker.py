@@ -357,12 +357,10 @@ class Worker:
         builds = session.query(Build).filter(
                 Build.sourcerepository_id == repository_id).all()
 
-        if not repo.projectversions:
+        if not repo.projectversions and not builds:
             repo.set_busy()
             session.commit()
             logger.info("worker: deleting repo %d", repository_id)
-            for build in builds:
-                session.delete(build)
             session.commit()
             session.delete(repo)
             shutil.rmtree("/var/lib/molior/repositories/%d" % repository_id, ignore_errors=True)  # not fail on read-only files
