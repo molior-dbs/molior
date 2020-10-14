@@ -55,7 +55,7 @@ async def get_repository(request):
 
 @app.http_get("/api2/repository/{repository_id}/dependents")
 @app.authenticated
-async def get_projectversion_dependents(request):
+async def get_sourcerepository_dependents(request):
     """
     Returns a list of projectversions.
 
@@ -100,29 +100,21 @@ async def get_projectversion_dependents(request):
     """
     repository_id = request.match_info["repository_id"]
     filter_name = request.GET.getone("q", "")
-
     db = request.cirrina.db_session
     repo = db.query(SourceRepository).filter_by(id=repository_id).first()
     if not repo:
         return ErrorResponse(404, "Repository with id {} could not be found!".format(repository_id))
-
-    dependents = repo.projectversions
-
+    query = db.query(ProjectVersion).filter(SouRepProVer.projectversion_id == ProjectVersion.id,
+                                            SouRepProVer.sourcerepository_id == repo.id)
     if filter_name:
-        dependents_old = dependents
-        dependents = []
-        for dependent in dependents_old:
-            if filter_name in dependent.fullname:
-                dependents.append(dependent)
-
-    nb_results = len(dependents)
-
-    # FIXME use query for paginate
-    # dependents = paginate(request, dependents)
+        query = query.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+    query = query.order_by(ProjectVersion.fullname)
+    nb_results = query.count()
+    query = paginate(request, query)
+    dependents = query.all()
     results = []
     for dependent in dependents:
         results.append(dependent.data())
-
     data = {"total_result_count": nb_results, "results": results}
     return OKResponse(data)
 
