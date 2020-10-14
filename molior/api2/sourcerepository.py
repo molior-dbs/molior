@@ -577,3 +577,18 @@ async def merge_repository(request):
     await request.cirrina.task_queue.put(args)
 
     return OKResponse("SourceRepository changed")
+
+
+@app.http_delete("/api2/repository/{repository_id}")
+@req_admin
+async def delete_repository(request):
+    repository_id = request.match_info["repository_id"]
+    try:
+        repository_id = int(repository_id)
+    except Exception:
+        return ErrorResponse(400, "Invalid parameter received")
+
+    args = {"delete_repo": [repository_id]}
+    await request.cirrina.task_queue.put(args)
+
+    return OKResponse("Repository deleted")
