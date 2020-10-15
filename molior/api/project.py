@@ -318,9 +318,9 @@ async def get_apt_sources(request):
         return ErrorResponse(400, "projectversion not found")
 
     deps = [version]
-    dep_ids = get_projectversion_deps(version.id, db)
-    for dep_id in dep_ids:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+    deps = get_projectversion_deps(version.id, db)
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if dep:
             deps.append(dep)
 

@@ -11,6 +11,7 @@ from ..model.project import Project
 from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
 from ..model.postbuildhook import PostBuildHook
+from ..model.projectversiondependency import ProjectVersionDependency
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -109,7 +110,8 @@ async def get_projectversion_dependencies(request):
         return ErrorResponse(400, "Projectversion not found")
 
     # get existing dependencies
-    dep_ids = get_projectversion_deps(projectversion.id, db)
+    deps = get_projectversion_deps(projectversion.id, db)
+    dep_ids = [d[0] for d in deps]
 
     results = []
     if candidates:  # return candidate dependencies
@@ -154,6 +156,7 @@ async def add_projectversion_dependency(request):
     db = request.cirrina.db_session
     params = await request.json()
     dependency_name = params.get("dependency")
+    use_cibuilds = params.get("use_cibuilds")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -170,11 +173,16 @@ async def add_projectversion_dependency(request):
         return ErrorResponse(400, "Cannot add a dependency of the same projectversion to itself")
 
     # check for dependency loops
-    dep_ids = get_projectversion_deps(dependency.id, db)
+    deps = get_projectversion_deps(dependency.id, db)
+    dep_ids = [d[0] for d in deps]
     if projectversion.id in dep_ids:
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
 
-    projectversion.dependencies.append(dependency)
+    pdep = ProjectVersionDependency(
+            projectversion_id=projectversion.id,
+            dependency_id=dependency.id,
+            use_cibuilds=use_cibuilds)
+    db.add(pdep)
     db.commit()
     return OKResponse("Dependency added")
 
@@ -286,7 +294,7 @@ async def snapshot_projectversion(request):
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
-        dependencies=projectversion.dependencies,
+        dependencies=projectversion.dependencies,   # FIXME: use_cubilds not included via relationship
         mirror_architectures=projectversion.mirror_architectures,
         basemirror_id=projectversion.basemirror_id,
         sourcerepositories=projectversion.sourcerepositories,
