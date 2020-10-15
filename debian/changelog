@@ -1,3 +1,9 @@
+molior (1.4.0~alpha164) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha164
+
+ -- André Roth <neolynx@gmail.com>  Thu, 15 Oct 2020 07:12:53 +0000
+
 molior (1.4.0~alpha163) stretch; urgency=medium
 
   * repository: improve delete
