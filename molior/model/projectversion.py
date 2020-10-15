@@ -32,16 +32,15 @@ class ProjectVersion(Base):
                               foreign_keys=basemirror_id)
     external_repo = Column(Boolean, default=False)
     dependencies = relationship("ProjectVersion",
-                                secondary=ProjectVersionDependency,
-                                primaryjoin=id == ProjectVersionDependency.c.projectversion_id,
-                                secondaryjoin=id == ProjectVersionDependency.c.dependency_id,
+                                secondary=ProjectVersionDependency.__table__,
+                                primaryjoin=id == ProjectVersionDependency.projectversion_id,
+                                secondaryjoin=id == ProjectVersionDependency.dependency_id,
                                 )
     dependents = relationship("ProjectVersion",
-                              secondary=ProjectVersionDependency,
-                              primaryjoin=id == ProjectVersionDependency.c.dependency_id,
-                              secondaryjoin=id == ProjectVersionDependency.c.projectversion_id,
+                              secondary=ProjectVersionDependency.__table__,
+                              primaryjoin=id == ProjectVersionDependency.dependency_id,
+                              secondaryjoin=id == ProjectVersionDependency.projectversion_id,
                               )
-    # buildvariants = relationship("BuildVariant", secondary=ProVerBuiVar)
     mirror_url = Column(String)
     mirror_distribution = Column(String)
     mirror_components = Column(String)
@@ -182,13 +181,13 @@ def get_projectversion_deps(projectversion_id, session):
         FROM projectversiondependency s2, getparents s1
         WHERE s2.projectversion_id = s1.dependency_id
     )
-    SELECT projectversion_id, dependency_id FROM getparents;
+    SELECT projectversion_id, dependency_id, use_cibuilds FROM getparents;
     """
     result = session.execute(query, {"projectversion_id": projectversion_id})
 
     projectversion_ids = []
     for row in result:
-        projectversion_ids.append(row[1])
+        projectversion_ids.append((row[1], row[2]))
     return projectversion_ids
 
 

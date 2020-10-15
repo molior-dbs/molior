@@ -94,10 +94,10 @@ async def get_projectversions(request):
 
     for projectversion in projectversions:
         projectversion_dict = projectversion.data()
-        dep_ids = get_projectversion_deps(projectversion.id, db)
+        deps = get_projectversion_deps(projectversion.id, db)
         projectversion_dict["dependencies"] = []
-        for dep_id in dep_ids:
-            dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+        for d in deps:
+            dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
             if dep:
                 projectversion_dict["dependencies"].append(dep.data())
         results.append(projectversion_dict)
@@ -144,10 +144,10 @@ async def get_projectversion(request):
         return ErrorResponse(400, "Projectversion %d not found" % projectversion_id)
 
     projectversion_dict = projectversion.data()
-    dep_ids = get_projectversion_deps(projectversion.id, db)
+    deps = get_projectversion_deps(projectversion.id, db)
     projectversion_dict["dependencies"] = []
-    for dep_id in dep_ids:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if dep:
             projectversion_dict["dependencies"].append(dep.data())
 
@@ -610,9 +610,9 @@ def do_lock(request, projectversion_id):
         return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
                 projectversion_id=projectversion_id))
 
-    dep_ids = get_projectversion_deps(projectversion.id, db)
-    for dep_id in dep_ids:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == dep_id).first()
+    deps = get_projectversion_deps(projectversion.id, db)
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if dep and not dep.is_locked:
             return ErrorResponse(400, "Dependencies of given projectversion must be locked")
 
@@ -831,8 +831,8 @@ async def post_projectversion_dependency(request):
         return ErrorResponse(400, "Invalid data received")
 
     # check for dependency loops
-    dep_ids = get_projectversion_deps(dependency_id, db)
-    if projectversion_id in dep_ids:
+    deps = get_projectversion_deps(dependency_id, db)
+    if projectversion_id in [d[0] for d in deps]:
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
 
     projectversion.dependencies.append(dependency)
