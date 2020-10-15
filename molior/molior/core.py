@@ -201,7 +201,6 @@ def get_apt_repos(project_version, session, is_ci=False):
         list: List of apt urls.
     """
     deps = get_projectversion_deps(project_version.id, session)
-    dep_ids = [d[0] for d in deps]
 
     urls = []
 
@@ -209,7 +208,7 @@ def get_apt_repos(project_version, session, is_ci=False):
         urls.append(project_version.get_apt_repo(dist="unstable"))
 
     urls.append(project_version.get_apt_repo())
-    for p in dep_ids:
+    for p in deps:
         dependency = session.query(ProjectVersion).filter(ProjectVersion.id == p[0]).first()
         urls.append(dependency.get_apt_repo())
         if is_ci and p[1]:  # use unstable dependency for ci builds
