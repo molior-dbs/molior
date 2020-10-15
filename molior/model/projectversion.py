@@ -171,13 +171,13 @@ def get_projectversion_deps(projectversion_id, session):
     """
     query = """
     WITH RECURSIVE getparents(projectversion_id, dependency_id) AS (
-        SELECT projectversion_id, dependency_id
+        SELECT projectversion_id, dependency_id, use_cibuilds
         FROM projectversiondependency
         WHERE projectversion_id = :projectversion_id
 
         UNION ALL
 
-        SELECT s2.projectversion_id, s2.dependency_id
+        SELECT s2.projectversion_id, s2.dependency_id, s2.use_cibuilds
         FROM projectversiondependency s2, getparents s1
         WHERE s2.projectversion_id = s1.dependency_id
     )
