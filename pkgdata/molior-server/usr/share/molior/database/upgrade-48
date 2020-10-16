@@ -2,7 +2,13 @@
 
 psql molior <<EOF
 
-ALTER TABLE projectversiondependency ADD COLUMN id INTEGER NOT NULL;
+ALTER TABLE projectversiondependency ADD COLUMN use_cibuilds BOOLEAN;
+
+update projectversiondependency set use_cibuilds = 'f';
+
+ALTER TABLE projectversiondependency ADD COLUMN id INTEGER;
+
+update projectversiondependency set id = nextval('projectversiondependency_id_seq'::regclass);
 
 CREATE SEQUENCE projectversiondependency_id_seq
     START WITH 1
@@ -15,7 +21,6 @@ ALTER TABLE projectversiondependency_id_seq OWNER TO molior;
 
 ALTER TABLE projectversiondependency ALTER COLUMN id SET DEFAULT nextval('projectversiondependency_id_seq'::regclass);
 
-ALTER TABLE projectversiondependency ADD COLUMN use_cibuilds BOOLEAN;
 
 ALTER TABLE projectversiondependency ADD CONSTRAINT projectversiondependency_pkey PRIMARY KEY (id);
 
