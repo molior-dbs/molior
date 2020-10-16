@@ -10,6 +10,7 @@ from ..model.projectversion import ProjectVersion, get_projectversion, get_proje
 from ..model.project import Project
 from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
+from ..model.buildtask import BuildTask
 from ..model.postbuildhook import PostBuildHook
 from ..model.projectversiondependency import ProjectVersionDependency
 
@@ -370,9 +371,18 @@ async def delete_projectversion(request):
         parent = None
         if len(build.parent.children) == 1:
             parent = build.parent
+        buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
+        for buildtask in buildtasks:
+            db.delete(buildtask)
         db.delete(build)
         if parent:
+            buildtasks = db.query(BuildTask).filter(BuildTask.build == parent.parent).all()
+            for buildtask in buildtasks:
+                db.delete(buildtask)
             db.delete(parent.parent)
+            buildtasks = db.query(BuildTask).filter(BuildTask.build == parent).all()
+            for buildtask in buildtasks:
+                db.delete(buildtask)
             db.delete(parent)
 
     # delete hooks
