@@ -133,7 +133,7 @@ log_title "Downloading source"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
 log "Downloading $sources_url"
 # FIXME: use curl, remove wget
-pkgdir=`wget -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
+pkgdir=`wget --timeout=30 -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
   echo "Directory for source package $REPO_NAME $VERSION not found"
   exit 1
@@ -144,7 +144,7 @@ VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
 
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
 log "Downloading $dsc_url"
-wget -q $dsc_url
+wget ---timeout=30q $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "Error downloading source package $dsc_url"
   exit 1
@@ -154,7 +154,7 @@ for srcfile in `/usr/lib/molior/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
 do
   src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
   log "Downloading $src_url"
-  wget -q $src_url
+  wget --timeout=30 -q $src_url
 done
 
 dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc
@@ -169,8 +169,8 @@ if [ ! -e /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$
   CLEANUP_SCHROOT=1
   SCHROOT_URL=http://$MOLIOR_SERVER/schroots/
   log "Downloading $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
-  wget -q $SCHROOT_URL/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
-  wget -q $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
+  wget --timeout=30 -q $SCHROOT_URL/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
+  wget --timeout=30 -q $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
 
   #FIXME: move to separate installschroot.sh, allow sudo only for this script
   sudo mv sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
