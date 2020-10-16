@@ -272,7 +272,6 @@ class DebianRepository:
         await self.__await_task(task_id)
 
         snapshot_name = self.__get_snapshot_name(dist, temporary=False)
-        logger.warning("renaming snapshot '%s' to '%s'", snapshot_name_tmp, snapshot_name)
         try:
             task_id = await self.__api.snapshot_delete(snapshot_name)
             await self.__await_task(task_id)
