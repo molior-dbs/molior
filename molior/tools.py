@@ -233,7 +233,7 @@ async def get_changelog_attr(name, path):
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        logger.error("error occured while getting changelog attribute: %s", str(err, "utf-8"))
+        logger.error("error occured while getting changelog attribute: %s", err)
         raise Exception("error running dpkg-parsechangelog")
 
     return attr.strip()
