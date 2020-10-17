@@ -136,26 +136,30 @@ class DebianRepository:
                                               self.basemirror_version,
                                               self.project_name,
                                               self.project_version, dist)
-            except Exception as exc:
+            except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
-                logger.exception(exc)
 
             # FIXME: delete also old timestamped snapshots
-            for tmp in [False, True]:
-                snapshot_name = self.__get_snapshot_name(dist, tmp)
-                try:
-                    task_id = await self.__api.snapshot_delete(snapshot_name)
-                    await self.__await_task(task_id)
-                except Exception as exc:
-                    logger.warning("Error deleting snapshot '%s'" % snapshot_name)
-                    logger.exception(exc)
+            snapshot_name = self.__get_snapshot_name(dist)
+            try:
+                task_id = await self.__api.snapshot_delete(snapshot_name)
+                await self.__await_task(task_id)
+            except Exception:
+                logger.warning("Error deleting snapshot '%s'" % snapshot_name)
+
+            # delete leftover tmp snapshot
+            snapshot_name = self.__get_snapshot_name(dist, True)
+            try:
+                task_id = await self.__api.snapshot_delete(snapshot_name)
+                await self.__await_task(task_id)
+            except Exception:
+                pass
 
             try:
                 # FIXME: should this aptly task run in background?
                 await self.__api.repo_delete(repo_name)
-            except Exception as exc:
+            except Exception:
                 logger.warning("Error deleting repo '%s'" % repo_name)
-                logger.exception(exc)
 
     def __get_snapshot_name(self, dist, temporary=False):
         """
