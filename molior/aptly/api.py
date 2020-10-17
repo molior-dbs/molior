@@ -468,6 +468,7 @@ class AptlyApi:
             package_refs (list): Packages to create snapshot from.
                 e.g. ["Pamd64 my-package 1.0.3 863efd9e94da9fbc"]
         """
+        ret = None
         if package_refs:
             data = {"Name": snapshot_name, "PackageRefs": package_refs}
             async with aiohttp.ClientSession() as http:
@@ -475,7 +476,7 @@ class AptlyApi:
                                      data=json.dumps(data), auth=self.auth) as resp:
                     if not self.__check_status_code(resp.status):
                         self.__raise_aptly_error(resp)
-                    ret = json.loads(await resp.text())
+                    ret = json.loads(await resp.text())["ID"]
         else:
             data = {"Name": snapshot_name}
             async with aiohttp.ClientSession() as http:
