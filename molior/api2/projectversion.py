@@ -393,11 +393,8 @@ async def delete_projectversion(request):
         for hook in hooks:
             db.delete(hook)
 
-    # delete sourcerepos
-
     # delete projectversion
     db.delete(projectversion)
-
     db.commit()
 
     await request.cirrina.aptly_queue.put(
