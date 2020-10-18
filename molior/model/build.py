@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
 from ..app import logger
-from ..tools import get_local_tz, write_log_title
+from ..tools import get_local_tz, write_log_title, db2array
 # from .tools import check_user_role
 from ..molior.notifier import Subject, Event, notify, run_hooks
 
@@ -243,7 +243,7 @@ class Build(Base):
         if self.projectversion:
             if self.projectversion.project.is_mirror:
                 if self.buildtype == "mirror":
-                    data.update({"architectures": self.projectversion.mirror_architectures[1:-1].split(",")})
+                    data.update({"architectures": db2array(self.projectversion.mirror_architectures)})
             elif self.buildtype == "deb" or self.buildtype == "chroot":
                 data.update({"architecture": self.architecture})
                 data.update({"project": {
