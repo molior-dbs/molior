@@ -473,7 +473,7 @@ async def put_update_mirror(request):
     if (mirror.mirror_state != "error" and mirror.mirror_state != "init_error" and mirror.mirror_state != "new"):
         return ErrorResponse(400, "Mirror not in error state")
 
-    if mirror.mirror_state == "new":
+    if mirror.mirror_state == "new" or mirror.mirror_state == "init_error":
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}

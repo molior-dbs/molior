@@ -630,7 +630,7 @@ class AptlyWorker:
                     mirror.basemirror.name if mirror.basemirror else "",
                     mirror.mirror_url,
                     mirror.mirror_distribution,
-                    mirror.mirror_components.split(" "),
+                    mirror.mirror_components.split(","),  # FIXME: should be array in db
                     db2array(mirror.mirror_architectures),
                     download_sources=mirror.mirror_with_sources,
                     download_udebs=mirror.mirror_with_installer,
