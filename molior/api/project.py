@@ -303,6 +303,7 @@ async def get_apt_sources(request):
     db = request.cirrina.db_session
     project_name = request.match_info.get("project_name")
     projectver_name = request.match_info.get("projectver_name")
+    unstable = request.GET.getone("unstable", "")
 
     if not project_name or not projectver_name:
         return ErrorResponse(400, "Parameter missing")
@@ -311,18 +312,14 @@ async def get_apt_sources(request):
     if not project:
         return ErrorResponse(400, "project not found")
 
-    version = db.query(ProjectVersion).join(Project).filter(
+    projectversion = db.query(ProjectVersion).join(Project).filter(
             Project.id == project.id,
             ProjectVersion.name == projectver_name).first()
-    if not version:
+    if not projectversion:
         return ErrorResponse(400, "projectversion not found")
 
-    deps = [version]
-    dependencies = get_projectversion_deps(version.id, db)
-    for d in dependencies:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
-        if dep:
-            deps.append(dep)
+    deps = [(projectversion.id, projectversion.ci_builds_enabled)]
+    deps += get_projectversion_deps(projectversion.id, db)
 
     cfg = Configuration()
     apt_url = cfg.aptly.get("apt_url")
@@ -330,12 +327,19 @@ async def get_apt_sources(request):
 
     sources_list = "# APT Sources for project {0} {1}\n".format(project_name, projectver_name)
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not project.is_basemirror and version.basemirror:
-        sources_list += "# Base Mirror\n"
-        sources_list += "{}\n".format(version.basemirror.get_apt_repo())
+    if not project.is_basemirror and projectversion.basemirror:
+        sources_list += "\n# Base Mirror\n"
+        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
 
-    sources_list += "# Project Sources\n"
-    for dep in deps:
+    sources_list += "\n# Project Sources\n"
+    for d in deps:
+        logger.info("deb %s", str(d))
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
+        if not dep:
+            logger.error("projectsources: projecversion %d not found", d[0])
         sources_list += "{}\n".format(dep.get_apt_repo())
+        # ci builds requested & use ci builds from this dep & dep has ci builds
+        if unstable == "true" and d[1] and dep.ci_builds_enabled:
+            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
 
     return web.Response(status=200, text=sources_list)
