@@ -33,12 +33,12 @@ async def startup_migration(task_queue):
             return
 
         aptly_repos = await aptly.repo_get()
+        aptly_snapshots = await aptly.snapshot_get()
         projectversions = query.all()
         for projectversion in projectversions:
             repo_name = "%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
                                          projectversion.project.name, projectversion.name)
 
-            aptly_snapshots = await aptly.snapshot_get()
             for aptly_snapshot in aptly_snapshots:
                 aptly_snapshot_name = aptly_snapshot.get("Name")
                 publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
@@ -48,9 +48,7 @@ async def startup_migration(task_queue):
                 for dist in ["stable", "unstable"]:
                     snapshot_name = "{}-{}-".format(publish_name, dist)
                     if aptly_snapshot_name.startswith(snapshot_name):
-                        task_id = await aptly.snapshot_delete(aptly_snapshot_name)
-                        await aptly.wait_task(task_id)
-                        # FIXME: delete task
+                        await aptly.snapshot_rename(aptly_snapshot_name, "{}-{}".format(publish_name, dist))
 
             found = False
             for a in aptly_repos:
@@ -59,7 +57,6 @@ async def startup_migration(task_queue):
                     break
             if not found:
                 continue
-            logger.warning("renaming repo %s" % repo_name)
             try:
                 task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")
                 await aptly.wait_task(task_id)
