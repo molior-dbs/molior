@@ -1,6 +1,6 @@
 from sqlalchemy.sql import or_
 
-from ..app import app, logger
+from ..app import app
 from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int
 from ..auth import req_role
 
