@@ -1,7 +1,7 @@
 import re
 
 from ..app import logger
-from ..tools import get_changelog_attr
+from ..tools import get_changelog_attr, db2array
 from .configuration import Configuration
 
 from ..model.project import Project
@@ -182,7 +182,7 @@ def get_target_arch(build):
         str: The target architecture
     """
     for arch in TARGET_ARCH_ORDER:
-        if arch in build.projectversion.mirror_architectures[1:-1].split(","):
+        if arch in db2array(build.projectversion.mirror_architectures):
             return arch
     return None
 

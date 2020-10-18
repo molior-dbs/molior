@@ -4,7 +4,7 @@ import uuid
 from aiohttp import web
 
 from ..app import app, logger
-from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate
+from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate, db2array
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -63,7 +63,7 @@ def get_architectures(db, repo, projectversion):
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == repo.id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
 
-    return buildconfig.architectures[1:-1].split(",")
+    return db2array(buildconfig.architectures)
 
 
 @app.http_get("/api/repositories", threaded=True)

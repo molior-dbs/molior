@@ -5,7 +5,7 @@ from sqlalchemy.sql import or_
 
 from ..app import app, logger
 from ..auth import req_admin
-from ..tools import OKResponse, ErrorResponse, paginate
+from ..tools import OKResponse, ErrorResponse, paginate, db2array
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
@@ -275,7 +275,7 @@ async def get_mirrors(request):
                 "distribution": mirror.mirror_distribution,
                 "components": mirror.mirror_components,
                 "is_basemirror": mirror.project.is_basemirror,
-                "architectures": mirror.mirror_architectures[1:-1].split(","),
+                "architectures": db2array(mirror.mirror_architectures),
                 "is_locked": mirror.is_locked,
                 "with_sources": mirror.mirror_with_sources,
                 "with_installer": mirror.mirror_with_installer,
@@ -347,7 +347,7 @@ async def get_mirror(request):
         "distribution": mirror.mirror_distribution,
         "components": mirror.mirror_components,
         "is_basemirror": mirror.project.is_basemirror,
-        "architectures": mirror.mirror_architectures[1:-1],
+        "architectures": db2array(mirror.mirror_architectures),
         "is_locked": mirror.is_locked,
         "with_sources": mirror.mirror_with_sources,
         "with_installer": mirror.mirror_with_installer,

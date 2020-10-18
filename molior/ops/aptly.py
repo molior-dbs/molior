@@ -6,7 +6,7 @@ from pathlib import Path
 from aiofile import AIOFile
 
 from ..app import logger
-from ..tools import strip_epoch_version, write_log, write_log_title
+from ..tools import strip_epoch_version, write_log, write_log_title, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
 
@@ -82,7 +82,7 @@ async def DebSrcPublish(session, build):
             basemirror_version = projectversion.basemirror.name
             project_name = projectversion.project.name
             project_version = projectversion.name
-            archs = projectversion.mirror_architectures[1:-1].split(",")
+            archs = db2array(projectversion.mirror_architectures)
 
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
@@ -168,7 +168,7 @@ async def publish_packages(session, build, out_path):
     basemirror_version = build.projectversion.basemirror.name
     project_name = build.projectversion.project.name
     project_version = build.projectversion.name
-    archs = build.projectversion.mirror_architectures[1:-1].split(",")
+    archs = db2array(build.projectversion.mirror_architectures)
 
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
     ret = False
