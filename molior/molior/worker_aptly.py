@@ -296,7 +296,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                                      {"id": build.id, "progress": total_progress["PercentSize"]})
                         await notify(Subject.mirror.value, Event.changed.value,
                                      {"id": mirror.id, "progress": total_progress["PercentSize"]})
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)
 
                 await write_log(build.id, "I: creating snapshot\n")
 
@@ -411,7 +411,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                                  {"id": build.id, "progress": upd_progress["PercentPackages"]})
                     await notify(Subject.mirror.value, Event.changed.value,
                                  {"id": mirror.id, "progress": upd_progress["PercentPackages"]})
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)
 
             if mirror.project.is_basemirror:
                 await create_chroots(mirror, build, mirror_project, mirror_version, task_queue, session)
