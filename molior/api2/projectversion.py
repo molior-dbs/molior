@@ -139,14 +139,21 @@ async def get_projectversion_dependencies(request):
         for cand in cands.all():
             results.append(cand.data())
 
-    else:  # return existing dependencies
-        deps = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids))
-        if filter_name:
-            deps = deps.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
-        for dep in deps.all():
-            if dep:
-                results.append(dep.data())
+        data = {"total_result_count": len(results), "results": results}
+        return OKResponse(data)
 
+    # return existing dependencies
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids))
+        if filter_name:
+            dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        dep = dep.first()
+        if dep:
+            data = dep.data()
+            data["use_cibuilds"] = d[1]
+            results.append(data)
+
+    # FIXME paginate ??
     data = {"total_result_count": len(results), "results": results}
     return OKResponse(data)
 
