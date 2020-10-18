@@ -1,11 +1,13 @@
 from sqlalchemy.sql import or_
 
-from ..app import app
+from ..app import app, logger
 from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int
 from ..auth import req_role
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion
+from ..model.user import User
+from ..model.userrole import UserRole, USER_ROLES
 
 
 @app.http_get("/api2/project/{project_name}")
@@ -324,3 +326,52 @@ async def delete_project2(request):
     db.delete(project)
     db.commit()
     return OKResponse("project {} deleted".format(project_name))
+
+
+@app.http_get("/api2/project/{project_name}/permissions")
+@app.authenticated
+async def get_project_users2(request):
+    project_name = request.match_info["project_name"]
+
+    project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
+
+    filter_name = request.GET.getone("filter_name", "")
+    filter_role = request.GET.getone("filter_role", "")
+
+    query = (
+        request.cirrina.db_session.query(UserRole)
+        .filter_by(project_id=project.id)
+        .join(User)
+        .filter(UserRole.user_id == User.id)
+        .join(Project)
+        .filter(UserRole.project_id == Project.id)
+        .order_by(User.username)
+    )
+
+    if filter_name:
+        query = query.filter(User.username.like("%{}%".format(filter_name)))
+
+    if filter_role:
+        role = None
+        for i in USER_ROLES:
+            if i.find(filter_role.lower()) >= 0:
+                role = i
+                break
+        if role:
+            query = query.filter(UserRole.role == role)
+
+    query = paginate(request, query)
+    roles = query.all()
+    nb_roles = query.count()
+
+    data = {
+        "total_result_count": nb_roles,
+        "results": [
+            {"id": role.user.id, "username": role.user.username, "role": role.role}
+            for role in roles
+        ],
+    }
+
+    return OKResponse(data)
