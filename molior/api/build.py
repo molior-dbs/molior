@@ -460,15 +460,11 @@ async def trigger_build(request):
     if not repository:
         return web.Response(text="Bad Request", status=400)
 
-    logger.info("build triggered: %s %s %s", repository, git_ref, git_branch)
-
-    repo = (
-        request.cirrina.db_session.query(SourceRepository)
-        .filter(SourceRepository.url == repository)
-        .first()
-    )
+    repo = request.cirrina.db_session.query(SourceRepository).filter(SourceRepository.url == repository).first()
     if not repo:
         return web.Response(text="Repo not found", status=400)
+
+    repo.log_state("build triggered: %s(%s) force_ci=%s, targets=%s", git_ref, git_branch, force_ci, str(targets))
 
     build = Build(
         version=None,

@@ -137,7 +137,8 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
 
         if not targets:
             repo.log_state("unknown target projectversions in debian/molior.yml")
-            await write_log(parent_build_id, "E: the repository is not added to any projectversions from debian/molior.yml\n")
+            await write_log(parent_build_id, "E: the repository is not added to any projectversions from debian/molior.yml:\n")
+            await write_log(parent_build_id, "   %s\n" % str(info.plain_targets))
             await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
             repo.set_ready()
             await parent.set_nothing_done()
