@@ -67,7 +67,7 @@ class DebianRepository:
             repo_name = self.name + "-%s" % dist
             for repo in repos:
                 if repo.get("Name") == repo_name:
-                    logger.error("repository '%s' already exists", repo_name)
+                    logger.error("aptly repo '%s' already exists", repo_name)
                     return False
             snapshot_name = self.__get_snapshot_name(dist)
             for snapshot in snapshots:
@@ -138,6 +138,7 @@ class DebianRepository:
                                               self.project_version, dist)
             except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
+            await asyncio.sleep(5)
 
             # FIXME: delete also old timestamped snapshots
             snapshot_name = self.__get_snapshot_name(dist)
@@ -177,6 +178,7 @@ class DebianRepository:
             raise Exception("task_id '%s' must be int" % str(task_id))
 
         while True:
+            await asyncio.sleep(2)
             try:
                 task_state = await self.__api.get_task_state(task_id)
             except Exception as exc:
@@ -188,10 +190,9 @@ class DebianRepository:
                 return True
 
             if task_state.get("State") == TaskState.FAILED.value:
+                logger.error("aptly task %d failed" % task_id)
                 await self.__api.delete_task(task_id)
                 return False
-
-            await asyncio.sleep(2)
 
     async def __remove_old_packages(self, packages):
         """
