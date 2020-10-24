@@ -8,6 +8,7 @@ from ..api.projectversion import do_clone, do_lock, do_overlay
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 from ..model.project import Project
+from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -459,9 +460,9 @@ async def delete_repository2(request):
         return ErrorResponse(400, "Projectversion not found")
     if projectversion.is_locked:
         return ErrorResponse(400, "Projectversion is locked")
-    sourcerepository_id = parse_int(request.match_info["sourcerepository_id"])
-
-    if not sourcerepository_id:
+    try:
+        sourcerepository_id = int(request.match_info["sourcerepository_id"])
+    except Exception:
         return ErrorResponse(400, "No valid sourcerepository_id received")
 
     sourcerepository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
