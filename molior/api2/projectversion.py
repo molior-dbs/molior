@@ -421,3 +421,60 @@ async def delete_projectversion(request):
     )
     logger.info("ProjectVersion '%s/%s' deleted", project_name, project_version)
     return OKResponse("Deleted Project Version")
+
+
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}/repositories/{sourcerepository_id}")
+@req_role(["member", "owner"])
+async def delete_repository2(request):
+    """
+    Adds given sourcerepositories to the given
+    projectversion.
+
+    ---
+    description: Adds given sourcerepositories to given projectversion.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/json
+    parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: sourcerepository_id
+          in: path
+          required: true
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid data received.
+    """
+    db = request.cirrina.db_session
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+    sourcerepository_id = parse_int(request.match_info["sourcerepository_id"])
+
+    if not sourcerepository_id:
+        return ErrorResponse(400, "No valid sourcerepository_id received")
+
+    sourcerepository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
+    if not sourcerepository:
+        return ErrorResponse(400, "Sourcerepository {} could not been found".format(sourcerepository_id))
+
+    # get the association of the projectversion and the sourcerepository
+    sourcerepositoryprojectversion = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                                   SouRepProVer.projectversion_id == projectversion.id).first()
+    if not sourcerepositoryprojectversion:
+        return ErrorResponse(400, "Could not find the sourcerepository for the projectversion")
+
+    projectversion.sourcerepositories.remove(sourcerepository)
+    db.commit()
+
+    return OKResponse("Sourcerepository removed from projectversion")
