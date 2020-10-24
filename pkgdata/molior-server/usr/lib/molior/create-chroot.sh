@@ -23,17 +23,8 @@
 #eval $(parse_yaml $CONFIG_FILE)
 #DEBSIGN_GPG_EMAIL=$debsign_gpg_email
 
-# Workaround obsolete pxz package on buster
-xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
-if dpkg --compare-versions "$xzversion" lt 5.2.4-1; then
-  TAR_PXZ="-Ipxz"
-else
-  TAR_PXZ=""
-fi
-
-
-if [ "$1" != "info" -a "$#" -lt 5 ]; then
-  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> [components,]" 1>&2
+if [ "$1" != "info" -a "$#" -lt 7 ]; then
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> components <mirror url> keys" 1>&2
   echo "       $0 info" 1>&2
   exit 1
 fi
@@ -43,7 +34,7 @@ DIST_RELEASE=$2
 DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
-COMPONENTS=$6
+COMPONENTS=$6 # separated by comma
 REPO_URL=$7
 KEYS="$8"  # separated by space
 
@@ -174,7 +165,7 @@ publish_chroot()
 
   echo I: Creating schroot tar
   cd $target
-  tar $TAR_PXZ -cf ../$CHROOT_NAME.tar.xz .
+  XZ_OPT="--threads=`nproc --ignore=1`" tar -cJf ../$CHROOT_NAME.tar.xz .
   cd - > /dev/null
   rm -rf $target
 
