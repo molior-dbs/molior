@@ -1,6 +1,6 @@
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
@@ -238,12 +238,13 @@ async def create_projectversions(request):
         return ErrorResponse(400, "Projectversion already exists{}".format(
                 ", and is marked as deleted!" if projectversion.is_deleted else ""))
 
-    basemirror = db.query(ProjectVersion).filter(ProjectVersion.project.name == basemirror_name,
-                                                 ProjectVersion.name == basemirror_version).first()
+    basemirror = db.query(ProjectVersion).join(Project).filter(Project.name == basemirror_name,
+                                                               ProjectVersion.name == basemirror_version).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion = ProjectVersion(name=name, project=project, architectures=architectures, basemirror=basemirror)
+    projectversion = ProjectVersion(name=name, project=project, mirror_architectures=array2db(architectures),
+                                    basemirror=basemirror, description=description, dependency_policy=dependency_policy)
     db.add(projectversion)
     db.commit()
 
@@ -257,8 +258,6 @@ async def create_projectversions(request):
                 basemirror_version,
                 project_name,
                 project_version,
-                description,
-                dependency_policy,
                 architectures]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
@@ -408,6 +407,7 @@ async def do_clone(request, projectversion_id, name):
     db.add(new_projectversion)
     db.commit()
 
+    logger.error("archs '%s'" % str(new_projectversion.mirror_architectures))
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
@@ -415,8 +415,6 @@ async def do_clone(request, projectversion_id, name):
                 new_projectversion.basemirror.name,
                 new_projectversion.project.name,
                 new_projectversion.name,
-                new_projectversion.description,
-                new_projectversion.dependency_policy,
                 db2array(new_projectversion.mirror_architectures),
             ]
         }
@@ -508,9 +506,6 @@ async def do_overlay(request, projectversion_id, name):
                 basemirror.name,
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
-                overlay_projectversion.description,
-                overlay_projectversion.dependency_policy,
-                overlay_projectversion.ci_builds_enabled,
                 db2array(overlay_projectversion.mirror_architectures)
             ]
         }
