@@ -336,19 +336,23 @@ async def add_repository(request):
     except giturlparse.parser.ParserError:
         return ErrorResponse(400, "Invalid git URL")
 
-    query = db.query(SourceRepository).filter(or_(
-                SourceRepository.url == url,
-                SourceRepository.url.like("%{}%{}%{}".format(repoinfo.resource, repoinfo.owner, repoinfo.name)),
-                SourceRepository.url.like("%{}%{}%{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
-    if query.count() == 1:
-        repo = query.first()
-        logger.info("found existing repo {} for {} {} {}".format(repo.url, repoinfo.resource, repoinfo.owner, repoinfo.name))
-        if repo not in projectversion.sourcerepositories:
-            projectversion.sourcerepositories.append(repo)
-            db.commit()
-    else:
-        repo = SourceRepository(url=url, name=repoinfo.name, state="new")
-        db.add(repo)
+    repo = db.query(SourceRepository).filter(SourceRepository.url == url).first()
+    if not repo:
+        query = db.query(SourceRepository).filter(or_(
+                    SourceRepository.url.like("%{}%{}%{}".format(repoinfo.resource, repoinfo.owner, repoinfo.name)),
+                    SourceRepository.url.like("%{}%{}%{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
+        if query.count() > 1:
+            repo = query.first()
+            logger.info("found %d similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
+                                                                                      repoinfo.owner, repoinfo.name))
+        elif query.count() == 1:
+            logger.info("found similar repo {} for {} {} {}".format(repo.url, repoinfo.resource, repoinfo.owner, repoinfo.name))
+            repo = query.first()
+        else:
+            repo = SourceRepository(url=url, name=repoinfo.name, state="new")
+            db.add(repo)
+
+    if repo not in projectversion.sourcerepositories:
         projectversion.sourcerepositories.append(repo)
         db.commit()
 
