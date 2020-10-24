@@ -376,21 +376,25 @@ async def delete_projectversion(request):
     builds = db.query(Build).filter(Build.projectversion_id == projectversion.id).all()
     for build in builds:
         parent = None
+        grandparent = None
         if len(build.parent.children) == 1:
             parent = build.parent
+        if len(build.parent.parent.children) == 1:
+            grandparent = build.parent.parent
         buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
         for buildtask in buildtasks:
             db.delete(buildtask)
         db.delete(build)
         if parent:
-            buildtasks = db.query(BuildTask).filter(BuildTask.build == parent.parent).all()
-            for buildtask in buildtasks:
-                db.delete(buildtask)
-            db.delete(parent.parent)
             buildtasks = db.query(BuildTask).filter(BuildTask.build == parent).all()
             for buildtask in buildtasks:
                 db.delete(buildtask)
             db.delete(parent)
+        if grandparent:
+            buildtasks = db.query(BuildTask).filter(BuildTask.build == grandparent).all()
+            for buildtask in buildtasks:
+                db.delete(buildtask)
+            db.delete(grandparent)
 
     # delete hooks
     sourcerepositoryprojectversions = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion.id).all()
