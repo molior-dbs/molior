@@ -250,7 +250,6 @@ class Worker:
                             chroot.get_mirror_url(),
                             chroot.get_mirror_keys(),
                             ]}
-                    logger.info("queueing {}".format(args))
                     await self.task_queue.put(args)
                     ok = True
 
