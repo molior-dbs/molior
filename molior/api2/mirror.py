@@ -1,6 +1,6 @@
 import re
 
-from ..app import app
+from ..app import app, logger
 from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse
 
@@ -318,3 +318,80 @@ async def edit_mirror(request):
         args = {"update_mirror": [mirror.id]}
     await request.cirrina.aptly_queue.put(args)
     return OKResponse("Mirror update started")
+
+
+@app.http_delete("/api2/mirror/{name}/{version}")
+@req_admin
+# FIXME: req_role
+async def delete_mirror2(request):
+    """
+    Delete a single mirror on aptly and from database.
+
+    ---
+    description: Delete a single mirror on aptly and from database.
+    tags:
+        - Mirrors
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: id
+          in: path
+          required: true
+          type: integer
+          description: id of the mirror
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: removal failed from aptly.
+        "404":
+            description: mirror not found on aptly.
+        "500":
+            description: internal server error.
+        "503":
+            description: removal failed from database.
+    """
+    db = request.cirrina.db_session
+    mirror_name = request.match_info["name"]
+    mirror_version = request.match_info["version"]
+
+    mirror = db.query(ProjectVersion).join(Project).filter(
+                ProjectVersion.project_id == Project.id,
+                ProjectVersion.name == mirror_version,
+                Project.name == mirror_name,
+                Project.is_mirror.is_(True)).first()
+    if not mirror:
+        return ErrorResponse(400, "Mirror not found {}/{}".format(mirror_name, mirror_version))
+
+    # FIXME: check state, do not delete ready/updating/...
+
+    mirrorname = "{}-{}".format(mirror.project.name, mirror.name)
+
+    # check relations
+    if mirror.sourcerepositories:
+        logger.warning("error deleting mirror '%s': referenced by one or more source repositories", mirrorname)
+        return ErrorResponse(412, "Error deleting mirror {}: still referenced from source repositories".format(mirrorname))
+    # FIXME: how to check build references
+    # if mirror.buildconfiguration:
+    #    logger.warning("error deleting mirror '%s': referenced by one or more build configurations", mirrorname)
+    #    return ErrorResponse(412, "Error deleting mirror {}: still referenced from build configurations".format(mirrorname))
+    if mirror.dependents:
+        logger.warning("error deleting mirror '%s': referenced by one or more project versions", mirrorname)
+        return ErrorResponse(412, "Error deleting mirror {}: still referenced from project versions".format(mirrorname))
+
+    if mirror.project.is_basemirror:
+        dependents = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id).all()
+        if dependents:
+            logger.warning("error deleting mirror '%s': used as basemirror by one or more project versions", mirrorname)
+            return ErrorResponse(412,
+                                 "Error deleting mirror {}: still used as base mirror by one or more project versions".format(
+                                     mirrorname))
+
+    mirror.is_deleted = True
+    db.commit()
+    args = {"delete_mirror": [mirror.id]}
+    await request.cirrina.aptly_queue.put(args)
+
+    return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
