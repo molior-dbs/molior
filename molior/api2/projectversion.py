@@ -115,8 +115,8 @@ async def get_projectversion_dependencies(request):
     deps = get_projectversion_deps(projectversion.id, db)
     dep_ids = [d[0] for d in deps]
 
-    results = []
     if candidates:  # return candidate dependencies
+        results = []
         cands_query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
                                                       ProjectVersion.id != projectversion.id,
                                                       ProjectVersion.id.notin_(dep_ids))
@@ -144,8 +144,9 @@ async def get_projectversion_dependencies(request):
         return OKResponse(data)
 
     # return existing dependencies
+    results = []
     for d in deps:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id.in_(dep_ids))
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0])
         if filter_name:
             dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
         dep = dep.first()
