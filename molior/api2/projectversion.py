@@ -188,6 +188,10 @@ async def add_projectversion_dependency(request):
     if projectversion.id in dep_ids:
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
 
+    # do not allow using a mirror for ci builds
+    if dependency.project.is_mirror:
+        use_cibuilds = False
+
     pdep = ProjectVersionDependency(
             projectversion_id=projectversion.id,
             dependency_id=dependency.id,
@@ -345,6 +349,7 @@ async def snapshot_projectversion(request):
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}")
 @req_role("owner")
 async def delete_projectversion(request):
+    db = request.cirrina.db_session
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -364,15 +369,13 @@ async def delete_projectversion(request):
     projectversion.is_deleted = True
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    request.cirrina.db_session.commit()
+    db.commit()
 
     basemirror_name = projectversion.basemirror.project.name
     basemirror_version = projectversion.basemirror.name
     project_name = projectversion.project.name
     project_version = projectversion.name
     architectures = db2array(projectversion.mirror_architectures)
-
-    db = request.cirrina.db_session
 
     # delete builds
     builds = db.query(Build).filter(Build.projectversion_id == projectversion.id).all()
