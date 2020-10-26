@@ -492,7 +492,7 @@ async def trigger_build(request):
 
 
 @app.http_get("/api/build/{build_id}")
-async def get_build_by_token(request):
+async def get_build_info(request):
     """
     Gets build task info.
 
@@ -516,6 +516,10 @@ async def get_build_by_token(request):
             description: internal server error
     """
     build_id = request.match_info["build_id"]
+    try:
+        build_id = int(build_id)
+    except (ValueError, TypeError):
+        return web.Response(text="Incorrect value for build_id", status=400)
 
     data = {}
 
