@@ -144,7 +144,7 @@ VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
 
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
 log "Downloading $dsc_url"
-wget ---timeout=30q $dsc_url
+wget --timeout=30 -q $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "Error downloading source package $dsc_url"
   exit 1
