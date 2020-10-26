@@ -407,7 +407,6 @@ async def do_clone(request, projectversion_id, name):
     db.add(new_projectversion)
     db.commit()
 
-    logger.error("archs '%s'" % str(new_projectversion.mirror_architectures))
     await request.cirrina.aptly_queue.put(
         {
             "init_repository": [
