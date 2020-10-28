@@ -11,6 +11,7 @@ from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..molior.core import get_maintainer, get_target_config
+from ..molior.queues import enqueue_task
 
 
 async def run_git(cmd, cwd, build_id, write_output_log=True):
@@ -37,7 +38,7 @@ async def run_git_cmds(git_commands, repo_path, build_id, write_output_log=True)
     return True
 
 
-async def GitClone(build_id, repo_id, task_queue):
+async def GitClone(build_id, repo_id):
     with Session() as session:
         repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
@@ -84,7 +85,7 @@ async def GitClone(build_id, repo_id, task_queue):
         session.commit()
 
         args = {"buildlatest": [repo.id, build_id]}
-        await task_queue.put(args)
+        enqueue_task(args)
 
 
 async def GitCleanLocal(repo_path, build_id):

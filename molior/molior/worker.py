@@ -7,6 +7,7 @@ from ..ops import GitClone, get_latest_tag
 from ..ops import BuildProcess, ScheduleBuilds, CreateBuildEnv
 from ..tools import write_log, write_log_title
 from ..molior.configuration import Configuration
+from ..molior.queues import enqueue_task, dequeue_task, enqueue_aptly
 
 from ..model.database import Session
 from ..model.build import Build
@@ -66,9 +67,7 @@ class Worker:
 
     """
 
-    def __init__(self, task_queue, aptly_queue):
-        self.task_queue = task_queue
-        self.aptly_queue = aptly_queue
+    def __init__(self):
         self.chroot_build_count = 0
 
     async def _clone(self, args, session):
@@ -93,7 +92,7 @@ class Worker:
         repo.set_cloning()
         session.commit()
 
-        asyncio.ensure_future(GitClone(build_id, repo.id, self.task_queue))
+        asyncio.ensure_future(GitClone(build_id, repo.id))
 
     async def _build(self, args, session):
         logger.debug("worker: got build task")
@@ -122,7 +121,7 @@ class Worker:
 
         if repo.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repo_id)
-            await self.task_queue.put({"build": args})
+            enqueue_task({"build": args})
             await asyncio.sleep(2)
             return
 
@@ -132,7 +131,7 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        asyncio.ensure_future(BuildProcess(self.task_queue, self.aptly_queue, build_id, repo.id,
+        asyncio.ensure_future(BuildProcess(build_id, repo.id,
                                            git_ref, ci_branch, targets, force_ci))
 
     async def _buildlatest(self, args, session):
@@ -156,7 +155,7 @@ class Worker:
             return
 
         if repo.state != "ready":
-            await self.task_queue.put({"buildlatest": args})
+            enqueue_task({"buildlatest": args})
             logger.info("worker: repo %d not ready, requeueing", repo_id)
             await asyncio.sleep(2)
             return
@@ -197,7 +196,7 @@ class Worker:
         await write_log(build.id, "\n")
         git_ref = str(latest_tag)
         args = {"build": [build_id, repo_id, git_ref, None, None, False]}
-        await self.task_queue.put(args)
+        enqueue_task(args)
 
     async def _rebuild(self, args, session):
         logger.debug("worker: got rebuild task")
@@ -224,7 +223,7 @@ class Worker:
                 session.commit()
 
                 args = {"schedule": []}
-                await self.task_queue.put(args)
+                enqueue_task(args)
 
         if build.buildtype == "source":
             if build.buildstate == "publish_failed":
@@ -232,7 +231,7 @@ class Worker:
                 await build.set_needs_publish()
                 session.commit()
                 await write_log(build.parent.id, "I: publishing source package\n")
-                await self.aptly_queue.put({"src_publish": [build.id]})
+                enqueue_aptly({"src_publish": [build.id]})
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
@@ -250,7 +249,7 @@ class Worker:
                             chroot.get_mirror_url(),
                             chroot.get_mirror_keys(),
                             ]}
-                    await self.task_queue.put(args)
+                    enqueue_task(args)
                     ok = True
 
         if not ok:
@@ -264,7 +263,7 @@ class Worker:
         max_parallel_chroots = cfg.max_parallel_chroots
         if max_parallel_chroots and type(max_parallel_chroots) is int and max_parallel_chroots > 0:
             if self.chroot_build_count >= max_parallel_chroots:
-                await self.task_queue.put({"buildenv": args})
+                enqueue_task({"buildenv": args})
                 logger.info("worker: building %d chroots already, requeueing...", self.chroot_build_count)
                 await asyncio.sleep(2)
                 return
@@ -284,7 +283,7 @@ class Worker:
                               arch, components, repo_url, mirror_keys))
 
     async def create_build_env(self, chroot_id, build_id, dist, name, version, arch, components, repo_url, mirror_keys):
-        await CreateBuildEnv(self.task_queue, chroot_id, build_id, dist,
+        await CreateBuildEnv(chroot_id, build_id, dist,
                              name, version, arch, components, repo_url, mirror_keys)
         self.chroot_build_count -= 1
 
@@ -304,13 +303,13 @@ class Worker:
 
         if original.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
-            await self.task_queue.put({"merge_duplicate_repo": args})
+            enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
         if duplicate.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", duplicate_id)
-            await self.task_queue.put({"merge_duplicate_repo": args})
+            enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
@@ -359,7 +358,7 @@ class Worker:
         # FIXME: delete also repos in error state
         if repo.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
-            await self.task_queue.put({"delete_repo": args})
+            enqueue_task({"delete_repo": args})
             await asyncio.sleep(2)
             return
 
@@ -390,7 +389,7 @@ class Worker:
         while True:
             session = None
             try:
-                task = await self.task_queue.get()
+                task = await dequeue_task()
                 if task is None:
                     logger.info("worker: got emtpy task, aborting...")
                     break
@@ -448,8 +447,6 @@ class Worker:
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))
-
-                    self.task_queue.task_done()
 
             except Exception as exc:
                 logger.exception(exc)

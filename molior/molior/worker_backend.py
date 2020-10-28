@@ -1,15 +1,12 @@
-import asyncio
-
 from ..app import logger
 from ..tools import write_log
 from .backend import Backend
 from .notifier import send_mail_notification
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend
 
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-
-backend_queue = asyncio.Queue()
 
 
 class BackendWorker:
@@ -18,9 +15,7 @@ class BackendWorker:
 
     """
 
-    def __init__(self, task_queue, aptly_queue):
-        self.task_queue = task_queue
-        self.aptly_queue = aptly_queue
+    def __init__(self):
         self.logging_done = []
         self.build_outcome = {}  # build_id: outcome
 
@@ -41,17 +36,17 @@ class BackendWorker:
     async def _succeeded(self, session, build_id):
         self.build_outcome[build_id] = True
         if build_id in self.logging_done:
-            await backend_queue.put({"terminate": build_id})
+            enqueue_backend({"terminate": build_id})
 
     async def _failed(self, session, build_id):
         self.build_outcome[build_id] = False
         if build_id in self.logging_done:
-            await backend_queue.put({"terminate": build_id})
+            enqueue_backend({"terminate": build_id})
 
     async def _logging_done(self, session, build_id):
         self.logging_done.append(build_id)
         if build_id in self.build_outcome:
-            await backend_queue.put({"terminate": build_id})
+            enqueue_backend({"terminate": build_id})
 
     async def _terminate(self, session, build_id):
         outcome = self.build_outcome[build_id]
@@ -59,7 +54,7 @@ class BackendWorker:
         self.logging_done.remove(build_id)
 
         if outcome:  # build successful
-            await self.aptly_queue.put({"publish": [build_id]})
+            enqueue_aptly({"publish": [build_id]})
         else:        # build failed
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
@@ -83,7 +78,7 @@ class BackendWorker:
 
         while True:
             try:
-                task = await backend_queue.get()
+                task = await dequeue_backend()
                 if task is None:
                     logger.info("backend: got emtpy task, aborting...")
                     break
@@ -119,13 +114,11 @@ class BackendWorker:
                     if node_dummy:
                         # Schedule builds
                         args = {"schedule": []}
-                        await self.task_queue.put(args)
+                        enqueue_task(args)
                         handled = True
 
                 if not handled:
                     logger.error("backend: got unknown task %s", str(task))
-
-                backend_queue.task_done()
 
             except Exception as exc:
                 logger.exception(exc)

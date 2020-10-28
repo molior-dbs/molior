@@ -6,6 +6,7 @@ from sqlalchemy.sql import or_
 from ..app import app, logger
 from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse, paginate, db2array
+from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
@@ -151,7 +152,7 @@ async def create_mirror(request):
             False
         ]
     }
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
     return OKResponse("Mirror {} successfully created.".format(mirror))
 
 
@@ -430,7 +431,7 @@ async def delete_mirror(request):
     mirror.is_deleted = True
     request.cirrina.db_session.commit()
     args = {"delete_mirror": [mirror.id]}
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
 
     return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
 
@@ -478,6 +479,6 @@ async def put_update_mirror(request):
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
 
     return OKResponse("Successfully started update on mirror")

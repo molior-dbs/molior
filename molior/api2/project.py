@@ -3,6 +3,7 @@ from sqlalchemy.sql import or_
 from ..app import app
 from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int
 from ..auth import req_role
+from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion
@@ -228,7 +229,7 @@ async def create_projectversion(request):
     db.add(projectversion)
     db.commit()
 
-    await request.cirrina.aptly_queue.put({"init_repository": [
+    enqueue_aptly({"init_repository": [
                 basemirror_name,
                 basemirror_version,
                 projectversion.project.name,

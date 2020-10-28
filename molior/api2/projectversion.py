@@ -5,6 +5,7 @@ from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
 from ..api.projectversion import do_clone, do_lock, do_overlay
+from ..molior.queues import enqueue_aptly
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 from ..model.project import Project
@@ -329,7 +330,7 @@ async def snapshot_projectversion(request):
     db.add(new_projectversion)
     db.commit()
 
-    await request.cirrina.aptly_queue.put(
+    enqueue_aptly(
         {
             "snapshot_repository": [
                 projectversion.basemirror.project.name,
@@ -413,7 +414,7 @@ async def delete_projectversion(request):
     db.delete(projectversion)
     db.commit()
 
-    await request.cirrina.aptly_queue.put(
+    enqueue_aptly(
         {
             "delete_repository": [
                 basemirror_name,

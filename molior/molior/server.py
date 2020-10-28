@@ -7,17 +7,17 @@ from launchy import Launchy
 from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
 
-from molior.app import logger
-from molior.molior.worker import Worker
-from molior.molior.worker_aptly import AptlyWorker
-from molior.molior.worker_backend import BackendWorker, backend_queue
-from molior.molior.worker_notification import NotificationWorker
-from molior.model.database import database
-from molior.app import app
-from molior.version import MOLIOR_VERSION
-from molior.molior.backend import Backend
-from molior.auth import Auth
-from molior.molior.queues import task_queue, aptly_queue
+from ..app import app, logger
+from ..version import MOLIOR_VERSION
+from ..model.database import database
+from ..auth import Auth
+
+from .worker import Worker
+from .worker_aptly import AptlyWorker
+from .worker_backend import BackendWorker
+from .worker_notification import NotificationWorker
+from .backend import Backend
+from .queues import enqueue_aptly
 
 # import api handlers
 import molior.api.build              # noqa: F401
@@ -59,8 +59,8 @@ def run_backend_thread(backend):
     logger.info("backend thread terminated")
 
 
-async def cleanup_task(aptly_queue):
-    await aptly_queue.put({"cleanup": []})
+async def cleanup_task():
+    enqueue_aptly({"cleanup": []})
 
 
 async def main(backend):
@@ -69,13 +69,13 @@ async def main(backend):
     # await asyncio.ensure_future(startup_scan())
     # logger.info("source repository scan: finished")
 
-    worker = Worker(task_queue, aptly_queue)
+    worker = Worker()
     asyncio.ensure_future(worker.run())
 
-    backend_worker = BackendWorker(task_queue, aptly_queue)
+    backend_worker = BackendWorker()
     asyncio.ensure_future(backend_worker.run())
 
-    aptly_worker = AptlyWorker(aptly_queue, task_queue)
+    aptly_worker = AptlyWorker()
     asyncio.ensure_future(aptly_worker.run())
 
     notification_worker = NotificationWorker()
@@ -90,7 +90,7 @@ async def main(backend):
 
     cleanup_sched = Scheduler(locale="en_US")
     # cleanup_job = CronJob(name='cleanup').every().hour.at(":34").go(cleanup_task, (5), age=99)
-    cleanup_job = CronJob(name='cleanup').every(5).hours.go(cleanup_task, aptly_queue=aptly_queue)
+    cleanup_job = CronJob(name='cleanup').every(5).hours.go(cleanup_task)
     cleanup_sched.add_job(cleanup_job)
     asyncio.ensure_future(cleanup_sched.start())
 
@@ -98,8 +98,6 @@ async def main(backend):
 def create_cirrina_context(cirrina):
     maker = sessionmaker(bind=database.engine)
     cirrina.add_context("db_session", maker())
-    cirrina.add_context("task_queue", task_queue)
-    cirrina.add_context("aptly_queue", aptly_queue)
 
 
 def destroy_cirrina_context(cirrina):
@@ -125,7 +123,7 @@ if __name__ == "__main__":
 
     Launchy.attach_loop(loop)
 
-    backend = Backend().init(backend_queue)
+    backend = Backend().init()
     if not backend:
         exit(1)
     if not Auth().init():

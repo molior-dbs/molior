@@ -2,12 +2,13 @@ import socket
 
 from jinja2 import Template
 
-from molior.app import app, logger
-from molior.molior.notifier import trigger_hook
-from molior.molior.configuration import Configuration
-from molior.model.database import Session
-from molior.model.build import Build
-from molior.molior.queues import notification_queue
+from ..app import app, logger
+from ..model.database import Session
+from ..model.build import Build
+
+from .notifier import trigger_hook
+from .configuration import Configuration
+from .queues import dequeue_notification
 
 
 class NotificationWorker:
@@ -24,7 +25,7 @@ class NotificationWorker:
         while True:
             handled = False
             try:
-                task = await notification_queue.get()
+                task = await dequeue_notification()
                 if task is None:
                     logger.info("notification:: got emtpy task, aborting...")
                     break
@@ -41,8 +42,6 @@ class NotificationWorker:
 
                 if not handled:
                     logger.error("notification: got unknown task %s", str(task))
-
-                notification_queue.task_done()
 
             except Exception as exc:
                 logger.exception(exc)

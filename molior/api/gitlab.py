@@ -7,6 +7,7 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository
 from ..molior.configuration import Configuration
+from ..molior.queues import enqueue_task
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -259,11 +260,8 @@ async def process_tag_push(request, data):
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if git_ref and repo.id:
         args = {"build": [build.id, repo.id, git_ref, ui_branch, None]}
-
-        # Queue new build job
-        if await request.cirrina.task_queue.put(args):
-            logger.info("GitLab-API: BUILD triggered (sourcename): %s", build.sourcename)
-            return "OK", 200
+        enqueue_task(args)
+        return "OK", 200
 
     return "Unprocessable Entity", 422
 
@@ -390,10 +388,7 @@ async def process_push(request, data):
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if checkout_sha and repo.id:
         args = {"build": [build.id, repo.id, checkout_sha, ci_branch, None, False]}
-
-        # Queue new build job
-        if await request.cirrina.task_queue.put(args):
-            logger.info("GitLab-API: CI-BUILD triggered (sourcename): %s", build.sourcename)
-            return "OK", 200
+        enqueue_task(args)
+        return "OK", 200
 
     return "Unprocessable Entity", 422

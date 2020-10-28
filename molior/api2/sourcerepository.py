@@ -12,6 +12,7 @@ from ..model.projectversion import ProjectVersion, get_projectversion
 from ..model.sourepprover import SouRepProVer
 from ..model.postbuildhook import PostBuildHook
 from ..model.hook import Hook
+from ..molior.queues import enqueue_task
 
 
 @app.http_get("/api2/repository/{repository_id}")
@@ -381,7 +382,7 @@ async def add_repository(request):
         await build.build_added()
 
         args = {"clone": [build.id, repo.id]}
-        await request.cirrina.task_queue.put(args)
+        enqueue_task(args)
 
     else:  # existing repo
         build = Build(
@@ -401,7 +402,7 @@ async def add_repository(request):
         await build.build_added()
 
         args = {"buildlatest": [repo.id, build.id]}
-        await request.cirrina.task_queue.put(args)
+        enqueue_task(args)
 
     return OKResponse("SourceRepository added")
 
@@ -578,7 +579,7 @@ async def merge_repository(request):
     # verify stuff (if there is repo behnd those numbers)
 
     args = {"merge_duplicate_repo": [repository_id, duplicate_id]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
 
     return OKResponse("SourceRepository changed")
 
@@ -603,5 +604,5 @@ async def delete_repository(request):
         return ErrorResponse(400, "Repository cannot be deleted")
 
     args = {"delete_repo": [repository_id]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
     return OKResponse("Repository deleted")
