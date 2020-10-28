@@ -8,6 +8,7 @@ from ..molior.notifier import build_added
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository
+from ..molior.queues import enqueue_task
 
 logger = logging.getLogger("molior-web")
 
@@ -125,6 +126,6 @@ async def bitbucket_trigger(request):
     request.cirrina.db_session.commit()
 
     args = {"build": [build.id, repo.id, git_ref, branch, None, False]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
 
     return web.Response(status=200, text="OK")

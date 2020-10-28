@@ -2,8 +2,8 @@ import asyncio
 import json
 
 from ...app import app, logger
-from ...molior.worker_backend import backend_queue
 from ...molior.configuration import Configuration
+from ...molior.queues import enqueue_backend
 
 registry = {"amd64": [], "arm64": []}
 build_tasks = {"amd64": asyncio.Queue(), "arm64": asyncio.Queue()}
@@ -50,7 +50,7 @@ async def node_register(ws_client):
         registry[arch].insert(0, ws_client)
         logger.info("backend: %s node registered: %s", arch, node)
         asyncio.ensure_future(watchdog(ws_client))
-        await backend_queue.put({"node_registered": 1})
+        enqueue_backend({"node_registered": 1})
     else:
         logger.error("backend: invalid architecture received: '%s'", arch)
 
@@ -69,10 +69,10 @@ async def node_message(ws_client, msg):
         build_id = ws_client.molior_build_id
 
         if status["status"] == "building":
-            await backend_queue.put({"started": build_id})
+            enqueue_backend({"started": build_id})
 
         elif status["status"] == "failed":
-            await backend_queue.put({"failed": build_id})
+            enqueue_backend({"failed": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
@@ -80,7 +80,7 @@ async def node_message(ws_client, msg):
 
         elif status["status"] == "success":
             logger.debug("node: finished build {}".format(build_id))
-            await backend_queue.put({"succeeded": build_id})
+            enqueue_backend({"succeeded": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
@@ -106,7 +106,7 @@ async def node_disconnected(ws_client):
         running_nodes[arch].remove(ws_client)
         build_id = ws_client.molior_build_id
         logger.error("backend: lost build_%d on %s/%s", build_id, arch, node)
-        await backend_queue.put({"failed": build_id})
+        enqueue_backend({"failed": build_id})
 
     else:
         logger.warn("backend: unknown node disconnect: %s/%s", arch, node)
@@ -117,8 +117,7 @@ class HTTPBackend:
     This is the default backend, using HTTP and WebSockets.
     """
 
-    def __init__(self, bq, loop):
-        self.backend_queue = bq
+    def __init__(self, loop):
         self.loop = loop
         asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
         asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)

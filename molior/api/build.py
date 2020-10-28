@@ -12,6 +12,7 @@ from ..model.project import Project
 from ..model.projectversion import ProjectVersion
 from ..model.maintainer import Maintainer
 from ..tools import paginate
+from ..molior.queues import enqueue_task
 
 
 @app.http_get("/api/builds")
@@ -401,7 +402,7 @@ async def rebuild_build(request):
         return web.Response(text="This build cannot be rebuilt", status=400)
 
     args = {"rebuild": [build_id]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
     return web.json_response("Rebuild triggered")
 
 
@@ -486,7 +487,7 @@ async def trigger_build(request):
         args = {"buildlatest": [repo.id, build.id]}
     else:
         args = {"build": [build.id, repo.id, git_ref, git_branch, targets, force_ci]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
 
     return web.json_response({"build_id": str(build.id)})
 

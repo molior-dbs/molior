@@ -9,6 +9,7 @@ from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly
 
 from ..model.database import Session
 from ..model.build import Build
@@ -18,7 +19,7 @@ from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
 
-async def startup_migration(task_queue):
+async def startup_migration():
     """
     Migrate old aptly repos
     """
@@ -68,7 +69,7 @@ async def startup_migration(task_queue):
                 logger.exception(exc)
 
 
-async def startup_mirror(task_queue):
+async def startup_mirror():
     """
     Starts a finalize_mirror task in the asyncio event loop
     for all mirrors which have the state 'updating'
@@ -157,7 +158,6 @@ async def startup_mirror(task_queue):
             components = mirror.mirror_components.split(",")
             loop.create_task(
                 finalize_mirror(
-                    task_queue,
                     build.id,
                     base_mirror,
                     base_mirror_version,
@@ -170,7 +170,7 @@ async def startup_mirror(task_queue):
             )
 
 
-async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, mirror, version, components):
+async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components):
     """
     Creates an update task in the asyncio event loop.
 
@@ -187,11 +187,11 @@ async def update_mirror(task_queue, build_id, base_mirror, base_mirror_version, 
 
     logger.debug("start update progress: aptly tasks %s", str(task_ids))
     loop = asyncio.get_event_loop()
-    loop.create_task(finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version,
+    loop.create_task(finalize_mirror(build_id, base_mirror, base_mirror_version,
                                      mirror, version, components, task_ids))
 
 
-async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version,
+async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                           mirror_project, mirror_version, components, task_ids):
     try:
         mirrorname = "{}-{}".format(mirror_project, mirror_version)
@@ -414,7 +414,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
                     await asyncio.sleep(5)
 
             if mirror.project.is_basemirror:
-                await create_chroots(mirror, build, mirror_project, mirror_version, task_queue, session)
+                await create_chroots(mirror, build, mirror_project, mirror_version, session)
 
             mirror.is_locked = True
             mirror.mirror_state = "ready"
@@ -431,7 +431,7 @@ async def finalize_mirror(task_queue, build_id, base_mirror, base_mirror_version
         logger.exception(exc)
 
 
-async def create_chroots(mirror, build, mirror_project, mirror_version, task_queue, session):
+async def create_chroots(mirror, build, mirror_project, mirror_version, session):
     for arch_name in db2array(mirror.mirror_architectures):
         await write_log(build.id, "I: starting chroot environments build\n")
 
@@ -477,7 +477,7 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, task_que
                 chroot.get_mirror_url(),
                 chroot.get_mirror_keys(),
                 ]}
-        await task_queue.put(args)
+        enqueue_task(args)
 
 
 class AptlyWorker:
@@ -485,10 +485,6 @@ class AptlyWorker:
     Source Packaging worker thread
 
     """
-
-    def __init__(self, aptly_queue, task_queue):
-        self.aptly_queue = aptly_queue
-        self.task_queue = task_queue
 
     async def _create_mirror(self, args, session):
         (
@@ -573,7 +569,7 @@ class AptlyWorker:
         await build.build_added()
 
         args = {"init_mirror": [mirror.id]}
-        await self.aptly_queue.put(args)
+        enqueue_aptly(args)
         return True
 
     async def _init_mirror(self, args, session):
@@ -657,7 +653,7 @@ class AptlyWorker:
         session.commit()
 
         args = {"update_mirror": [mirror.id]}
-        await self.aptly_queue.put(args)
+        enqueue_aptly(args)
         return True
 
     async def _update_mirror(self, args, session):
@@ -693,7 +689,6 @@ class AptlyWorker:
             mirror_name = "{}/{}".format(mirror.project.name, mirror.name)
             try:
                 await update_mirror(
-                    self.task_queue,
                     build.id,
                     mirror.basemirror.project.name if mirror.basemirror else "",
                     mirror.basemirror.name if mirror.basemirror else "",
@@ -721,7 +716,7 @@ class AptlyWorker:
 
         else:  # external repo
             if mirror.project.is_basemirror:
-                await create_chroots(mirror, build, mirror.project.name, mirror.name, self.task_queue, session)
+                await create_chroots(mirror, build, mirror.project.name, mirror.name, session)
 
             mirror.is_locked = True
             mirror.mirror_state = "ready"
@@ -779,7 +774,7 @@ class AptlyWorker:
 
         # Schedule builds
         args = {"schedule": []}
-        await self.task_queue.put(args)
+        enqueue_task(args)
 
     async def _publish(self, args, session):
         build_id = args[0]
@@ -813,7 +808,7 @@ class AptlyWorker:
 
         # Schedule builds
         args = {"schedule": []}
-        await self.task_queue.put(args)
+        enqueue_task(args)
 
     async def _drop_publish(self, args, _):
         base_mirror_name = args[0]
@@ -917,12 +912,12 @@ class AptlyWorker:
         Run the worker task.
         """
 
-        await startup_mirror(self.task_queue)
-        await startup_migration(self.task_queue)
+        await startup_mirror()
+        await startup_migration()
 
         while True:
             try:
-                task = await self.aptly_queue.get()
+                task = await dequeue_aptly()
                 if task is None:
                     logger.error("aptly worker: got emtpy task, aborting...")
                     break
@@ -999,8 +994,6 @@ class AptlyWorker:
 
                     if not handled:
                         logger.error("aptly worker got unknown task %s", str(task))
-
-                    self.aptly_queue.task_done()
 
             except Exception as exc:
                 logger.exception(exc)

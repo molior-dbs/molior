@@ -5,9 +5,10 @@ from ..tools import write_log, write_log_title
 from ..model.database import Session
 from ..model.build import Build
 from ..model.chroot import Chroot
+from ..molior.queues import enqueue_task
 
 
-async def CreateBuildEnv(task_queue, chroot_id, build_id, dist,
+async def CreateBuildEnv(chroot_id, build_id, dist,
                          name, version, arch, components, repo_url, mirror_keys):
     """
     Creates a sbuild chroot and other build environments.
@@ -84,6 +85,6 @@ async def CreateBuildEnv(task_queue, chroot_id, build_id, dist,
 
         # Schedule builds
         args = {"schedule": []}
-        await task_queue.put(args)
+        enqueue_task(args)
 
         return True

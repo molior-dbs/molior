@@ -8,7 +8,7 @@ from enum import Enum
 from ..app import logger
 from .emailer import send_mail
 from .configuration import Configuration
-from .queues import notification_queue
+from .queues import enqueue_notification
 
 
 class Subject(Enum):
@@ -142,8 +142,8 @@ def send_mail_notification(build):
 
 
 async def notify(subject, event, data):
-    await notification_queue.put({"notify": {"subject": subject, "event": event, "data": data}})
+    enqueue_notification({"notify": {"subject": subject, "event": event, "data": data}})
 
 
 async def run_hooks(build_id):
-        await notification_queue.put({"hooks": {"build_id": build_id}})
+    enqueue_notification({"hooks": {"build_id": build_id}})

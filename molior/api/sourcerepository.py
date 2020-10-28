@@ -10,6 +10,7 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 from ..model.sourepprover import SouRepProVer
+from ..molior.queues import enqueue_task
 
 
 def get_last_gitref(repo, db):
@@ -536,7 +537,7 @@ async def trigger_clone(request):
     request.cirrina.db_session.commit()
 
     args = {"clone": [build.id, repository.id]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
     return web.Response(status=200, text="Clone job started")
 
 
@@ -609,6 +610,6 @@ async def trigger_build(request):
     request.cirrina.db_session.commit()
 
     args = {"buildlatest": [repository_id, build.id]}
-    await request.cirrina.task_queue.put(args)
+    enqueue_task(args)
 
     return web.json_response({"build_token": str(token)})

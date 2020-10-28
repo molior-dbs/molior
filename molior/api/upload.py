@@ -10,7 +10,7 @@ from ..molior.configuration import Configuration
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from ..molior.worker_backend import backend_queue
+from ..molior.queues import enqueue_backend
 
 
 if not os.environ.get("IS_SPHINX", False):
@@ -93,7 +93,7 @@ async def ws_logs_disconnected(ws_client):
     async def terminate(afp):
         await afp.fsync()
         await afp.close()
-        await backend_queue.put({"logging_done": ws_client.cirrina.build_id})
+        enqueue_backend({"logging_done": ws_client.cirrina.build_id})
     get_event_loop().create_task(terminate(afp))
 
     return ws_client

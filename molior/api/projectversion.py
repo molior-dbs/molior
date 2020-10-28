@@ -5,6 +5,7 @@ from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
+from ..molior.queues import enqueue_aptly
 
 
 @app.http_get("/api/projectversions")
@@ -253,7 +254,7 @@ async def create_projectversions(request):
     project_name = projectversion.project.name
     project_version = projectversion.name
 
-    await request.cirrina.aptly_queue.put({"init_repository": [
+    enqueue_aptly({"init_repository": [
                 basemirror_name,
                 basemirror_version,
                 project_name,
@@ -407,7 +408,7 @@ async def do_clone(request, projectversion_id, name):
     db.add(new_projectversion)
     db.commit()
 
-    await request.cirrina.aptly_queue.put(
+    enqueue_aptly(
         {
             "init_repository": [
                 new_projectversion.basemirror.project.name,
@@ -498,7 +499,7 @@ async def do_overlay(request, projectversion_id, name):
 
     basemirror = overlay_projectversion.basemirror
 
-    await request.cirrina.aptly_queue.put(
+    enqueue_aptly(
         {
             "init_repository": [
                 basemirror.project.name,
@@ -678,7 +679,7 @@ async def mark_delete_projectversion(request):
             "stable",
         ]
     }
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
     args = {
         "drop_publish": [
             base_mirror_name,
@@ -688,7 +689,7 @@ async def mark_delete_projectversion(request):
             "unstable",
         ]
     }
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
 
     projectversion.is_deleted = True
     # lock the projectversion so no packages can be published in this repository

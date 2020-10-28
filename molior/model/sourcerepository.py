@@ -5,7 +5,6 @@ from sqlalchemy.orm import relationship
 from ..app import logger
 from ..molior.configuration import Configuration
 from .database import Base
-from .projectversion import ProjectVersion
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
 DEFAULT_CWD = "/var/lib/molior"
@@ -18,7 +17,7 @@ class SourceRepository(Base):
     url = Column(String)
     name = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
-    projectversions = relationship(ProjectVersion, secondary="sourcerepositoryprojectversion")
+    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
 
 #    def __init__(self, url):
 #        self.url = url

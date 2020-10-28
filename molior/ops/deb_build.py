@@ -22,7 +22,7 @@ from ..model.chroot import Chroot
 from ..model.projectversion import ProjectVersion
 from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
-from ..molior.worker_backend import backend_queue
+from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend
 
 
 async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
@@ -88,7 +88,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     return True
 
 
-async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
+async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
@@ -218,7 +218,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
             await parent.set_already_exists()
             session.commit()
             args = {"schedule": []}
-            await task_queue.put(args)
+            enqueue_task(args)
             return
 
         # Use commiter name as maintainer for CI builds
@@ -396,7 +396,7 @@ async def BuildProcess(task_queue, aptly_queue, parent_build_id, repo_id, git_re
         session.commit()
 
         await write_log(parent_build_id, "I: publishing source package\n")
-        await aptly_queue.put({"src_publish": [build.id]})
+        enqueue_aptly({"src_publish": [build.id]})
 
 
 def chroot_ready(build, session):
@@ -456,7 +456,7 @@ async def schedule_build(build, session):
     await build.set_scheduled()
     session.commit()  # pylint: disable=no-member
 
-    await backend_queue.put(
+    enqueue_backend(
         {
             "schedule": [
                 build.id,

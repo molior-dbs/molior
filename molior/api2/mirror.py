@@ -3,6 +3,7 @@ import re
 from ..app import app, logger
 from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse
+from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
@@ -251,7 +252,7 @@ async def create_mirror2(request):
             external_repo,
         ]
     }
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
     return OKResponse("Mirror creation started")
 
 
@@ -316,7 +317,7 @@ async def edit_mirror(request):
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
     return OKResponse("Mirror update started")
 
 
@@ -392,6 +393,6 @@ async def delete_mirror2(request):
     mirror.is_deleted = True
     db.commit()
     args = {"delete_mirror": [mirror.id]}
-    await request.cirrina.aptly_queue.put(args)
+    enqueue_aptly(args)
 
     return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
