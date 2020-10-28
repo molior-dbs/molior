@@ -167,7 +167,7 @@ def get_targets(plain_targets, repo, custom_targets, session):
     return targets
 
 
-def get_target_arch(build):
+def get_target_arch(build, session):
     """
     Gets the best target architecture from TARGET_ARCH_ORDER
     for the given build for 'all' packages.
@@ -183,6 +183,12 @@ def get_target_arch(build):
     """
     for arch in TARGET_ARCH_ORDER:
         if arch in db2array(build.projectversion.mirror_architectures):
+            if build.buildtype == "deb":
+                sourepprover = session.query(SouRepProVer).filter(
+                        SouRepProVer.sourcerepository_id == build.sourcerepository.id,
+                        SouRepProVer.projectversion_id == build.projectversion.id).first()
+                if arch not in db2array(sourepprover.architectures):
+                    continue
             return arch
     return None
 

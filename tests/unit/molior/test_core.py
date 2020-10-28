@@ -181,8 +181,10 @@ def test_get_target_arch():
     Test get target architecture
     """
     build = MagicMock()
+    session = MagicMock()
     build.projectversion.mirror_architectures = "{armhf,i386}"
-    ret = get_target_arch(build)
+    build.buildtype = "build"
+    ret = get_target_arch(build, session)
     assert ret == "i386"
 
 
