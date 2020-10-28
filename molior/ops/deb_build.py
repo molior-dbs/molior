@@ -411,7 +411,7 @@ def chroot_ready(build, session):
     Returns:
         bool: True if chroot ready, otherwise False.
     """
-    target_arch = get_target_arch(build)
+    target_arch = get_target_arch(build, session)
     chroot = session.query(Chroot).filter(Chroot.basemirror_id == build.projectversion.basemirror_id,
                                           Chroot.architecture == target_arch).first()
     if not chroot:
@@ -446,7 +446,7 @@ async def schedule_build(build, session):
     project_version = build.projectversion
     apt_urls = get_apt_repos(project_version, session, is_ci=build.is_ci)
 
-    arch_any_only = False if arch == get_target_arch(build) else True
+    arch_any_only = False if arch == get_target_arch(build, session) else True
 
     config = Configuration()
     apt_url = config.aptly.get("apt_url")
