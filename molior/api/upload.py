@@ -8,7 +8,7 @@ from ..molior.configuration import Configuration
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from ..molior.queues import enqueue_backend, buildlog
+from ..molior.queues import buildlog
 
 
 if not os.environ.get("IS_SPHINX", False):
@@ -61,9 +61,5 @@ async def ws_logs(ws_client, msg):
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
     logger.debug("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
-    buildlog(ws_client.cirrina.build_id, None)
-
-    async def terminate(afp):
-        enqueue_backend({"logging_done": ws_client.cirrina.build_id})
-
+    buildlog(ws_client.cirrina.build_id, None)  # signal end of logs
     return ws_client

@@ -425,6 +425,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
 
             build.log("\n")
             build.logtitle("Done", no_footer_newline=True)
+            build.logdone()
             logger.debug("mirror %s succesfully created", mirrorname)
 
     except Exception as exc:
@@ -727,6 +728,7 @@ class AptlyWorker:
 
             build.log("\n")
             build.logtitle("Done", no_footer_newline=True)
+            build.logdone()
 
     async def _src_publish(self, args, session):
         build_id = args[0]
@@ -748,6 +750,7 @@ class AptlyWorker:
         if not ret:
             build.parent.log("E: publishing source package failed\n")
             build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            build.logdone()
             await build.set_publish_failed()
             session.commit()
             return
@@ -756,6 +759,7 @@ class AptlyWorker:
         session.commit()
 
         build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+        build.logdone()
 
         build.parent.log("I: scheduling deb package builds\n")
         # schedule child builds
@@ -764,6 +768,7 @@ class AptlyWorker:
             logger.error("publishsrc_succeeded no build childs found for %d", build_id)
             build.parent.log("E: no deb builds found\n")
             build.parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            build.logdone()
             await build.parent.set_failed()
             session.commit()
             return
@@ -801,6 +806,7 @@ class AptlyWorker:
             build.parent.log("E: publishing build failed\n")
             build.log("E: publishing build failed\n")
         build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+        build.logdone()
         session.commit()
 
         if not build.is_ci:

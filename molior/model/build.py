@@ -6,7 +6,7 @@ from ..app import logger
 from ..tools import get_local_tz, db2array
 # from .tools import check_user_role
 from ..molior.notifier import Subject, Event, notify, run_hooks
-from ..molior.queues import buildlog, buildlogtitle
+from ..molior.queues import buildlog, buildlogtitle, buildlogdone
 
 from .database import Base
 from .sourcerepository import SourceRepository
@@ -67,6 +67,9 @@ class Build(Base):
 
     def logtitle(self, title, no_footer_newline=False, no_header_newline=True, error=False):
         buildlogtitle(self.id, title, no_footer_newline, no_header_newline, error)
+
+    def logdone(self):
+        buildlogdone(self.id)
 
     def log_state(self, statemsg):
         prefix = ""
@@ -135,6 +138,7 @@ class Build(Base):
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
                 self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                self.parent.parent.logdone()
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -161,6 +165,7 @@ class Build(Base):
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
                 self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                self.parent.parent.logdone()
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -183,6 +188,7 @@ class Build(Base):
             if all_ok:
                 await self.parent.parent.set_successful()
                 self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                self.parent.parent.logdone()
 
     async def set_already_exists(self):
         self.log_state("version already exists")
