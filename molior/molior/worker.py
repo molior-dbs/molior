@@ -165,7 +165,7 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        build.log("Checking Repository")
+        build.logtitle("Checking Repository")
 
         build.log("I: fetching git tags\n")
         try:
