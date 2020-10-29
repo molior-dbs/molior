@@ -2,6 +2,7 @@ import shutil
 import shlex
 import operator
 import os
+import asyncio
 
 from launchy import Launchy
 
@@ -19,15 +20,15 @@ async def run_git(cmd, cwd, build_id, write_output_log=True):
 
     async def outh(line):
         if write_output_log:
-            await write_log(build_id, "%s\n" % line)
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(write_log(build_id, "%s\n" % line), loop)
 
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""
     process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd, env=env)
     await process.launch()
-    if await process.wait() != 0:
-        return False
-    return True
+    ret = await process.wait()
+    return ret == 0
 
 
 async def run_git_cmds(git_commands, repo_path, build_id, write_output_log=True):
@@ -199,7 +200,7 @@ async def get_latest_tag(repo_path, build_id):
     if not await GitCleanLocal(repo_path, build_id):
         return None
 
-    if not await run_git("git fetch --tags --prune --prune-tags --force", str(repo_path), build_id):
+    if not await run_git("git fetch --tags --prune --prune-tags --force", str(repo_path), build_id, write_output_log=False):
         logger.error("error running git fetch: %s", str(repo_path))
         return None
 
