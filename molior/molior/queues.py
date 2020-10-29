@@ -85,7 +85,6 @@ async def buildlog_writer(build_id):
             break
         await writer(msg)
         await afp.fsync()
-
     del buildlogs[build_id]
 
 
