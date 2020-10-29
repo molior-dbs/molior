@@ -20,9 +20,7 @@ async def run_git(cmd, cwd, build, write_output_log=True):
 
     async def outh(line):
         if write_output_log:
-            pass
-            # loop = asyncio.get_event_loop()
-            # asyncio.run_coroutine_threadsafe(write_log(build_id, "%s\n" % line), loop)
+            build.log(line)
 
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""

@@ -287,7 +287,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         # add build order dependencies
         build_after = get_buildorder(repo.src_path)
         if build_after:
-            build.log("N: source can build after: %s", ", ".join(build_after))
+            build.parent.log("N: source needs to build after: %s" % ", ".join(build_after))
             build.builddeps = "{" + ",".join(build_after) + "}"
             session.commit()
 
