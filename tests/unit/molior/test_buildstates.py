@@ -1,7 +1,7 @@
 import asyncio
 import sys
 
-from mock import MagicMock, patch, mock
+from mock import MagicMock, mock
 sys.modules['aiofile'] = mock.MagicMock()
 
 from molior.model.build import Build            # noqa: E402
@@ -14,14 +14,16 @@ def test_src_build_failed():
     """
     src_build = Build(buildtype="source")
     src_build.parent = Build(buildtype="build")
+
     src_build.log_state = MagicMock()
     src_build.parent.log_state = MagicMock()
+    src_build.log = MagicMock()
+    src_build.parent.log = MagicMock()
+    src_build.logtitle = MagicMock()
+    src_build.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
-            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(src_build.set_failed())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(src_build.set_failed())
 
     assert src_build.buildstate == "build_failed"
     assert src_build.parent.buildstate == "build_failed"
@@ -31,22 +33,25 @@ def test_deb_build_failed():
     """
     Tests whether a debian build was set to failed correctly
     """
-    src_build = Build(buildtype="deb")
-    src_build.parent = Build(buildtype="source")
-    src_build.parent.parent = Build(buildtype="build")
+    deb_build = Build(buildtype="deb")
+    deb_build.parent = Build(buildtype="source")
+    deb_build.parent.parent = Build(buildtype="build")
 
-    src_build.log_state = MagicMock()
-    src_build.parent.log_state = MagicMock()
-    src_build.parent.parent.log_state = MagicMock()
+    deb_build.log_state = MagicMock()
+    deb_build.parent.log_state = MagicMock()
+    deb_build.parent.parent.log_state = MagicMock()
+    deb_build.log = MagicMock()
+    deb_build.parent.log = MagicMock()
+    deb_build.parent.parent.log = MagicMock()
+    deb_build.logtitle = MagicMock()
+    deb_build.parent.logtitle = MagicMock()
+    deb_build.parent.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.model.build.write_log_title", side_effect=asyncio.coroutine(
-                lambda a, b, no_footer_newline=True, no_header_newline=False, e=False: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(src_build.set_failed())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(deb_build.set_failed())
 
-    assert src_build.buildstate == "build_failed"
-    assert src_build.parent.parent.buildstate == "build_failed"
+    assert deb_build.buildstate == "build_failed"
+    assert deb_build.parent.parent.buildstate == "build_failed"
 
 
 def test_src_build_publish_failed():
@@ -59,12 +64,13 @@ def test_src_build_publish_failed():
 
     src_build.log_state = MagicMock()
     src_build.parent.log_state = MagicMock()
+    src_build.log = MagicMock()
+    src_build.parent.log = MagicMock()
+    src_build.logtitle = MagicMock()
+    src_build.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
-            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(src_build.set_publish_failed())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(src_build.set_publish_failed())
 
     assert src_build.buildstate == "publish_failed"
     assert src_build.parent.buildstate == "build_failed"
@@ -82,12 +88,15 @@ def test_deb_build_publish_failed():
     deb_build.log_state = MagicMock()
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
+    deb_build.log = MagicMock()
+    deb_build.parent.log = MagicMock()
+    deb_build.parent.parent.log = MagicMock()
+    deb_build.logtitle = MagicMock()
+    deb_build.parent.logtitle = MagicMock()
+    deb_build.parent.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.model.build.write_log_title", side_effect=asyncio.coroutine(
-                lambda a, b, no_footer_newline=True, no_header_newline=False, e=False: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(deb_build.set_publish_failed())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(deb_build.set_publish_failed())
 
     assert deb_build.buildstate == "publish_failed"
     assert deb_build.parent.parent.buildstate == "build_failed"
@@ -97,10 +106,7 @@ def test_deb_build_successful_only_build():
     """
     Tests whether a debian was set to successful correctly
     """
-    deb_build = Build(
-        id=1337,
-        buildtype="deb"
-    )
+    deb_build = Build(id=1337, buildtype="deb")
     deb_build.parent = Build(buildtype="source")
     deb_build.parent.parent = Build(buildtype="build")
     deb_build.parent.children = [deb_build]
@@ -108,12 +114,15 @@ def test_deb_build_successful_only_build():
     deb_build.log_state = MagicMock()
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
+    deb_build.log = MagicMock()
+    deb_build.parent.log = MagicMock()
+    deb_build.parent.parent.log = MagicMock()
+    deb_build.logtitle = MagicMock()
+    deb_build.parent.logtitle = MagicMock()
+    deb_build.parent.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.model.build.write_log_title", side_effect=asyncio.coroutine(
-                lambda a, b, no_footer_newline=True, no_header_newline=False, e=False: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(deb_build.set_successful())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate == "successful"
@@ -139,12 +148,15 @@ def test_deb_build_successful_all_successful():
     deb_build.log_state = MagicMock()
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
+    deb_build.log = MagicMock()
+    deb_build.parent.log = MagicMock()
+    deb_build.parent.parent.log = MagicMock()
+    deb_build.logtitle = MagicMock()
+    deb_build.parent.logtitle = MagicMock()
+    deb_build.parent.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.model.build.write_log_title", side_effect=asyncio.coroutine(
-                lambda a, b, no_footer_newline=True, no_header_newline=False, e=False: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(deb_build.set_successful())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate == "successful"
@@ -170,12 +182,15 @@ def test_deb_build_successful_other_failed():
     deb_build.log_state = MagicMock()
     deb_build.parent.log_state = MagicMock()
     deb_build.parent.parent.log_state = MagicMock()
+    deb_build.log = MagicMock()
+    deb_build.parent.log = MagicMock()
+    deb_build.parent.parent.log = MagicMock()
+    deb_build.logtitle = MagicMock()
+    deb_build.parent.logtitle = MagicMock()
+    deb_build.parent.parent.logtitle = MagicMock()
 
-    with patch(
-            "molior.tools.write_log", side_effect=asyncio.coroutine(lambda a, b: None)), patch(
-            "molior.tools.write_log_title", side_effect=asyncio.coroutine(lambda a, b: None)):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(deb_build.set_successful())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate != "successful"

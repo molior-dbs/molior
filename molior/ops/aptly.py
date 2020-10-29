@@ -6,7 +6,7 @@ from pathlib import Path
 from aiofile import AIOFile
 
 from ..app import logger
-from ..tools import strip_epoch_version, write_log, write_log_title, db2array
+from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
 
@@ -51,8 +51,8 @@ async def DebSrcPublish(session, build):
         bool: True if successful, otherwise False.
     """
 
-    await write_log(build.id, "\n")
-    await write_log_title(build.id, "Publishing")
+    build.log("\n")
+    build.logtitle("Publishing")
     sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
     srcfiles = await debchanges_get_files(sourcepath, build.sourcename, build.version)
     if not srcfiles:
@@ -74,10 +74,10 @@ async def DebSrcPublish(session, build):
             projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
             if not projectversion:
                 logger.error("publisher: error finding projectversion {}".format(projectversion_id))
-                await write_log(build.id, "E: error finding projectversion {}\n".format(projectversion_id))
+                build.log("E: error finding projectversion {}\n".format(projectversion_id))
                 continue
 
-            await write_log(build.id, "I: publishing for %s\n" % projectversion.fullname)
+            build.log("I: publishing for %s\n" % projectversion.fullname)
             basemirror_name = projectversion.basemirror.project.name
             basemirror_version = projectversion.basemirror.name
             project_name = projectversion.project.name
@@ -89,10 +89,10 @@ async def DebSrcPublish(session, build):
             await debian_repo.add_packages(publish_files, ci_build=build.is_ci)
             ret = True
         except Exception as exc:
-            await write_log(build.id, "E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            build.log("E: error adding files to projectversion {}\n".format(projectversion.fullname))
             logger.exception(exc)
 
-    await write_log(build.id, "\n")
+    build.log("\n")
 
     if ret:  # only delete if published, allow republish
         files2delete = publish_files
@@ -134,22 +134,22 @@ async def publish_packages(session, build, out_path):
     count_files = len(files2upload)
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build.id)
-        await write_log(build.id, "E: no debian packages found to upload\n")
-        await write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
+        build.log("E: no debian packages found to upload\n")
+        build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
     # FIXME: check on startup
     key = Configuration().debsign_gpg_email
     if not key:
         logger.error("Signing key not defined in configuration")
-        await write_log(build.id, "E: no signinig key defined in configuration\n")
-        await write_log(build.parent.parent.id, "E: build %d failed\n" % build.id)
+        build.log("E: no signinig key defined in configuration\n")
+        build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
-    await write_log(build.id, "I: Signing packages\n")
+    build.log("I: Signing packages\n")
 
     async def outh(line):
-        await write_log(build.id, "%s\n" % line)
+        build.log("%s\n" % line)
 
     v = strip_epoch_version(build.version)
     changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)
@@ -176,7 +176,7 @@ async def publish_packages(session, build, out_path):
         await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
         ret = True
     except Exception as exc:
-        await write_log(build.id, "E: error uploading files to repository\n")
+        build.log("E: error uploading files to repository\n")
         logger.exception(exc)
 
     files2delete = files2upload
@@ -203,8 +203,8 @@ async def DebPublish(session, build):
 
     try:
         out_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
-        await write_log(build.parent.parent.id, "I: publishing build %d\n" % build.id)
-        await write_log_title(build.id, "Publishing", no_header_newline=False)
+        build.parent.parent.log("I: publishing build %d\n" % build.id)
+        build.logtitle("Publishing", no_header_newline=False)
         if not await publish_packages(session, build, out_path):
             logger.error("publisher: error publishing build %d" % build.id)
             return False
