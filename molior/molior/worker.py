@@ -307,7 +307,7 @@ class Worker:
             await asyncio.sleep(2)
             return
 
-        if duplicate.state != "ready":
+        if duplicate.state != "ready" or duplicate.state != "error":  # merge duplicates in error state
             logger.info("worker: repo %d not ready, requeueing", duplicate_id)
             enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
