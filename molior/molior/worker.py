@@ -175,6 +175,7 @@ class Worker:
             logger.error("worker: error getting latest git tag")
             build.log("E: Error getting git tags\n")
             build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            build.logdone()
             logger.exception(exc)
             await build.set_failed()
             repo.set_ready()
@@ -188,6 +189,7 @@ class Worker:
             logger.error("sourcerepository '%s' has no release tag", repo.url)
             build.log("E: no git tags found\n")
             build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            build.logdone()
             await build.set_failed()
             session.commit()
             return

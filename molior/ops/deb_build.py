@@ -108,6 +108,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             logger.error("source repository %d not found", repo_id)
             parent.log("E: source repository {} not found\n".format(repo_id))
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             await parent.set_failed()
             session.commit()
             return
@@ -119,6 +120,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         if not ret:
             parent.log("E: git checkout failed\n")
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             await parent.set_failed()
             repo.set_ready()
             session.commit()
@@ -134,6 +136,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         if not info:
             parent.log("E: Error getting build information\n")
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             await parent.set_failed()
             repo.set_ready()
             session.commit()
@@ -146,6 +149,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             parent.log("E: the repository is not added to any projectversions from debian/molior.yml:\n")
             parent.log("   %s\n" % str(info.plain_targets))
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             repo.set_ready()
             await parent.set_nothing_done()
             session.commit()
@@ -180,6 +184,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             repo.log_state("CI builds are not enabled in configuration")
             parent.log("E: CI builds are not enabled in configuration\n")
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             await parent.set_successful()
             repo.set_ready()
             session.commit()
@@ -206,6 +211,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 repo.log_state("CI builds not enabled in specified projectversions, not building...")
                 parent.log("E: CI builds not enabled in specified projectversions, not building...\n")
                 parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                parent.logdone()
                 await parent.set_nothing_done()
                 repo.set_ready()
                 session.commit()
@@ -220,6 +226,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             repo.log_state("source package already built for version {}".format(info.version))
             parent.log("E: source package already built for version {}\n".format(info.version))
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             repo.set_ready()
             await parent.set_already_exists()
             session.commit()
@@ -361,6 +368,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         if not found:
             parent.log("E: no projectversion found to build for")
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            parent.logdone()
             await parent.set_nothing_done()
             repo.set_ready()
             session.commit()
@@ -376,6 +384,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         async def fail():
             parent.log("E: building source package failed\n")
             build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            parent.logdone()
             repo.set_ready()
             await build.set_failed()
             session.commit()
