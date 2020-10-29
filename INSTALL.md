@@ -190,6 +190,17 @@ sudo -u molior cat ~molior/.ssh/id_rsa.pub
 ```
   This key needs to be added to the ~molior/.ssh/authorized_keys on the build nodes (see below), and the git repositories needs to grant read access to this key.
 
+```
+$ ssh admin@molior-node
+admin@molior-node:~$ sudo su molior
+$ cd
+$ mkdir .ssh
+$ chmod 700 .ssh
+$ cat >.ssh/authorized_keys << EOF
+[ paste SSH ub key above ]
+EOF
+```
+
 ### Configure aptly server
 
 If you run aptly on a separate machine, you might want to configure it:
