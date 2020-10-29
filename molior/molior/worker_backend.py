@@ -1,5 +1,4 @@
 from ..app import logger
-from ..tools import write_log
 from .backend import Backend
 from .notifier import send_mail_notification
 from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend
@@ -29,7 +28,7 @@ class BackendWorker:
         if not build:
             logger.error("build_started: no build found for %d", build_id)
             return
-        await write_log(build.parent.parent.id, "I: started build %d\n" % build_id)
+        build.parent.parent.log("I: started build %d\n" % build_id)
         await build.set_building()
         session.commit()
 
@@ -60,7 +59,7 @@ class BackendWorker:
             if not build:
                 logger.error("build_failed: no build found for %d", build_id)
                 return
-            await write_log(build.parent.parent.id, "E: build %d failed\n" % build_id)
+            build.parent.parent.log("E: build %d failed\n" % build_id)
             await build.set_failed()
             session.commit()
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from ..app import logger
-from ..tools import get_changelog_attr, strip_epoch_version, write_log, write_log_title, db2array
+from ..tools import get_changelog_attr, strip_epoch_version, db2array
 from .git import GitCheckout, GetBuildInfo
 
 from ..model.database import Session
@@ -26,66 +26,72 @@ from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend
 
 
 async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
-    await write_log(build_id, "I: getting debian build information\n")
-    src_package_name = await get_changelog_attr("Source", repo_path)
-    version = await get_changelog_attr("Version", repo_path)
-    repo_path = Path(repo_path)
-
-    # FIXME: use global var
-    key = Configuration().debsign_gpg_email
-    if not key:
-        await write_log(build_id, "E: Signing key not defined in configuration\n")
-        logger.error("Signing key not defined in configuration")
-        return False
-
-    async def outh(line):
-        line = line.strip()
-        if line:
-            await write_log(build_id, "%s\n" % line)
-
-    if is_ci:
-        # in order to publish a sourcepackage for a ci build we need
-        # to create a ci changelog with the correct version
-
-        distribution = await get_changelog_attr("Distribution", repo_path)
-
-        env = os.environ.copy()
-        env["DEBFULLNAME"] = author
-        env["DEBEMAIL"] = email
-        dchcmd = "dch -v %s --distribution %s --force-distribution 'CI Build'" % (ci_version, distribution)
-        version = ci_version
-
-        process = Launchy(shlex.split(dchcmd), outh, outh, cwd=str(repo_path), env=env)
-        await process.launch()
-        ret = await process.wait()
-        if ret != 0:
-            logger.error("Error running dch for CI build")
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("BuildDebSrc: build %s not found" % build_id)
             return False
 
-        if (repo_path / ".git").exists():
-            process = Launchy(shlex.split(
-                              "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
-                              outh, outh, cwd=str(repo_path))
+        build.log("I: getting debian build information\n")
+        src_package_name = await get_changelog_attr("Source", repo_path)
+        version = await get_changelog_attr("Version", repo_path)
+        repo_path = Path(repo_path)
+
+        # FIXME: use global var
+        key = Configuration().debsign_gpg_email
+        if not key:
+            build.log("E: Signing key not defined in configuration\n")
+            logger.error("Signing key not defined in configuration")
+            return False
+
+        async def outh(line):
+            line = line.strip()
+            if line:
+                build.log("%s\n" % line)
+
+        if is_ci:
+            # in order to publish a sourcepackage for a ci build we need
+            # to create a ci changelog with the correct version
+
+            distribution = await get_changelog_attr("Distribution", repo_path)
+
+            env = os.environ.copy()
+            env["DEBFULLNAME"] = author
+            env["DEBEMAIL"] = email
+            dchcmd = "dch -v %s --distribution %s --force-distribution 'CI Build'" % (ci_version, distribution)
+            version = ci_version
+
+            process = Launchy(shlex.split(dchcmd), outh, outh, cwd=str(repo_path), env=env)
             await process.launch()
             ret = await process.wait()
             if ret != 0:
-                logger.error("Error creating ci build commit")
+                logger.error("Error running dch for CI build")
                 return False
 
-    logger.debug("%s: creating source package", src_package_name)
-    await write_log(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
+            if (repo_path / ".git").exists():
+                process = Launchy(shlex.split(
+                                  "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
+                                  outh, outh, cwd=str(repo_path))
+                await process.launch()
+                ret = await process.wait()
+                if ret != 0:
+                    logger.error("Error creating ci build commit")
+                    return False
 
-    cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
-    await process.launch()
-    ret = await process.wait()
-    if ret != 0:
-        await write_log(build_id, "E: Error building source package\n")
-        logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
-        return False
+        logger.debug("%s: creating source package", src_package_name)
+        build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
 
-    logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
-    return True
+        cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
+        process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
+        await process.launch()
+        ret = await process.wait()
+        if ret != 0:
+            build.log("E: Error building source package\n")
+            logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
+            return False
+
+        logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
+        return True
 
 
 async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
@@ -95,30 +101,30 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
             return
 
-        await write_log_title(parent_build_id, "Molior Build")
+        parent.logtitle("Molior Build")
 
         repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
         if not repo:
             logger.error("source repository %d not found", repo_id)
-            await write_log(parent_build_id, "E: source repository {} not found\n".format(repo_id))
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: source repository {} not found\n".format(repo_id))
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_failed()
             session.commit()
             return
 
-        await write_log(parent_build_id, "I: git checkout {}\n".format(git_ref))
+        parent.log("I: git checkout {}\n".format(git_ref))
 
         # Checkout
         ret = await asyncio.ensure_future(GitCheckout(repo.src_path, git_ref, parent_build_id))
         if not ret:
-            await write_log(parent_build_id, "E: git checkout failed\n")
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: git checkout failed\n")
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_failed()
             repo.set_ready()
             session.commit()
             return
 
-        await write_log(parent_build_id, "\nI: get build information\n")
+        parent.log("\nI: get build information\n")
         info = None
         try:
             info = await GetBuildInfo(repo.src_path, git_ref)
@@ -126,8 +132,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             logger.exception(exc)
 
         if not info:
-            await write_log(parent_build_id, "E: Error getting build information\n")
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: Error getting build information\n")
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_failed()
             repo.set_ready()
             session.commit()
@@ -137,9 +143,9 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         if not targets:
             repo.log_state("unknown target projectversions in debian/molior.yml")
-            await write_log(parent_build_id, "E: the repository is not added to any projectversions from debian/molior.yml:\n")
-            await write_log(parent_build_id, "   %s\n" % str(info.plain_targets))
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: the repository is not added to any projectversions from debian/molior.yml:\n")
+            parent.log("   %s\n" % str(info.plain_targets))
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             repo.set_ready()
             await parent.set_nothing_done()
             session.commit()
@@ -172,8 +178,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         if is_ci and not ci_enabled:
             repo.log_state("CI builds are not enabled in configuration")
-            await write_log(parent_build_id, "E: CI builds are not enabled in configuration\n")
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: CI builds are not enabled in configuration\n")
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_successful()
             repo.set_ready()
             session.commit()
@@ -198,8 +204,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                     break
             if not found:
                 repo.log_state("CI builds not enabled in specified projectversions, not building...")
-                await write_log(parent_build_id, "E: CI builds not enabled in specified projectversions, not building...\n")
-                await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+                parent.log("E: CI builds not enabled in specified projectversions, not building...\n")
+                parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
                 await parent.set_nothing_done()
                 repo.set_ready()
                 session.commit()
@@ -212,8 +218,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                                             Build.buildstate == "successful").first()
         if build:
             repo.log_state("source package already built for version {}".format(info.version))
-            await write_log(parent_build_id, "E: source package already built for version {}\n".format(info.version))
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: source package already built for version {}\n".format(info.version))
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             repo.set_ready()
             await parent.set_already_exists()
             session.commit()
@@ -239,7 +245,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         maintainer = session.query(Maintainer).filter(Maintainer.email == email).first()
         if not maintainer:
             repo.log_state("creating new maintainer: %s %s <%s>" % (firstname, lastname, email))
-            await write_log(parent_build_id, "I: creating new maintainer: %s %s <%s>\n" % (firstname, lastname, email))
+            parent.log("I: creating new maintainer: %s %s <%s>\n" % (firstname, lastname, email))
             maintainer = Maintainer(firstname=firstname, surname=lastname, email=email)
             session.add(maintainer)
             session.commit()
@@ -287,7 +293,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                         projectversion.project.name,
                         projectversion.name,
                     ))
-                await write_log(parent_build_id, "W: build to locked projectversion '%s-%s' not permitted\n" % (
+                parent.log("W: build to locked projectversion '%s-%s' not permitted\n" % (
                         projectversion.project.name,
                         projectversion.name,
                     ))
@@ -298,7 +304,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                         projectversion.project.name,
                         projectversion.name,
                     ))
-                await write_log(parent_build_id, "W: CI builds not enabled in projectversion '%s-%s'\n" % (
+                parent.log("W: CI builds not enabled in projectversion '%s-%s'\n" % (
                         projectversion.project.name,
                         projectversion.name,
                     ))
@@ -321,12 +327,12 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                         found = True
                         continue
                     logger.warning("already built %s", repo.name)
-                    await write_log(parent_build_id, "E: already built {}\n".format(repo.name))
+                    parent.log("E: already built {}\n".format(repo.name))
                     continue
 
                 found = True
 
-                await write_log(parent_build_id, "I: creating build for projectversion '%s/%s'\n" % (
+                parent.log("I: creating build for projectversion '%s/%s'\n" % (
                         projectversion.project.name,
                         projectversion.name,
                     ))
@@ -353,8 +359,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 await deb_build.build_added()
 
         if not found:
-            await write_log(parent_build_id, "E: no projectversion found to build for")
-            await write_log_title(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            parent.log("E: no projectversion found to build for")
+            parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.set_nothing_done()
             repo.set_ready()
             session.commit()
@@ -365,18 +371,18 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         await build.set_building()
         session.commit()
 
-        await write_log(parent_build_id, "I: building source package\n")
+        parent.log("I: building source package\n")
 
         async def fail():
-            await write_log(parent_build_id, "E: building source package failed\n")
-            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=True)
+            parent.log("E: building source package failed\n")
+            build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             repo.set_ready()
             await build.set_failed()
             session.commit()
             # FIXME: cancel deb builds, or only create deb builds after source build ok
 
         # Build Source Package
-        await write_log_title(build.id, "Source Build")
+        build.logtitle("Source Build")
         try:
             ret = await BuildDebSrc(repo_id, repo.src_path, build.id, info.version, is_ci,
                                     "{} {}".format(firstname, lastname), email)
@@ -395,7 +401,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         repo.set_ready()
         session.commit()
 
-        await write_log(parent_build_id, "I: publishing source package\n")
+        parent.log("I: publishing source package\n")
         enqueue_aptly({"src_publish": [build.id]})
 
 
@@ -511,8 +517,7 @@ async def ScheduleBuilds():
                     if not repo_dep:
                         logger.error("build-{}: dependency {} not found in projectversion {}".format(build.id,
                                      builddep, build.projectversion_id))
-                        await write_log(build.id,
-                                        "W: waiting for build order dependency {} to be built in projectversion {}\n".format(
+                        build.log("W: waiting for build order dependency {} to be built in projectversion {}\n".format(
                                              builddep, pvname))
                         ready = False
                         break
@@ -552,7 +557,7 @@ async def ScheduleBuilds():
                 if running_builds:
                     ready = False
                     builds = [str(b.id) for b in running_builds]
-                    await write_log(build.id, "W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
+                    build.log("W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
                                          dep_repo.name, ", ".join(builds), pvname))
                     continue
 
@@ -578,7 +583,7 @@ async def ScheduleBuilds():
                     else:
                         pvname = projectversion.fullname
 
-                    await write_log(build.id, "W: waiting for repo {} to be built in projectversion {}\n".format(
+                    build.log("W: waiting for repo {} to be built in projectversion {}\n".format(
                                          dep_repo.name, pvname))
                     continue
 

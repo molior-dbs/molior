@@ -1,7 +1,6 @@
 from launchy import Launchy
 
 from ..app import logger
-from ..tools import write_log, write_log_title
 from ..model.database import Session
 from ..model.build import Build
 from ..model.chroot import Chroot
@@ -28,16 +27,16 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             logger.error("aptly worker: mirror build with id %d not found", build_id)
             return False
 
-        await write_log_title(build_id, "Chroot Environment")
+        build.buildligtitle("Chroot Environment")
 
         await build.set_building()
         session.commit()
 
         logger.info("creating build environments for %s-%s-%s", dist, version, arch)
-        await write_log(build_id, "Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
+        build.log("Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
 
         async def outh(line):
-            await write_log(build_id, "%s\n" % line)
+            build.log("%s\n" % line)
 
         process = Launchy(["sudo", "run-parts", "-a", "build", "-a", dist, "-a", name,
                            "-a", version, "-a", arch, "-a", components, "-a", repo_url,
@@ -48,9 +47,9 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         if not ret == 0:
             logger.error("error creating build env")
-            await write_log(build_id, "Error creating build environment\n")
-            await write_log(build_id, "\n")
-            await write_log_title(build_id, "Done", no_footer_newline=True)
+            build.log("Error creating build environment\n")
+            build.log("\n")
+            build.buildligtitle("Done", no_footer_newline=True)
             await build.set_failed()
             session.commit()
             return False
@@ -68,14 +67,14 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         if not ret == 0:
             logger.error("error publishing build env")
-            await write_log(build_id, "Error publishing build environment\n")
-            await write_log_title(build_id, "Done", no_footer_newline=True)
+            build.log("Error publishing build environment\n")
+            build.buildligtitle("Done", no_footer_newline=True)
             await build.set_publish_failed()
             session.commit()
             return False
 
-        await write_log(build_id, "\n")
-        await write_log_title(build_id, "Done", no_footer_newline=True)
+        build.log("\n")
+        build.buildligtitle("Done", no_footer_newline=True)
         await build.set_successful()
         session.commit()
 

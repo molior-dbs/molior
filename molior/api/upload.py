@@ -2,15 +2,13 @@ import os
 
 from aiohttp import web
 from pathlib import Path
-from aiofile import AIOFile, Writer
-from asyncio import get_event_loop
 
 from ..app import app, logger
 from ..molior.configuration import Configuration
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from ..molior.queues import enqueue_backend
+from ..molior.queues import enqueue_backend, buildlog
 
 
 if not os.environ.get("IS_SPHINX", False):
@@ -68,32 +66,21 @@ async def ws_logs_connected(ws_client):
             return ws_client
 
     logger.debug("ws: recieving logs for build {}".format(build.id))
-    filename = get_log_file_path(build.id)
-    afp = AIOFile(filename, 'w')
-    await afp.open()
-    writer = Writer(afp)
     ws_client.cirrina.build_id = build.id
-    ws_client.cirrina.buildlog = (afp, writer)
     return ws_client
 
 
 @app.websocket_message("/internal/buildlog/{token}", group="log", authenticated=False)
 async def ws_logs(ws_client, msg):
-    afp, writer = ws_client.cirrina.buildlog
-    await writer(msg)
-    await afp.fsync()
+    buildlog(ws_client.cirrina.build_id, msg)
     return ws_client
 
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
     logger.debug("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
-    afp, _ = ws_client.cirrina.buildlog
 
     async def terminate(afp):
-        await afp.fsync()
-        await afp.close()
         enqueue_backend({"logging_done": ws_client.cirrina.build_id})
-    get_event_loop().create_task(terminate(afp))
 
     return ws_client

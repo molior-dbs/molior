@@ -5,7 +5,6 @@ import giturlparse
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
 from ..ops import BuildProcess, ScheduleBuilds, CreateBuildEnv
-from ..tools import write_log, write_log_title
 from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, dequeue_task, enqueue_aptly
 
@@ -92,7 +91,7 @@ class Worker:
         repo.set_cloning()
         session.commit()
 
-        asyncio.ensure_future(GitClone(build_id, repo.id))
+        asyncio.ensure_future(GitClone(build.id, repo.id))
 
     async def _build(self, args, session):
         logger.debug("worker: got build task")
@@ -115,7 +114,7 @@ class Worker:
             return
 
         if repo.state == "error":
-            await write_log(build.id, "E: git repo is in error state\n")
+            build.log("E: git repo is in error state\n")
             await build.set_failed()
             return
 
@@ -150,7 +149,7 @@ class Worker:
             return
 
         if repo.state == "error":
-            await write_log(build.id, "E: git repo is in error state\n")
+            build.log("E: git repo is in error state\n")
             await build.set_failed()
             return
 
@@ -166,16 +165,16 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        await write_log_title(build.id, "Checking Repository")
+        build.log("Checking Repository")
 
-        await write_log(build.id, "I: fetching git tags\n")
+        build.log("I: fetching git tags\n")
         try:
             # this does a git fetch
             latest_tag = await get_latest_tag(repo.src_path, build_id)
         except Exception as exc:
             logger.error("worker: error getting latest git tag")
-            await write_log(build.id, "E: Error getting git tags\n")
-            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
+            build.log("E: Error getting git tags\n")
+            build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             logger.exception(exc)
             await build.set_failed()
             repo.set_ready()
@@ -187,13 +186,13 @@ class Worker:
 
         if not latest_tag:
             logger.error("sourcerepository '%s' has no release tag", repo.url)
-            await write_log(build.id, "E: no git tags found\n")
-            await write_log_title(build.id, "Done", no_footer_newline=True, no_header_newline=False)
+            build.log("E: no git tags found\n")
+            build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await build.set_failed()
             session.commit()
             return
 
-        await write_log(build.id, "\n")
+        build.log("\n")
         git_ref = str(latest_tag)
         args = {"build": [build_id, repo_id, git_ref, None, None, False]}
         enqueue_task(args)
@@ -230,7 +229,7 @@ class Worker:
                 ok = True
                 await build.set_needs_publish()
                 session.commit()
-                await write_log(build.parent.id, "I: publishing source package\n")
+                build.parent.log("I: publishing source package\n")
                 enqueue_aptly({"src_publish": [build.id]})
 
         if build.buildtype == "chroot":
