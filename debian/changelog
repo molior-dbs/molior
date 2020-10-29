@@ -1,3 +1,9 @@
+molior (1.4.0~alpha178) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha178
+
+ -- André Roth <neolynx@gmail.com>  Thu, 29 Oct 2020 22:45:17 +0000
+
 molior (1.4.0~alpha177) stretch; urgency=medium
 
   * repo delete: include repo in error state
