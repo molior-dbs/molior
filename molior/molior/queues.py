@@ -1,7 +1,11 @@
 import asyncio
+
 from datetime import datetime
+from aiofile import AIOFile, Writer
+from pathlib import Path
 
 from ..tools import get_local_tz
+from ..molior.configuration import Configuration
 
 # worker queues
 task_queue = asyncio.Queue()
@@ -59,9 +63,37 @@ async def dequeue_backend():
     return await dequeue(backend_queue)
 
 
+buildout_path = Path(Configuration().working_dir) / "buildout"
+
+
+def get_log_file_path(build_id):
+    dir_path = buildout_path / str(build_id)
+    if not dir_path.is_dir():
+        dir_path.mkdir(parents=True)
+    full_path = dir_path / "build.log"
+    return str(full_path)
+
+
+async def buildlog_writer(build_id):
+    filename = get_log_file_path(build_id)
+    afp = AIOFile(filename, 'a')
+    await afp.open()
+    writer = Writer(afp)
+    while True:
+        msg = await dequeue(buildlogs[build_id])
+        if msg is None:
+            enqueue_backend({"logging_done": build_id})
+            break
+        await writer(msg)
+        await afp.fsync()
+
+    del buildlogs[build_id]
+
+
 async def enqueue_buildlog(build_id, msg):
     if build_id not in buildlogs:
         buildlogs[build_id] = asyncio.Queue()
+        asyncio.ensure_future(buildlog_writer(build_id))
     await buildlogs[build_id].put(msg)
 
 

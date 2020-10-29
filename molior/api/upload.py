@@ -36,24 +36,6 @@ async def file_upload(request, tempfile, filename, size):
     return web.Response(text="file uploaded: {} ({} bytes)".format(filename, size))
 
 
-def get_log_file_path(build_id):
-    """Get log file path for given task_id.
-
-        Args:
-            task_id (str): The tasks's id
-
-        Returns:
-            str: Path to log file
-    """
-    buildout_path = Path(Configuration().working_dir) / "buildout"
-    dir_path = buildout_path / str(build_id)
-    # FIXME: do not create buildout directory here
-    if not dir_path.is_dir():
-        dir_path.mkdir(parents=True)
-    full_path = dir_path / "build.log"
-    return str(full_path)
-
-
 @app.websocket_connect(group="log")
 async def ws_logs_connected(ws_client):
     token = ws_client.cirrina.request.match_info["token"]
@@ -79,6 +61,7 @@ async def ws_logs(ws_client, msg):
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
     logger.debug("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
+    buildlog(ws_client.cirrina.build_id, None)
 
     async def terminate(afp):
         enqueue_backend({"logging_done": ws_client.cirrina.build_id})
