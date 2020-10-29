@@ -1,9 +1,16 @@
 #!/bin/bash
 
-if [ "$1" != "info" -a "$#" -lt 5 ]; then
-  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> [components,]" >&2
+usage()
+{
+  echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> components <mirror url> keys" 1>&2
   echo "       $0 info" 1>&2
   exit 1
+}
+
+if [ "$1" == "build" -a "$#" -lt 7 ]; then
+  usage
+elif [ "$1" != "publish" -a "$#" -lt 4 ]; then
+  usage
 fi
 
 ACTION=$1
@@ -11,20 +18,12 @@ DIST_RELEASE=$2
 DIST_NAME=$3
 DIST_VERSION=$4
 ARCH=$5
-COMPONENTS=$6
+COMPONENTS=$6 # separated by comma
 REPO_URL=$7
 KEYS="$8"  # separated by space
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
 DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
-
-# Workaround obsolete pxz package on buster
-xzversion=`dpkg -s xz-utils | grep ^Version: | sed 's/^Version: //'`
-if dpkg --compare-versions "$xzversion" lt 5.2.4-1; then
-  TAR_PXZ="-Ipxz"
-else
-  TAR_PXZ=""
-fi
 
 set -e
 
@@ -125,7 +124,7 @@ publish_debootstrap()
 
   echo I: Creating debootstrap tar
   cd $DEBOOTSTRAP
-  tar $TAR_PXZ -cf ../$DEBOOTSTRAP_NAME.tar.xz .
+  XZ_OPT="--threads=`nproc --ignore=1`" tar -cJf ../$DEBOOTSTRAP_NAME.tar.xz .
   cd - > /dev/null
   rm -rf $DEBOOTSTRAP
 

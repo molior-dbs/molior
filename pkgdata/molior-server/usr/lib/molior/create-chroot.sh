@@ -1,32 +1,16 @@
 #!/bin/bash
 
-#function parse_yaml {
-   #local prefix=$2
-   #local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   #sed -ne "s|^\($s\):|\1|" \
-        #-e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        #-e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   #awk -F$fs '{
-      #indent = length($1)/2;
-      #vname[indent] = $2;
-      #for (i in vname) {if (i > indent) {delete vname[i]}}
-      #if (length($3) > 0) {
-         #vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         #printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      #}
-   #}'
-#}
-
-#CONFIG_FILE=/etc/molior/molior.yml
-
-## Reads the config yaml and sets env variables
-#eval $(parse_yaml $CONFIG_FILE)
-#DEBSIGN_GPG_EMAIL=$debsign_gpg_email
-
-if [ "$1" != "info" -a "$#" -lt 7 ]; then
+usage()
+{
   echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> components <mirror url> keys" 1>&2
   echo "       $0 info" 1>&2
   exit 1
+}
+
+if [ "$1" == "build" -a "$#" -lt 7 ]; then
+  usage
+elif [ "$1" != "publish" -a "$#" -lt 4 ]; then
+  usage
 fi
 
 ACTION=$1
