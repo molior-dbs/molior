@@ -91,7 +91,7 @@ class Worker:
         repo.set_cloning()
         session.commit()
 
-        asyncio.ensure_future(GitClone(build.id, repo.id))
+        asyncio.ensure_future(GitClone(build.id, repo.id, session))
 
     async def _build(self, args, session):
         logger.debug("worker: got build task")
