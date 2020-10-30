@@ -1,3 +1,4 @@
+import re
 import giturlparse
 
 from sqlalchemy.sql import or_
@@ -148,8 +149,8 @@ async def get_repositories2(request):
             description: successful
     """
     db = request.cirrina.db_session
-    url = request.GET.getone("url", "")
-    name = request.GET.getone("filter_name", "")
+    url = request.GET.getone("filter_url", "")
+    filter_name = request.GET.getone("q", "")
     exclude_projectversion_id = request.GET.getone("exclude_projectversion_id", "")
     try:
         exclude_projectversion_id = int(exclude_projectversion_id)
@@ -159,10 +160,14 @@ async def get_repositories2(request):
     query = db.query(SourceRepository)
 
     if url:
-        query = query.filter(SourceRepository.url.like("%{}%".format(url)))
+        terms = re.split("[/ ]", url)
+        for term in terms:
+            if not term:
+                continue
+            query = query.filter(SourceRepository.url.like("%{}%".format(term)))
 
-    if name:
-        query = query.filter(SourceRepository.name.like("%{}%".format(name)))
+    if filter_name:
+        query = query.filter(SourceRepository.name.like("%{}%".format(filter_name)))
 
     if exclude_projectversion_id != -1:
         query = query.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
