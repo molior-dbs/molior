@@ -22,9 +22,12 @@ async def run_git(cmd, cwd, build, write_output_log=True):
         if write_output_log:
             build.log(line)
 
+    async def errh(line):
+        build.log(line)
+
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd, env=env)
+    process = Launchy(shlex.split(cmd), outh, errh, cwd=cwd, env=env)
     await process.launch()
     ret = await process.wait()
     return ret == 0
@@ -176,12 +179,12 @@ async def GitCheckout(repo_path, git_ref, build_id):
 
         if not await GitCleanLocal(repo_path, build):
             return False
-
         if not await run_git("git fetch --tags --prune --prune-tags --force", repo_path, build, write_output_log=False):
             return False
+        if not await run_git("git checkout --force {}".format(git_ref), repo_path, build, write_output_log=False):
+            return False
 
-        git_commands = ["git checkout --force {}".format(git_ref),
-                        "git submodule sync --recursive",
+        git_commands = ["git submodule sync --recursive",
                         "git submodule update --init --recursive",
                         "git clean -dffx",
                         "git lfs pull"]
