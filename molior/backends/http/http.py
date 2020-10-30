@@ -60,7 +60,6 @@ async def node_register(ws_client):
 async def node_message(ws_client, msg):
     try:
         status = json.loads(msg)
-        logger.warning(status)
         if "register" in status:
             ws_client.molior_cpu_cores = status["register"]["cpu_cores"]
             ws_client.molior_ram_total = status["register"]["ram_total"]
