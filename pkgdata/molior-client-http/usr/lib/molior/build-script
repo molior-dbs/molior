@@ -112,21 +112,18 @@ log "Build ID: $BUILD_ID"
 log "Builder : `hostname`"
 echo
 
-log "Apt Repository Dependencies:"
-log "$APT_URLS_PLAIN"
-
-log "APT Sources"
-wget -q -O- $MOLIOR_SERVER/api/projectsources/$PROJECT/$PROJECTVERSION
-
-
+log "APT Sources:"
+wget -q -O- $MOLIOR_SERVER/api/projectsources/$PROJECT/$PROJECTVERSION | sed -e '/^#/d' -e '/^$/d' -e 's/^/- /'
+echo
 
 cd # why are we not in $HOME ?
 
 mkdir -p build
 cd build
 
+log "Downloading:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
-log "Downloading $sources_url"
+log "- $sources_url"
 # FIXME: use curl, remove wget
 pkgdir=`wget --timeout=30 -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
@@ -138,7 +135,7 @@ fi
 VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
 
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
-log "Downloading $dsc_url"
+log "- $dsc_url"
 wget --timeout=30 -q $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "Error downloading source package $dsc_url"
@@ -148,10 +145,12 @@ fi
 for srcfile in `/usr/lib/molior/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
 do
   src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
-  log "Downloading $src_url"
+  log "- $src_url"
   wget --timeout=30 -q $src_url
 done
 
+echo
+echo -n "Validating "
 dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc
 if [ "$?" -ne 0 ]; then
   echo "Error: invalid source signature"
@@ -162,7 +161,7 @@ CLEANUP_SCHROOT=0
 if [ ! -e /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH ]; then
   CLEANUP_SCHROOT=1
   SCHROOT_URL=http://$MOLIOR_SERVER/schroots/
-  log "Downloading $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
+  log "- $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
   wget --timeout=30 -q $SCHROOT_URL/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
   wget --timeout=30 -q $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
 
@@ -174,6 +173,7 @@ else
   sudo cp /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
 fi
 
+echo
 log "Extracting $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
 sudo rm -rf   /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 sudo mkdir -p /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
