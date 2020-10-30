@@ -60,19 +60,19 @@ async def node_message(ws_client, msg):
     try:
         status = json.loads(msg)
         if "register" in status:
-            ws_client.molior_cpu_cores = status["register"]["cpu_cores"]
-            ws_client.molior_ram_total = status["register"]["ram_total"]
-            ws_client.molior_disk_total = status["register"]["disk_total"]
-            ws_client.molior_machine_id = status["register"]["machine_id"]
-            ws_client.molior_ip = status["register"]["ip"]
-            ws_client.molior_client_ver = status["register"]["client_ver"]
+            ws_client.molior_cpu_cores = status["register"].get("cpu_cores")
+            ws_client.molior_ram_total = status["register"].get("ram_total")
+            ws_client.molior_disk_total = status["register"].get("disk_total")
+            ws_client.molior_machine_id = status["register"].get("machine_id")
+            ws_client.molior_ip = status["register"].get("ip")
+            ws_client.molior_client_ver = status["register"].get("client_ver")
 
         if "pong" in status:
             ws_client.molior_pong_pending = 0
             ws_client.molior_uptime_seconds = status["pong"]["uptime_seconds"]
             ws_client.molior_load = status["pong"]["load"]
-            ws_client.molior_ram_used = status["pong"]["ram_used"]
-            ws_client.molior_disk_used = status["pong"]["disk_used"]
+            ws_client.molior_ram_used = status["pong"].get("ram_used")
+            ws_client.molior_disk_used = status["pong"].get("disk_used")
             return
 
         arch = ws_client.molior_node_arch
@@ -168,14 +168,14 @@ class HTTPBackend:
                     "state": "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
-                    "cpu_cores": node.molior_cpu_cores,
-                    "ram_used": node.molior_ram_used,
-                    "ram_total": node.molior_ram_total,
-                    "disk_used": node.molior_disk_used,
-                    "disk_total": node.molior_disk_total,
-                    "machine_id": node.molior_machine_id,
-                    "ip": node.molior_ip,
-                    "client_ver": node.molior_client_ver
+                    "cpu_cores": node.get("molior_cpu_cores"),
+                    "ram_used": node.get("molior_ram_used"),
+                    "ram_total": node.get("molior_ram_total"),
+                    "disk_used": node.get("molior_disk_used"),
+                    "disk_total": node.get("molior_disk_total"),
+                    "machine_id": node.get("molior_machine_id"),
+                    "ip": node.get("molior_ip"),
+                    "client_ver": node.get("molior_client_ver")
                 }
         for arch in running_nodes:
             for node in running_nodes[arch]:
@@ -184,14 +184,14 @@ class HTTPBackend:
                     "state": "busy",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
-                    "cpu_cores": node.molior_cpu_cores,
-                    "ram_used": node.molior_ram_used,
-                    "ram_total": node.molior_ram_total,
-                    "disk_used": node.molior_disk_used,
-                    "disk_total": node.molior_disk_total,
-                    "machine_id": node.molior_machine_id,
-                    "ip": node.molior_ip,
-                    "client_ver": node.molior_client_ver
+                    "cpu_cores": node.get("molior_cpu_cores"),
+                    "ram_used": node.get("molior_ram_used"),
+                    "ram_total": node.get("molior_ram_total"),
+                    "disk_used": node.get("molior_disk_used"),
+                    "disk_total": node.get("molior_disk_total"),
+                    "machine_id": node.get("molior_machine_id"),
+                    "ip": node.get("molior_ip"),
+                    "client_ver": node.get("molior_client_ver")
                 }
         return build_nodes
 
