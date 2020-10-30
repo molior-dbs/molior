@@ -3,10 +3,9 @@ import json
 
 from ...app import app, logger
 from ...molior.configuration import Configuration
-from ...molior.queues import enqueue_backend
+from ...molior.queues import enqueue_backend, enqueue_buildtask, dequeue_buildtask
 
 registry = {"amd64": [], "arm64": []}
-build_tasks = {"amd64": asyncio.Queue(), "arm64": asyncio.Queue()}
 running_nodes = {"amd64": [], "arm64": []}
 
 cfg = Configuration()
@@ -144,27 +143,20 @@ class HTTPBackend:
             logger.error("backend: invalid build architecture '%s'", arch)
             return False
 
-        async def queueup():
-            await build_tasks[queue_arch].put(
-                {
-                    "build_id": build_id,
-                    "token": token,
-                    "version": build_version,
-                    "apt_server": apt_server,
-                    "architecture": arch,
-                    "arch_any_only": arch_any_only,
-                    "distrelease": distrelease_name,
-                    "distversion": distrelease_version,
-                    "project_dist": project_dist,
-                    "repository_name": sourcename,
-                    "project": project_name,
-                    "projectversion": project_version,
-                    "apt_urls": apt_urls,
-                    "task_id": task_id,
-                }
-            )
-
-        asyncio.ensure_future(queueup(), loop=self.loop)
+        enqueue_buildtask(queue_arch, {"build_id": build_id,
+                                       "token": token,
+                                       "version": build_version,
+                                       "apt_server": apt_server,
+                                       "architecture": arch,
+                                       "arch_any_only": arch_any_only,
+                                       "distrelease": distrelease_name,
+                                       "distversion": distrelease_version,
+                                       "project_dist": project_dist,
+                                       "repository_name": sourcename,
+                                       "project": project_name,
+                                       "projectversion": project_version,
+                                       "apt_urls": apt_urls,
+                                       "task_id": task_id})
 
     def get_nodes_info(self):
         # FIXME: lock both dicts on every access
@@ -206,7 +198,7 @@ class HTTPBackend:
     async def scheduler(self, arch):
         while True:
             try:
-                task = await build_tasks[arch].get()
+                task = await dequeue_buildtask(arch)
                 if task is None:
                     logger.error("backend: got emtpy task, aborting...")
                     break
@@ -228,7 +220,6 @@ class HTTPBackend:
                     await node.send_str(json.dumps({"task": task}))
                 else:
                     node.send_str(json.dumps({"task": task}))
-                build_tasks[arch].task_done()
 
             except Exception as exc:
                 logger.exception(exc)

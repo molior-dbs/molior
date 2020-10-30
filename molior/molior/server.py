@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import click
 
 from sqlalchemy.orm import sessionmaker
@@ -46,19 +45,6 @@ import molior.api2.mirror            # noqa: F401
 loop = asyncio.get_event_loop()
 
 
-def run_backend_thread(backend):
-    """
-    Starts the threads
-    """
-    import threading
-
-    backend_thread = threading.Thread(target=backend.run)
-    backend_thread.start()
-    logger.info("joining backend thread")
-    backend_thread.join()
-    logger.info("backend thread terminated")
-
-
 async def cleanup_task():
     enqueue_aptly({"cleanup": []})
 
@@ -81,12 +67,7 @@ async def main(backend):
     notification_worker = NotificationWorker()
     asyncio.ensure_future(notification_worker.run())
 
-    if hasattr(backend, "run"):
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            await loop.run_in_executor(pool, run_backend_thread, backend)
-        logger.info("asyncio threads terminated")
-
-    # FIXME: await futures ?
+    asyncio.ensure_future(backend.run())
 
     cleanup_sched = Scheduler(locale="en_US")
     # cleanup_job = CronJob(name='cleanup').every().hour.at(":34").go(cleanup_task, (5), age=99)
@@ -129,4 +110,4 @@ if __name__ == "__main__":
     if not Auth().init():
         exit(1)
     asyncio.ensure_future(main(backend))
-    mainloop()  # pylint: disable=no-value-for-parameter
+    mainloop()

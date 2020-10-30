@@ -16,6 +16,9 @@ backend_queue = asyncio.Queue()
 # build log queues
 buildlogs = {}
 
+# buildtask queues
+buildtasks = {"amd64": asyncio.Queue(), "arm64": asyncio.Queue()}
+
 
 async def enqueue(queue, item):
     return await queue.put(item)
@@ -129,3 +132,14 @@ def buildlogtitle(build_id, title, no_footer_newline=False, no_header_newline=Tr
           "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline)
 
     buildlog(build_id, msg)
+
+
+def enqueue_buildtask(arch, task):
+    if arch not in buildtasks:
+        return
+    loop = asyncio.get_event_loop()
+    asyncio.run_coroutine_threadsafe(enqueue(buildtasks[arch], task), loop)
+
+
+async def dequeue_buildtask(arch):
+    return await dequeue(buildtasks[arch])
