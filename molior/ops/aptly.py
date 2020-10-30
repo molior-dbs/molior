@@ -1,5 +1,6 @@
 import os
 import shlex
+import re
 
 from launchy import Launchy
 from pathlib import Path
@@ -149,7 +150,8 @@ async def publish_packages(session, build, out_path):
     build.log("Signing packages:\n")
 
     async def outh(line):
-        build.log("%s\n" % line)
+        if len(line.strip()) != 0:
+            build.log("%s\n" % re.sub(r"^ *", " * ", line))
 
     v = strip_epoch_version(build.version)
     changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)

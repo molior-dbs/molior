@@ -87,11 +87,11 @@ finish ()
     set +e
     log "\nCleanup:"
     cd / # step out of mounted directories
-    log " * Deleting schroot session"
+    log " * deleting schroot session"
     schroot --all-sessions -e
-    log " * Cleaning up /var/lib/sbuild/build"
+    log " * cleaning up /var/lib/sbuild/build"
     sudo rm -rf /var/lib/sbuild/build/*
-    log " * Cleaning up /var/lib/schroot/chroots"
+    log " * cleaning up /var/lib/schroot/chroots"
     sudo rm -rf /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
     sudo rm -f /etc/schroot/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
 
@@ -104,7 +104,7 @@ finish ()
 }
 trap finish EXIT
 
-log_title "Building" no-header-newline
+log_title "Molior Build" no-header-newline
 
 log "Building: $REPO_NAME $VERSION"
 log "Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
@@ -151,7 +151,7 @@ done
 
 echo
 echo -n "Validating "
-dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc
+dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc | sed 's/^ */ * /'
 if [ "$?" -ne 0 ]; then
   echo "Error: invalid source signature"
   exit 1
@@ -194,6 +194,10 @@ else
     SBUILD_ARCH_ARGS="--arch-all --arch=$ARCH"
 fi
 
+if echo $VERSION | grep -q "+git"; then
+    SBUILD_ARGS="--no-run-lintian"
+fi
+
 # FIXME: signature verification inside sbuild schroot
 
 APT_KEYS=""
@@ -224,7 +228,7 @@ log_title "Uploading"
 rm -f ${REPO_NAME}_${VERSION}_$ARCH.build
 OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.build" -o -name "*_$ARCH.buildinfo" -o -name "*_$ARCH.changes"`
 
-log "Uploading output files: "
+log "Uploading: "
 for f in $OUTPUT_FILES
 do
   log " * `echo $f | sed 's#^./##'`"
