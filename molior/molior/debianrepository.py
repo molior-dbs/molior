@@ -138,7 +138,7 @@ class DebianRepository:
                                               self.project_version, dist)
             except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)
 
             # FIXME: delete also old timestamped snapshots
             snapshot_name = self.__get_snapshot_name(dist)
