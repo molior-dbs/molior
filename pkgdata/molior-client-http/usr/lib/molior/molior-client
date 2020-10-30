@@ -7,6 +7,10 @@ import logging
 import json
 import os
 import shlex
+import subprocess
+from multiprocessing import cpu_count
+from psutil import virtual_memory, disk_usage
+from netifaces import ifaddresses, AF_INET
 from launchy import Launchy
 
 # allow older aiohttp versions
@@ -96,9 +100,36 @@ async def build(params, masterws):
 
 
 async def main():
+
+    def get_machine_id():
+        try:
+            with open('/etc/machine-id') as machine_id_file:
+                machine_id = machine_id_file.readline().strip()
+        except IOError:
+            machine_id = None
+        return machine_id
+
+    def get_ip_address(interface_name):
+        interface = {}
+        inet_config = ifaddresses(interface_name).get(AF_INET, None)
+        if inet_config:
+            if len(inet_config) > 0:
+                interface = inet_config[0]
+        ip = interface.get("addr", "")
+        if ip == "?":
+            return None
+        return ip
+
     session = aiohttp.ClientSession()
     machine = platform.machine()
     node = platform.node()
+    cpu_cores = cpu_count()
+    ram_total = virtual_memory().total
+    disk_total = disk_usage("/").total
+    machine_id = get_machine_id()
+    ip = get_ip_address("eth0")
+    client_ver = str(subprocess.check_output(["dpkg-query", "--showformat=${Version}", "--show",
+                     "molior-client-http"], stderr=subprocess.DEVNULL), "utf-8")
 
     if machine == 'x86_64':
         arch = 'amd64'
@@ -112,7 +143,14 @@ async def main():
 
     while(True):
         try:
-            async with session.ws_connect("ws://{}/internal/registry/{}/{}".format(molior_server, arch, node)) as ws:
+            async with session.ws_connect("ws://{}/internal/registry/{}/{}".format(
+                                          molior_server, arch, node)) as ws:
+                await ws.send_str(json.dumps({"register": {"cpu_cores": cpu_cores,
+                                                           "ram_total": ram_total,
+                                                           "disk_total": disk_total,
+                                                           "machine_id": machine_id,
+                                                           "ip": ip,
+                                                           "client_ver": client_ver}}))
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         try:
@@ -130,14 +168,11 @@ async def main():
                             with open('/proc/uptime', 'r') as f:
                                 uptime_seconds = float(f.readline().split()[0])
 
-                            if asyncio.iscoroutinefunction(ws.send_str):
-                                await ws.send_str(json.dumps({"pong": {"seq": req["ping"],
-                                                             "uptime_seconds": uptime_seconds,
-                                                              "load": os.getloadavg()}}))
-                            else:
-                                ws.send_str(json.dumps({"pong": {"seq": req["ping"],
-                                                       "uptime_seconds": uptime_seconds,
-                                                        "load": os.getloadavg()}}))
+                            await ws.send_str(json.dumps({"pong": {
+                                              "seq": req["ping"],
+                                              "uptime_seconds": uptime_seconds,
+                                              "load": os.getloadavg(), "ram_used": virtual_memory().used,
+                                              "disk_used": disk_usage("/").used}}))
 
                         else:
                             logger.error("invalid request: %s", msg.data)

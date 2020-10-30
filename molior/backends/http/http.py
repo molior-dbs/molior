@@ -55,14 +55,26 @@ async def node_register(ws_client):
         logger.error("backend: invalid architecture received: '%s'", arch)
 
 
-@app.websocket_message("/internal/registry/{arch}/{node}", group="registry", authenticated=False)
+@app.websocket_message("/internal/registry/{arch}/{node}",
+                       group="registry", authenticated=False)
 async def node_message(ws_client, msg):
     try:
         status = json.loads(msg)
+        logger.warning(status)
+        if "register" in status:
+            ws_client.molior_cpu_cores = status["register"]["cpu_cores"]
+            ws_client.molior_ram_total = status["register"]["ram_total"]
+            ws_client.molior_disk_total = status["register"]["disk_total"]
+            ws_client.molior_machine_id = status["register"]["machine_id"]
+            ws_client.molior_ip = status["register"]["ip"]
+            ws_client.molior_client_ver = status["register"]["client_ver"]
+
         if "pong" in status:
             ws_client.molior_pong_pending = 0
             ws_client.molior_uptime_seconds = status["pong"]["uptime_seconds"]
             ws_client.molior_load = status["pong"]["load"]
+            ws_client.molior_ram_used = status["pong"]["ram_used"]
+            ws_client.molior_disk_used = status["pong"]["disk_used"]
             return
 
         arch = ws_client.molior_node_arch
@@ -165,6 +177,14 @@ class HTTPBackend:
                     "state": "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
+                    "cpu_cores": node.molior_cpu_cores,
+                    "ram_used": node.molior_ram_used,
+                    "ram_total": node.molior_ram_total,
+                    "disk_used": node.molior_disk_used,
+                    "disk_total": node.molior_disk_total,
+                    "machine_id": node.molior_machine_id,
+                    "ip": node.molior_ip,
+                    "client_ver": node.molior_client_ver
                 }
         for arch in running_nodes:
             for node in running_nodes[arch]:
@@ -173,6 +193,14 @@ class HTTPBackend:
                     "state": "busy",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
+                    "cpu_cores": node.molior_cpu_cores,
+                    "ram_used": node.molior_ram_used,
+                    "ram_total": node.molior_ram_total,
+                    "disk_used": node.molior_disk_used,
+                    "disk_total": node.molior_disk_total,
+                    "machine_id": node.molior_machine_id,
+                    "ip": node.molior_ip,
+                    "client_ver": node.molior_client_ver
                 }
         return build_nodes
 
