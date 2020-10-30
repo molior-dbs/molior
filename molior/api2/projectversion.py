@@ -280,7 +280,7 @@ async def snapshot_projectversion(request):
     if db.query(ProjectVersion).join(Project).filter(
             ProjectVersion.name == name,
             Project.id == projectversion.project_id).first():
-        return ErrorResponse(400, "Projectversion already exists.")
+        return ErrorResponse(400, "Projectversion '%s' already exists" % name)
 
     # find latest builds
     latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
