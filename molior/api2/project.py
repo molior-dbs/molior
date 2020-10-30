@@ -207,8 +207,9 @@ async def create_projectversion(request):
     projectversion = db.query(ProjectVersion).join(Project).filter(
             ProjectVersion.name == name, Project.id == project.id).first()
     if projectversion:
-        return ErrorResponse(400, "Projectversion already exists{}".format(
-                ", and is marked as deleted" if projectversion.is_deleted else ""))
+        return ErrorResponse(400, "Projectversion '{}' already exists{}".format(
+                                        name,
+                                        ", and is marked as deleted" if projectversion.is_deleted else ""))
 
     basemirror = db.query(ProjectVersion).join(Project).filter(
                                     Project.id == ProjectVersion.project_id,
