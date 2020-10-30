@@ -114,6 +114,7 @@ async def get_builds(request):
     search = request.GET.getone("search", None)
     project = request.GET.getone("project", None)
     maintainer = request.GET.getone("maintainer", None)
+    commit = request.GET.getone("commit", None)
 
     # FIXME:
     # buildvariant = request.GET.getone("buildvariant", None)
@@ -220,6 +221,8 @@ async def get_builds(request):
         builds = builds.filter(Build.version.like("%{}%".format(version)))
     if maintainer:
         builds = builds.filter(Maintainer.fullname.ilike("%{}%".format(maintainer)))
+    if commit:
+        builds = builds.filter(Build.git_ref.like("%{}%".format(commit)))
     if architecture:
         builds = builds.filter(Build.architecture.like("%{}%".format(architecture)))
     if sourcerepository_name:
