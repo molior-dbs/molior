@@ -146,7 +146,7 @@ async def publish_packages(session, build, out_path):
         build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
-    build.log("I: Signing packages\n")
+    build.log("Signing packages:\n")
 
     async def outh(line):
         build.log("%s\n" % line)
