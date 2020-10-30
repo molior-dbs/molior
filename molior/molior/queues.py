@@ -81,6 +81,7 @@ async def buildlog_writer(build_id):
         msg = await dequeue(buildlogs[build_id])
         if msg is None:
             enqueue_backend({"logging_done": build_id})
+            continue
         elif msg is False:
             break
         await writer(msg)
