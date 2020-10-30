@@ -87,11 +87,11 @@ finish ()
     set +e
     log "\nCleanup:"
     cd / # step out of mounted directories
-    log " * deleting schroot session"
+    log " - deleting schroot session"
     schroot --all-sessions -e
-    log " * cleaning up /var/lib/sbuild/build"
+    log " - cleaning up /var/lib/sbuild/build"
     sudo rm -rf /var/lib/sbuild/build/*
-    log " * cleaning up /var/lib/schroot/chroots"
+    log " - cleaning up /var/lib/schroot/chroots"
     sudo rm -rf /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
     sudo rm -f /etc/schroot/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
 
@@ -113,7 +113,7 @@ log "Builder : `hostname`"
 echo
 
 log "APT Sources:"
-wget -q -O- $MOLIOR_SERVER/api/projectsources/$PROJECT/$PROJECTVERSION | sed -e '/^#/d' -e '/^$/d' -e 's/^/ * /'
+wget -q -O- $MOLIOR_SERVER/api/projectsources/$PROJECT/$PROJECTVERSION | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 echo
 
 cd # why are we not in $HOME ?
@@ -123,7 +123,7 @@ cd build
 
 log "Downloading:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
-log " * $sources_url"
+log " - $sources_url"
 # FIXME: use curl, remove wget
 pkgdir=`wget --timeout=30 -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
@@ -135,7 +135,7 @@ fi
 VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
 
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
-log " * $dsc_url"
+log " - $dsc_url"
 wget --timeout=30 -q $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "Error downloading source package $dsc_url"
@@ -145,13 +145,13 @@ fi
 for srcfile in `/usr/lib/molior/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
 do
   src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
-  log " * $src_url"
+  log " - $src_url"
   wget --timeout=30 -q $src_url
 done
 
 echo
 echo -n "Validating "
-dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc | sed 's/^ */ * /'
+dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc | sed 's/^ \+/ - /'
 if [ "$?" -ne 0 ]; then
   echo "Error: invalid source signature"
   exit 1
