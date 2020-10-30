@@ -183,17 +183,6 @@ async def get_repositories(request):
                 "name": repository.name,
                 "url": repository.url,
                 "state": repository.state,
-                "hooks": [
-                    {
-                        "id": hook.id,
-                        "url": hook.url,
-                        "body": hook.body,
-                        "method": hook.method,
-                        "enabled": hook.enabled,
-                        "triggers": get_hook_triggers(hook),
-                    }
-                    for hook in repository.hooks
-                ],
                 "dependencies": [
                     {
                         "id": dependency.id,
@@ -234,23 +223,13 @@ async def get_repositories(request):
             data["results"].append(repoinfo)
         return web.json_response(data)
 
+        # FIXME: ????
         data["results"] = [
             {
                 "id": repository.id,
                 "name": repository.name,
                 "url": repository.url,
                 "state": repository.state,
-                "hooks": [
-                    {
-                        "id": hook.id,
-                        "url": hook.url,
-                        "body": hook.body,
-                        "method": hook.method,
-                        "enabled": hook.enabled,
-                        "triggers": get_hook_triggers(hook),
-                    }
-                    for hook in repository.hooks
-                ],
                 "dependencies": [
                     {
                         "id": dependency.id,

@@ -383,9 +383,9 @@ async def delete_projectversion(request):
     for build in builds:
         parent = None
         grandparent = None
-        if len(build.parent.children) == 1:
+        if build.parent and len(build.parent.children) == 1:
             parent = build.parent
-        if len(build.parent.parent.children) == 1:
+        if build.parent and build.parent.parent and len(build.parent.parent.children) == 1:
             grandparent = build.parent.parent
         buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
         for buildtask in buildtasks:

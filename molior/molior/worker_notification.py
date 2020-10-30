@@ -96,7 +96,7 @@ class NotificationWorker:
                 "project": project,
             }
 
-            if build.sourcerepository:
+            if False:  # FIXME: build.sourcerepository:
                 for hook in build.sourcerepository.hooks:
                     if not hook.enabled:
                         continue

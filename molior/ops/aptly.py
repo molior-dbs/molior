@@ -57,7 +57,7 @@ async def DebSrcPublish(session, build):
     sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
     srcfiles = await debchanges_get_files(sourcepath, build.sourcename, build.version)
     if not srcfiles:
-        logger.error("no source files found")
+        logger.error("DebSrcPublish: no source files found")
         return False
 
     build.add_files(session, srcfiles)

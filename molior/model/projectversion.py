@@ -200,10 +200,12 @@ def get_projectversion(request):
         project_version = request.match_info["project_version"]
     elif "projectversion_id" in request.match_info:
         project_version = request.match_info["projectversion_id"]
-    return request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
+    projectversion = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
             ProjectVersion.name == project_version,
             Project.name == project_name,
         ).first()
+    logger.warning("projectversion not found: %s/%s" % (project_name, project_version))
+    return projectversion
 
 
 def get_projectversion_byname(fullname, session):
