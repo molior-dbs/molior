@@ -151,7 +151,7 @@ done
 
 echo
 echo -n "Validating "
-dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc | sed 's/^ \+/ - /'
+dscverify --no-default-keyrings --keyring ~/.gnupg/trustedkeys.gpg ${REPO_NAME}_$VERSION.dsc | sed -e 's/^ \+/ - /' -e 's/^All/ - All/'
 if [ "$?" -ne 0 ]; then
   echo "Error: invalid source signature"
   exit 1
