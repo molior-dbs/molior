@@ -151,7 +151,7 @@ async def publish_packages(session, build, out_path):
 
     async def outh(line):
         if len(line.strip()) != 0:
-            build.log("%s\n" % re.sub(r"^ *", " * ", line))
+            build.log("%s\n" % re.sub(r"^ *", " - ", line))
 
     v = strip_epoch_version(build.version)
     changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)
