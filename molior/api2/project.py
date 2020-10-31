@@ -325,6 +325,11 @@ async def delete_project2(request):
     if project.projectversions:
         return ErrorResponse(400, "Cannot delete project containing projectversions")
 
+    query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
+    query = query.filter(Project.id == project.id)
+    userroles = query.all()
+    for userrole in userroles:
+        db.delete(userrole)
     db.delete(project)
     db.commit()
     return OKResponse("project {} deleted".format(project_name))
