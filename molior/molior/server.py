@@ -49,7 +49,7 @@ async def cleanup_task():
     enqueue_aptly({"cleanup": []})
 
 
-async def main(backend):
+async def main():
     # OBSOLETE schedule any missed builds
     # logger.info("source repository scan: starting")
     # await asyncio.ensure_future(startup_scan())
@@ -66,8 +66,6 @@ async def main(backend):
 
     notification_worker = NotificationWorker()
     asyncio.ensure_future(notification_worker.run())
-
-    asyncio.ensure_future(backend.run())
 
     cleanup_sched = Scheduler(locale="en_US")
     # cleanup_job = CronJob(name='cleanup').every().hour.at(":34").go(cleanup_task, (5), age=99)
@@ -109,5 +107,5 @@ if __name__ == "__main__":
         exit(1)
     if not Auth().init():
         exit(1)
-    asyncio.ensure_future(main(backend))
+    asyncio.ensure_future(main())
     mainloop()
