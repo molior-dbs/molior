@@ -43,15 +43,28 @@ async def watchdog(ws_client):
 async def node_register(ws_client):
     node = ws_client.cirrina.request.match_info["node"]
     arch = ws_client.cirrina.request.match_info["arch"]
+
+    if arch not in registry:
+        logger.error("backend: invalid architecture received: '%s'", arch)
+        await ws_client.close()
+        return ws_client
+
+    # initialize
     ws_client.molior_node_name = node
     ws_client.molior_node_arch = arch
-    if arch in registry:
-        registry[arch].insert(0, ws_client)
-        logger.info("backend: %s node registered: %s", arch, node)
-        asyncio.ensure_future(watchdog(ws_client))
-        enqueue_backend({"node_registered": 1})
-    else:
-        logger.error("backend: invalid architecture received: '%s'", arch)
+    ws_client.molior_cpu_cores = 0
+    ws_client.molior_ram_total = 0
+    ws_client.molior_disk_total = 0
+    ws_client.molior_machine_id = 0
+    ws_client.molior_ip = ""
+    ws_client.molior_client_ver = ""
+    ws_client.molior_ram_used = 0
+    ws_client.molior_disk_used = 0
+
+    registry[arch].insert(0, ws_client)
+    logger.info("backend: %s node registered: %s", arch, node)
+    asyncio.ensure_future(watchdog(ws_client))
+    enqueue_backend({"node_registered": 1})
 
 
 @app.websocket_message("/internal/registry/{arch}/{node}",
@@ -66,6 +79,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_machine_id = status["register"].get("machine_id")
             ws_client.molior_ip = status["register"].get("ip")
             ws_client.molior_client_ver = status["register"].get("client_ver")
+            return
 
         if "pong" in status:
             ws_client.molior_pong_pending = 0
@@ -168,14 +182,14 @@ class HTTPBackend:
                     "state": "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
-                    "cpu_cores": node.get("molior_cpu_cores"),
-                    "ram_used": node.get("molior_ram_used"),
-                    "ram_total": node.get("molior_ram_total"),
-                    "disk_used": node.get("molior_disk_used"),
-                    "disk_total": node.get("molior_disk_total"),
-                    "machine_id": node.get("molior_machine_id"),
-                    "ip": node.get("molior_ip"),
-                    "client_ver": node.get("molior_client_ver")
+                    "cpu_cores": node.molior_cpu_cores,
+                    "ram_used": node.molior_ram_used,
+                    "ram_total": node.molior_ram_total,
+                    "disk_used": node.molior_disk_used,
+                    "disk_total": node.molior_disk_total,
+                    "machine_id": node.molior_machine_id,
+                    "ip": node.molior_ip,
+                    "client_ver": node.molior_client_ver
                 }
         for arch in running_nodes:
             for node in running_nodes[arch]:
@@ -184,14 +198,14 @@ class HTTPBackend:
                     "state": "busy",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
-                    "cpu_cores": node.get("molior_cpu_cores"),
-                    "ram_used": node.get("molior_ram_used"),
-                    "ram_total": node.get("molior_ram_total"),
-                    "disk_used": node.get("molior_disk_used"),
-                    "disk_total": node.get("molior_disk_total"),
-                    "machine_id": node.get("molior_machine_id"),
-                    "ip": node.get("molior_ip"),
-                    "client_ver": node.get("molior_client_ver")
+                    "cpu_cores": node.molior_cpu_cores,
+                    "ram_used": node.molior_ram_used,
+                    "ram_total": node.molior_ram_total,
+                    "disk_used": node.molior_disk_used,
+                    "disk_total": node.molior_disk_total,
+                    "machine_id": node.molior_machine_id,
+                    "ip": node.molior_ip,
+                    "client_ver": node.molior_client_ver
                 }
         return build_nodes
 
