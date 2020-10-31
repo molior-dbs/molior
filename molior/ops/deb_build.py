@@ -220,11 +220,10 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         # Check if source build already exists
         build = session.query(Build).filter(Build.buildtype == "source",
                                             Build.sourcerepository == repo,
-                                            Build.version == info.version,
-                                            Build.buildstate == "successful").first()
+                                            Build.version == info.version).first()
         if build:
-            repo.log_state("source package already built for version {}".format(info.version))
-            parent.log("E: source package already built for version {}\n".format(info.version))
+            repo.log_state("source package already exists for version {}".format(info.version))
+            parent.log("E: source package already exists for version {}\n".format(info.version))
             parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             parent.logdone()
             repo.set_ready()
