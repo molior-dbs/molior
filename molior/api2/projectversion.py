@@ -378,29 +378,36 @@ async def delete_projectversion(request):
     project_version = projectversion.name
     architectures = db2array(projectversion.mirror_architectures)
 
-    # delete builds
-    builds = db.query(Build).filter(Build.projectversion_id == projectversion.id).all()
-    for build in builds:
-        parent = None
-        grandparent = None
-        if build.parent and len(build.parent.children) == 1:
-            parent = build.parent
-        if build.parent and build.parent.parent and len(build.parent.parent.children) == 1:
-            grandparent = build.parent.parent
+    # delete deb builds and parents if needed
+    todelete = []
+    debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb").all()
+    for debbuild in debbuilds:
+        todelete.append(debbuild)
+
+    for debbuild in debbuilds:
+        sourcebuild = None
+        if debbuild.parent:
+            sourcebuild = debbuild.parent
+            for child in debbuild.parent.children:
+                if child.projectversion_id == projectversion.id:
+                    continue
+                sourcebuild = None  # source build has childs belonging to a different projectversion
+        if sourcebuild and sourcebuild not in todelete:
+            todelete.append(sourcebuild)
+
+    def deletebuild(build):
         buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
         for buildtask in buildtasks:
             db.delete(buildtask)
         db.delete(build)
-        if parent:
-            buildtasks = db.query(BuildTask).filter(BuildTask.build == parent).all()
-            for buildtask in buildtasks:
-                db.delete(buildtask)
-            db.delete(parent)
-        if grandparent:
-            buildtasks = db.query(BuildTask).filter(BuildTask.build == grandparent).all()
-            for buildtask in buildtasks:
-                db.delete(buildtask)
-            db.delete(grandparent)
+
+    for build in todelete:
+        if build.buildtype == "source":
+            topbuild = build.parent
+            deletebuild(build)
+            deletebuild(topbuild)
+        else:
+            deletebuild(build)
 
     # delete hooks
     sourcerepositoryprojectversions = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion.id).all()
@@ -425,7 +432,6 @@ async def delete_projectversion(request):
             ]
         }
     )
-    logger.info("ProjectVersion '%s/%s' deleted", project_name, project_version)
     return OKResponse("Deleted Project Version")
 
 
