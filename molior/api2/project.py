@@ -392,14 +392,17 @@ async def get_project_users2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/project/{project_name}/permissions")
+@app.http_post("/api2/project/{project_name}/permissions/{username}")
 @req_role("owner")
 async def add_project_users2(request):
     db = request.cirrina.db_session
     project_name = request.match_info["project_name"]
+    username = request.match_info["username"]
     params = await request.json()
-    username = params.get("username")
     role = params.get("role")
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     if role not in ["member", "manager", "owner"]:
         return ErrorResponse(400, "Invalid role")
@@ -407,9 +410,6 @@ async def add_project_users2(request):
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
-
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -424,6 +424,35 @@ async def add_project_users2(request):
 
     userrole = UserRole(user_id=user.id, project_id=project.id, role=role)
     db.add(userrole)
+    db.commit()
+
+    return OKResponse()
+
+
+@app.http_delete("/api2/project/{project_name}/permissions/{username}")
+@req_role("owner")
+async def delete_project_users2(request):
+    db = request.cirrina.db_session
+    project_name = request.match_info["project_name"]
+    username = request.match_info["username"]
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
+
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return ErrorResponse(404, "User not found")
+
+    # check existing
+    query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
+    query = query.filter(User.username == username)
+    query = query.filter(Project.id == project.id)
+    userrole = query.first()
+    db.delete(userrole)
     db.commit()
 
     return OKResponse()
