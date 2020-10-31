@@ -204,7 +204,8 @@ def get_projectversion(request):
             ProjectVersion.name == project_version,
             Project.name == project_name,
         ).first()
-    logger.warning("projectversion not found: %s/%s" % (project_name, project_version))
+    if not projectversion:
+        logger.warning("projectversion not found: %s/%s" % (project_name, project_version))
     return projectversion
 
 
