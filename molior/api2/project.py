@@ -334,6 +334,9 @@ async def delete_project2(request):
 @app.authenticated
 async def get_project_users2(request):
     project_name = request.match_info["project_name"]
+    candidates = request.GET.getone("candidates", None)
+    if candidates:
+        candidates = candidates == "true"
 
     project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
     if not project:
@@ -342,15 +345,26 @@ async def get_project_users2(request):
     filter_name = request.GET.getone("filter_name", "")
     filter_role = request.GET.getone("filter_role", "")
 
-    query = (
-        request.cirrina.db_session.query(UserRole)
-        .filter_by(project_id=project.id)
-        .join(User)
-        .filter(UserRole.user_id == User.id)
-        .join(Project)
-        .filter(UserRole.project_id == Project.id)
-        .order_by(User.username)
-    )
+    if candidates:
+        query = request.cirrina.db_session.query(User).outerjoin(UserRole).outerjoin(Project)
+        query = query.filter(User.username != "admin")
+        query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
+        if filter_name:
+            query = query.filter(User.username.like("%{}%".format(filter_name)))
+        query = query.order_by(User.username)
+        query = paginate(request, query)
+        users = query.all()
+
+        data = {
+            "total_result_count": query.count(),
+            "results": [
+                {"id": user.id, "username": user.username}
+                for user in users
+            ],
+        }
+        return OKResponse(data)
+
+    query = request.cirrina.db_session.query(UserRole).join(User).join(Project).order_by(User.username)
 
     if filter_name:
         query = query.filter(User.username.like("%{}%".format(filter_name)))
@@ -375,5 +389,41 @@ async def get_project_users2(request):
             for role in roles
         ],
     }
-
     return OKResponse(data)
+
+
+@app.http_post("/api2/project/{project_name}/permissions")
+@req_role("owner")
+async def add_project_users2(request):
+    db = request.cirrina.db_session
+    project_name = request.match_info["project_name"]
+    params = await request.json()
+    username = params.get("username")
+    role = params.get("role")
+
+    if role not in ["member", "manager", "owner"]:
+        return ErrorResponse(400, "Invalid role")
+
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return ErrorResponse(404, "User not found")
+
+    # check existing
+    query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
+    query = query.filter(User.username == username)
+    query = query.filter(Project.id == project.id)
+    if query.all():
+        return ErrorResponse(400, "User permission already added")
+
+    userrole = UserRole(user_id=user.id, project_id=project.id, role=role)
+    db.add(userrole)
+    db.commit()
+
+    return OKResponse()

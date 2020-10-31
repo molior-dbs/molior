@@ -130,6 +130,9 @@ class req_role(object):
                     maintenance_mode = True
                 break
 
+            if check_admin(request.cirrina.web_session, request.cirrina.db_session):
+                return await func(request)
+
             if maintenance_mode:
                 return web.Response(status=503, text="Maintenance Mode")
 
