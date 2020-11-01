@@ -55,6 +55,7 @@ async def build(params, masterws):
         env["PROJECTVERSION"] = params.get("projectversion")
         env["APT_SERVER"] = params.get("apt_server")
         env["PROJECT_DIST"] = params.get("project_dist")
+        env["RUN_LINTIAN"] = "1" if params.get("run_lintian", False) else "0"
 
         session = aiohttp.ClientSession()
         async with session.ws_connect("ws://{}/internal/buildlog/{}".format(molior_server, token)) as buildws:
