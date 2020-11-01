@@ -324,7 +324,7 @@ async def add_repository(request):
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
-    startbuild = params.get("startbuild", False)
+    startbuild = params.get("startbuild", "true")
     startbuild = startbuild == "true"
 
     if not url:
