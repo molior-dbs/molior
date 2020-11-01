@@ -324,6 +324,8 @@ async def add_repository(request):
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
+    startbuild = params.get("startbuild", False)
+    startbuild = startbuild == "true"
 
     if not url:
         return ErrorResponse(400, "No URL received")
@@ -390,24 +392,25 @@ async def add_repository(request):
         enqueue_task(args)
 
     else:  # existing repo
-        build = Build(
-            version=None,
-            git_ref=None,
-            ci_branch=None,
-            is_ci=None,
-            sourcename=repo.name,
-            buildstate="new",
-            buildtype="build",
-            sourcerepository=repo,
-            maintainer=None,
-        )
+        if startbuild:
+            build = Build(
+                version=None,
+                git_ref=None,
+                ci_branch=None,
+                is_ci=None,
+                sourcename=repo.name,
+                buildstate="new",
+                buildtype="build",
+                sourcerepository=repo,
+                maintainer=None,
+            )
 
-        request.cirrina.db_session.add(build)
-        request.cirrina.db_session.commit()
-        await build.build_added()
+            request.cirrina.db_session.add(build)
+            request.cirrina.db_session.commit()
+            await build.build_added()
 
-        args = {"buildlatest": [repo.id, build.id]}
-        enqueue_task(args)
+            args = {"buildlatest": [repo.id, build.id]}
+            enqueue_task(args)
 
     return OKResponse("SourceRepository added")
 
