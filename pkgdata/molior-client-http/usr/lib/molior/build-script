@@ -13,6 +13,7 @@
 : ${PROJECTVERSION?"set PROJECTVERSION before running this script"}
 : ${APT_SERVER?"set APT_SERVER before running this script"}
 : ${APT_URLS?"set APT_URLS before running this script"}
+: ${RUN_LINTIAN?"set RUN_LINTIAN before running this script"}
 
 if [ -f /etc/default/molior-client ]; then
   . /etc/default/molior-client
@@ -194,7 +195,7 @@ else
     SBUILD_ARCH_ARGS="--arch-all --arch=$ARCH"
 fi
 
-if echo $VERSION | grep -q "+git"; then
+if [ "$RUN_LINTIAN" != "1" ]; then
     SBUILD_ARGS="--no-run-lintian"
 fi
 

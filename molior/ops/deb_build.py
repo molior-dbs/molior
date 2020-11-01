@@ -467,8 +467,12 @@ async def schedule_build(build, session):
 
     token = buildtask.task_id
 
+    run_lintian = True
+    if build.is_ci:
+        run_lintian = False
+
     await build.set_scheduled()
-    session.commit()  # pylint: disable=no-member
+    session.commit()
 
     enqueue_backend(
         {
@@ -486,6 +490,7 @@ async def schedule_build(build, session):
                 project_version.project.name,
                 project_version.name,
                 apt_urls,
+                run_lintian
             ]
         }
     )
