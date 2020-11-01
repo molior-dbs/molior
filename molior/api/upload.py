@@ -54,12 +54,12 @@ async def ws_logs_connected(ws_client):
 
 @app.websocket_message("/internal/buildlog/{token}", group="log", authenticated=False)
 async def ws_logs(ws_client, msg):
-    buildlog(ws_client.cirrina.build_id, msg)
+    await buildlog(ws_client.cirrina.build_id, msg)
     return ws_client
 
 
 @app.websocket_disconnect(group="log")
 async def ws_logs_disconnected(ws_client):
     logger.debug("ws: end of logs for build {}".format(ws_client.cirrina.build_id))
-    buildlog(ws_client.cirrina.build_id, None)  # signal end of logs
+    await buildlog(ws_client.cirrina.build_id, None)  # signal end of logs
     return ws_client

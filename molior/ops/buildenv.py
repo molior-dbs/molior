@@ -33,10 +33,10 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         session.commit()
 
         logger.info("creating build environments for %s-%s-%s", dist, version, arch)
-        build.log("Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
+        await build.log("Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
 
         async def outh(line):
-            build.log("%s\n" % line)
+            await build.log("%s\n" % line)
 
         process = Launchy(["sudo", "run-parts", "-a", "build", "-a", dist, "-a", name,
                            "-a", version, "-a", arch, "-a", components, "-a", repo_url,
@@ -47,8 +47,8 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         if not ret == 0:
             logger.error("error creating build env")
-            build.log("Error creating build environment\n")
-            build.log("\n")
+            await build.log("Error creating build environment\n")
+            await build.log("\n")
             build.buildligtitle("Done", no_footer_newline=True)
             await build.set_failed()
             session.commit()
@@ -67,13 +67,13 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         if not ret == 0:
             logger.error("error publishing build env")
-            build.log("Error publishing build environment\n")
+            await build.log("Error publishing build environment\n")
             build.buildligtitle("Done", no_footer_newline=True)
             await build.set_publish_failed()
             session.commit()
             return False
 
-        build.log("\n")
+        await build.log("\n")
         build.buildligtitle("Done", no_footer_newline=True)
         await build.set_successful()
         session.commit()
@@ -84,6 +84,6 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         # Schedule builds
         args = {"schedule": []}
-        enqueue_task(args)
+        await enqueue_task(args)
 
         return True

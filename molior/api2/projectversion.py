@@ -305,7 +305,6 @@ async def snapshot_projectversion(request):
         if not build.debianpackages:
             return ErrorResponse(400, "No debian packages found for %s/%s" % (build.sourcename, build.version))
         for deb in build.debianpackages:
-            logger.info("deb %s_%s_%s.deb" % (deb.name, build.version, deb.suffix))
             packages.append((deb.name, build.version, deb.suffix))
 
     new_projectversion = ProjectVersion(
@@ -332,7 +331,7 @@ async def snapshot_projectversion(request):
     db.add(new_projectversion)
     db.commit()
 
-    enqueue_aptly(
+    await enqueue_aptly(
         {
             "snapshot_repository": [
                 projectversion.basemirror.project.name,
@@ -423,7 +422,7 @@ async def delete_projectversion(request):
     db.delete(projectversion)
     db.commit()
 
-    enqueue_aptly(
+    await enqueue_aptly(
         {
             "delete_repository": [
                 basemirror_name,
@@ -556,7 +555,6 @@ async def get_apt_sources2(request):
 
     sources_list += "\n# Project Sources\n"
     for d in deps:
-        logger.info("deb %s", str(d))
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if not dep:
             logger.error("projectsources: projecversion %d not found", d[0])

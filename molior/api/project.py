@@ -333,7 +333,6 @@ async def get_apt_sources(request):
 
     sources_list += "# Project Sources\n"
     for d in deps:
-        logger.info("deb %s", str(d))
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if not dep:
             logger.error("projectsources: projecversion %d not found", d[0])

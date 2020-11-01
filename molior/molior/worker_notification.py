@@ -106,7 +106,7 @@ class NotificationWorker:
                                                              SouRepProVer.projectversion_id == build.projectversion_id).first()
             if not buildconfig:
                 return
-            postbuildhooks = session.query(PostBuildHook).join(Hook).filter(
+            postbuildhooks = session.query(Hook).join(PostBuildHook).filter(
                     PostBuildHook.sourcerepositoryprojectversion_id == buildconfig.id)
             for hook in postbuildhooks:
                 if not hook.enabled:

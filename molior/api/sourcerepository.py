@@ -516,7 +516,7 @@ async def trigger_clone(request):
     request.cirrina.db_session.commit()
 
     args = {"clone": [build.id, repository.id]}
-    enqueue_task(args)
+    await enqueue_task(args)
     return web.Response(status=200, text="Clone job started")
 
 
@@ -589,6 +589,6 @@ async def trigger_build(request):
     request.cirrina.db_session.commit()
 
     args = {"buildlatest": [repository_id, build.id]}
-    enqueue_task(args)
+    await enqueue_task(args)
 
     return web.json_response({"build_token": str(token)})

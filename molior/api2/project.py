@@ -230,7 +230,7 @@ async def create_projectversion(request):
     db.add(projectversion)
     db.commit()
 
-    enqueue_aptly({"init_repository": [
+    await enqueue_aptly({"init_repository": [
                 basemirror_name,
                 basemirror_version,
                 projectversion.project.name,

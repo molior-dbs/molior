@@ -46,7 +46,7 @@ loop = asyncio.get_event_loop()
 
 
 async def cleanup_task():
-    enqueue_aptly({"cleanup": []})
+    await enqueue_aptly({"cleanup": []})
 
 
 async def main():

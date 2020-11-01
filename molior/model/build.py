@@ -62,14 +62,14 @@ class Build(Base):
     architecture = Column(String)
     debianpackages = relationship(Debianpackage, secondary=BuildDebianpackage)
 
-    def log(self, msg):
-        buildlog(self.id, msg)
+    async def log(self, msg):
+        await buildlog(self.id, msg)
 
-    def logtitle(self, title, no_footer_newline=False, no_header_newline=True, error=False):
-        buildlogtitle(self.id, title, no_footer_newline, no_header_newline, error)
+    async def logtitle(self, title, no_footer_newline=False, no_header_newline=True, error=False):
+        await buildlogtitle(self.id, title, no_footer_newline, no_header_newline, error)
 
-    def logdone(self):
-        buildlogdone(self.id)
+    async def logdone(self):
+        await buildlogdone(self.id)
 
     def log_state(self, statemsg):
         prefix = ""

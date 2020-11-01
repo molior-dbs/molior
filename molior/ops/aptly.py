@@ -52,8 +52,8 @@ async def DebSrcPublish(session, build):
         bool: True if successful, otherwise False.
     """
 
-    build.log("\n")
-    build.logtitle("Publishing")
+    await build.log("\n")
+    await build.logtitle("Publishing")
     sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
     srcfiles = await debchanges_get_files(sourcepath, build.sourcename, build.version)
     if not srcfiles:
@@ -75,10 +75,10 @@ async def DebSrcPublish(session, build):
             projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
             if not projectversion:
                 logger.error("publisher: error finding projectversion {}".format(projectversion_id))
-                build.log("E: error finding projectversion {}\n".format(projectversion_id))
+                await build.log("E: error finding projectversion {}\n".format(projectversion_id))
                 continue
 
-            build.log("I: publishing for %s\n" % projectversion.fullname)
+            await build.log("I: publishing for %s\n" % projectversion.fullname)
             basemirror_name = projectversion.basemirror.project.name
             basemirror_version = projectversion.basemirror.name
             project_name = projectversion.project.name
@@ -90,10 +90,10 @@ async def DebSrcPublish(session, build):
             await debian_repo.add_packages(publish_files, ci_build=build.is_ci)
             ret = True
         except Exception as exc:
-            build.log("E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            await build.log("E: error adding files to projectversion {}\n".format(projectversion.fullname))
             logger.exception(exc)
 
-    build.log("\n")
+    await build.log("\n")
 
     if ret:  # only delete if published, allow republish
         files2delete = publish_files
@@ -135,7 +135,7 @@ async def publish_packages(session, build, out_path):
     count_files = len(files2upload)
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build.id)
-        build.log("E: no debian packages found to upload\n")
+        await build.log("E: no debian packages found to upload\n")
         build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
@@ -143,15 +143,15 @@ async def publish_packages(session, build, out_path):
     key = Configuration().debsign_gpg_email
     if not key:
         logger.error("Signing key not defined in configuration")
-        build.log("E: no signinig key defined in configuration\n")
+        await build.log("E: no signinig key defined in configuration\n")
         build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
-    build.log("Signing packages:\n")
+    await build.log("Signing packages:\n")
 
     async def outh(line):
         if len(line.strip()) != 0:
-            build.log("%s\n" % re.sub(r"^ *", " - ", line))
+            await build.log("%s\n" % re.sub(r"^ *", " - ", line))
 
     v = strip_epoch_version(build.version)
     changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)
@@ -178,7 +178,7 @@ async def publish_packages(session, build, out_path):
         await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
         ret = True
     except Exception as exc:
-        build.log("E: error uploading files to repository\n")
+        await build.log("E: error uploading files to repository\n")
         logger.exception(exc)
 
     files2delete = files2upload
@@ -206,7 +206,7 @@ async def DebPublish(session, build):
     try:
         out_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
         build.parent.parent.log("I: publishing build %d\n" % build.id)
-        build.logtitle("Publishing", no_header_newline=False)
+        await build.logtitle("Publishing", no_header_newline=False)
         if not await publish_packages(session, build, out_path):
             logger.error("publisher: error publishing build %d" % build.id)
             return False

@@ -152,7 +152,7 @@ async def create_mirror(request):
             False
         ]
     }
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
     return OKResponse("Mirror {} successfully created.".format(mirror))
 
 
@@ -431,7 +431,7 @@ async def delete_mirror(request):
     mirror.is_deleted = True
     request.cirrina.db_session.commit()
     args = {"delete_mirror": [mirror.id]}
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
 
     return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
 
@@ -479,6 +479,6 @@ async def put_update_mirror(request):
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
 
     return OKResponse("Successfully started update on mirror")

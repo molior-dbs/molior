@@ -16,14 +16,14 @@ from ..molior.queues import enqueue_task
 
 
 async def run_git(cmd, cwd, build, write_output_log=True):
-    build.log("$: %s\n" % cmd)
+    await build.log("$: %s\n" % cmd)
 
     async def outh(line):
         if write_output_log:
-            build.log(line + "\n")
+            await build.log(line + "\n")
 
     async def errh(line):
-        build.log(line + "\n")
+        await build.log(line + "\n")
 
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""
@@ -56,9 +56,9 @@ async def GitClone(build_id, repo_id, session):
         repo.set_busy()
         session.commit()
 
-        build.logtitle("Clone Respository")
+        await build.logtitle("Clone Respository")
         logger.info("cloning repository '%s' into '%s'", repo.url, str(repo.src_path))
-        build.log("I: cloning repository '{}'\n".format(repo.url))
+        await build.log("I: cloning repository '{}'\n".format(repo.url))
 
         if not repo.path.exists():
             repo.path.mkdir()
@@ -83,13 +83,13 @@ async def GitClone(build_id, repo_id, session):
                 session.commit()
                 return
 
-        build.log("\n")
+        await build.log("\n")
 
         repo.set_ready()
         session.commit()
 
         args = {"buildlatest": [repo.id, build.id]}
-        enqueue_task(args)
+        await enqueue_task(args)
 
 
 async def GitCleanLocal(repo_path, build):

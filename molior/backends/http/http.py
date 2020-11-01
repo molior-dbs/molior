@@ -64,7 +64,7 @@ async def node_register(ws_client):
     registry[arch].insert(0, ws_client)
     logger.info("backend: %s node registered: %s", arch, node)
     asyncio.ensure_future(watchdog(ws_client))
-    enqueue_backend({"node_registered": 1})
+    await enqueue_backend({"node_registered": 1})
 
 
 @app.websocket_message("/internal/registry/{arch}/{node}",
@@ -93,10 +93,10 @@ async def node_message(ws_client, msg):
         build_id = ws_client.molior_build_id
 
         if status["status"] == "building":
-            enqueue_backend({"started": build_id})
+            await enqueue_backend({"started": build_id})
 
         elif status["status"] == "failed":
-            enqueue_backend({"failed": build_id})
+            await enqueue_backend({"failed": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
@@ -104,7 +104,7 @@ async def node_message(ws_client, msg):
 
         elif status["status"] == "success":
             logger.debug("node: finished build {}".format(build_id))
-            enqueue_backend({"succeeded": build_id})
+            await enqueue_backend({"succeeded": build_id})
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
@@ -130,7 +130,7 @@ async def node_disconnected(ws_client):
         running_nodes[arch].remove(ws_client)
         build_id = ws_client.molior_build_id
         logger.error("backend: lost build_%d on %s/%s", build_id, arch, node)
-        enqueue_backend({"failed": build_id})
+        await enqueue_backend({"failed": build_id})
 
     else:
         logger.warn("backend: unknown node disconnect: %s/%s", arch, node)
@@ -146,8 +146,8 @@ class HTTPBackend:
         asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
         asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
 
-    def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
-              project_dist, sourcename, project_name, project_version, apt_urls, run_lintian=True):
+    async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
+                    project_dist, sourcename, project_name, project_version, apt_urls, run_lintian=True):
         task_id = "build_%d" % build_id
         if arch == "i386" or arch == "amd64":
             queue_arch = "amd64"
@@ -157,21 +157,21 @@ class HTTPBackend:
             logger.error("backend: invalid build architecture '%s'", arch)
             return False
 
-        enqueue_buildtask(queue_arch, {"build_id": build_id,
-                                       "token": token,
-                                       "version": build_version,
-                                       "apt_server": apt_server,
-                                       "architecture": arch,
-                                       "arch_any_only": arch_any_only,
-                                       "distrelease": distrelease_name,
-                                       "distversion": distrelease_version,
-                                       "project_dist": project_dist,
-                                       "repository_name": sourcename,
-                                       "project": project_name,
-                                       "projectversion": project_version,
-                                       "apt_urls": apt_urls,
-                                       "task_id": task_id,
-                                       "run_lintian": run_lintian})
+        await enqueue_buildtask(queue_arch, {"build_id": build_id,
+                                             "token": token,
+                                             "version": build_version,
+                                             "apt_server": apt_server,
+                                             "architecture": arch,
+                                             "arch_any_only": arch_any_only,
+                                             "distrelease": distrelease_name,
+                                             "distversion": distrelease_version,
+                                             "project_dist": project_dist,
+                                             "repository_name": sourcename,
+                                             "project": project_name,
+                                             "projectversion": project_version,
+                                             "apt_urls": apt_urls,
+                                             "task_id": task_id,
+                                             "run_lintian": run_lintian})
 
     def get_nodes_info(self):
         # FIXME: lock both dicts on every access

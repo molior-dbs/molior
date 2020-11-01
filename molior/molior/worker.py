@@ -114,13 +114,13 @@ class Worker:
             return
 
         if repo.state == "error":
-            build.log("E: git repo is in error state\n")
+            await build.log("E: git repo is in error state\n")
             await build.set_failed()
             return
 
         if repo.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repo_id)
-            enqueue_task({"build": args})
+            await enqueue_task({"build": args})
             await asyncio.sleep(2)
             return
 
@@ -149,12 +149,12 @@ class Worker:
             return
 
         if repo.state == "error":
-            build.log("E: git repo is in error state\n")
+            await build.log("E: git repo is in error state\n")
             await build.set_failed()
             return
 
         if repo.state != "ready":
-            enqueue_task({"buildlatest": args})
+            await enqueue_task({"buildlatest": args})
             logger.info("worker: repo %d not ready, requeueing", repo_id)
             await asyncio.sleep(2)
             return
@@ -165,17 +165,17 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        build.logtitle("Checking Repository")
+        await build.logtitle("Checking Repository")
 
-        build.log("I: fetching git tags\n")
+        await build.log("I: fetching git tags\n")
         try:
             # this does a git fetch
             latest_tag = await get_latest_tag(repo.src_path, build_id)
         except Exception as exc:
             logger.error("worker: error getting latest git tag")
-            build.log("E: Error getting git tags\n")
-            build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            build.logdone()
+            await build.log("E: Error getting git tags\n")
+            await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            await build.logdone()
             logger.exception(exc)
             await build.set_failed()
             repo.set_ready()
@@ -187,17 +187,17 @@ class Worker:
 
         if not latest_tag:
             logger.error("sourcerepository '%s' has no release tag", repo.url)
-            build.log("E: no git tags found\n")
-            build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            build.logdone()
+            await build.log("E: no git tags found\n")
+            await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            await build.logdone()
             await build.set_failed()
             session.commit()
             return
 
-        build.log("\n")
+        await build.log("\n")
         git_ref = str(latest_tag)
         args = {"build": [build_id, repo_id, git_ref, None, None, False]}
-        enqueue_task(args)
+        await enqueue_task(args)
 
     async def _rebuild(self, args, session):
         logger.debug("worker: got rebuild task")
@@ -224,7 +224,7 @@ class Worker:
                 session.commit()
 
                 args = {"schedule": []}
-                enqueue_task(args)
+                await enqueue_task(args)
 
         if build.buildtype == "source":
             if build.buildstate == "publish_failed":
@@ -232,7 +232,7 @@ class Worker:
                 await build.set_needs_publish()
                 session.commit()
                 build.parent.log("I: publishing source package\n")
-                enqueue_aptly({"src_publish": [build.id]})
+                await enqueue_aptly({"src_publish": [build.id]})
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
@@ -250,7 +250,7 @@ class Worker:
                             chroot.get_mirror_url(),
                             chroot.get_mirror_keys(),
                             ]}
-                    enqueue_task(args)
+                    await enqueue_task(args)
                     ok = True
 
         if not ok:
@@ -264,7 +264,7 @@ class Worker:
         max_parallel_chroots = cfg.max_parallel_chroots
         if max_parallel_chroots and type(max_parallel_chroots) is int and max_parallel_chroots > 0:
             if self.chroot_build_count >= max_parallel_chroots:
-                enqueue_task({"buildenv": args})
+                await enqueue_task({"buildenv": args})
                 logger.info("worker: building %d chroots already, requeueing...", self.chroot_build_count)
                 await asyncio.sleep(2)
                 return
@@ -304,13 +304,13 @@ class Worker:
 
         if original.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
-            enqueue_task({"merge_duplicate_repo": args})
+            await enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
         if duplicate.state != "ready" or duplicate.state != "error":  # merge duplicates in error state
             logger.info("worker: repo %d not ready, requeueing", duplicate_id)
-            enqueue_task({"merge_duplicate_repo": args})
+            await enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
@@ -358,7 +358,7 @@ class Worker:
 
         if repo.state != "ready" or repo.state != "error":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
-            enqueue_task({"delete_repo": args})
+            await enqueue_task({"delete_repo": args})
             await asyncio.sleep(2)
             return
 
