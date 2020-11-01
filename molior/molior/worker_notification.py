@@ -5,6 +5,9 @@ from jinja2 import Template
 from ..app import app, logger
 from ..model.database import Session
 from ..model.build import Build
+from ..model.sourepprover import SouRepProVer
+from ..model.postbuildhook import PostBuildHook
+from ..model.hook import Hook
 
 from .notifier import trigger_hook
 from .configuration import Configuration
@@ -96,24 +99,41 @@ class NotificationWorker:
                 "project": project,
             }
 
-            if False:  # FIXME: build.sourcerepository:
-                for hook in build.sourcerepository.hooks:
-                    if not hook.enabled:
-                        continue
+            if not build.sourcerepository or not build.projectversion:
+                return
 
-                    try:
-                        url = Template(hook.url).render(**args)
-                    except Exception as exc:
-                        logger.error("hook: error rendering URL template", url, exc)
-                        return
+            buildconfig = session.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == build.sourcerepository_id,
+                                                             SouRepProVer.projectversion_id == build.projectversion_id).first()
+            if not buildconfig:
+                return
+            postbuildhooks = session.query(PostBuildHook).join(Hook).filter(
+                    PostBuildHook.sourcerepositoryprojectversion_id == buildconfig.id)
+            for hook in postbuildhooks:
+                if not hook.enabled:
+                    continue
 
-                    try:
-                        body = Template(hook.body).render(**args)
-                    except Exception as exc:
-                        logger.error("hook: error rendering BODY template", url, exc)
-                        return
+                if build.buildtype == "build" and not hook.notify_overall:
+                    continue
 
-                    try:
-                        await trigger_hook(hook.method, url, skip_ssl=hook.skip_ssl, body=body)
-                    except Exception as exc:
-                        logger.error("hook: error calling {} '{}': {}".format(hook.method, url, exc))
+                if build.buildtype == "source" and not hook.notify_src:
+                    continue
+
+                if build.buildtype == "deb" and not hook.notify_deb:
+                    continue
+
+                try:
+                    url = Template(hook.url).render(**args)
+                except Exception as exc:
+                    logger.error("hook: error rendering URL template", url, exc)
+                    return
+
+                try:
+                    body = Template(hook.body).render(**args)
+                except Exception as exc:
+                    logger.error("hook: error rendering BODY template", url, exc)
+                    return
+
+                try:
+                    await trigger_hook(hook.method, url, skip_ssl=hook.skip_ssl, body=body)
+                except Exception as exc:
+                    logger.error("hook: error calling {} '{}': {}".format(hook.method, url, exc))
