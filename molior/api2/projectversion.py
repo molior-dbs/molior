@@ -1,11 +1,13 @@
 from sqlalchemy.orm import aliased
 from sqlalchemy import func
+from aiohttp import web
 
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
 from ..api.projectversion import do_clone, do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
+from ..molior.configuration import Configuration
 
 from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
 from ..model.project import Project
@@ -490,3 +492,77 @@ async def delete_repository2(request):
     db.commit()
 
     return OKResponse("Sourcerepository removed from projectversion")
+
+
+@app.http_get("/api2/{project_name}/{projectver_name}/aptsources")
+async def get_apt_sources2(request):
+    """
+    Returns apt sources list for given project,
+    projectversion and distrelease.
+
+    ---
+    description: Returns apt sources list.
+    tags:
+        - Projects
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: str
+        - name: projectver_name
+          in: path
+          required: true
+          type: str
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Parameter missing
+    """
+    db = request.cirrina.db_session
+    project_name = request.match_info.get("project_name")
+    projectver_name = request.match_info.get("projectver_name")
+    unstable = request.GET.getone("unstable", "")
+
+    if not project_name or not projectver_name:
+        return ErrorResponse(400, "Parameter missing")
+
+    project = db.query(Project).filter(Project.name == project_name).first()
+    if not project:
+        return ErrorResponse(400, "project not found")
+
+    projectversion = db.query(ProjectVersion).join(Project).filter(
+            Project.id == project.id,
+            ProjectVersion.name == projectver_name).first()
+    if not projectversion:
+        return ErrorResponse(400, "projectversion not found")
+
+    deps = [(projectversion.id, projectversion.ci_builds_enabled)]
+    deps += get_projectversion_deps(projectversion.id, db)
+
+    cfg = Configuration()
+    apt_url = cfg.aptly.get("apt_url")
+    keyfile = cfg.aptly.get("key")
+
+    sources_list = "# APT Sources for project {0} {1}\n".format(project_name, projectver_name)
+    sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
+    if not project.is_basemirror and projectversion.basemirror:
+        sources_list += "\n# Base Mirror\n"
+        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
+
+    sources_list += "\n# Project Sources\n"
+    for d in deps:
+        logger.info("deb %s", str(d))
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
+        if not dep:
+            logger.error("projectsources: projecversion %d not found", d[0])
+        sources_list += "{}\n".format(dep.get_apt_repo())
+        # ci builds requested & use ci builds from this dep & dep has ci builds
+        if unstable == "true" and d[1] and dep.ci_builds_enabled:
+            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
+
+    return web.Response(status=200, text=sources_list)
