@@ -252,7 +252,7 @@ async def create_mirror2(request):
             external_repo,
         ]
     }
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
     return OKResponse("Mirror creation started")
 
 
@@ -317,7 +317,7 @@ async def edit_mirror(request):
         args = {"init_mirror": [mirror.id]}
     else:
         args = {"update_mirror": [mirror.id]}
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
     return OKResponse("Mirror update started")
 
 
@@ -393,6 +393,6 @@ async def delete_mirror2(request):
     mirror.is_deleted = True
     db.commit()
     args = {"delete_mirror": [mirror.id]}
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
 
     return OKResponse("Successfully deleted mirror: {}".format(mirrorname))

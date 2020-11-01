@@ -405,7 +405,7 @@ async def rebuild_build(request):
         return web.Response(text="This build cannot be rebuilt", status=400)
 
     args = {"rebuild": [build_id]}
-    enqueue_task(args)
+    await enqueue_task(args)
     return web.json_response("Rebuild triggered")
 
 
@@ -490,7 +490,7 @@ async def trigger_build(request):
         args = {"buildlatest": [repo.id, build.id]}
     else:
         args = {"build": [build.id, repo.id, git_ref, git_branch, targets, force_ci]}
-    enqueue_task(args)
+    await enqueue_task(args)
 
     return web.json_response({"build_id": str(build.id)})
 

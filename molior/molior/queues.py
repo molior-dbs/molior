@@ -30,36 +30,32 @@ async def dequeue(queue):
     return ret
 
 
-def enqueue_task(task):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue(task_queue, task), loop)
+async def enqueue_task(task):
+    await task_queue.put(task)
 
 
 async def dequeue_task():
     return await dequeue(task_queue)
 
 
-def enqueue_aptly(task):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue(aptly_queue, task), loop)
+async def enqueue_aptly(task):
+    await aptly_queue.put(task)
 
 
 async def dequeue_aptly():
     return await dequeue(aptly_queue)
 
 
-def enqueue_notification(msg):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue(notification_queue, msg), loop)
+async def enqueue_notification(msg):
+    await notification_queue.put(msg)
 
 
 async def dequeue_notification():
     return await dequeue(notification_queue)
 
 
-def enqueue_backend(msg):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue(backend_queue, msg), loop)
+async def enqueue_backend(msg):
+    await backend_queue.put(msg)
 
 
 async def dequeue_backend():
@@ -83,7 +79,7 @@ async def buildlog_writer(build_id):
     while True:
         msg = await dequeue(buildlogs[build_id])
         if msg is None:
-            enqueue_backend({"logging_done": build_id})
+            await enqueue_backend({"logging_done": build_id})
             continue
         elif msg is False:
             break
@@ -99,17 +95,15 @@ async def enqueue_buildlog(build_id, msg):
     await buildlogs[build_id].put(msg)
 
 
-def buildlogdone(build_id):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue_buildlog(build_id, False), loop)
+async def buildlogdone(build_id):
+    await enqueue_buildlog(build_id, False)
 
 
-def buildlog(build_id, msg):
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue_buildlog(build_id, msg), loop)
+async def buildlog(build_id, msg):
+    await enqueue_buildlog(build_id, msg)
 
 
-def buildlogtitle(build_id, title, no_footer_newline=False, no_header_newline=True, error=False):
+async def buildlogtitle(build_id, title, no_footer_newline=False, no_header_newline=True, error=False):
     now = get_local_tz().localize(datetime.now(), is_dst=None)
     date = datetime.strftime(now, "%a, %d %b %Y %H:%M:%S %z")
 
@@ -131,14 +125,13 @@ def buildlogtitle(build_id, title, no_footer_newline=False, no_header_newline=Tr
           "\x1b[{}m\x1b[1m| molior: {:36} {} |\x1b[0m\n".format(color, title, date) + \
           "\x1b[{}m\x1b[1m{}\x1b[0m\n{}".format(color, BORDER, footer_newline)
 
-    buildlog(build_id, msg)
+    await buildlog(build_id, msg)
 
 
-def enqueue_buildtask(arch, task):
+async def enqueue_buildtask(arch, task):
     if arch not in buildtasks:
         return
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(enqueue(buildtasks[arch], task), loop)
+    await enqueue(buildtasks[arch], task)
 
 
 async def dequeue_buildtask(arch):

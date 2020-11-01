@@ -254,7 +254,7 @@ async def create_projectversions(request):
     project_name = projectversion.project.name
     project_version = projectversion.name
 
-    enqueue_aptly({"init_repository": [
+    await enqueue_aptly({"init_repository": [
                 basemirror_name,
                 basemirror_version,
                 project_name,
@@ -408,7 +408,7 @@ async def do_clone(request, projectversion_id, name):
     db.add(new_projectversion)
     db.commit()
 
-    enqueue_aptly(
+    await enqueue_aptly(
         {
             "init_repository": [
                 new_projectversion.basemirror.project.name,
@@ -499,7 +499,7 @@ async def do_overlay(request, projectversion_id, name):
 
     basemirror = overlay_projectversion.basemirror
 
-    enqueue_aptly(
+    await enqueue_aptly(
         {
             "init_repository": [
                 basemirror.project.name,
@@ -679,7 +679,7 @@ async def mark_delete_projectversion(request):
             "stable",
         ]
     }
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
     args = {
         "drop_publish": [
             base_mirror_name,
@@ -689,7 +689,7 @@ async def mark_delete_projectversion(request):
             "unstable",
         ]
     }
-    enqueue_aptly(args)
+    await enqueue_aptly(args)
 
     projectversion.is_deleted = True
     # lock the projectversion so no packages can be published in this repository

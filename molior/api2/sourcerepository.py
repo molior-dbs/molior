@@ -389,7 +389,7 @@ async def add_repository(request):
         await build.build_added()
 
         args = {"clone": [build.id, repo.id]}
-        enqueue_task(args)
+        await enqueue_task(args)
 
     else:  # existing repo
         if startbuild:
@@ -410,7 +410,7 @@ async def add_repository(request):
             await build.build_added()
 
             args = {"buildlatest": [repo.id, build.id]}
-            enqueue_task(args)
+            await enqueue_task(args)
 
     return OKResponse("SourceRepository added")
 
@@ -673,7 +673,7 @@ async def merge_repository(request):
     # verify stuff (if there is repo behnd those numbers)
 
     args = {"merge_duplicate_repo": [repository_id, duplicate_id]}
-    enqueue_task(args)
+    await enqueue_task(args)
 
     return OKResponse("SourceRepository changed")
 
@@ -698,5 +698,5 @@ async def delete_repository(request):
         return ErrorResponse(400, "Repository cannot be deleted")
 
     args = {"delete_repo": [repository_id]}
-    enqueue_task(args)
+    await enqueue_task(args)
     return OKResponse("Repository deleted")

@@ -32,7 +32,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
             logger.error("BuildDebSrc: build %s not found" % build_id)
             return False
 
-        build.log("I: getting debian build information\n")
+        await build.log("I: getting debian build information\n")
         src_package_name = await get_changelog_attr("Source", repo_path)
         version = await get_changelog_attr("Version", repo_path)
         repo_path = Path(repo_path)
@@ -40,14 +40,14 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
         # FIXME: use global var
         key = Configuration().debsign_gpg_email
         if not key:
-            build.log("E: Signing key not defined in configuration\n")
+            await build.log("E: Signing key not defined in configuration\n")
             logger.error("Signing key not defined in configuration")
             return False
 
         async def outh(line):
             line = line.strip()
             if line:
-                build.log("%s\n" % line)
+                await build.log("%s\n" % line)
 
         if is_ci:
             # in order to publish a sourcepackage for a ci build we need
@@ -79,14 +79,14 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
                     return False
 
         logger.debug("%s: creating source package", src_package_name)
-        build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
+        await build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
 
         cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
         process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
         await process.launch()
         ret = await process.wait()
         if ret != 0:
-            build.log("E: Error building source package\n")
+            await build.log("E: Error building source package\n")
             logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
             return False
 
@@ -230,7 +230,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.set_already_exists()
             session.commit()
             args = {"schedule": []}
-            enqueue_task(args)
+            await enqueue_task(args)
             return
 
         # Use commiter name as maintainer for CI builds
@@ -382,7 +382,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         async def fail():
             parent.log("E: building source package failed\n")
-            build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             parent.logdone()
             repo.set_ready()
             await build.set_failed()
@@ -390,7 +390,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             # FIXME: cancel deb builds, or only create deb builds after source build ok
 
         # Build Source Package
-        build.logtitle("Source Build")
+        await build.logtitle("Source Build")
         try:
             ret = await BuildDebSrc(repo_id, repo.src_path, build.id, info.version, is_ci,
                                     "{} {}".format(firstname, lastname), email)
@@ -410,7 +410,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         session.commit()
 
         parent.log("I: publishing source package\n")
-        enqueue_aptly({"src_publish": [build.id]})
+        await enqueue_aptly({"src_publish": [build.id]})
 
 
 def chroot_ready(build, session):
@@ -474,7 +474,7 @@ async def schedule_build(build, session):
     await build.set_scheduled()
     session.commit()
 
-    enqueue_backend(
+    await enqueue_backend(
         {
             "schedule": [
                 build.id,
@@ -530,7 +530,7 @@ async def ScheduleBuilds():
                     if not repo_dep:
                         logger.error("build-{}: dependency {} not found in projectversion {}".format(build.id,
                                      builddep, build.projectversion_id))
-                        build.log("W: waiting for build order dependency {} to be built in projectversion {}\n".format(
+                        await build.log("W: waiting for build order dependency {} to be built in projectversion {}\n".format(
                                              builddep, pvname))
                         ready = False
                         break
@@ -570,7 +570,7 @@ async def ScheduleBuilds():
                 if running_builds:
                     ready = False
                     builds = [str(b.id) for b in running_builds]
-                    build.log("W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
+                    await build.log("W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
                                          dep_repo.name, ", ".join(builds), pvname))
                     continue
 
@@ -596,7 +596,7 @@ async def ScheduleBuilds():
                     else:
                         pvname = projectversion.fullname
 
-                    build.log("W: waiting for repo {} to be built in projectversion {}\n".format(
+                    await build.log("W: waiting for repo {} to be built in projectversion {}\n".format(
                                          dep_repo.name, pvname))
                     continue
 

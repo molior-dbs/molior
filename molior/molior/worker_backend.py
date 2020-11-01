@@ -21,7 +21,7 @@ class BackendWorker:
     async def _schedule(self, job):
         b = Backend()
         backend = b.get_backend()
-        backend.build(*job)
+        await backend.build(*job)
 
     async def _started(self, session, build_id):
         build = session.query(Build).filter(Build.id == build_id).first()
@@ -35,17 +35,17 @@ class BackendWorker:
     async def _succeeded(self, session, build_id):
         self.build_outcome[build_id] = True
         if build_id in self.logging_done:
-            enqueue_backend({"terminate": build_id})
+            await enqueue_backend({"terminate": build_id})
 
     async def _failed(self, session, build_id):
         self.build_outcome[build_id] = False
         if build_id in self.logging_done:
-            enqueue_backend({"terminate": build_id})
+            await enqueue_backend({"terminate": build_id})
 
     async def _logging_done(self, session, build_id):
         self.logging_done.append(build_id)
         if build_id in self.build_outcome:
-            enqueue_backend({"terminate": build_id})
+            await enqueue_backend({"terminate": build_id})
 
     async def _terminate(self, session, build_id):
         outcome = self.build_outcome[build_id]
@@ -53,7 +53,7 @@ class BackendWorker:
         self.logging_done.remove(build_id)
 
         if outcome:  # build successful
-            enqueue_aptly({"publish": [build_id]})
+            await enqueue_aptly({"publish": [build_id]})
         else:        # build failed
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
@@ -113,7 +113,7 @@ class BackendWorker:
                     if node_dummy:
                         # Schedule builds
                         args = {"schedule": []}
-                        enqueue_task(args)
+                        await enqueue_task(args)
                         handled = True
 
                 if not handled:

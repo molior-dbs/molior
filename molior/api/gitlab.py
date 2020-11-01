@@ -260,7 +260,7 @@ async def process_tag_push(request, data):
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if git_ref and repo.id:
         args = {"build": [build.id, repo.id, git_ref, ui_branch, None]}
-        enqueue_task(args)
+        await enqueue_task(args)
         return "OK", 200
 
     return "Unprocessable Entity", 422
@@ -388,7 +388,7 @@ async def process_push(request, data):
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if checkout_sha and repo.id:
         args = {"build": [build.id, repo.id, checkout_sha, ci_branch, None, False]}
-        enqueue_task(args)
+        await enqueue_task(args)
         return "OK", 200
 
     return "Unprocessable Entity", 422

@@ -142,8 +142,8 @@ def send_mail_notification(build):
 
 
 async def notify(subject, event, data):
-    enqueue_notification({"notify": {"subject": subject, "event": event, "data": data}})
+    await enqueue_notification({"notify": {"subject": subject, "event": event, "data": data}})
 
 
 async def run_hooks(build_id):
-    enqueue_notification({"hooks": {"build_id": build_id}})
+    await enqueue_notification({"hooks": {"build_id": build_id}})
