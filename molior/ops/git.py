@@ -20,10 +20,10 @@ async def run_git(cmd, cwd, build, write_output_log=True):
 
     async def outh(line):
         if write_output_log:
-            build.log(line)
+            build.log(line + "\n")
 
     async def errh(line):
-        build.log(line)
+        build.log(line + "\n")
 
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""
