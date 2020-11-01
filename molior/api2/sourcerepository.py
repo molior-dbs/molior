@@ -480,10 +480,24 @@ async def get_repository_hooks(request):
     postbuildhooks = db.query(PostBuildHook).join(Hook).filter(PostBuildHook.sourcerepositoryprojectversion_id == buildconfig.id)
     data = {"total_result_count": postbuildhooks.count(), "results": []}
     for postbuildhook in postbuildhooks:
+        hooktype = ""
+        if postbuildhook.hook.notify_overall:
+            hooktype = "top"
+        if postbuildhook.hook.notify_deb:
+            if hooktype:
+                hooktype += "+"
+            hooktype += "deb"
+        if postbuildhook.hook.notify_src:
+            if hooktype:
+                hooktype += "+"
+            hooktype += "src"
+
         data["results"].append({
             "id": postbuildhook.id,
             "method": postbuildhook.hook.method,
             "url": postbuildhook.hook.url,
+            "skipssl": postbuildhook.hook.skip_ssl,
+            "hooktype": hooktype,
             "enabled": postbuildhook.hook.enabled,
         })
     return OKResponse(data)
@@ -532,8 +546,10 @@ async def add_repository_hook(request):
     sourcerepository_id = request.match_info["sourcerepository_id"]
     params = await request.json()
     url = params.get("url", "")
+    skip_ssl = params.get("skipssl", "")
     body = params.get("body", "")
-    method = params.get("method", "")
+    hooktype = params.get("hooktype", "top")
+    method = params.get("method", "").lower()
 
     if not url:
         return ErrorResponse(400, "No URL received")
@@ -541,6 +557,8 @@ async def add_repository_hook(request):
         return ErrorResponse(400, "No Body received")
     if method not in ["post", "get"]:
         return ErrorResponse(400, "Invalid method received")
+
+    skip_ssl = skip_ssl == "true"
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -553,7 +571,11 @@ async def add_repository_hook(request):
     if not buildconfig:
         return ErrorResponse(404, "SourceRepository not found in project")
 
-    hook = Hook(url=url, method=method, body=body)
+    notify_overall = "top" in hooktype
+    notify_deb = "deb" in hooktype
+    notify_src = "src" in hooktype
+    hook = Hook(url=url, method=method, body=body, skip_ssl=skip_ssl,
+                notify_overall=notify_overall, notify_deb=notify_deb, notify_src=notify_src)
     db.add(hook)
     db.commit()
     postbuildhook = PostBuildHook(sourcerepositoryprojectversion_id=buildconfig.id, hook_id=hook.id)
@@ -561,6 +583,70 @@ async def add_repository_hook(request):
     db.commit()
 
     return OKResponse("Hook added")
+
+
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hook/{hook_id}")
+@req_role(["member", "owner"])
+async def delete_repository_hook(request):
+    """
+    Adds given sourcerepositories to the given
+    projectversion.
+
+    ---
+    description: Adds given sourcerepositories to given projectversion.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/json
+    parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: sourcerepository_id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                buildvariants:
+                    type: array
+                    example: [1, 2]
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid data received.
+    """
+    db = request.cirrina.db_session
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    hook_id = request.match_info["hook_id"]
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Project not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    hook = db.query(PostBuildHook).filter_by(sourcerepositoryprojectversion_id=buildconfig.id, id=hook_id).first()
+    if not hook:
+        return ErrorResponse(404, "Hook not found")
+
+    db.delete(hook)
+    db.commit()
+
+    return OKResponse("Hook deleted")
 
 
 @app.http_put("/api2/repository/{repository_id}/merge")
