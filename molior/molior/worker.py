@@ -231,7 +231,7 @@ class Worker:
                 ok = True
                 await build.set_needs_publish()
                 session.commit()
-                build.parent.log("I: publishing source package\n")
+                await build.parent.log("I: publishing source package\n")
                 await enqueue_aptly({"src_publish": [build.id]})
 
         if build.buildtype == "chroot":

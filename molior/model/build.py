@@ -137,8 +137,8 @@ class Build(Base):
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
-                self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-                self.parent.parent.logdone()
+                await self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                await self.parent.parent.logdone()
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -164,8 +164,8 @@ class Build(Base):
         if self.buildtype == "deb":
             if not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
-                self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-                self.parent.parent.logdone()
+                await self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                await self.parent.parent.logdone()
         elif self.buildtype == "source":
             await self.parent.set_failed()
 
@@ -187,8 +187,8 @@ class Build(Base):
                     break
             if all_ok:
                 await self.parent.parent.set_successful()
-                self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-                self.parent.parent.logdone()
+                await self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                await self.parent.parent.logdone()
 
     async def set_already_exists(self):
         self.log_state("version already exists")

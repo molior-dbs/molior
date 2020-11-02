@@ -136,7 +136,7 @@ async def publish_packages(session, build, out_path):
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build.id)
         await build.log("E: no debian packages found to upload\n")
-        build.parent.parent.log("E: build %d failed\n" % build.id)
+        await build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
     # FIXME: check on startup
@@ -144,7 +144,7 @@ async def publish_packages(session, build, out_path):
     if not key:
         logger.error("Signing key not defined in configuration")
         await build.log("E: no signinig key defined in configuration\n")
-        build.parent.parent.log("E: build %d failed\n" % build.id)
+        await build.parent.parent.log("E: build %d failed\n" % build.id)
         return False
 
     await build.log("Signing packages:\n")
@@ -205,7 +205,7 @@ async def DebPublish(session, build):
 
     try:
         out_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
-        build.parent.parent.log("I: publishing build %d\n" % build.id)
+        await build.parent.parent.log("I: publishing build %d\n" % build.id)
         await build.logtitle("Publishing", no_header_newline=False)
         if not await publish_packages(session, build, out_path):
             logger.error("publisher: error publishing build %d" % build.id)

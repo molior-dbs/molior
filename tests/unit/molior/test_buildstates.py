@@ -1,11 +1,26 @@
 import asyncio
 import sys
 
-from mock import MagicMock, mock
+from mock import MagicMock, mock, Mock
 sys.modules['aiofile'] = mock.MagicMock()
 
 from molior.model.build import Build            # noqa: E402
 from molior.model.maintainer import Maintainer  # noqa: F401
+
+
+def logmock(build):
+    build.log_state = MagicMock()
+    build.parent.log_state = MagicMock()
+    if build.parent.parent:
+        build.parent.parent.log_state = MagicMock()
+    build.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    build.parent.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    if build.parent.parent:
+        build.parent.parent.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    build.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    build.parent.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    if build.parent.parent:
+        build.parent.parent.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
 
 
 def test_src_build_failed():
@@ -15,12 +30,7 @@ def test_src_build_failed():
     src_build = Build(buildtype="source")
     src_build.parent = Build(buildtype="build")
 
-    src_build.log_state = MagicMock()
-    src_build.parent.log_state = MagicMock()
-    src_build.log = MagicMock()
-    src_build.parent.log = MagicMock()
-    src_build.logtitle = MagicMock()
-    src_build.parent.logtitle = MagicMock()
+    logmock(src_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(src_build.set_failed())
@@ -37,15 +47,7 @@ def test_deb_build_failed():
     deb_build.parent = Build(buildtype="source")
     deb_build.parent.parent = Build(buildtype="build")
 
-    deb_build.log_state = MagicMock()
-    deb_build.parent.log_state = MagicMock()
-    deb_build.parent.parent.log_state = MagicMock()
-    deb_build.log = MagicMock()
-    deb_build.parent.log = MagicMock()
-    deb_build.parent.parent.log = MagicMock()
-    deb_build.logtitle = MagicMock()
-    deb_build.parent.logtitle = MagicMock()
-    deb_build.parent.parent.logtitle = MagicMock()
+    logmock(deb_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(deb_build.set_failed())
@@ -62,12 +64,7 @@ def test_src_build_publish_failed():
     src_build = Build(buildtype="source")
     src_build.parent = Build(buildtype="build")
 
-    src_build.log_state = MagicMock()
-    src_build.parent.log_state = MagicMock()
-    src_build.log = MagicMock()
-    src_build.parent.log = MagicMock()
-    src_build.logtitle = MagicMock()
-    src_build.parent.logtitle = MagicMock()
+    logmock(src_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(src_build.set_publish_failed())
@@ -85,15 +82,7 @@ def test_deb_build_publish_failed():
     deb_build.parent = Build(buildtype="source")
     deb_build.parent.parent = Build(buildtype="build")
 
-    deb_build.log_state = MagicMock()
-    deb_build.parent.log_state = MagicMock()
-    deb_build.parent.parent.log_state = MagicMock()
-    deb_build.log = MagicMock()
-    deb_build.parent.log = MagicMock()
-    deb_build.parent.parent.log = MagicMock()
-    deb_build.logtitle = MagicMock()
-    deb_build.parent.logtitle = MagicMock()
-    deb_build.parent.parent.logtitle = MagicMock()
+    logmock(deb_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(deb_build.set_publish_failed())
@@ -111,15 +100,7 @@ def test_deb_build_successful_only_build():
     deb_build.parent.parent = Build(buildtype="build")
     deb_build.parent.children = [deb_build]
 
-    deb_build.log_state = MagicMock()
-    deb_build.parent.log_state = MagicMock()
-    deb_build.parent.parent.log_state = MagicMock()
-    deb_build.log = MagicMock()
-    deb_build.parent.log = MagicMock()
-    deb_build.parent.parent.log = MagicMock()
-    deb_build.logtitle = MagicMock()
-    deb_build.parent.logtitle = MagicMock()
-    deb_build.parent.parent.logtitle = MagicMock()
+    logmock(deb_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(deb_build.set_successful())
@@ -145,15 +126,7 @@ def test_deb_build_successful_all_successful():
 
     deb_build.parent.children = [deb_build, other_build]
 
-    deb_build.log_state = MagicMock()
-    deb_build.parent.log_state = MagicMock()
-    deb_build.parent.parent.log_state = MagicMock()
-    deb_build.log = MagicMock()
-    deb_build.parent.log = MagicMock()
-    deb_build.parent.parent.log = MagicMock()
-    deb_build.logtitle = MagicMock()
-    deb_build.parent.logtitle = MagicMock()
-    deb_build.parent.parent.logtitle = MagicMock()
+    logmock(deb_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(deb_build.set_successful())
@@ -179,15 +152,7 @@ def test_deb_build_successful_other_failed():
 
     deb_build.parent.children = [deb_build, other_build]
 
-    deb_build.log_state = MagicMock()
-    deb_build.parent.log_state = MagicMock()
-    deb_build.parent.parent.log_state = MagicMock()
-    deb_build.log = MagicMock()
-    deb_build.parent.log = MagicMock()
-    deb_build.parent.parent.log = MagicMock()
-    deb_build.logtitle = MagicMock()
-    deb_build.parent.logtitle = MagicMock()
-    deb_build.parent.parent.logtitle = MagicMock()
+    logmock(deb_build)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(deb_build.set_successful())
