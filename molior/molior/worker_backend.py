@@ -28,7 +28,7 @@ class BackendWorker:
         if not build:
             logger.error("build_started: no build found for %d", build_id)
             return
-        build.parent.parent.log("I: started build %d\n" % build_id)
+        await build.parent.parent.log("I: started build %d\n" % build_id)
         await build.set_building()
         session.commit()
 
@@ -59,7 +59,7 @@ class BackendWorker:
             if not build:
                 logger.error("build_failed: no build found for %d", build_id)
                 return
-            build.parent.parent.log("E: build %d failed\n" % build_id)
+            await build.parent.parent.log("E: build %d failed\n" % build_id)
             await build.set_failed()
             session.commit()
 

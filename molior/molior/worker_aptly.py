@@ -748,7 +748,7 @@ class AptlyWorker:
             logger.exception(exc)
 
         if not ret:
-            build.parent.log("E: publishing source package failed\n")
+            await build.parent.log("E: publishing source package failed\n")
             await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             await build.logdone()
             await build.set_publish_failed()
@@ -761,13 +761,13 @@ class AptlyWorker:
         await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
         await build.logdone()
 
-        build.parent.log("I: scheduling deb package builds\n")
+        await build.parent.log("I: scheduling deb package builds\n")
         # schedule child builds
         childs = session.query(Build).filter(Build.parent_id == build.id).all()
         if not childs:
             logger.error("publishsrc_succeeded no build childs found for %d", build_id)
-            build.parent.log("E: no deb builds found\n")
-            build.parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            await build.parent.log("E: no deb builds found\n")
+            await build.parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             await build.logdone()
             await build.parent.set_failed()
             session.commit()
@@ -802,8 +802,8 @@ class AptlyWorker:
             await build.set_successful()
         else:
             await build.set_publish_failed()
-            build.parent.parent.log("E: publishing build %d failed\n" % build.id)
-            build.parent.log("E: publishing build failed\n")
+            await build.parent.parent.log("E: publishing build %d failed\n" % build.id)
+            await build.parent.log("E: publishing build failed\n")
             await build.log("E: publishing build failed\n")
         await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
         await build.logdone()
