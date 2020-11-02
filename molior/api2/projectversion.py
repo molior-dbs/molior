@@ -411,12 +411,21 @@ async def delete_projectversion(request):
             deletebuild(build)
 
     # delete hooks
+    todelete = []
     sourcerepositoryprojectversions = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion.id).all()
     for sourcerepositoryprojectversion in sourcerepositoryprojectversions:
         hooks = db.query(PostBuildHook).filter(PostBuildHook.sourcerepositoryprojectversion_id ==
                                                sourcerepositoryprojectversion.id).all()
+
         for hook in hooks:
             db.delete(hook)
+
+        todelete.append(sourcerepositoryprojectversion)
+
+    for d in todelete:
+        db.delete(d)
+
+    db.commit()
 
     # delete projectversion
     db.delete(projectversion)
