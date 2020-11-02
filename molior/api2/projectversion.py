@@ -359,14 +359,14 @@ async def delete_projectversion(request):
         return ErrorResponse(400, "Projectversion is locked")
 
     if projectversion.dependents:
-        blocking_dependants = []
+        blocking_dependents = []
         for d in projectversion.dependents:
             if not d.is_deleted:
-                blocking_dependants.append("{}/{}".format(d.project.name, d.name))
+                blocking_dependents.append("{}/{}".format(d.project.name, d.name))
                 logger.error("projectversion delete: projectversion_id %d still has dependency %d", projectversion.id, d.id)
-        if blocking_dependants:
+        if blocking_dependents:
             return ErrorResponse(400, "Projectversions '{}' are still depending on this version, cannot delete it".format(
-                                  ", ".join(blocking_dependants)))
+                                  ", ".join(blocking_dependents)))
 
     projectversion.is_deleted = True
     projectversion.is_locked = True
@@ -564,3 +564,110 @@ async def get_apt_sources2(request):
             sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
 
     return web.Response(status=200, text=sources_list)
+
+
+@app.http_get("/api2/project/{project_id}/{projectversion_id}/dependents")
+@app.authenticated
+async def get_projectversion_dependents(request):
+    """
+    Returns a list of projectversions.
+
+    ---
+    description: Returns a list of projectversions.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: basemirror_id
+          in: query
+          required: false
+          type: integer
+        - name: is_basemirror
+          in: query
+          required: false
+          type: bool
+        - name: project_id
+          in: query
+          required: false
+          type: integer
+        - name: project_name
+          in: query
+          required: false
+          type: string
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    db = request.cirrina.db_session
+    candidates = request.GET.getone("candidates", None)
+    filter_name = request.GET.getone("q", None)
+
+    if candidates:
+        candidates = candidates == "true"
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    # get existing dependents
+    deps = projectversion.dependents
+    dep_ids = []
+    for d in deps:
+        dep_ids.append(d.id)
+
+    if candidates:  # return candidate dependents
+        results = []
+        cands_query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
+                                                      ProjectVersion.id != projectversion.id,
+                                                      ProjectVersion.id.notin_(dep_ids))
+        BaseMirror = aliased(ProjectVersion)
+        dist_query = db.query(ProjectVersion).join(BaseMirror, BaseMirror.id == ProjectVersion.basemirror_id).filter(
+                                                   ProjectVersion.dependency_policy == "distribution",
+                                                   BaseMirror.project_id == projectversion.basemirror.project_id,
+                                                   BaseMirror.id != projectversion.basemirror_id,
+                                                   ProjectVersion.id.notin_(dep_ids))
+
+        any_query = db.query(ProjectVersion).filter(
+                                                   ProjectVersion.dependency_policy == "any",
+                                                   ProjectVersion.id != projectversion.id,
+                                                   ProjectVersion.id.notin_(dep_ids))
+        cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
+                                                                                Project.name,
+                                                                                ProjectVersion.name.asc())
+        if filter_name:
+            cands = cands.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+
+        for cand in cands.all():
+            results.append(cand.data())
+
+        data = {"total_result_count": len(results), "results": results}
+        return OKResponse(data)
+
+    # return existing dependents
+    results = []
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
+        if filter_name:
+            dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        dep = dep.first()
+        if dep:
+            data = dep.data()
+            data["use_cibuilds"] = d.ci_builds_enabled
+            results.append(data)
+
+    # FIXME paginate ??
+    data = {"total_result_count": len(results), "results": results}
+    return OKResponse(data)
