@@ -27,7 +27,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             logger.error("aptly worker: mirror build with id %d not found", build_id)
             return False
 
-        build.buildligtitle("Chroot Environment")
+        await build.logtitle("Chroot Environment")
 
         await build.set_building()
         session.commit()
@@ -49,7 +49,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             logger.error("error creating build env")
             await build.log("Error creating build environment\n")
             await build.log("\n")
-            build.buildligtitle("Done", no_footer_newline=True)
+            await build.logtitle("Done", no_footer_newline=True)
             await build.set_failed()
             session.commit()
             return False
@@ -68,13 +68,13 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         if not ret == 0:
             logger.error("error publishing build env")
             await build.log("Error publishing build environment\n")
-            build.buildligtitle("Done", no_footer_newline=True)
+            await build.logtitle("Done", no_footer_newline=True)
             await build.set_publish_failed()
             session.commit()
             return False
 
         await build.log("\n")
-        build.buildligtitle("Done", no_footer_newline=True)
+        await build.logtitle("Done", no_footer_newline=True)
         await build.set_successful()
         session.commit()
 
