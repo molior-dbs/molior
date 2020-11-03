@@ -128,7 +128,6 @@ async def main():
     ram_total = virtual_memory().total
     disk_total = disk_usage("/").total
     machine_id = get_machine_id()
-    ip = get_ip_address("eth0")
     client_ver = str(subprocess.check_output(["dpkg-query", "--showformat=${Version}", "--show",
                      "molior-client-http"], stderr=subprocess.DEVNULL), "utf-8")
 
@@ -150,7 +149,7 @@ async def main():
                                                            "ram_total": ram_total,
                                                            "disk_total": disk_total,
                                                            "machine_id": machine_id,
-                                                           "ip": ip,
+                                                           "ip": get_ip_address("eth0"),
                                                            "client_ver": client_ver}}))
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
