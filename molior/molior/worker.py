@@ -221,8 +221,7 @@ class Worker:
                 logger.info("removing %s", buildout)
                 try:
                     shutil.rmtree(buildout)
-                except Exception as exc:
-                    logger.exception(exc)
+                except Exception:
                     pass
 
                 await build.set_needs_build()
