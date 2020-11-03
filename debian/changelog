@@ -1,3 +1,9 @@
+molior (1.4.0~alpha194) stretch; urgency=medium
+
+  * projectversion: do not delete if builds are running
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Tue, 03 Nov 2020 15:52:21 +0000
+
 molior (1.4.0~alpha193) stretch; urgency=medium
 
   * client: send updated IP
