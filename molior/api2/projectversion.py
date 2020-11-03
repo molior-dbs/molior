@@ -1,5 +1,5 @@
 from sqlalchemy.orm import aliased
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from aiohttp import web
 
 from ..app import app, logger
@@ -378,6 +378,18 @@ async def delete_projectversion(request):
     project_name = projectversion.project.name
     project_version = projectversion.name
     architectures = db2array(projectversion.mirror_architectures)
+
+    # do not delete PV if builds are running
+    debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb", or_(
+                                       Build.buildstate == "new",
+                                       Build.buildstate == "needs_build",
+                                       Build.buildstate == "scheduled",
+                                       Build.buildstate == "building",
+                                       Build.buildstate == "needs_publish",
+                                       Build.buildstate == "publishing"
+                                       )).first()
+    if debbuilds:
+        return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
 
     # delete deb builds and parents if needed
     todelete = []
