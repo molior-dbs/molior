@@ -1,3 +1,11 @@
+molior (1.4.0~alpha193) stretch; urgency=medium
+
+  * client: send updated IP
+  * user: fix id
+  * projectversion: get dependents
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Tue, 03 Nov 2020 14:27:20 +0000
+
 molior (1.4.0~alpha192) stretch; urgency=medium
 
   * bump version 1.4.0~alpha192
