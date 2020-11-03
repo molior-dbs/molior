@@ -251,6 +251,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         await build.log("E: error updating mirror\n")
                         mirror.mirror_state = "error"
                         await build.set_failed()
+                        await build.logdone()
                         session.commit()
                         # FIXME: delete all tasks
                         # await aptly.delete_task(task_id)
@@ -603,6 +604,7 @@ class AptlyWorker:
                     await build.log("E: Error adding keys from '%s'\n" % key_url)
                     logger.error("key error: %s", exc)
                     await build.set_failed()
+                    await build.logdone()
                     mirror.mirror_state = "init_error"
                     session.commit()
                     return False
@@ -614,6 +616,7 @@ class AptlyWorker:
                     await build.log("E: Error adding keys %s\n" % str(keyids))
                     logger.error("key error: %s", exc)
                     await build.set_failed()
+                    await build.logdone()
                     mirror.mirror_state = "init_error"
                     session.commit()
                     return False
@@ -638,6 +641,7 @@ class AptlyWorker:
                 await build.log("E: aptly seems to be not available: %s\n" % str(exc))
                 logger.error("aptly seems to be not available: %s", str(exc))
                 await build.set_failed()
+                await build.logdone()
                 mirror.mirror_state = "init_error"
                 session.commit()
                 return False
@@ -646,6 +650,7 @@ class AptlyWorker:
                 await build.log("E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
                 logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
                 await build.set_failed()
+                await build.logdone()
                 mirror.mirror_state = "init_error"
                 session.commit()
                 return False
@@ -702,6 +707,7 @@ class AptlyWorker:
                 logger.error("aptly seems to be not available: %s", str(exc))
                 # FIXME: remove from db
                 await build.set_failed()
+                await build.logdone()
                 session.commit()
                 return
             except AptlyError as exc:
@@ -709,6 +715,7 @@ class AptlyWorker:
                 logger.error("failed to update mirror %s on aptly: %s", mirror_name, str(exc))
                 # FIXME: remove from db
                 await build.set_failed()
+                await build.logdone()
                 session.commit()
                 return
 
@@ -770,6 +777,7 @@ class AptlyWorker:
             await build.parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             await build.logdone()
             await build.parent.set_failed()
+            await build.parent.logdone()
             session.commit()
             return
 
