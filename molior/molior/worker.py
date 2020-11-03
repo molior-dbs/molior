@@ -55,7 +55,12 @@ def cleanup_repos():
                 logger.warning("error parsing git url: {}".format(repo.url))
                 continue
             repo.name = repoinfo.name
+        if repos:
+            session.commit()
 
+        repos = session.query(SourceRepository).filter(SourceRepository.state == "busy").all()
+        for repo in repos:
+            repo.state = "ready"
         if repos:
             session.commit()
 
