@@ -121,6 +121,7 @@ class Worker:
         if repo.state == "error":
             await build.log("E: git repo is in error state\n")
             await build.set_failed()
+            await build.logdone()
             return
 
         if repo.state != "ready":
@@ -156,6 +157,7 @@ class Worker:
         if repo.state == "error":
             await build.log("E: git repo is in error state\n")
             await build.set_failed()
+            await build.logdone()
             return
 
         if repo.state != "ready":

@@ -71,6 +71,7 @@ async def GitClone(build_id, repo_id, session):
             logger.error("error running git clone")
             repo.set_error()
             await build.set_failed()
+            await build.logdone()
             session.commit()
             return
 
@@ -80,6 +81,7 @@ async def GitClone(build_id, repo_id, session):
                 logger.error("error running git command: %s", git_command)
                 repo.set_error()
                 await build.set_failed()
+                await build.logdone()
                 session.commit()
                 return
 

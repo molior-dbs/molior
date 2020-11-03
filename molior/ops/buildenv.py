@@ -51,6 +51,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             await build.log("\n")
             await build.logtitle("Done", no_footer_newline=True)
             await build.set_failed()
+            await build.logdone()
             session.commit()
             return False
 
@@ -70,6 +71,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             await build.log("Error publishing build environment\n")
             await build.logtitle("Done", no_footer_newline=True)
             await build.set_publish_failed()
+            await build.logdone()
             session.commit()
             return False
 
