@@ -25,73 +25,67 @@ from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend
 
 
-async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
-    with Session() as session:
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("BuildDebSrc: build %s not found" % build_id)
-            return False
+async def BuildDebSrc(repo_id, repo_path, build, ci_version, is_ci, author, email):
+    await build.log("I: getting debian build information\n")
+    src_package_name = await get_changelog_attr("Source", repo_path)
+    version = await get_changelog_attr("Version", repo_path)
+    repo_path = Path(repo_path)
 
-        await build.log("I: getting debian build information\n")
-        src_package_name = await get_changelog_attr("Source", repo_path)
-        version = await get_changelog_attr("Version", repo_path)
-        repo_path = Path(repo_path)
+    # FIXME: use global var
+    key = Configuration().debsign_gpg_email
+    if not key:
+        await build.log("E: Signing key not defined in configuration\n")
+        logger.error("Signing key not defined in configuration")
+        return False
 
-        # FIXME: use global var
-        key = Configuration().debsign_gpg_email
-        if not key:
-            await build.log("E: Signing key not defined in configuration\n")
-            logger.error("Signing key not defined in configuration")
-            return False
+    async def outh(line):
+        line = line.strip()
+        if line:
+            await build.log("%s\n" % line)
 
-        async def outh(line):
-            line = line.strip()
-            if line:
-                await build.log("%s\n" % line)
+    if is_ci:
+        # in order to publish a sourcepackage for a ci build we need
+        # to create a ci changelog with the correct version
 
-        if is_ci:
-            # in order to publish a sourcepackage for a ci build we need
-            # to create a ci changelog with the correct version
+        distribution = await get_changelog_attr("Distribution", repo_path)
 
-            distribution = await get_changelog_attr("Distribution", repo_path)
+        env = os.environ.copy()
+        env["DEBFULLNAME"] = author
+        env["DEBEMAIL"] = email
+        dchcmd = "dch -v %s --distribution %s --force-distribution 'CI Build'" % (ci_version, distribution)
+        version = ci_version
 
-            env = os.environ.copy()
-            env["DEBFULLNAME"] = author
-            env["DEBEMAIL"] = email
-            dchcmd = "dch -v %s --distribution %s --force-distribution 'CI Build'" % (ci_version, distribution)
-            version = ci_version
-
-            process = Launchy(shlex.split(dchcmd), outh, outh, cwd=str(repo_path), env=env)
-            await process.launch()
-            ret = await process.wait()
-            if ret != 0:
-                logger.error("Error running dch for CI build")
-                return False
-
-            if (repo_path / ".git").exists():
-                process = Launchy(shlex.split(
-                                  "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
-                                  outh, outh, cwd=str(repo_path))
-                await process.launch()
-                ret = await process.wait()
-                if ret != 0:
-                    logger.error("Error creating ci build commit")
-                    return False
-
-        logger.debug("%s: creating source package", src_package_name)
-        await build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
-
-        cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
-        process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
+        process = Launchy(shlex.split(dchcmd), outh, outh, cwd=str(repo_path), env=env)
         await process.launch()
         ret = await process.wait()
         if ret != 0:
-            await build.log("E: Error building source package\n")
-            logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
+            logger.error("Error running dch for CI build")
             return False
 
-        logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
-        return True
+        if (repo_path / ".git").exists():
+            process = Launchy(shlex.split(
+                              "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
+                              outh, outh, cwd=str(repo_path))
+            await process.launch()
+            ret = await process.wait()
+            if ret != 0:
+                logger.error("Error creating ci build commit")
+                return False
+
+    logger.debug("%s: creating source package", src_package_name)
+    await build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
+
+    cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
+    process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
+    await process.launch()
+    ret = await process.wait()
+    if ret != 0:
+        await build.log("E: Error building source package\n")
+        logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
+        return False
+
+    logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
+    return True
 
 
 async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
@@ -392,7 +386,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         # Build Source Package
         await build.logtitle("Source Build")
         try:
-            ret = await BuildDebSrc(repo_id, repo.src_path, build.id, info.version, is_ci,
+            ret = await BuildDebSrc(repo_id, repo.src_path, build, info.version, is_ci,
                                     "{} {}".format(firstname, lastname), email)
         except Exception as exc:
             logger.exception(exc)
