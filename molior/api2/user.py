@@ -47,6 +47,6 @@ async def get_user_byname(request):
 
     data = {"username": user.username,
             "email": user.email,
-            "user_id": user.id,
+            "id": user.id,
             "is_admin": user.is_admin}
     return OKResponse(data)
