@@ -197,6 +197,8 @@ fi
 
 if [ "$RUN_LINTIAN" != "1" ]; then
     SBUILD_ARGS="--no-run-lintian"
+else
+    SBUILD_ARGS="--run-lintian"
 fi
 
 # FIXME: signature verification inside sbuild schroot
@@ -206,7 +208,7 @@ APT_KEYS=""
 # --extra-repository-key=
 
 eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION \
-            --purge=never --verbose --run-lintian --no-clean-source --no-apt-clean --build-dep-resolver=aptitude \
+            --purge=never --verbose --no-clean-source --no-apt-clean --build-dep-resolver=aptitude \
             $SBUILD_ARCH_ARGS \
             $APT_URLS \
             $APT_KEYS \
