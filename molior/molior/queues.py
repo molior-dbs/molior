@@ -4,6 +4,7 @@ from datetime import datetime
 from aiofile import AIOFile, Writer
 from pathlib import Path
 
+from ..app import logger
 from ..tools import get_local_tz
 from ..molior.configuration import Configuration
 
@@ -66,25 +67,36 @@ def get_log_file_path(build_id):
     buildout_path = Path(Configuration().working_dir) / "buildout"
     dir_path = buildout_path / str(build_id)
     if not dir_path.is_dir():
-        dir_path.mkdir(parents=True)
+        try:
+            dir_path.mkdir(parents=True)
+        except Exception:
+            return None
     full_path = dir_path / "build.log"
     return str(full_path)
 
 
 async def buildlog_writer(build_id):
     filename = get_log_file_path(build_id)
-    afp = AIOFile(filename, 'a')
-    await afp.open()
-    writer = Writer(afp)
-    while True:
-        msg = await dequeue(buildlogs[build_id])
-        if msg is None:
-            await enqueue_backend({"logging_done": build_id})
-            continue
-        elif msg is False:
-            break
-        await writer(msg)
-        await afp.fsync()
+    if not filename:
+        logger.error("buildlog_writer: cannot get path for build %s", str(build_id))
+        del buildlogs[build_id]
+        return
+    try:
+        afp = AIOFile(filename, 'a')
+        await afp.open()
+        writer = Writer(afp)
+        while True:
+            msg = await dequeue(buildlogs[build_id])
+            if msg is None:
+                await enqueue_backend({"logging_done": build_id})
+                continue
+            elif msg is False:
+                break
+            await writer(msg)
+            await afp.fsync()
+    except Exception as exc:
+        logger.exception(exc)
+
     del buildlogs[build_id]
 
 
