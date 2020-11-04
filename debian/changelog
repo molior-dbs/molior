@@ -1,3 +1,13 @@
+molior (1.4.0~alpha195) stretch; urgency=medium
+
+  * node: add ws notifier
+  * projectversion: fix dependency removal
+  * projectversion: send distinct dependencies
+  * projectversion: add dependency and dependents ids
+  * mirror delete: rm schroot
+
+ -- André Roth <neolynx@gmail.com>  Wed, 04 Nov 2020 17:33:19 +0000
+
 molior (1.4.0~alpha194) stretch; urgency=medium
 
   * projectversion: do not delete if builds are running
