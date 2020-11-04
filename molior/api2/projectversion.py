@@ -442,6 +442,8 @@ async def delete_projectversion(request):
 
         todelete.append(sourcerepositoryprojectversion)
 
+    db.commit()
+
     for d in todelete:
         db.delete(d)
 

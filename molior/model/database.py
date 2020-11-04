@@ -39,7 +39,7 @@ class Database(object):
         if not self._engine:
             self._db = Configuration().database
             self._engine = create_engine("postgresql://{}".format(self._db), echo=False, poolclass=QueuePool,
-                                         pool_size=200, max_overflow=100, client_encoding="utf8")
+                                         pool_size=2048, max_overflow=1024, client_encoding="utf8")
         return self._engine
 
 

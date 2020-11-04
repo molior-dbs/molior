@@ -11,7 +11,6 @@ from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
 
-from ..model.database import Session
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 
@@ -71,20 +70,20 @@ async def DebSrcPublish(session, build):
 
     ret = False
     for projectversion_id in build.projectversions:
-        with Session() as session:
-            projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
-            if not projectversion:
-                logger.error("publisher: error finding projectversion {}".format(projectversion_id))
-                await build.log("E: error finding projectversion {}\n".format(projectversion_id))
-                continue
+        projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
+        if not projectversion:
+            logger.error("publisher: error finding projectversion {}".format(projectversion_id))
+            await build.log("E: error finding projectversion {}\n".format(projectversion_id))
+            continue
 
-            await build.log("I: publishing for %s\n" % projectversion.fullname)
-            basemirror_name = projectversion.basemirror.project.name
-            basemirror_version = projectversion.basemirror.name
-            project_name = projectversion.project.name
-            project_version = projectversion.name
-            archs = db2array(projectversion.mirror_architectures)
+        fullname = projectversion.fullname
+        basemirror_name = projectversion.basemirror.project.name
+        basemirror_version = projectversion.basemirror.name
+        project_name = projectversion.project.name
+        project_version = projectversion.name
+        archs = db2array(projectversion.mirror_architectures)
 
+        await build.log("I: publishing for %s\n" % fullname)
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
             await debian_repo.add_packages(publish_files, ci_build=build.is_ci)
