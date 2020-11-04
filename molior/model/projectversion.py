@@ -134,6 +134,12 @@ class ProjectVersion(Base):
             dict: The dict which can be processed by json_response
 
         """
+        dependency_ids = []
+        for d in self.dependencies:
+            dependency_ids.append(d.id)
+        dependent_ids = []
+        for d in self.dependents:
+            dependent_ids.append(d.id)
         data = {
             "id": self.id,
             "name": self.name,
@@ -144,7 +150,9 @@ class ProjectVersion(Base):
             "architectures": db2array(self.mirror_architectures),
             "is_locked": self.is_locked,
             "ci_builds_enabled": self.ci_builds_enabled,
-            "dependency_policy": self.dependency_policy
+            "dependency_policy": self.dependency_policy,
+            "dependency_ids": dependency_ids,
+            "dependent_ids": dependent_ids
         }
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})
