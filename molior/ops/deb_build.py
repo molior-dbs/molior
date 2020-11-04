@@ -22,11 +22,11 @@ from ..model.chroot import Chroot
 from ..model.projectversion import ProjectVersion
 from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
-from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend
+from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend, buildlog
 
 
-async def BuildDebSrc(repo_id, repo_path, build, ci_version, is_ci, author, email):
-    await build.log("I: getting debian build information\n")
+async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
+    await buildlog(build_id, "I: getting debian build information\n")
     src_package_name = await get_changelog_attr("Source", repo_path)
     version = await get_changelog_attr("Version", repo_path)
     repo_path = Path(repo_path)
@@ -34,14 +34,14 @@ async def BuildDebSrc(repo_id, repo_path, build, ci_version, is_ci, author, emai
     # FIXME: use global var
     key = Configuration().debsign_gpg_email
     if not key:
-        await build.log("E: Signing key not defined in configuration\n")
+        await buildlog(build_id, "E: Signing key not defined in configuration\n")
         logger.error("Signing key not defined in configuration")
         return False
 
     async def outh(line):
         line = line.strip()
         if line:
-            await build.log("%s\n" % line)
+            await buildlog(build_id, "%s\n" % line)
 
     if is_ci:
         # in order to publish a sourcepackage for a ci build we need
@@ -73,14 +73,14 @@ async def BuildDebSrc(repo_id, repo_path, build, ci_version, is_ci, author, emai
                 return False
 
     logger.debug("%s: creating source package", src_package_name)
-    await build.log("I: creating source package: %s (%s)\n" % (src_package_name, version))
+    await buildlog(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
 
     cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        await build.log("E: Error building source package\n")
+        await buildlog(build_id, "E: Error building source package\n")
         logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
         return False
 
@@ -109,8 +109,19 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         await parent.log("I: git checkout {}\n".format(git_ref))
 
-        # Checkout
-        ret = await asyncio.ensure_future(GitCheckout(repo.src_path, git_ref, parent_build_id))
+    # Checkout
+    ret = await asyncio.ensure_future(GitCheckout(repo.src_path, git_ref, parent_build_id))
+
+    with Session() as session:
+        parent = session.query(Build).filter(Build.id == parent_build_id).first()
+        if not parent:
+            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+            return
+        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        if not repo:
+            logger.error("source repository %d not found", repo_id)
+            return
+
         if not ret:
             await parent.log("E: git checkout failed\n")
             await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
@@ -121,11 +132,22 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             return
 
         await parent.log("\nI: get build information\n")
-        info = None
-        try:
-            info = await GetBuildInfo(repo.src_path, git_ref)
-        except Exception as exc:
-            logger.exception(exc)
+
+    info = None
+    try:
+        info = await GetBuildInfo(repo.src_path, git_ref)
+    except Exception as exc:
+        logger.exception(exc)
+
+    with Session() as session:
+        parent = session.query(Build).filter(Build.id == parent_build_id).first()
+        if not parent:
+            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+            return
+        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        if not repo:
+            logger.error("source repository %d not found", repo_id)
+            return
 
         if not info:
             await parent.log("E: Error getting build information\n")
@@ -149,30 +171,42 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             session.commit()
             return
 
-        is_ci = False
-        if force_ci:
-            is_ci = True
+        src_path = repo.src_path
+
+    is_ci = False
+    if force_ci:
+        is_ci = True
+    else:
+        # check if it is a CI build
+        # i.e. if gittag does not match version in debian/changelog
+        gittag = ""
+
+        async def outh(line):
+            nonlocal gittag
+            gittag += line
+
+        process = Launchy(shlex.split("git describe --tags --abbrev=40"), outh, outh, cwd=str(src_path))
+        await process.launch()
+        ret = await process.wait()
+        if ret != 0:
+            logger.error("error running git describe: %s" % gittag.strip())
         else:
-            # check if it is a CI build
-            # i.e. if gittag does not match version in debian/changelog
-            gittag = ""
+            v = strip_epoch_version(info.version)
+            if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
+                is_ci = True
 
-            async def outh(line):
-                nonlocal gittag
-                gittag += line
+    ci_cfg = Configuration().ci_builds
+    ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
 
-            process = Launchy(shlex.split("git describe --tags --abbrev=40"), outh, outh, cwd=str(repo.src_path))
-            await process.launch()
-            ret = await process.wait()
-            if ret != 0:
-                logger.error("error running git describe: %s" % gittag.strip())
-            else:
-                v = strip_epoch_version(info.version)
-                if not re.match("^v?{}$".format(v.replace("~", "-")), gittag):
-                    is_ci = True
-
-        ci_cfg = Configuration().ci_builds
-        ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
+    with Session() as session:
+        parent = session.query(Build).filter(Build.id == parent_build_id).first()
+        if not parent:
+            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+            return
+        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        if not repo:
+            logger.error("source repository %d not found", repo_id)
+            return
 
         if is_ci and not ci_enabled:
             repo.log_state("CI builds are not enabled in configuration")
@@ -374,7 +408,25 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         await parent.log("I: building source package\n")
 
-        async def fail():
+        # Build Source Package
+        await build.logtitle("Source Build")
+        build_id = build.id
+
+    async def fail():
+        with Session() as session:
+            parent = session.query(Build).filter(Build.id == parent_build_id).first()
+            if not parent:
+                logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+                return
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("BuildProcess: build {} not found".format(build_id))
+                return
+            repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+            if not repo:
+                logger.error("source repository %d not found", repo_id)
+                return
+
             await parent.log("E: building source package failed\n")
             await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             await parent.logdone()
@@ -383,18 +435,30 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             session.commit()
             # FIXME: cancel deb builds, or only create deb builds after source build ok
 
-        # Build Source Package
-        await build.logtitle("Source Build")
-        try:
-            ret = await BuildDebSrc(repo_id, repo.src_path, build, info.version, is_ci,
-                                    "{} {}".format(firstname, lastname), email)
-        except Exception as exc:
-            logger.exception(exc)
-            await fail()
-            return
+    try:
+        ret = await BuildDebSrc(repo_id, src_path, build_id, info.version, is_ci,
+                                "{} {}".format(firstname, lastname), email)
+    except Exception as exc:
+        logger.exception(exc)
+        await fail()
+        return
 
-        if not ret:
-            await fail()
+    if not ret:
+        await fail()
+        return
+
+    with Session() as session:
+        parent = session.query(Build).filter(Build.id == parent_build_id).first()
+        if not parent:
+            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+            return
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("BuildProcess: build {} not found".format(build_id))
+            return
+        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        if not repo:
+            logger.error("source repository %d not found", repo_id)
             return
 
         await build.set_needs_publish()
@@ -403,8 +467,8 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         repo.set_ready()
         session.commit()
 
-        await parent.log("I: publishing source package\n")
-        await enqueue_aptly({"src_publish": [build.id]})
+    await buildlog(parent_build_id, "I: publishing source package\n")
+    await enqueue_aptly({"src_publish": [build_id]})
 
 
 def chroot_ready(build, session):

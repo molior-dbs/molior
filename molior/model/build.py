@@ -72,35 +72,7 @@ class Build(Base):
         await buildlogdone(self.id)
 
     def log_state(self, statemsg):
-        prefix = ""
-        if self.buildtype == "deb":
-            prefix = self.buildtype
-            name = self.sourcerepository.name
-        elif self.buildtype == "source":
-            prefix = self.buildtype
-            name = self.sourcerepository.name
-        elif self.buildtype == "mirror":
-            prefix = self.buildtype
-            name = self.sourcename
-        elif self.buildtype == "chroot":
-            prefix = self.buildtype
-            name = self.sourcename
-        elif self.buildtype == "debootstrap":
-            prefix = self.buildtype
-            name = self.sourcename
-        elif self.buildtype == "build":
-            prefix = "task"
-            name = self.sourcename
-        else:
-            name = "unknown"
-        if not self.id:
-            b_id = -1
-        else:
-            b_id = self.id
-        version = ""
-        if self.version:
-            version = self.version
-        logger.info("build-%d %s %s: %s %s", b_id, prefix, statemsg, name, version)
+        build_logstate(self.id, self.buildtype, self.sourcename, self.version, statemsg)
 
     async def set_needs_build(self):
         self.log_state("needs build")
@@ -305,45 +277,12 @@ class Build(Base):
 
         await run_hooks(self.id)
 
-    def add_files(self, session, files):
-        for f in files:
-            name = ""
-            version = ""
-            arch = ""
-            ext = ""
-            suffix = ""
 
-            p = f.split("_")
-
-            if self.buildtype == "deb":
-                if len(p) != 3:
-                    logger.error("build: unknown file: {}".format(f))
-                    continue
-                name, version, suffix = p
-                s = suffix.split(".", 2)
-                if len(s) != 2:
-                    logger.error("build: cannot add file: {}".format(f))
-                    continue
-                arch, ext = s
-                suffix = arch
-                if ext != "deb":
-                    continue
-
-            elif self.buildtype == "source":
-                if len(p) == 3:  # $pkg_$ver_source.buildinfo
-                    continue
-                if len(p) != 2:
-                    logger.error("build: unknown file: {}".format(f))
-                    continue
-
-                name, suffix = p
-                suffix = suffix.replace(self.version, "")
-                suffix = suffix[1:]  # remove dot
-                if suffix.endswith("dsc") or suffix.endswith("source.buildinfo"):
-                    continue
-
-            pkg = session.query(Debianpackage).filter_by(name=name, suffix=suffix).first()
-            if not pkg:
-                pkg = Debianpackage(name=name, suffix=suffix)
-            if pkg not in self.debianpackages:
-                self.debianpackages.append(pkg)
+def build_logstate(build_id, buildtype, sourcename, version, statemsg):
+    prefix = buildtype
+    name = sourcename
+    if buildtype == "build":
+        prefix = "task"
+    if not build_id:
+        build_id = -1
+    logger.info("build-%d %s %s: %s %s", build_id, prefix, statemsg, name, version)

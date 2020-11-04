@@ -10,7 +10,7 @@ from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
-from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle
 
 from ..model.database import Session
 from ..model.build import Build
@@ -760,20 +760,33 @@ class AptlyWorker:
 
             await build.set_publishing()
             session.commit()
+            repo_id = build.sourcerepository_id
+            sourcename = build.sourcename
+            version = build.version
+            projectversions = build.projectversions
+            is_ci = build.is_ci
+            parent_id = build.parent_id
 
-            ret = False
-            try:
-                ret = await DebSrcPublish(session, build)
-            except Exception as exc:
-                logger.exception(exc)
+        ret = False
+        try:
+            ret = await DebSrcPublish(build_id, repo_id, sourcename, version, projectversions, is_ci)
+        except Exception as exc:
+            logger.exception(exc)
 
-            if not ret:
-                await build.parent.log("E: publishing source package failed\n")
-                await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
-                await build.logdone()
-                await build.set_publish_failed()
-                session.commit()
+        if not ret:
+            await buildlog(parent_id, "E: publishing source package failed\n")
+            await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
+            await build.logdone()
+
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("aptly worker: build with id %d not found", build_id)
                 return False
+
+            await build.set_publish_failed()
+            session.commit()
+            return False
 
             await build.set_successful()
             session.commit()
