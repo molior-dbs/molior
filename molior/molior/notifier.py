@@ -23,6 +23,7 @@ class Subject(Enum):
     build = 7
     buildlog = 8
     mirror = 9
+    node = 10
 
 
 class Event(Enum):
