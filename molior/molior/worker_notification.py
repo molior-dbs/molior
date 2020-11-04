@@ -52,6 +52,11 @@ class NotificationWorker:
         logger.info("terminating notification task")
 
     async def do_hooks(self, build_id):
+        method = None
+        url = None
+        skip_ssl = None
+        body = None
+
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
@@ -133,7 +138,10 @@ class NotificationWorker:
                     logger.error("hook: error rendering BODY template", url, exc)
                     return
 
-                try:
-                    await trigger_hook(hook.method, url, skip_ssl=hook.skip_ssl, body=body)
-                except Exception as exc:
-                    logger.error("hook: error calling {} '{}': {}".format(hook.method, url, exc))
+                method = hook.method
+                skip_ssl = hook.skip_ssl
+
+        try:
+            await trigger_hook(method, url, skip_ssl=skip_ssl, body=body)
+        except Exception as exc:
+            logger.error("hook: error calling {} '{}': {}".format(method, url, exc))

@@ -23,15 +23,17 @@ async def file_upload(request, tempfile, filename, size):
     token = request.match_info["token"]
     logger.debug("file uploaded: %s (%s) %dbytes, token %s", tempfile, filename, size, token)
 
+    build_id = None
     with Session() as session:
         build = session.query(Build).join(BuildTask).filter(BuildTask.task_id == token).first()
         if not build:
             logger.error("file_upload: no build found for token '%s'", token)
             return web.Response(status=400, text="Invalid file upload.")
+        build_id = build.id
 
-        buildout_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
-        # FIXME: do not overwrite
-        os.rename(tempfile, str(buildout_path / filename))
+    buildout_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
+    # FIXME: do not overwrite
+    os.rename(tempfile, str(buildout_path / filename))
 
     return web.Response(text="file uploaded: {} ({} bytes)".format(filename, size))
 
@@ -40,15 +42,17 @@ async def file_upload(request, tempfile, filename, size):
 async def ws_logs_connected(ws_client):
     token = ws_client.cirrina.request.match_info["token"]
 
+    build_id = None
     with Session() as session:
         build = session.query(Build).join(BuildTask).filter(BuildTask.task_id == token).first()
         if not build:
             logger.error("file_upload: no build found for token '%s'", token)
             # FIXME: disconnect
             return ws_client
+        build_id = build.id
 
-    logger.debug("ws: recieving logs for build {}".format(build.id))
-    ws_client.cirrina.build_id = build.id
+    logger.debug("ws: recieving logs for build {}".format(build_id))
+    ws_client.cirrina.build_id = build_id
     return ws_client
 
 
