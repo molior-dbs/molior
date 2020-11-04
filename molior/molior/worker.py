@@ -38,6 +38,11 @@ async def cleanup_builds():
                 session.delete(build.buildtask)
             cleaned_up = True
 
+        builds = session.query(Build).filter(Build.buildstate == "scheduled" and Build.buildtype == "deb").all()
+        for build in builds:
+            await build.set_needs_build()
+            cleaned_up = True
+
         if cleaned_up:
             session.commit()
 
