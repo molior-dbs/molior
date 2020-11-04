@@ -227,6 +227,8 @@ async def delete_projectversion_dependency(request):
     if not dependency:
         return ErrorResponse(400, "Dependency not found")
 
+    if dependency not in projectversion.dependencies:
+        return ErrorResponse(400, "Dependency not found")
 
     projectversion.dependencies.remove(dependency)
     db.commit()
