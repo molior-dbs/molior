@@ -1,6 +1,7 @@
 import asyncio
 import operator
 
+from os import remove
 from sqlalchemy import or_
 
 from ..app import logger
@@ -882,6 +883,17 @@ class AptlyWorker:
             base_mirror = mirror.basemirror.project.name
             base_mirror_version = mirror.basemirror.name
             # FIXME: cleanup chroot table, schroots, debootstrap,
+            archs = mirror.mirror_architectures
+            for arch in archs:
+                m = base_mirror + "-" + base_mirror_version + "-" + arch
+                try:
+                    remove("/var/lib/schroot/chroots/%s.tar.xz" % m)
+                except Exception as exc:
+                    logger.exception(exc)
+                try:
+                    remove("/var/lib/schroot/chroots/chroot.d/sbuild-%s" % m)
+                except Exception as exc:
+                    logger.exception(exc)
 
         try:
             # FIXME: use altpy queue !
