@@ -10,9 +10,13 @@ from ..app import logger
 from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
+from ..molior.queues import buildlog, buildlogtitle
 
+from ..model.database import Session
+from ..model.build import build_logstate
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
+from ..model.debianpackage import Debianpackage
 
 
 async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
@@ -39,7 +43,7 @@ async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
     return files
 
 
-async def DebSrcPublish(session, build):
+async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions, is_ci):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -50,54 +54,60 @@ async def DebSrcPublish(session, build):
     Returns:
         bool: True if successful, otherwise False.
     """
+    buildtype = "source"
 
-    await build.log("\n")
-    await build.logtitle("Publishing")
-    sourcepath = Path(Configuration().working_dir) / "repositories" / str(build.sourcerepository.id)
-    srcfiles = await debchanges_get_files(sourcepath, build.sourcename, build.version)
+    await buildlog(build_id, "\n")
+    await buildlogtitle(build_id, "Publishing")
+    sourcepath = Path(Configuration().working_dir) / "repositories" / str(repo_id)
+    srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
     if not srcfiles:
         logger.error("DebSrcPublish: no source files found")
         return False
 
-    build.add_files(session, srcfiles)
+    add_files(build_id, buildtype, version, srcfiles)
 
     publish_files = []
     for f in srcfiles:
         logger.debug("publisher: adding %s", f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
-    build.log_state("publishing {} for projectversion ids {}".format(build.sourcename, str(build.projectversions)))
+    build_logstate(build_id, buildtype, sourcename, version,
+                   "publishing {} for projectversion ids {}".format(sourcename, str(projectversions)))
 
     ret = False
-    for projectversion_id in build.projectversions:
-        projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
-        if not projectversion:
+    for projectversion_id in projectversions:
+        fullname = None
+        with Session() as session:
+            projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
+            if projectversion:
+                fullname = projectversion.fullname
+                basemirror_name = projectversion.basemirror.project.name
+                basemirror_version = projectversion.basemirror.name
+                project_name = projectversion.project.name
+                project_version = projectversion.name
+                archs = db2array(projectversion.mirror_architectures)
+
+        if not fullname:
             logger.error("publisher: error finding projectversion {}".format(projectversion_id))
-            await build.log("E: error finding projectversion {}\n".format(projectversion_id))
+            await buildlog(build_id, "E: error finding projectversion {}\n".format(projectversion_id))
             continue
 
-        fullname = projectversion.fullname
-        basemirror_name = projectversion.basemirror.project.name
-        basemirror_version = projectversion.basemirror.name
-        project_name = projectversion.project.name
-        project_version = projectversion.name
-        archs = db2array(projectversion.mirror_architectures)
+        await buildlog(build_id, "I: publishing for %s\n" % fullname)
 
-        await build.log("I: publishing for %s\n" % fullname)
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
-            await debian_repo.add_packages(publish_files, ci_build=build.is_ci)
+            await debian_repo.add_packages(publish_files, ci_build=is_ci)
             ret = True
         except Exception as exc:
-            await build.log("E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            await buildlog(build_id, "E: error adding files to projectversion {}\n".format(projectversion.fullname))
             logger.exception(exc)
 
-    await build.log("\n")
+    await buildlog(build_id, "\n")
 
     if ret:  # only delete if published, allow republish
         files2delete = publish_files
-        v = strip_epoch_version(build.version)
-        changes_file = "{}_{}_{}.changes".format(build.sourcename, v, "source")
+        v = strip_epoch_version(version)
+        changes_file = "{}_{}_{}.changes".format(sourcename, v, "source")
         files2delete.append("{}/{}".format(sourcepath, changes_file))
         for f in files2delete:
             logger.debug("publisher: removing %s", f)
@@ -218,3 +228,53 @@ async def DebPublish(session, build):
         if buildtask:
             session.delete(buildtask)
     return True
+
+
+def add_files(build_id, buildtype, version, files):
+    packages = {}
+    for f in files:
+        name = ""
+        version = ""
+        arch = ""
+        ext = ""
+        suffix = ""
+
+        p = f.split("_")
+
+        if buildtype == "deb":
+            if len(p) != 3:
+                logger.error("build: unknown file: {}".format(f))
+                continue
+            name, version, suffix = p
+            s = suffix.split(".", 2)
+            if len(s) != 2:
+                logger.error("build: cannot add file: {}".format(f))
+                continue
+            arch, ext = s
+            suffix = arch
+            if ext != "deb":
+                continue
+
+        elif buildtype == "source":
+            if len(p) == 3:  # $pkg_$ver_source.buildinfo
+                continue
+            if len(p) != 2:
+                logger.error("build: unknown file: {}".format(f))
+                continue
+
+            name, suffix = p
+            suffix = suffix.replace(version, "")
+            suffix = suffix[1:]  # remove dot
+            if suffix.endswith("dsc") or suffix.endswith("source.buildinfo"):
+                continue
+
+        key = "%s_%s:" % (name, suffix)
+        if key not in packages.keys():
+            packages[key] = (name, suffix)
+
+    with Session() as session:
+        pkg = session.query(Debianpackage).filter_by(name=name, suffix=suffix).first()
+        if not pkg:
+            pkg = Debianpackage(name=name, suffix=suffix)
+        if pkg not in self.debianpackages:
+            self.debianpackages.append(pkg)
