@@ -4,6 +4,8 @@ import json
 from ...app import app, logger
 from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_backend, enqueue_buildtask, dequeue_buildtask
+from ...molior.notifier import Subject, Event, notify
+
 
 registry = {"amd64": [], "arm64": []}
 running_nodes = {"amd64": [], "arm64": []}
@@ -60,6 +62,7 @@ async def node_register(ws_client):
     ws_client.molior_client_ver = ""
     ws_client.molior_ram_used = 0
     ws_client.molior_disk_used = 0
+    ws_client.molior_sourcename = ""
 
     registry[arch].insert(0, ws_client)
     logger.info("backend: %s node registered: %s", arch, node)
@@ -145,6 +148,7 @@ class HTTPBackend:
         self.loop = loop
         asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
         asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
+        asyncio.ensure_future(self.notifier(), loop=self.loop)
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, run_lintian=True):
@@ -190,7 +194,8 @@ class HTTPBackend:
                     "disk_total": node.molior_disk_total,
                     "machine_id": node.molior_machine_id,
                     "ip": node.molior_ip,
-                    "client_ver": node.molior_client_ver
+                    "client_ver": node.molior_client_ver,
+                    "sourcename": node.molior_sourcename
                 }
         for arch in running_nodes:
             for node in running_nodes[arch]:
@@ -206,7 +211,8 @@ class HTTPBackend:
                     "disk_total": node.molior_disk_total,
                     "machine_id": node.molior_machine_id,
                     "ip": node.molior_ip,
-                    "client_ver": node.molior_client_ver
+                    "client_ver": node.molior_client_ver,
+                    "sourcename": node.molior_sourcename
                 }
         return build_nodes
 
@@ -231,6 +237,7 @@ class HTTPBackend:
                 running_nodes[arch].append(node)
                 logger.info("build-%d: building for %s on %s ", build_id, arch, node.molior_node_name)
                 node.molior_build_id = build_id
+                node.molior_sourcename = task["sourcename"]
                 if asyncio.iscoroutinefunction(node.send_str):
                     await node.send_str(json.dumps({"task": task}))
                 else:
@@ -240,3 +247,24 @@ class HTTPBackend:
                 logger.exception(exc)
 
             await asyncio.sleep(1)
+
+    async def notifier(self):
+        while True:
+            nodes = []
+            for arch in registry:
+                nodes.extend(registry[arch])
+            for arch in running_nodes:
+                nodes.extend(running_nodes[arch])
+
+            data = []
+            for node in nodes:
+                data.append({
+                    "state": "busy" if node in running_nodes["amd64"] or node in running_nodes["arm64"] else "idle",
+                    "uptime_seconds": node.molior_uptime_seconds,
+                    "load": node.molior_load,
+                    "ram_used": node.molior_ram_used,
+                    "disk_used": node.molior_disk_used,
+                    "sourcename": node.molior_sourcename
+                    })
+            await notify(Subject.node.value, Event.changed.value, data)
+            await asyncio.sleep(10)
