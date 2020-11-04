@@ -148,7 +148,12 @@ async def get_projectversion_dependencies(request):
 
     # return existing dependencies
     results = []
+    # send unique deps
+    deps_unique = []
     for d in deps:
+        if d not in deps_unique:
+            deps_unique.append(d)
+    for d in deps_unique:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0])
         if filter_name:
             dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
@@ -221,6 +226,7 @@ async def delete_projectversion_dependency(request):
     dependency = get_projectversion_byname(dependency_name + "/" + dependency_version, db)
     if not dependency:
         return ErrorResponse(400, "Dependency not found")
+
 
     projectversion.dependencies.remove(dependency)
     db.commit()
