@@ -32,8 +32,11 @@ async def file_upload(request, tempfile, filename, size):
         build_id = build.id
 
     buildout_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
-    # FIXME: do not overwrite
-    os.rename(tempfile, str(buildout_path / filename))
+    try:
+        # FIXME: do not overwrite
+        os.rename(tempfile, str(buildout_path / filename))
+    except Exception as exc:
+        logger.exception(exc)
 
     return web.Response(text="file uploaded: {} ({} bytes)".format(filename, size))
 
