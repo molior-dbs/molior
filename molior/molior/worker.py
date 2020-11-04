@@ -1,6 +1,7 @@
-import shutil
 import asyncio
 import giturlparse
+
+from shutil import rmtree
 
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
@@ -222,9 +223,9 @@ class Worker:
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 logger.info("removing %s", buildout)
                 try:
-                    shutil.rmtree(buildout)
-                except Exception:
-                    pass
+                    rmtree(buildout)
+                except Exception as exc:
+                    logger.exception(exc)
 
                 await build.set_needs_build()
                 session.commit()
@@ -346,7 +347,7 @@ class Worker:
         session.delete(duplicate)
 
         try:
-            shutil.rmtree("/var/lib/molior/repositories/%d" % duplicate_id)
+            rmtree("/var/lib/molior/repositories/%d" % duplicate_id)
         except Exception as exc:
             logger.exception(exc)
 
@@ -373,7 +374,10 @@ class Worker:
         logger.info("worker: deleting repo %d", repository_id)
         session.commit()
         session.delete(repo)
-        shutil.rmtree("/var/lib/molior/repositories/%d" % repository_id, ignore_errors=True)  # not fail on read-only files
+        try:
+            rmtree("/var/lib/molior/repositories/%d" % repository_id)
+        except Exception as exc:
+            logger.exception(exc)
         session.commit()
 
     async def run(self):
