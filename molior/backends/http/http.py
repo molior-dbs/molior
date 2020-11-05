@@ -267,6 +267,7 @@ class HTTPBackend:
             data = []
             for node in nodes:
                 data.append({
+                    "name": node.molior_node_name,
                     "state": "busy" if node in running_nodes["amd64"] or node in running_nodes["arm64"] else "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
