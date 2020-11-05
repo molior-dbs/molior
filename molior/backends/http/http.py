@@ -30,8 +30,8 @@ async def watchdog(ws_client):
             if hasattr(ws_client, "molior_pong_pending") and ws_client.molior_pong_pending == 1:
                 logger.warn("backend: ping timeout after %ds on %s/%s",
                             PING_TIMEOUT, ws_client.molior_node_arch, ws_client.molior_node_name)
-                await ws_client.close()
                 await deregister_node(ws_client)
+                # await ws_client.close()
                 break
 
             # send ping
@@ -46,7 +46,7 @@ async def watchdog(ws_client):
 
     except Exception as exc:
         logger.exception(exc)
-        await ws_client.close()
+        # await ws_client.close()
 
 
 @app.websocket_connect(group="registry")
@@ -56,7 +56,7 @@ async def node_register(ws_client):
 
     if arch not in registry:
         logger.error("backend: invalid architecture received: '%s'", arch)
-        await ws_client.close()
+        # await ws_client.close()
         return ws_client
 
     # initialize
