@@ -937,8 +937,9 @@ class AptlyWorker:
             if not mirror.project.is_basemirror:
                 base_mirror = mirror.basemirror.project.name
                 base_mirror_version = mirror.basemirror.name
+            else:
                 # FIXME: cleanup chroot table, schroots, debootstrap,
-                archs = mirror.mirror_architectures
+                archs = db2array(mirror.mirror_architectures)
                 for arch in archs:
                     m = base_mirror + "-" + base_mirror_version + "-" + arch
                     try:
