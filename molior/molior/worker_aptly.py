@@ -10,7 +10,7 @@ from ..ops import DebSrcPublish, DebPublish
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
-from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone
 
 from ..model.database import Session
 from ..model.build import Build
@@ -776,40 +776,45 @@ class AptlyWorker:
         if not ret:
             await buildlog(parent_id, "E: publishing source package failed\n")
             await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await build.logdone()
+            await buildlogdone(parent_id)
+        else:
+            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
+            await buildlog(parent_id, "I: scheduling deb package builds\n")
 
+        await buildlogdone(build_id)
+
+        found_childs = False
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return False
-
-            await build.set_publish_failed()
-            session.commit()
-            return False
+            if not ret:
+                await build.set_publish_failed()
+                session.commit()
+                return False
 
             await build.set_successful()
             session.commit()
 
-            await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
-            await build.logdone()
-
-            await build.parent.log("I: scheduling deb package builds\n")
             # schedule child builds
             childs = session.query(Build).filter(Build.parent_id == build.id).all()
             if not childs:
                 logger.error("publishsrc_succeeded no build childs found for %d", build_id)
-                await build.parent.log("E: no deb builds found\n")
-                await build.parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
-                await build.logdone()
                 await build.parent.set_failed()
-                await build.parent.logdone()
                 session.commit()
-                return False
 
             for child in childs:
+                found_childs = True
                 await child.set_needs_build()
                 session.commit()
+
+        if not found_childs:
+            await buildlog(parent_id, "E: no deb builds found\n")
+            await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
+            await buildlogdone(build_id)
+            await buildlogdone(parent_id)
+            return False
 
         # Schedule builds
         args = {"schedule": []}
@@ -829,21 +834,41 @@ class AptlyWorker:
             await build.set_publishing()
             session.commit()
 
-            ret = False
-            try:
-                ret = await DebPublish(session, build)
-            except Exception as exc:
-                logger.exception(exc)
+            basemirror_name = build.projectversion.basemirror.project.name
+            basemirror_version = build.projectversion.basemirror.name
+            project_name = build.projectversion.project.name
+            project_version = build.projectversion.name
+            archs = db2array(build.projectversion.mirror_architectures)
+            parent_parent_id = build.parent.parent.id
+            buildtype = build.buildtype
+            sourcename = build.sourcename
+            version = build.version
+            architecture = build.architecture
+            is_ci = build.is_ci
 
+        ret = False
+        try:
+            ret = await DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+                                   basemirror_name, basemirror_version, project_name, project_version, archs)
+        except Exception as exc:
+            logger.exception(exc)
+
+        if not ret:
+            await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
+            await buildlog(build_id, "E: publishing build failed\n")
+        else:
+            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            await buildlogdone(build_id)
+
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("aptly worker: build with id %d not found", build_id)
+                return
             if ret:
                 await build.set_successful()
             else:
                 await build.set_publish_failed()
-                await build.parent.parent.log("E: publishing build %d failed\n" % build.id)
-                await build.parent.log("E: publishing build failed\n")
-                await build.log("E: publishing build failed\n")
-            await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await build.logdone()
             session.commit()
 
             if not build.is_ci:

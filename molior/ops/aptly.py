@@ -14,6 +14,7 @@ from ..molior.queues import buildlog, buildlogtitle
 
 from ..model.database import Session
 from ..model.build import build_logstate
+from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 from ..model.debianpackage import Debianpackage
@@ -119,7 +120,8 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
     return ret
 
 
-async def publish_packages(session, build, out_path):
+async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+                           basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
     """
     Publishes given packages to given
     publish point.
@@ -132,8 +134,8 @@ async def publish_packages(session, build, out_path):
         bool: True if successful, otherwise False.
     """
 
-    outfiles = await debchanges_get_files(out_path, build.sourcename, build.version, build.architecture)
-    build.add_files(session, outfiles)
+    outfiles = await debchanges_get_files(out_path, sourcename, version, architecture)
+    add_files(build_id, buildtype, version, outfiles)
     # FIXME: commit
 
     files2upload = []
@@ -143,27 +145,27 @@ async def publish_packages(session, build, out_path):
 
     count_files = len(files2upload)
     if count_files == 0:
-        logger.error("publisher: build %d: no files to upload", build.id)
-        await build.log("E: no debian packages found to upload\n")
-        await build.parent.parent.log("E: build %d failed\n" % build.id)
+        logger.error("publisher: build %d: no files to upload", build_id)
+        await buildlog(build_id, "E: no debian packages found to upload\n")
+        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
     # FIXME: check on startup
     key = Configuration().debsign_gpg_email
     if not key:
         logger.error("Signing key not defined in configuration")
-        await build.log("E: no signinig key defined in configuration\n")
-        await build.parent.parent.log("E: build %d failed\n" % build.id)
+        await buildlog(build_id, "E: no signinig key defined in configuration\n")
+        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
-    await build.log("Signing packages:\n")
+    await buildlog(build_id, "Signing packages:\n")
 
     async def outh(line):
         if len(line.strip()) != 0:
-            await build.log("%s\n" % re.sub(r"^ *", " - ", line))
+            await buildlog(build_id, "%s\n" % re.sub(r"^ *", " - ", line))
 
-    v = strip_epoch_version(build.version)
-    changes_file = "{}_{}_{}.changes".format(build.sourcename, v, build.architecture)
+    v = strip_epoch_version(version)
+    changes_file = "{}_{}_{}.changes".format(sourcename, v, architecture)
 
     cmd = "debsign -pgpg1 -k{} {}".format(key, changes_file)
     process = Launchy(shlex.split(cmd), outh, outh, cwd=str(out_path))
@@ -175,19 +177,13 @@ async def publish_packages(session, build, out_path):
 
     logger.debug("publisher: uploading %d file%s", count_files, "" if count_files == 1 else "s")
 
-    basemirror_name = build.projectversion.basemirror.project.name
-    basemirror_version = build.projectversion.basemirror.name
-    project_name = build.projectversion.project.name
-    project_version = build.projectversion.name
-    archs = db2array(build.projectversion.mirror_architectures)
-
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
     ret = False
     try:
-        await debian_repo.add_packages(files2upload, ci_build=build.is_ci)
+        await debian_repo.add_packages(files2upload, ci_build=is_ci)
         ret = True
     except Exception as exc:
-        await build.log("E: error uploading files to repository\n")
+        await buildlog(build_id, "E: error uploading files to repository\n")
         logger.exception(exc)
 
     files2delete = files2upload
@@ -199,7 +195,8 @@ async def publish_packages(session, build, out_path):
     return ret
 
 
-async def DebPublish(session, build):
+async def DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+                     basemirror_name, basemirror_version, project_name, project_version, archs):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -212,21 +209,25 @@ async def DebPublish(session, build):
         bool: True if successful, otherwise False.
     """
 
+    out_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
+    await buildlog(parent_parent_id, "I: publishing build %d\n" % build_id)
+    await buildlogtitle(build_id, "Publishing", no_header_newline=False)
+
     try:
-        out_path = Path(Configuration().working_dir) / "buildout" / str(build.id)
-        await build.parent.parent.log("I: publishing build %d\n" % build.id)
-        await build.logtitle("Publishing", no_header_newline=False)
-        if not await publish_packages(session, build, out_path):
-            logger.error("publisher: error publishing build %d" % build.id)
+        if not await publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+                                      basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
+            logger.error("publisher: error publishing build %d" % build_id)
             return False
     except Exception as exc:
-        logger.error("publisher: error publishing build %d" % build.id)
+        logger.error("publisher: error publishing build %d" % build_id)
         logger.exception(exc)
         return False
     finally:
-        buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-        if buildtask:
-            session.delete(buildtask)
+        with Session() as session:
+            buildtask = session.query(BuildTask).filter(BuildTask.build_id == build_id).first()
+            if buildtask:
+                session.delete(buildtask)
+                session.commit()
     return True
 
 
@@ -273,8 +274,15 @@ def add_files(build_id, buildtype, version, files):
             packages[key] = (name, suffix)
 
     with Session() as session:
-        pkg = session.query(Debianpackage).filter_by(name=name, suffix=suffix).first()
-        if not pkg:
-            pkg = Debianpackage(name=name, suffix=suffix)
-        if pkg not in self.debianpackages:
-            self.debianpackages.append(pkg)
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("clone: build %d not found", build_id)
+            return
+        for package in packages:
+            name, suffix = packages[package]
+            pkg = session.query(Debianpackage).filter_by(name=name, suffix=suffix).first()
+            if not pkg:
+                pkg = Debianpackage(name=name, suffix=suffix)
+            if pkg not in build.debianpackages:
+                build.debianpackages.append(pkg)
+        session.commit()
