@@ -147,6 +147,10 @@ async def get_nodes_info(request):
             continue
         results.append(node)
 
+    def sortBy(node):
+        return node["name"]
+    results.sort(key=sortBy)
+
     # FIXME: sort?
 
     # paginate
