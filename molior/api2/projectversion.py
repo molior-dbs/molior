@@ -387,7 +387,6 @@ async def delete_projectversion(request):
     if debbuilds:
         return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
 
-
     # remember configuration
     basemirror_name = projectversion.basemirror.project.name
     basemirror_version = projectversion.basemirror.name
