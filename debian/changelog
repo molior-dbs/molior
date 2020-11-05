@@ -1,3 +1,9 @@
+molior (1.4.0~alpha203) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha203
+
+ -- André Roth <neolynx@gmail.com>  Thu, 05 Nov 2020 18:28:34 +0100
+
 molior (1.4.0~alpha201) stretch; urgency=medium
 
   * mirror delete: improve
