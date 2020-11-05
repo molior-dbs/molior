@@ -7,13 +7,15 @@ from ..app import app, logger
 from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref, get_last_build
+from ..molior.queues import enqueue_task
+
+from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.projectversion import ProjectVersion, get_projectversion
 from ..model.sourepprover import SouRepProVer
 from ..model.postbuildhook import PostBuildHook
 from ..model.hook import Hook
-from ..molior.queues import enqueue_task
 
 
 @app.http_get("/api2/repository/{repository_id}")
@@ -443,27 +445,27 @@ async def get_projectversion_repository(request):
 @app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
 async def edit_repository(request):
-    sourcerepository_id = request.match_info["sourcerepository_id"]
-    db = request.cirrina.db_session
     params = await request.json()
+    sourcerepository_id = request.match_info["sourcerepository_id"]
     architectures = params.get("architectures", [])
-
     if not architectures:
         return ErrorResponse(400, "No architectures received")
 
-    projectversion = get_projectversion(request)
-    if not projectversion:
-        return ErrorResponse(404, "Project not found")
-    if projectversion.is_locked:
-        return ErrorResponse(400, "Projectversion is locked")
+    with Session() as db:
+        projectversion = get_projectversion(request, db)
+        if not projectversion:
+            return ErrorResponse(404, "Project not found")
+        if projectversion.is_locked:
+            return ErrorResponse(400, "Projectversion is locked")
 
-    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
-                                                SouRepProVer.projectversion_id == projectversion.id).first()
-    if not buildconfig:
-        return ErrorResponse(404, "SourceRepository not found in project")
+        buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                    SouRepProVer.projectversion_id == projectversion.id).first()
+        if not buildconfig:
+            return ErrorResponse(404, "SourceRepository not found in project")
 
-    buildconfig.architectures = array2db(architectures)
-    db.commit()
+        buildconfig.architectures = array2db(architectures)
+        db.commit()
+
     return OKResponse("SourceRepository changed")
 
 

@@ -199,22 +199,21 @@ def get_projectversion_deps(projectversion_id, session):
     return projectversion_ids
 
 
-def get_projectversion(request):
+def get_projectversion(request, db=None):
+    if not db:
+        db = request.cirrina.db_session
     if "project_name" in request.match_info:
-        project_name = request.match_info["project_name"]
+        name = request.match_info["project_name"]
     elif "project_id" in request.match_info:
-        project_name = request.match_info["project_id"]
+        name = request.match_info["project_id"]
     if "project_version" in request.match_info:
-        project_version = request.match_info["project_version"]
+        version = request.match_info["project_version"]
     elif "projectversion_id" in request.match_info:
-        project_version = request.match_info["projectversion_id"]
-    projectversion = request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.name == project_version,
-            Project.name == project_name,
-        ).first()
-    if not projectversion:
-        logger.warning("projectversion not found: %s/%s" % (project_name, project_version))
-    return projectversion
+        version = request.match_info["projectversion_id"]
+    pv = db.query(ProjectVersion).join(Project).filter(Project.name == name, ProjectVersion.name == version).first()
+    if not pv:
+        logger.warning("projectversion not found: %s/%s" % (name, version))
+    return pv
 
 
 def get_projectversion_byname(fullname, session):
