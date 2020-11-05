@@ -922,7 +922,11 @@ class AptlyWorker:
 
     async def _delete_mirror(self, args):
         mirror_id = args[0]
+        aptly = get_aptly_connection()
 
+        base_mirror = ""
+        base_mirror_version = ""
+        is_basemirror = False
         with Session() as session:
             mirror = session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == mirror_id,
                                                                         Project.is_mirror.is_(True)).first()
@@ -930,35 +934,48 @@ class AptlyWorker:
                 logger.error("aptly worker: mirror with id %d not found", mirror_id)
                 return
 
-            aptly = get_aptly_connection()
-
-            base_mirror = ""
-            base_mirror_version = ""
             if not mirror.project.is_basemirror:
                 base_mirror = mirror.basemirror.project.name
                 base_mirror_version = mirror.basemirror.name
-            else:
-                # FIXME: cleanup chroot table, schroots, debootstrap,
-                archs = db2array(mirror.mirror_architectures)
-                for arch in archs:
-                    m = base_mirror + "-" + base_mirror_version + "-" + arch
-                    try:
-                        remove("/var/lib/schroot/chroots/%s.tar.xz" % m)
-                    except Exception as exc:
-                        logger.exception(exc)
-                    try:
-                        remove("/var/lib/schroot/chroots/chroot.d/sbuild-%s" % m)
-                    except Exception as exc:
-                        logger.exception(exc)
 
-            try:
-                # FIXME: use altpy queue !
-                await aptly.mirror_delete(base_mirror, base_mirror_version, mirror.project.name,
-                                          mirror.name, mirror.mirror_distribution, mirror.mirror_components.split(","))
-            except Exception as exc:
-                # mirror did not exist
-                # FIXME: handle mirror has snapshots and cannot be deleted?
-                logger.exception(exc)
+            is_basemirror = mirror.project.is_basemirror
+            mirror_name = mirror.project.name
+            mirror_version = mirror.name
+            mirror_architectures = mirror.mirror_architectures
+            mirror_distribution = mirror.mirror_distribution
+            mirror_components = mirror.mirror_components.split(",")
+
+        # FIXME: cleanup chroot table, debootstrap,
+
+        # remove schroots if needed
+        if is_basemirror:
+            archs = db2array(mirror_architectures)
+            for arch in archs:
+                m = mirror_name + "-" + mirror_version + "-" + arch
+                try:
+                    remove("/var/lib/schroot/chroots/%s.tar.xz" % m)
+                except Exception as exc:
+                    logger.exception(exc)
+                try:
+                    remove("/var/lib/schroot/chroots/chroot.d/sbuild-%s" % m)
+                except Exception as exc:
+                    logger.exception(exc)
+
+        try:
+            # FIXME: use altpy queue !
+            await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_name,
+                                      mirror_version, mirror_distribution, mirror_components)
+        except Exception as exc:
+            # mirror did not exist
+            # FIXME: handle mirror has snapshots and cannot be deleted?
+            logger.exception(exc)
+
+        with Session() as session:
+            mirror = session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == mirror_id,
+                                                                        Project.is_mirror.is_(True)).first()
+            if not mirror:
+                logger.error("aptly worker: mirror with id %d not found", mirror_id)
+                return
 
             # remember for later
             project = mirror.project
