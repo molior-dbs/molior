@@ -57,7 +57,7 @@ async def node_register(ws_client):
     ws_client.molior_cpu_cores = 0
     ws_client.molior_ram_total = 0
     ws_client.molior_disk_total = 0
-    ws_client.molior_machine_id = 0
+    ws_client.molior_id = ""
     ws_client.molior_ip = ""
     ws_client.molior_client_ver = ""
     ws_client.molior_ram_used = 0
@@ -81,7 +81,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_cpu_cores = status["register"].get("cpu_cores")
             ws_client.molior_ram_total = status["register"].get("ram_total")
             ws_client.molior_disk_total = status["register"].get("disk_total")
-            ws_client.molior_machine_id = status["register"].get("machine_id")
+            ws_client.molior_id = status["register"].get("id")
             ws_client.molior_ip = status["register"].get("ip")
             ws_client.molior_client_ver = status["register"].get("client_ver")
             return
@@ -200,7 +200,7 @@ class HTTPBackend:
                     "ram_total": node.molior_ram_total,
                     "disk_used": node.molior_disk_used,
                     "disk_total": node.molior_disk_total,
-                    "machine_id": node.molior_machine_id,
+                    "id": node.molior_id,
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
@@ -219,7 +219,7 @@ class HTTPBackend:
                     "ram_total": node.molior_ram_total,
                     "disk_used": node.molior_disk_used,
                     "disk_total": node.molior_disk_total,
-                    "machine_id": node.molior_machine_id,
+                    "id": node.molior_id,
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
@@ -273,7 +273,7 @@ class HTTPBackend:
             data = []
             for node in nodes:
                 data.append({
-                    "name": node.molior_node_name,
+                    "id": node.molior_id,
                     "state": "busy" if node in running_nodes["amd64"] or node in running_nodes["arm64"] else "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,

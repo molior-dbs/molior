@@ -160,7 +160,7 @@ async def get_nodes_info(request):
     return web.json_response(data)
 
 
-@app.http_get("/api/node/{name}")
+@app.http_get("/api/node/{machineID}")
 async def get_node(request):
     """
     Returns info about the build node
@@ -177,16 +177,15 @@ async def get_node(request):
         "500":
             description: internal server error
     """
-    node_name = request.match_info["name"]
+    machine_id = request.match_info["machineID"]
 
     b = Backend()
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
 
-    if node_name not in build_nodes:
-        return web.Response(text="Node not found", status=404)
-
-    node = build_nodes[node_name]
-    node["name"] = node_name
-
-    return web.json_response(node)
+    for node_name in build_nodes:
+        if machine_id == build_nodes[node_name]["id"]:
+            node = build_nodes[node_name]
+            node["name"] = node_name
+            return web.json_response(node)
+    return web.Response(text="Node not found", status=404)
