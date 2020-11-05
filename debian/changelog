@@ -1,3 +1,9 @@
+molior (1.4.0~alpha198) stretch; urgency=medium
+
+  * source repo edit: use independent session
+
+ -- André Roth <neolynx@gmail.com>  Thu, 05 Nov 2020 16:30:18 +0100
+
 molior (1.4.0~alpha197) stretch; urgency=medium
 
   * source repo get: add architectures
