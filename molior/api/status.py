@@ -140,22 +140,18 @@ async def get_nodes_info(request):
     b = Backend()
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
-    # uptime_string = str(timedelta(seconds = uptime_seconds))
 
     results = []
-    for name in build_nodes:  # FIXME: sort?
-        if search and search not in name:
+    for node in build_nodes:
+        if search and search not in node["name"]:
             continue
+        results.append(node)
 
-        # load = ""
-        # for l in build_nodes[name]["load"]:
-        #     if load:
-        #         load += ", "
-        #     load += str(l)
-        # build_nodes[name]["load"] = load
-        results.append({**build_nodes[name], **{"name": name}})
+    # FIXME: sort?
 
+    # paginate
     result_page = results[page_size * (page - 1):page_size*page]
+
     data = {"total_result_count": len(results), "results": result_page}
     return web.json_response(data)
 
@@ -178,14 +174,10 @@ async def get_node(request):
             description: internal server error
     """
     machine_id = request.match_info["machineID"]
-
     b = Backend()
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
-
-    for node_name in build_nodes:
-        if machine_id == build_nodes[node_name]["id"]:
-            node = build_nodes[node_name]
-            node["name"] = node_name
+    for node in build_nodes:
+        if machine_id == node["id"]:
             return web.json_response(node)
     return web.Response(text="Node not found", status=404)
