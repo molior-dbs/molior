@@ -64,6 +64,7 @@ async def node_register(ws_client):
     ws_client.molior_disk_used = 0
     ws_client.molior_sourcename = ""
     ws_client.molior_sourceversion = ""
+    ws_client.molior_sourcearch = ""
 
     registry[arch].insert(0, ws_client)
     logger.info("backend: %s node registered: %s", arch, node)
@@ -107,6 +108,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_build_id = None
             ws_client.molior_sourcename = ""
             ws_client.molior_sourceversion = ""
+            ws_client.molior_sourcearch = ""
 
         elif status["status"] == "success":
             logger.debug("node: finished build {}".format(build_id))
@@ -117,6 +119,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_build_id = None
             ws_client.molior_sourcename = ""
             ws_client.molior_sourceversion = ""
+            ws_client.molior_sourcearch = ""
 
         else:
             logger.error("backend: invalid message received: '%s'", status["status"])
@@ -201,7 +204,8 @@ class HTTPBackend:
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
-                    "sourceversion": node.molior_sourceversion
+                    "sourceversion": node.molior_sourceversion,
+                    "sourcearch": node.molior_sourcearch
                 }
         for arch in running_nodes:
             for node in running_nodes[arch]:
@@ -219,7 +223,8 @@ class HTTPBackend:
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
-                    "sourceversion": node.molior_sourceversion
+                    "sourceversion": node.molior_sourceversion,
+                    "sourcearch": node.molior_sourcearch
                 }
         return build_nodes
 
@@ -246,6 +251,7 @@ class HTTPBackend:
                 node.molior_build_id = build_id
                 node.molior_sourcename = task.get("repository_name")
                 node.molior_sourceversion = task.get("version")
+                node.molior_sourcearch = task.get("architecture")
                 if asyncio.iscoroutinefunction(node.send_str):
                     await node.send_str(json.dumps({"task": task}))
                 else:
@@ -274,7 +280,8 @@ class HTTPBackend:
                     "ram_used": node.molior_ram_used,
                     "disk_used": node.molior_disk_used,
                     "sourcename": node.molior_sourcename,
-                    "sourceversion": node.molior_sourceversion
+                    "sourceversion": node.molior_sourceversion,
+                    "sourcearch": node.molior_sourcearch
                     })
             await notify(Subject.node.value, Event.changed.value, data)
             await asyncio.sleep(4)
