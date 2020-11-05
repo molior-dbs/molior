@@ -435,6 +435,7 @@ async def get_projectversion_repository(request):
         "name": repository.name,
         "url": repository.url,
         "state": repository.state,
+        "architectures": db2array(buildconfig.architectures)
     }
     return OKResponse(data)
 
