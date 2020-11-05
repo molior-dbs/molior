@@ -1,3 +1,10 @@
+molior (1.4.0~alpha204) stretch; urgency=medium
+
+  * nodes: sort by name
+  * fix websocket disconnect hang
+
+ -- André Roth <neolynx@gmail.com>  Thu, 05 Nov 2020 23:29:39 +0000
+
 molior (1.4.0~alpha203) stretch; urgency=medium
 
   * bump version 1.4.0~alpha203
