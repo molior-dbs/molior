@@ -22,7 +22,7 @@ from ..model.chroot import Chroot
 from ..model.projectversion import ProjectVersion
 from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
 from ..molior.configuration import Configuration
-from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend, buildlog
+from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend, buildlog, buildlogtitle, buildlogdone
 
 
 async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, email):
@@ -89,13 +89,12 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
 
 
 async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
+    await buildlogtitle(parent_build_id, "Molior Build")
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
             logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
             return
-
-        await parent.logtitle("Molior Build")
 
         repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
         if not repo:
@@ -106,11 +105,17 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.set_failed()
             session.commit()
             return
+        src_path = repo.src_path
 
-        await parent.log("I: git checkout {}\n".format(git_ref))
+    await buildlog(parent_build_id, "I: git checkout {}\n".format(git_ref))
 
     # Checkout
-    ret = await asyncio.ensure_future(GitCheckout(repo.src_path, git_ref, parent_build_id))
+    ret = await asyncio.ensure_future(GitCheckout(src_path, git_ref, parent_build_id))
+
+    if not ret:
+        await buildlog(parent_build_id, "E: git checkout failed\n")
+        await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+        await buildlogdone(parent_build_id)
 
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
@@ -123,21 +128,23 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             return
 
         if not ret:
-            await parent.log("E: git checkout failed\n")
-            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await parent.logdone()
             await parent.set_failed()
             repo.set_ready()
             session.commit()
             return
 
-        await parent.log("\nI: get build information\n")
+    await buildlog(parent_build_id, "\nI: get build information\n")
 
     info = None
     try:
         info = await GetBuildInfo(repo.src_path, git_ref)
     except Exception as exc:
         logger.exception(exc)
+
+    if not info:
+        await buildlog(parent_build_id, "E: Error getting build information\n")
+        await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+        await buildlogdone(parent_build_id)
 
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
@@ -150,9 +157,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             return
 
         if not info:
-            await parent.log("E: Error getting build information\n")
-            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await parent.logdone()
             await parent.set_failed()
             repo.set_ready()
             session.commit()
@@ -170,8 +174,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.set_nothing_done()
             session.commit()
             return
-
-        src_path = repo.src_path
 
     is_ci = False
     if force_ci:
