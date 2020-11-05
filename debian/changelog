@@ -1,3 +1,9 @@
+molior (1.4.0~alpha200) stretch; urgency=medium
+
+  * mirror: fix delete
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Thu, 05 Nov 2020 16:44:16 +0000
+
 molior (1.4.0~alpha199) stretch; urgency=medium
 
   * nodes: use machine id
