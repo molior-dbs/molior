@@ -148,7 +148,7 @@ async def main():
                 await ws.send_str(json.dumps({"register": {"cpu_cores": cpu_cores,
                                                            "ram_total": ram_total,
                                                            "disk_total": disk_total,
-                                                           "machine_id": machine_id,
+                                                           "id": machine_id,
                                                            "ip": get_ip_address("eth0"),
                                                            "client_ver": client_ver}}))
                 async for msg in ws:
