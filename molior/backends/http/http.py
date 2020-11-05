@@ -57,7 +57,7 @@ async def node_register(ws_client):
     ws_client.molior_cpu_cores = 0
     ws_client.molior_ram_total = 0
     ws_client.molior_disk_total = 0
-    ws_client.molior_id = ""
+    ws_client.molior_nodeid = ""
     ws_client.molior_ip = ""
     ws_client.molior_client_ver = ""
     ws_client.molior_ram_used = 0
@@ -81,7 +81,7 @@ async def node_message(ws_client, msg):
             ws_client.molior_cpu_cores = status["register"].get("cpu_cores")
             ws_client.molior_ram_total = status["register"].get("ram_total")
             ws_client.molior_disk_total = status["register"].get("disk_total")
-            ws_client.molior_id = status["register"].get("id")
+            ws_client.molior_nodeid = status["register"].get("id")
             ws_client.molior_ip = status["register"].get("ip")
             ws_client.molior_client_ver = status["register"].get("client_ver")
             return
@@ -187,10 +187,11 @@ class HTTPBackend:
 
     def get_nodes_info(self):
         # FIXME: lock both dicts on every access
-        build_nodes = {}
+        build_nodes = []
         for arch in registry:
             for node in registry[arch]:
-                build_nodes[node.molior_node_name] = {
+                build_nodes.append({
+                    "name": node.molior_node_name,
                     "arch": arch,
                     "state": "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
@@ -200,16 +201,17 @@ class HTTPBackend:
                     "ram_total": node.molior_ram_total,
                     "disk_used": node.molior_disk_used,
                     "disk_total": node.molior_disk_total,
-                    "id": node.molior_id,
+                    "id": node.molior_nodeid,
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
                     "sourceversion": node.molior_sourceversion,
                     "sourcearch": node.molior_sourcearch
-                }
+                })
         for arch in running_nodes:
             for node in running_nodes[arch]:
-                build_nodes[node.molior_node_name] = {
+                build_nodes.append({
+                    "name": node.molior_node_name,
                     "arch": arch,
                     "state": "busy",
                     "uptime_seconds": node.molior_uptime_seconds,
@@ -219,13 +221,13 @@ class HTTPBackend:
                     "ram_total": node.molior_ram_total,
                     "disk_used": node.molior_disk_used,
                     "disk_total": node.molior_disk_total,
-                    "id": node.molior_id,
+                    "id": node.molior_nodeid,
                     "ip": node.molior_ip,
                     "client_ver": node.molior_client_ver,
                     "sourcename": node.molior_sourcename,
                     "sourceversion": node.molior_sourceversion,
                     "sourcearch": node.molior_sourcearch
-                }
+                })
         return build_nodes
 
     async def scheduler(self, arch):
@@ -273,7 +275,7 @@ class HTTPBackend:
             data = []
             for node in nodes:
                 data.append({
-                    "id": node.molior_id,
+                    "id": node.molior_nodeid,
                     "state": "busy" if node in running_nodes["amd64"] or node in running_nodes["arm64"] else "idle",
                     "uptime_seconds": node.molior_uptime_seconds,
                     "load": node.molior_load,
