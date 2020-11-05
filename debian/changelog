@@ -1,3 +1,9 @@
+molior (1.4.0~alpha201) stretch; urgency=medium
+
+  * mirror delete: improve
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Thu, 05 Nov 2020 16:54:04 +0000
+
 molior (1.4.0~alpha200) stretch; urgency=medium
 
   * mirror: fix delete
