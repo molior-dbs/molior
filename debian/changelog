@@ -1,3 +1,9 @@
+molior (1.4.0~alpha199) stretch; urgency=medium
+
+  * nodes: use machine id
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Thu, 05 Nov 2020 16:37:54 +0000
+
 molior (1.4.0~alpha198) stretch; urgency=medium
 
   * source repo edit: use independent session
