@@ -376,20 +376,8 @@ async def delete_projectversion(request):
             return ErrorResponse(400, "Projectversions '{}' are still depending on this version, cannot delete it".format(
                                   ", ".join(blocking_dependents)))
 
-    projectversion.is_deleted = True
-    projectversion.is_locked = True
-    projectversion.ci_builds_enabled = False
-    db.commit()
-
-    basemirror_name = projectversion.basemirror.project.name
-    basemirror_version = projectversion.basemirror.name
-    project_name = projectversion.project.name
-    project_version = projectversion.name
-    architectures = db2array(projectversion.mirror_architectures)
-
     # do not delete PV if builds are running
     debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb", or_(
-                                       Build.buildstate == "new",
                                        Build.buildstate == "needs_build",
                                        Build.buildstate == "scheduled",
                                        Build.buildstate == "building",
@@ -398,6 +386,21 @@ async def delete_projectversion(request):
                                        )).first()
     if debbuilds:
         return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
+
+
+    # remember configuration
+    basemirror_name = projectversion.basemirror.project.name
+    basemirror_version = projectversion.basemirror.name
+    project_name = projectversion.project.name
+    project_version = projectversion.name
+    architectures = db2array(projectversion.mirror_architectures)
+
+    # mark as deleted
+    projectversion.is_deleted = True
+    projectversion.is_locked = True
+    projectversion.ci_builds_enabled = False
+    projectversion.name = projectversion.name + "-deleted"
+    db.commit()
 
     # delete deb builds and parents if needed
     todelete = []
