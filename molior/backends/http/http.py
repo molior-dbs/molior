@@ -22,20 +22,28 @@ async def watchdog(ws_client):
     try:
         arch = ws_client.molior_node_arch
         while True:
+            # stop if disconnected
+            if ws_client not in registry[arch] and ws_client not in running_nodes[arch]:
+                break
+
+            # was pong recieved ?
             if hasattr(ws_client, "molior_pong_pending") and ws_client.molior_pong_pending == 1:
                 logger.warn("backend: ping timeout after %ds on %s/%s",
                             PING_TIMEOUT, ws_client.molior_node_arch, ws_client.molior_node_name)
-                await node_disconnected(ws_client)
                 await ws_client.close()
+                await deregister_node(ws_client)
                 break
+
+            # send ping
             ws_client.molior_pong_pending = 1
             if asyncio.iscoroutinefunction(ws_client.send_str):
                 await ws_client.send_str(json.dumps({"ping": 1}))
             else:
                 ws_client.send_str(json.dumps({"ping": 1}))
+
+            # wait for pong
             await asyncio.sleep(PING_TIMEOUT)
-            if ws_client not in registry[arch] and ws_client not in running_nodes[arch]:
-                break
+
     except Exception as exc:
         logger.exception(exc)
         await ws_client.close()
@@ -130,6 +138,10 @@ async def node_message(ws_client, msg):
 
 @app.websocket_disconnect(group="registry")
 async def node_disconnected(ws_client):
+    await deregister_node(ws_client)
+
+
+async def deregister_node(ws_client):
     node = ws_client.molior_node_name
     arch = ws_client.molior_node_arch
 
