@@ -1,6 +1,6 @@
 [Unit]
 Wants=postgresql.service
-Description=Molior server daemon.
+Description=Molior Debian Build System.
 After=network.target postgresql.service
 
 [Service]
