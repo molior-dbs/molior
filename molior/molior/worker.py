@@ -257,7 +257,7 @@ class Worker:
                 await build.parent.log("I: publishing source package\n")
                 await enqueue_aptly({"src_publish": [build.id]})
             elif build.buildstate == "build_failed":
-                if build.sourcerepo.state == "error":
+                if build.sourcerepository.state == "error":
                     await build.log("E: git repo is in error state\n")
                     await build.set_failed()
                     await build.logdone()
