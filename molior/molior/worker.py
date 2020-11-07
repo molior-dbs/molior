@@ -5,7 +5,7 @@ from shutil import rmtree
 
 from ..app import logger
 from ..ops import GitClone, get_latest_tag
-from ..ops import BuildProcess, ScheduleBuilds, CreateBuildEnv
+from ..ops import BuildProcess, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
 from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, dequeue_task, enqueue_aptly
 
@@ -142,8 +142,19 @@ class Worker:
         repo.set_busy()
         session.commit()
 
-        asyncio.ensure_future(BuildProcess(build_id, repo.id,
-                                           git_ref, ci_branch, targets, force_ci))
+        asyncio.ensure_future(BuildProcess(build_id, repo.id, git_ref, ci_branch, targets, force_ci))
+
+    async def _srcbuild(self, args, session):
+        build_id = args[0]
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("build: build %d not found", build_id)
+            return
+
+        if build.buildstate != "new" and build.buildstate != "build_failed":
+            return
+
+        asyncio.ensure_future(BuildSourcePackage(build_id))
 
     async def _buildlatest(self, args, session):
         logger.debug("worker: got buildlatest task")
@@ -245,6 +256,19 @@ class Worker:
                 session.commit()
                 await build.parent.log("I: publishing source package\n")
                 await enqueue_aptly({"src_publish": [build.id]})
+            elif build.buildstate == "build_failed":
+                if build.sourcerepo.state == "error":
+                    await build.log("E: git repo is in error state\n")
+                    await build.set_failed()
+                    await build.logdone()
+                    return
+
+                if build.sourcerepo.state != "ready":
+                    await enqueue_task({"rebuild": args})
+                    logger.info("worker: repo %d not ready, requeueing", build.sourcerepo.id)
+                    await asyncio.sleep(2)
+                    return
+                await enqueue_task({"src_build": [build.id]})
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
@@ -429,6 +453,12 @@ class Worker:
                         if args:
                             handled = True
                             await self._buildlatest(args, session)
+
+                    if not handled:
+                        args = task.get("src_build")
+                        if args:
+                            handled = True
+                            await self._srcbuild(args, session)
 
                     if not handled:
                         args = task.get("rebuild")

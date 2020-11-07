@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from ..app import logger
-from ..tools import get_changelog_attr, strip_epoch_version, db2array
+from ..tools import get_changelog_attr, strip_epoch_version, db2array, array2db
 from .git import GitCheckout, GetBuildInfo
 
 from ..model.database import Session
@@ -309,7 +309,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         session.add(build)
         session.commit()
-        build.log_state("created")
         await parent.build_changed()
         await build.build_added()
 
@@ -391,7 +390,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 session.add(deb_build)
                 session.commit()
 
-                deb_build.log_state("created")
                 await deb_build.build_added()
 
         if not found:
@@ -403,26 +401,46 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             session.commit()
             return
 
-        build.projectversions = "{" + ",".join([str(p) for p in projectversion_ids]) + "}"
+        build.projectversions = array2db([str(p) for p in projectversion_ids])
+        session.commit()
+
+        build_id = build.id
+
+    await enqueue_task({"src_build": [build_id]})
+
+
+async def BuildSourcePackage(build_id):
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("BuildProcess: build {} not found".format(build_id))
+            return
+        parent_build_id = build.parent_id
+        repo_id = build.sourcerepository_id
+        src_path = build.sourcerepository.src_path
+        version = build.version
+        is_ci = build.is_ci
+        firstname = build.maintainer.firstname
+        lastname = build.maintainer.surname
+        email = build.maintainer.email
 
         await build.set_building()
         session.commit()
 
-        await parent.log("I: building source package\n")
+        await build.parent.log("I: building source package\n")
 
         # Build Source Package
         await build.logtitle("Source Build")
-        build_id = build.id
 
     async def fail():
         with Session() as session:
-            parent = session.query(Build).filter(Build.id == parent_build_id).first()
-            if not parent:
-                logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-                return
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("BuildProcess: build {} not found".format(build_id))
+                return
+            parent = session.query(Build).filter(Build.id == build.parent_id).first()
+            if not parent:
+                logger.error("BuildProcess: parent build {} not found".format(build.parent_id))
                 return
             repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
             if not repo:
@@ -438,7 +456,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             # FIXME: cancel deb builds, or only create deb builds after source build ok
 
     try:
-        ret = await BuildDebSrc(repo_id, src_path, build_id, info.version, is_ci,
+        ret = await BuildDebSrc(repo_id, src_path, build_id, version, is_ci,
                                 "{} {}".format(firstname, lastname), email)
     except Exception as exc:
         logger.exception(exc)
@@ -450,10 +468,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         return
 
     with Session() as session:
-        parent = session.query(Build).filter(Build.id == parent_build_id).first()
-        if not parent:
-            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-            return
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("BuildProcess: build {} not found".format(build_id))
