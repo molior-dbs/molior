@@ -263,9 +263,9 @@ class Worker:
                     await build.logdone()
                     return
 
-                if build.sourcerepo.state != "ready":
+                if build.sourcerepository.state != "ready":
                     await enqueue_task({"rebuild": args})
-                    logger.info("worker: repo %d not ready, requeueing", build.sourcerepo.id)
+                    logger.info("worker: repo %d not ready, requeueing", build.sourcerepository.id)
                     await asyncio.sleep(2)
                     return
                 await enqueue_task({"src_build": [build.id]})
