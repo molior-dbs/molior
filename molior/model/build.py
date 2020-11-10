@@ -134,7 +134,7 @@ class Build(Base):
         await self.build_changed()
 
         if self.buildtype == "deb":
-            if not self.parent.parent.buildstate == "build_failed":
+            if self.parent.parent and not self.parent.parent.buildstate == "build_failed":
                 await self.parent.parent.set_failed()
                 await self.parent.parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
                 await self.parent.parent.logdone()
