@@ -115,8 +115,8 @@ async def get_projectversion_dependencies(request):
         return ErrorResponse(400, "Projectversion not found")
 
     # get existing dependencies
-    deps = get_projectversion_deps(projectversion.id, db)
-    dep_ids = [d[0] for d in deps]
+    deps = projectversion.dependencies
+    dep_ids = [d.id for d in deps]
 
     if candidates:  # return candidate dependencies
         results = []
@@ -154,13 +154,13 @@ async def get_projectversion_dependencies(request):
         if d not in deps_unique:
             deps_unique.append(d)
     for d in deps_unique:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0])
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
         if filter_name:
             dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
         dep = dep.first()
         if dep:
             data = dep.data()
-            data["use_cibuilds"] = d[1]
+            data["use_cibuilds"] = d.ci_builds_enabled
             results.append(data)
 
     # FIXME paginate ??
