@@ -397,28 +397,33 @@ async def get_project_users2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/project/{project_name}/permissions/{username}")
+@app.http_post("/api2/project/{project_name}/permissions/{userid}")
 @req_role("owner")
 async def add_project_users2(request):
-    db = request.cirrina.db_session
     project_name = request.match_info["project_name"]
-    username = request.match_info["username"]
+    userid = request.match_info["userid"]
+    try:
+        userid = int(userid)
+    except (ValueError, TypeError):
+        return ErrorResponse(400, "Incorrect value for userid")
     params = await request.json()
     role = params.get("role")
-
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
 
     if role not in ["member", "manager", "owner"]:
         return ErrorResponse(400, "Invalid role")
 
+    db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
 
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.id == userid).first()
     if not user:
         return ErrorResponse(404, "User not found")
+
+    username = user.username
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     # check existing
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
@@ -434,23 +439,28 @@ async def add_project_users2(request):
     return OKResponse()
 
 
-@app.http_delete("/api2/project/{project_name}/permissions/{username}")
+@app.http_delete("/api2/project/{project_name}/permissions/{userid}")
 @req_role("owner")
 async def delete_project_users2(request):
-    db = request.cirrina.db_session
     project_name = request.match_info["project_name"]
-    username = request.match_info["username"]
+    userid = request.match_info["userid"]
+    try:
+        userid = int(userid)
+    except (ValueError, TypeError):
+        return ErrorResponse(400, "Incorrect value for userid")
 
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
-
+    db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
 
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.id == userid).first()
     if not user:
         return ErrorResponse(404, "User not found")
+
+    username = user.username
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     # check existing
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
