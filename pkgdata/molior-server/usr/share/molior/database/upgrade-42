@@ -14,7 +14,7 @@ ALTER TABLE projectversion ADD COLUMN dependency_level dependencylevel_enum;
 ALTER TABLE build DROP COLUMN buildconfiguration_id;
 ALTER TABLE chroot DROP COLUMN buildvariant_id;
 DROP TABLE projectversionbuildvariant;
-DROP TABLE buildvariant;
 DROP TABLE buildconfiguration;
+DROP TABLE buildvariant;
 
 EOF
