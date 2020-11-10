@@ -13,6 +13,7 @@ Type=simple
 KillSignal=SIGTERM
 KillMode=process
 TimeoutSec=900
+TimeoutStartSec=30min
 
 [Install]
 WantedBy=multi-user.target
