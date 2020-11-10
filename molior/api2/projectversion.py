@@ -160,7 +160,6 @@ async def get_projectversion_dependencies(request):
         dep = dep.first()
         if dep:
             data = dep.data()
-            data["use_cibuilds"] = d.ci_builds_enabled
             results.append(data)
 
     # FIXME paginate ??
