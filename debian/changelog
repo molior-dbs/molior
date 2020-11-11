@@ -1,3 +1,13 @@
+molior (1.4.0~alpha209) stretch; urgency=medium
+
+  * project permissions: add edit
+  * project: use user id for permissions
+  * pv: cleanup dependents
+  * pv: cleanup
+  * pv: return top dependencies only
+
+ -- André Roth <neolynx@gmail.com>  Wed, 11 Nov 2020 21:52:27 +0000
+
 molior (1.4.0~alpha208) stretch; urgency=medium
 
   * bump version 1.4.0~alpha208
