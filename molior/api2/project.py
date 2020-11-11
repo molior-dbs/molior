@@ -439,6 +439,44 @@ async def add_project_users2(request):
     return OKResponse()
 
 
+@app.http_put("/api2/project/{project_name}/permissions/{userid}")
+@req_role("owner")
+async def edit_project_users2(request):
+    project_name = request.match_info["project_name"]
+    userid = request.match_info["userid"]
+    try:
+        userid = int(userid)
+    except (ValueError, TypeError):
+        return ErrorResponse(400, "Incorrect value for userid")
+    params = await request.json()
+    role = params.get("role")
+
+    if role not in ["member", "manager", "owner"]:
+        return ErrorResponse(400, "Invalid role")
+
+    db = request.cirrina.db_session
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+
+    user = db.query(User).filter(User.id == userid).first()
+    if not user:
+        return ErrorResponse(404, "User not found")
+
+    username = user.username
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
+
+    userrole = request.cirrina.db_session.query(UserRole).filter(UserRole.project_id == project.id,
+                                                                 UserRole.user_id == userid).first()
+    if not userrole:
+        return ErrorResponse(400, "User Role not found")
+    userrole.role = role
+    db.commit()
+
+    return OKResponse()
+
+
 @app.http_delete("/api2/project/{project_name}/permissions/{userid}")
 @req_role("owner")
 async def delete_project_users2(request):
