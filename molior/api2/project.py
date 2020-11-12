@@ -347,8 +347,8 @@ async def get_project_users2(request):
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
 
-    filter_name = request.GET.getone("filter_name", "")
-    filter_role = request.GET.getone("filter_role", "")
+    filter_name = request.GET.getone("q", None)
+    filter_role = request.GET.getone("role", None)
 
     if candidates:
         query = request.cirrina.db_session.query(User).outerjoin(UserRole).outerjoin(Project)
@@ -359,7 +359,6 @@ async def get_project_users2(request):
         query = query.order_by(User.username)
         query = paginate(request, query)
         users = query.all()
-
         data = {
             "total_result_count": query.count(),
             "results": [
@@ -375,13 +374,9 @@ async def get_project_users2(request):
         query = query.filter(User.username.like("%{}%".format(filter_name)))
 
     if filter_role:
-        role = None
-        for i in USER_ROLES:
-            if i.find(filter_role.lower()) >= 0:
-                role = i
-                break
-        if role:
-            query = query.filter(UserRole.role == role)
+        for r in USER_ROLES:
+            if filter_role in r:
+                query = query.filter(UserRole.role == r)
 
     query = paginate(request, query)
     roles = query.all()
