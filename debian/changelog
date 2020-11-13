@@ -1,3 +1,9 @@
+molior (1.4.0~alpha210) stretch; urgency=medium
+
+  * project permissions: fix filter
+
+ -- André Roth <neolynx@gmail.com>  Fri, 13 Nov 2020 11:07:30 +0000
+
 molior (1.4.0~alpha209) stretch; urgency=medium
 
   * project permissions: add edit
