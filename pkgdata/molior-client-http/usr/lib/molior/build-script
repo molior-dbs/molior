@@ -158,11 +158,13 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
+echo
+echo "Preparing sbuild"
 CLEANUP_SCHROOT=0
 if [ ! -e /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH ]; then
   CLEANUP_SCHROOT=1
   SCHROOT_URL=http://$MOLIOR_SERVER/schroots/
-  log "- $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
+  log " - Downloading $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
   wget --timeout=30 -q $SCHROOT_URL/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
   wget --timeout=30 -q $SCHROOT_URL/$PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz
 
@@ -175,7 +177,7 @@ else
 fi
 
 echo
-log "Extracting schroot: $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
+log " - Extracting schroot"
 sudo rm -rf   /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 sudo mkdir -p /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 cd /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH/
@@ -234,7 +236,7 @@ OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.build" -o -name "*_$A
 log "Uploading: "
 for f in $OUTPUT_FILES
 do
-  log " * `echo $f | sed 's#^./##'`"
+  log " - `echo $f | sed 's#^./##'`"
   curl -fs -F "file=@$f" http://$MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
   if [ $? -ne 0 ]; then
     log_error "Error uploading output files"
