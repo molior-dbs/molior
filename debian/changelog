@@ -1,3 +1,9 @@
+molior (1.4.0~alpha211) stretch; urgency=medium
+
+  * bump version 1.4.0~alpha211
+
+ -- André Roth <neolynx@gmail.com>  Sun, 15 Nov 2020 22:54:20 +0000
+
 molior (1.4.0~alpha210) stretch; urgency=medium
 
   * project permissions: fix filter
