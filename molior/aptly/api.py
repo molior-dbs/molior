@@ -807,7 +807,15 @@ class AptlyApi:
 
         Returns:
         """
+        data = None
         async with aiohttp.ClientSession() as http:
             async with http.post(self.url + "/db/cleanup", headers=self.headers, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
+                data = json.loads(await resp.text())
+        logger.info(data)
+
+        task_id = data.get("ID")
+        if task_id:
+            return await self.wait_task(task_id)
+        return False
