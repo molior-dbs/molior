@@ -10,6 +10,7 @@ from ..app import app, logger
 from ..version import MOLIOR_VERSION
 from ..model.database import database
 from ..auth import Auth
+from .configuration import Configuration
 
 from .worker import Worker
 from .worker_aptly import AptlyWorker
@@ -67,9 +68,12 @@ async def main():
     notification_worker = NotificationWorker()
     asyncio.ensure_future(notification_worker.run())
 
+    cfg = Configuration()
+    daily_cleanup = cfg.aptly.get("daily_cleanup")
+    if not daily_cleanup:
+        daily_cleanup = "04:00"
     cleanup_sched = Scheduler(locale="en_US")
-    # cleanup_job = CronJob(name='cleanup').every().hour.at(":34").go(cleanup_task, (5), age=99)
-    cleanup_job = CronJob(name='cleanup').every(5).hours.go(cleanup_task)
+    cleanup_job = CronJob(name='cleanup').every().day.at(daily_cleanup).go(cleanup_task)
     cleanup_sched.add_job(cleanup_job)
     asyncio.ensure_future(cleanup_sched.start())
 
