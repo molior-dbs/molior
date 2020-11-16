@@ -815,7 +815,11 @@ class AptlyApi:
                 data = json.loads(await resp.text())
         logger.info(data)
 
+        ret = False
         task_id = data.get("ID")
         if task_id:
-            return await self.wait_task(task_id)
-        return False
+            ret = await self.wait_task(task_id)
+        if not ret:
+            logger.error("aptly: cleanup task failed")
+            return
+        logger.info("aptly: cleanup succeeded")
