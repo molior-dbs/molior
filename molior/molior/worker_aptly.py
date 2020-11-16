@@ -830,7 +830,6 @@ class AptlyWorker:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return
 
-            await build.set_needs_publish()
             await build.set_publishing()
             session.commit()
 
@@ -858,7 +857,8 @@ class AptlyWorker:
             await buildlog(build_id, "E: publishing build failed\n")
         else:
             await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
-            await buildlogdone(build_id)
+
+        await buildlogdone(build_id)
 
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()

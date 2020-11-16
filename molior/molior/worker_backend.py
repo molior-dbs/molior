@@ -49,18 +49,20 @@ class BackendWorker:
             await enqueue_backend({"terminate": build_id})
 
     async def _terminate(self, build_id):
+        outcome = self.build_outcome[build_id]
+        del self.build_outcome[build_id]
+        self.logging_done.remove(build_id)
+
         with Session() as session:
-            outcome = self.build_outcome[build_id]
-            del self.build_outcome[build_id]
-            self.logging_done.remove(build_id)
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("build_failed: no build found for %d", build_id)
+                return
 
             if outcome:  # build successful
+                await build.set_needs_publish()
                 await enqueue_aptly({"publish": [build_id]})
             else:        # build failed
-                build = session.query(Build).filter(Build.id == build_id).first()
-                if not build:
-                    logger.error("build_failed: no build found for %d", build_id)
-                    return
                 await build.parent.parent.log("E: build %d failed\n" % build_id)
                 await build.set_failed()
                 await buildlogdone(build.id)
