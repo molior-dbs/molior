@@ -451,6 +451,10 @@ async def edit_repository(request):
     if not architectures:
         return ErrorResponse(400, "No architectures received")
 
+    url = params.get("url", None)
+    if not url:
+        return ErrorResponse(400, "No url received")
+
     with Session() as db:
         projectversion = get_projectversion(request, db)
         if not projectversion:
