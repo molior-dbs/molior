@@ -363,7 +363,7 @@ async def get_build(request):
     return web.json_response(data)
 
 
-@app.http_delete("/api/builds/{build_id}")
+@app.http_put("/api/builds/{build_id}")
 @app.authenticated
 # FIXME: req_role
 async def rebuild_build(request):
@@ -398,7 +398,6 @@ async def rebuild_build(request):
     logger.info("rebuilding build %d" % build_id)
 
     build = request.cirrina.db_session.query(Build).filter(Build.id == build_id).first()
-
     if not build:
         logger.error("build %d not found" % build_id)
         return web.Response(text="Build not found", status=400)

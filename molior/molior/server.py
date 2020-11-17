@@ -42,6 +42,7 @@ import molior.api2.projectversion    # noqa: F401
 import molior.api2.sourcerepository  # noqa: F401
 import molior.api2.user              # noqa: F401
 import molior.api2.mirror            # noqa: F401
+import molior.api2.build             # noqa: F401
 
 loop = asyncio.get_event_loop()
 
