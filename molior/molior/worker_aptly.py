@@ -1006,6 +1006,42 @@ class AptlyWorker:
 
             session.commit()
 
+    async def _delete_build(self, args):
+        build_id = args[0]
+        logger.error("aptly worker: deleting build %d" % build_id)
+        with Session() as session:
+            topbuild = session.query(Build).filter(Build.id == build_id).first()
+            if not topbuild:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            srcpkgs = []
+            debpkgs = []
+            for src in topbuild.children:
+                srcpkgs.append(src)
+                for deb in src.children:
+                    debpkgs.append(deb)
+
+            for src in srcpkgs:
+                for f in src.debianpackages:
+                    logger.error("delete %s_%s.%s from %s" % (f.name, src.version, f.suffix, src.projectversions))
+
+            for deb in debpkgs:
+                for f in deb.debianpackages:
+                    logger.error("delete %s_%s_%s.deb form %d" % (f.name, deb.version, f.suffix, deb.projectversion_id))
+
+        # get builds with packages (src, debs)
+
+        # foreach package
+        #    # get debianpackage info
+        #    # foreach projectversion package is in
+        #        # get aptly repo name
+        #        # repo_packages_get repo_name search for package
+        #        # repo_packages_delete
+
+        # delete buildout directory
+        # delte build database entries
+
     async def run(self):
         """
         Run the worker task.
@@ -1081,6 +1117,12 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._delete_mirror(args)
+
+                if not handled:
+                    args = task.get("delete_build")
+                    if args:
+                        handled = True
+                        await self._delete_build(args)
 
                 if not handled:
                     args = task.get("cleanup")

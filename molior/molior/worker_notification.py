@@ -52,7 +52,6 @@ class NotificationWorker:
         logger.info("terminating notification task")
 
     async def do_hooks(self, build_id):
-        logger.info("do_hooks")
         hooks = []
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()
