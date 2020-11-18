@@ -9,7 +9,6 @@ from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref, get_last_build
 from ..molior.queues import enqueue_task
 
-from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.projectversion import ProjectVersion, get_projectversion
@@ -322,7 +321,6 @@ async def add_repository(request):
         "400":
             description: Invalid data received.
     """
-    db = request.cirrina.db_session
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
@@ -346,6 +344,11 @@ async def add_repository(request):
     except giturlparse.parser.ParserError:
         return ErrorResponse(400, "Invalid git URL")
 
+    for arch in architectures:
+        if arch not in db2array(projectversion.mirror_architectures):
+            return ErrorResponse(400, "Invalid architecture: " + arch)
+
+    db = request.cirrina.db_session
     repo = db.query(SourceRepository).filter(SourceRepository.url == url).first()
     if not repo:
         query = db.query(SourceRepository).filter(or_(
@@ -455,20 +458,24 @@ async def edit_repository(request):
     if not url:
         return ErrorResponse(400, "No url received")
 
-    with Session() as db:
-        projectversion = get_projectversion(request, db)
-        if not projectversion:
-            return ErrorResponse(404, "Project not found")
-        if projectversion.is_locked:
-            return ErrorResponse(400, "Projectversion is locked")
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(404, "Project not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
 
-        buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
-                                                    SouRepProVer.projectversion_id == projectversion.id).first()
-        if not buildconfig:
-            return ErrorResponse(404, "SourceRepository not found in project")
+    for arch in architectures:
+        if arch not in db2array(projectversion.mirror_architectures):
+            return ErrorResponse(400, "Invalid architecture: " + arch)
 
-        buildconfig.architectures = array2db(architectures)
-        db.commit()
+    db = request.cirrina.db_session
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    buildconfig.architectures = array2db(architectures)
+    db.commit()
 
     return OKResponse("SourceRepository changed")
 
