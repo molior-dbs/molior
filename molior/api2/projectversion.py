@@ -9,7 +9,8 @@ from ..api.projectversion import do_clone, do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
 
-from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname
+from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname, \
+                                   get_projectversion_byid
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
@@ -53,7 +54,7 @@ async def get_projectversion2(request):
         return ErrorResponse(400, "Projectversion not found")
 
     if projectversion.project.is_mirror:
-        return ErrorResponse(400, "Projectversion not found")
+        return ErrorResponse(400, "Projectversion is mirror")
 
     return OKResponse(projectversion.data())
 
@@ -170,7 +171,6 @@ async def get_projectversion_dependencies(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/dependencies")
 @req_role("owner")
 async def add_projectversion_dependency(request):
-    db = request.cirrina.db_session
     params = await request.json()
     dependency_name = params.get("dependency")
     use_cibuilds = params.get("use_cibuilds")
@@ -182,6 +182,7 @@ async def add_projectversion_dependency(request):
     if projectversion.is_locked:
         return ErrorResponse(400, "Cannot add dependencies on a locked projectversion")
 
+    db = request.cirrina.db_session
     dependency = get_projectversion_byname(dependency_name, db)
     if not dependency:
         return ErrorResponse(400, "Dependency not found")
@@ -189,11 +190,33 @@ async def add_projectversion_dependency(request):
     if dependency.id == projectversion.id:
         return ErrorResponse(400, "Cannot add a dependency of the same projectversion to itself")
 
+    if dependency.project.is_basemirror:
+        return ErrorResponse(400, "Cannot add a dependency which is a basemirror")
+
+    if projectversion.dependency_policy == "strict":
+        if dependency.basemirror_id != projectversion.basemirror_id:
+            return ErrorResponse(400, "Cannot add a dependency with different basemirror as per dependency policy")
+        elif dependency.dependency_policy != "strict":
+            return ErrorResponse(400, "Cannot add a dependency with different dependency policy")
+    elif projectversion.dependency_policy == "distribution":
+        if dependency.basemirror.project.id != projectversion.basemirror.project.id:
+            return ErrorResponse(400, "Cannot add a dependency from different distribution as per dependency policy")
+        elif dependency.dependency_policy == "any":
+            return ErrorResponse(400, "Cannot add a dependency with any dependency policy")
+
     # check for dependency loops
     deps = get_projectversion_deps(dependency.id, db)
     dep_ids = [d[0] for d in deps]
     if projectversion.id in dep_ids:
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
+    for dep_id in dep_ids:
+        dep = get_projectversion_byid(dep_id, db)
+        if projectversion.dependency_policy == "strict":
+            if dep.basemirror_id != projectversion.basemirror_id:
+                return ErrorResponse(400, "Cannot add a dependency with different basemirror as per dependency policy")
+        elif projectversion.dependency_policy == "distribution":
+            if dep.basemirror.project.id != projectversion.basemirror.project.id:
+                return ErrorResponse(400, "Cannot add a dependency from different distribution as per dependency policy")
 
     # do not allow using a mirror for ci builds
     if dependency.project.is_mirror:

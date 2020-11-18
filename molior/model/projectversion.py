@@ -227,6 +227,10 @@ def get_projectversion_byname(fullname, session):
         ).first()
 
 
+def get_projectversion_byid(id, session):
+    return session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == id).first()
+
+
 def get_mirror(request):
     if "mirror_name" not in request.match_info:
         return None
