@@ -194,7 +194,7 @@ async def create_projectversion(request):
         return ErrorResponse(400, "No valid architecture received")
 
     if not is_name_valid(name):
-        return ErrorResponse(400, "Invalid project name!")
+        return ErrorResponse(400, "Invalid project name")
 
     basemirror_name, basemirror_version = basemirror.split("/")
 
