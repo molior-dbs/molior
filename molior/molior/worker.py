@@ -338,13 +338,17 @@ class Worker:
             logger.error("merge: duplicate %d not found", duplicate_id)
             return
 
+        if original.state == "error":
+            logger.warning("worker: cannot merge with repo %d in error state", repository_id)
+            return
+
         if original.state != "ready":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
             await enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
             return
 
-        if duplicate.state != "ready" or duplicate.state != "error":  # merge duplicates in error state
+        if duplicate.state != "ready" and duplicate.state != "error":  # merge duplicates in error state
             logger.info("worker: repo %d not ready, requeueing", duplicate_id)
             await enqueue_task({"merge_duplicate_repo": args})
             await asyncio.sleep(2)
