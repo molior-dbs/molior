@@ -1,3 +1,11 @@
+molior (1.4.0~alpha214) stretch; urgency=medium
+
+  * repo merge: fix
+  * projectversion: check for dependencies policy
+  * sourcerepository: check arch
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Thu, 19 Nov 2020 08:17:10 +0000
+
 molior (1.4.0~alpha213) stretch; urgency=medium
 
   * delete build
