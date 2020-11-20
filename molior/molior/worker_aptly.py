@@ -15,7 +15,7 @@ from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog
 from ..model.database import Session
 from ..model.build import Build
 from ..model.project import Project
-from ..model.projectversion import ProjectVersion
+from ..model.projectversion import ProjectVersion, get_projectversion_byid
 from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
@@ -1009,11 +1009,18 @@ class AptlyWorker:
     async def _delete_build(self, args):
         build_id = args[0]
         logger.error("aptly worker: deleting build %d" % build_id)
+
+        to_delete = {}
+        publish_names = []
         with Session() as session:
             topbuild = session.query(Build).filter(Build.id == build_id).first()
             if not topbuild:
                 logger.error("aptly worker: build %d not found" % build_id)
                 return
+
+            dist = "stable"
+            if topbuild.is_ci:
+                dist = "unstable"
 
             srcpkgs = []
             debpkgs = []
@@ -1024,19 +1031,49 @@ class AptlyWorker:
 
             for src in srcpkgs:
                 for f in src.debianpackages:
-                    logger.error("delete %s_%s.%s from %s" % (f.name, src.version, f.suffix, src.projectversions))
+                    for projectversion_id in src.projectversions:
+                        projectversion = get_projectversion_byid(projectversion_id, session)
+                        if not projectversion:
+                            logger.error("delete build: projectversion %d not found" % projectversion_id)
+                            continue
+                        repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
+                                                        projectversion.project.name, projectversion.name, dist)
+                        publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
+                                                                  projectversion.basemirror.name, projectversion.project.name,
+                                                                  projectversion.name)
+                        if publish_name not in publish_names:
+                            publish_names.append(publish_name)
+                        if repo_name not in to_delete:
+                            to_delete[repo_name] = []
+                        to_delete[repo_name].append((f.name, src.version, "source"))
 
             for deb in debpkgs:
                 for f in deb.debianpackages:
-                    logger.error("delete %s_%s_%s.deb form %d" % (f.name, deb.version, f.suffix, deb.projectversion_id))
+                    projectversion = deb.projectversion
+                    repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
+                                                    projectversion.project.name, projectversion.name, dist)
+                    if repo_name not in to_delete:
+                        to_delete[repo_name] = []
+                    to_delete[repo_name].append((f.name, deb.version, f.suffix))
 
-        # get builds with packages (src, debs)
+        aptly = get_aptly_connection()
+        aptly_delete = {}
+        for repo_name in to_delete:
+            for package in to_delete[repo_name]:
+                # logger.error("delete %s %s" % (repo_name, pkgname))
+                pkgs = await aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                    package[1],   # version
+                                                                                    package[2]))  # arch
+                if repo_name not in aptly_delete:
+                    aptly_delete[repo_name] = []
+                aptly_delete[repo_name].extend(pkgs)
+        logger.error("delete %s" % aptly_delete)
 
-        # foreach package
-        #    # get debianpackage info
-        #    # foreach projectversion package is in
-        #        # get aptly repo name
-        #        # repo_packages_get repo_name search for package
+        for repo_name in aptly_delete:
+            await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
+
+        logger.error("republish %s" % publish_names)
+        # republish projectversions
         #        # repo_packages_delete
 
         # delete buildout directory
