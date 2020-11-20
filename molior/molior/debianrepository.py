@@ -111,9 +111,9 @@ class DebianRepository:
 
         package_refs = []
         for package in packages:
-            pkgs = await self.__api.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],
-                                                                                     package[1],
-                                                                                     package[2]))
+            pkgs = await self.__api.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                     package[1],   # version
+                                                                                     package[2]))  # arch
             package_refs += pkgs
 
         logger.info("snapshot: pkg refs %s" % package_refs)
