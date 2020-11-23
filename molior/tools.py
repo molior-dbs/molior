@@ -10,7 +10,6 @@ from aiohttp.web import json_response
 from aiofile import AIOFile, Writer
 
 from .app import logger
-from .aptly import AptlyApi
 from .molior.configuration import Configuration
 
 from .model.project import Project
@@ -192,23 +191,6 @@ def is_name_valid(name):
     return bool(re.compile(r"^[a-zA-Z0-9.-]+$").match(name))
 
 
-def get_aptly_connection():
-    """
-    Connects to aptly server and returns aptly
-    object.
-
-    Returns:
-        AptlyApi: The connected aptly api instance.
-    """
-    cfg = Configuration()
-    api_url = cfg.aptly.get("api_url")
-    gpg_key = cfg.aptly.get("gpg_key")
-    aptly_user = cfg.aptly.get("user")
-    aptly_passwd = cfg.aptly.get("pass")
-    aptly = AptlyApi(api_url, gpg_key, username=aptly_user, password=aptly_passwd)
-    return aptly
-
-
 async def get_changelog_attr(name, path):
     """
     Gets given changelog attribute from given
@@ -323,3 +305,14 @@ def db2array(val):
     if not val:
         return []
     return val[1:-1].split(",")
+
+
+def get_snapshot_name(publish_name, dist, temporary=False):
+    """
+        Returns a aptly snapshot name
+
+        Args:
+            dist (str): The distribution to be used (stable, unstable)
+            temporary (bool): use tempporary extension
+    """
+    return "{}-{}{}".format(publish_name, dist, "-tmp" if temporary else "")

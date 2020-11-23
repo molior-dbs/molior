@@ -4,6 +4,9 @@ import asyncio
 import aiohttp
 
 from ..app import logger
+from ..tools import get_snapshot_name
+from ..molior.configuration import Configuration
+
 from .taskstate import TaskState
 from .errors import AptlyError
 
@@ -120,31 +123,6 @@ class AptlyApi:
                     self.__raise_aptly_error(resp)
                 state = json.loads(await resp.text())
         return state
-
-    async def wait_task(self, task_id):
-        """
-        Waits for an aptly task to finish.
-
-        Args:
-            task_id(int): The task's id.
-
-        Returns:
-            bool: True if task was succesful, otherwise False.
-        """
-        while True:
-            try:
-                task_state = await self.get_task_state(task_id)
-            except Exception:
-                return False
-
-            if task_state.get("State") == TaskState.SUCCESSFUL.value:
-                await self.delete_task(task_id)
-                return True
-            if task_state.get("State") == TaskState.FAILED.value:
-                await self.delete_task(task_id)
-                return False
-
-            await asyncio.sleep(2)
 
     @staticmethod
     def get_aptly_names(base_mirror, base_mirror_version, repo, version, is_mirror=False):
@@ -823,3 +801,77 @@ class AptlyApi:
             logger.error("aptly: cleanup task failed")
             return
         logger.info("aptly: cleanup succeeded")
+
+    async def republish(self, dist, repo_name, publish_name):
+        snapshot_name_tmp = get_snapshot_name(publish_name, dist, temporary=True)
+
+        # package_refs = await self.__get_packages(ci_build)
+        # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
+
+        task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
+        await self.wait_task(task_id)
+
+        logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
+                     publish_name,
+                     dist,
+                     snapshot_name_tmp)
+
+        task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, publish_name)
+        await self.wait_task(task_id)
+
+        snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
+        try:
+            task_id = await self.snapshot_delete(snapshot_name)
+            await self.wait_task(task_id)
+        except Exception:
+            pass
+
+        task_id = await self.snapshot_rename(snapshot_name_tmp, snapshot_name)
+        await self.wait_task(task_id)
+
+    async def wait_task(self, task_id):
+        """
+        Waits for an aptly task to finish.
+
+        Args:
+            task_id(int): The task's id.
+
+        Returns:
+            bool: True if task was succesful, otherwise False.
+        """
+        if type(task_id) is not int:
+            raise Exception("task_id '%s' must be int" % str(task_id))
+
+        while True:
+            await asyncio.sleep(2)
+            try:
+                task_state = await self.get_task_state(task_id)
+            except Exception as exc:
+                logger.exception(exc)
+                return False
+
+            if task_state.get("State") == TaskState.SUCCESSFUL.value:
+                await self.delete_task(task_id)
+                return True
+
+            if task_state.get("State") == TaskState.FAILED.value:
+                logger.error("aptly task %d failed" % task_id)
+                await self.delete_task(task_id)
+                return False
+
+
+def get_aptly_connection():
+    """
+    Connects to aptly server and returns aptly
+    object.
+
+    Returns:
+        AptlyApi: The connected aptly api instance.
+    """
+    cfg = Configuration()
+    api_url = cfg.aptly.get("api_url")
+    gpg_key = cfg.aptly.get("gpg_key")
+    aptly_user = cfg.aptly.get("user")
+    aptly_passwd = cfg.aptly.get("pass")
+    aptly = AptlyApi(api_url, gpg_key, username=aptly_user, password=aptly_passwd)
+    return aptly

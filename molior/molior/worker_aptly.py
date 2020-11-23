@@ -2,11 +2,13 @@ import asyncio
 import operator
 
 from os import remove
+from shutil import rmtree
 from sqlalchemy import or_
 
 from ..app import logger
-from ..tools import get_aptly_connection, db2array, array2db
+from ..tools import db2array, array2db
 from ..ops import DebSrcPublish, DebPublish
+from ..aptly import get_aptly_connection
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
@@ -1008,8 +1010,9 @@ class AptlyWorker:
 
     async def _delete_build(self, args):
         build_id = args[0]
-        logger.error("aptly worker: deleting build %d" % build_id)
+        logger.info("aptly worker: deleting build %d" % build_id)
 
+        build_ids = [build_id]
         to_delete = {}
         publish_names = []
         with Session() as session:
@@ -1025,10 +1028,13 @@ class AptlyWorker:
             srcpkgs = []
             debpkgs = []
             for src in topbuild.children:
+                build_ids.append(src.id)
                 srcpkgs.append(src)
                 for deb in src.children:
+                    build_ids.append(deb.id)
                     debpkgs.append(deb)
 
+            projectversions = {}
             for src in srcpkgs:
                 for f in src.debianpackages:
                     for projectversion_id in src.projectversions:
@@ -1041,6 +1047,8 @@ class AptlyWorker:
                         publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
                                                                   projectversion.basemirror.name, projectversion.project.name,
                                                                   projectversion.name)
+                        if projectversion_id not in projectversions:
+                            projectversions[projectversion_id] = (repo_name, publish_name)
                         if publish_name not in publish_names:
                             publish_names.append(publish_name)
                         if repo_name not in to_delete:
@@ -1067,17 +1075,41 @@ class AptlyWorker:
                 if repo_name not in aptly_delete:
                     aptly_delete[repo_name] = []
                 aptly_delete[repo_name].extend(pkgs)
-        logger.error("delete %s" % aptly_delete)
 
         for repo_name in aptly_delete:
             await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
 
-        logger.error("republish %s" % publish_names)
-        # republish projectversions
-        #        # repo_packages_delete
+        for pv in projectversions:
+            await aptly.republish(dist, projectversions[pv][0], projectversions[pv][1])
 
-        # delete buildout directory
-        # delte build database entries
+        for bid in build_ids:
+            buildout = "/var/lib/molior/buildout/%d" % bid
+            try:
+                rmtree(buildout)
+            except Exception:
+                pass
+
+        with Session() as session:
+            top = session.query(Build).filter(Build.id == build_id).first()
+            if not top:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            to_delete = []
+            for src in top.children:
+                for deb in src.children:
+                    to_delete.append(deb)
+                to_delete.append(src)
+            to_delete.append(top)
+
+            for build in to_delete:
+                build.debianpackages = []
+                if build.buildtask:
+                    session.delete(build.buildtask)
+                session.delete(build)
+            session.commit()
+
+        logger.info("aptly worker: build %d deleted" % build_id)
 
     async def run(self):
         """
