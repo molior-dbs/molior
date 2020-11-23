@@ -305,14 +305,3 @@ def db2array(val):
     if not val:
         return []
     return val[1:-1].split(",")
-
-
-def get_snapshot_name(publish_name, dist, temporary=False):
-    """
-        Returns a aptly snapshot name
-
-        Args:
-            dist (str): The distribution to be used (stable, unstable)
-            temporary (bool): use tempporary extension
-    """
-    return "{}-{}{}".format(publish_name, dist, "-tmp" if temporary else "")
