@@ -613,8 +613,10 @@ class AptlyApi:
         """
         ret = None
         data = json.dumps({"PackageRefs": package_refs})
+        headers = {"content-type": "application/json"}
         async with aiohttp.ClientSession() as http:
-            async with http.delete("{}/repos/{}/packages".format(self.url, repo_name), data=data, auth=self.auth) as resp:
+            async with http.delete("{}/repos/{}/packages".format(self.url, repo_name),
+                                   headers=headers, data=data, auth=self.auth) as resp:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 ret = json.loads(await resp.text())["ID"]
