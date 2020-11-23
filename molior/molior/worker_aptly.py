@@ -1036,6 +1036,8 @@ class AptlyWorker:
 
             projectversions = {}
             for src in srcpkgs:
+                if not src.projectversions:
+                    continue
                 for f in src.debianpackages:
                     for projectversion_id in src.projectversions:
                         projectversion = get_projectversion_byid(projectversion_id, session)
@@ -1077,7 +1079,8 @@ class AptlyWorker:
                 aptly_delete[repo_name].extend(pkgs)
 
         for repo_name in aptly_delete:
-            await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
+            task_id = await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
+            await aptly.wait_task(task_id)
 
         for pv in projectversions:
             await aptly.republish(dist, projectversions[pv][0], projectversions[pv][1])
