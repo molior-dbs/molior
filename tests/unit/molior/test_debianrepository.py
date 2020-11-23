@@ -7,7 +7,7 @@ from datetime import datetime
 from mock import patch, Mock, MagicMock, PropertyMock
 
 from molior.molior.debianrepository import DebianRepository
-from molior.tools import get_snapshot_name
+from molior.aptly.api import get_snapshot_name
 
 
 def test_publish_name():
@@ -218,7 +218,7 @@ def test_add_packages():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.tools.get_snapshot_name") as get_snapshot_name, patch.object(
+            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name, patch(
             "molior.molior.debianrepository.logger"):
 
@@ -269,7 +269,7 @@ def test_init():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.tools.get_snapshot_name") as get_snapshot_name, patch.object(
+            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):
@@ -329,7 +329,7 @@ def test_init_exists():
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.tools.get_snapshot_name") as get_snapshot_name, patch.object(
+            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):

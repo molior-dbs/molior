@@ -4,7 +4,6 @@ import asyncio
 import aiohttp
 
 from ..app import logger
-from ..tools import get_snapshot_name
 from ..molior.configuration import Configuration
 
 from .taskstate import TaskState
@@ -877,3 +876,14 @@ def get_aptly_connection():
     aptly_passwd = cfg.aptly.get("pass")
     aptly = AptlyApi(api_url, gpg_key, username=aptly_user, password=aptly_passwd)
     return aptly
+
+
+def get_snapshot_name(publish_name, dist, temporary=False):
+    """
+        Returns a aptly snapshot name
+
+        Args:
+            dist (str): The distribution to be used (stable, unstable)
+            temporary (bool): use tempporary extension
+    """
+    return "{}-{}{}".format(publish_name, dist, "-tmp" if temporary else "")
