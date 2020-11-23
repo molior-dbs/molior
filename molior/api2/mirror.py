@@ -1,14 +1,95 @@
 import re
+from aiohttp import web
 
 from ..app import app, logger
 from ..auth import req_admin
-from ..tools import OKResponse, ErrorResponse
+from ..tools import OKResponse, ErrorResponse, db2array
 from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
 from ..tools import paginate
+
+
+@app.http_get("/api2/mirror/{name}/{version}")
+@app.authenticated
+async def get_mirror2(request):
+    """
+    Returns all mirrors from database.
+
+    ---
+    description: Returns mirrors from database.
+    tags:
+        - Mirrors
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: name
+          in: query
+          required: false
+          type: string
+          description: filter criteria
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: bad request
+    """
+    mirror_name = request.match_info["name"]
+    mirror_version = request.match_info["version"]
+
+    query = request.cirrina.db_session.query(ProjectVersion)
+    query = query.join(Project, Project.id == ProjectVersion.project_id)
+    query = query.filter(Project.is_mirror == "true",
+                         Project.name == mirror_name,
+                         ProjectVersion.name == mirror_version)
+
+    mirror = query.first()
+    if not mirror:
+        return ErrorResponse(404, "Mirror not found")
+
+    mirrorkeyurl = ""
+    mirrorkeyids = ""
+    mirrorkeyserver = ""
+    if not mirror.project.is_basemirror and mirror.basemirror:
+        mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
+        if mirrorkey:
+            mirrorkeyurl = mirrorkey.keyurl
+            mirrorkeyids = mirrorkey.keyids[1:-1]
+            mirrorkeyserver = mirrorkey.keyserver
+
+    apt_url = mirror.get_apt_repo(url_only=True)
+    basemirror_url = ""
+    basemirror_name = ""
+    if not mirror.project.is_basemirror and mirror.basemirror:
+        basemirror_url = mirror.basemirror.get_apt_repo(url_only=True)
+        basemirror_name = mirror.basemirror.project.name + "/" + mirror.basemirror.name
+
+    result = {
+        "id": mirror.id,
+        "name": mirror.project.name,
+        "version": mirror.name,
+        "url": mirror.mirror_url,
+        "basemirror_url": basemirror_url,
+        "basemirror_name": basemirror_name,
+        "distribution": mirror.mirror_distribution,
+        "components": mirror.mirror_components,
+        "is_basemirror": mirror.project.is_basemirror,
+        "architectures": db2array(mirror.mirror_architectures),
+        "is_locked": mirror.is_locked,
+        "with_sources": mirror.mirror_with_sources,
+        "with_installer": mirror.mirror_with_installer,
+        "project_id": mirror.project.id,
+        "state": mirror.mirror_state,
+        "apt_url": apt_url,
+        "mirrorkeyurl": mirrorkeyurl,
+        "mirrorkeyids": mirrorkeyids,
+        "mirrorkeyserver": mirrorkeyserver
+    }
+    return web.json_response(result)
 
 
 @app.http_get("/api2/mirror/{mirror_name}/{mirror_version}/dependents")
