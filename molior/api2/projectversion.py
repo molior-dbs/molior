@@ -446,6 +446,11 @@ async def delete_projectversion(request):
         for buildtask in buildtasks:
             db.delete(buildtask)
         db.delete(build)
+        buildout = "/var/lib/molior/buildout/%d" % build.id
+        try:
+            rmtree(buildout)
+        except Exception:
+            pass
 
     for build in todelete:
         if build.buildtype == "source":
@@ -454,12 +459,6 @@ async def delete_projectversion(request):
             deletebuild(topbuild)
         else:
             deletebuild(build)
-
-        buildout = "/var/lib/molior/buildout/%d" % build.id
-        try:
-            rmtree(buildout)
-        except Exception:
-            pass
 
     # delete hooks
     todelete = []
