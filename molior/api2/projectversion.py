@@ -1,6 +1,7 @@
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
+from shutil import rmtree
 
 from ..app import app, logger
 from ..auth import req_role
@@ -453,6 +454,12 @@ async def delete_projectversion(request):
             deletebuild(topbuild)
         else:
             deletebuild(build)
+
+        buildout = "/var/lib/molior/buildout/%d" % build.id
+        try:
+            rmtree(buildout)
+        except Exception:
+            pass
 
     # delete hooks
     todelete = []
