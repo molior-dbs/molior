@@ -61,6 +61,7 @@ class Build(Base):
     buildtask = relationship(BuildTask, uselist=False)
     architecture = Column(String)
     debianpackages = relationship(Debianpackage, secondary=BuildDebianpackage)
+    is_deleted = Column(Boolean, default=False)
 
     async def log(self, msg):
         await buildlog(self.id, msg)

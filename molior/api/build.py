@@ -195,6 +195,8 @@ async def get_builds(request):
 #    if buildvariant_id:
 #        builds = builds.filter(BuildVariant.id == buildvariant_id)
 
+    builds = builds.filter(Build.is_deleted.is_(False))
+
     if search:
         terms = re.split("[/ ]", search)
         for term in terms:
