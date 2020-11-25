@@ -1,3 +1,10 @@
+molior (1.4.0~alpha218) stretch; urgency=medium
+
+  * build: add is_deleted flag
+  * projectversion delete: remove build logs
+
+ -- André Roth <neolynx@gmail.com>  Wed, 25 Nov 2020 21:28:39 +0000
+
 molior (1.4.0~alpha217) stretch; urgency=medium
 
   * bump version 1.4.0~alpha217
