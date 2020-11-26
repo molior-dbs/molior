@@ -43,6 +43,11 @@ async def cleanup_builds():
             await build.set_needs_build()
             cleaned_up = True
 
+        builds = session.query(Build).filter(Build.buildstate == "needs_build" and Build.buildtype == "chroot").all()
+        for build in builds:
+            await build.set_failed()
+            cleaned_up = True
+
         if cleaned_up:
             session.commit()
 
