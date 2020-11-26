@@ -193,7 +193,7 @@ class Build(Base):
         if not is_failed:
             return False
 
-        if self.projectversion:
+        if self.projectversion and not self.projectversion.project.is_basemirror:
             is_locked = self.projectversion.is_locked
         else:
             # project_id = None
