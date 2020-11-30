@@ -466,7 +466,7 @@ async def edit_repository(request):
 
     for arch in architectures:
         if arch not in db2array(projectversion.mirror_architectures):
-            return ErrorResponse(400, "Invalid architecture: " + arch)
+            return ErrorResponse(400, "The architecture is not invalid, it is not supported in this projectversion: " + arch)
 
     db = request.cirrina.db_session
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
