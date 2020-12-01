@@ -194,16 +194,12 @@ async def add_projectversion_dependency(request):
     if dependency.project.is_basemirror:
         return ErrorResponse(400, "Cannot add a dependency which is a basemirror")
 
-    if projectversion.dependency_policy == "strict":
+    if dependency.dependency_policy == "strict":
         if dependency.basemirror_id != projectversion.basemirror_id:
             return ErrorResponse(400, "Cannot add a dependency with different basemirror as per dependency policy")
-        elif dependency.dependency_policy != "strict":
-            return ErrorResponse(400, "Cannot add a dependency with different dependency policy")
-    elif projectversion.dependency_policy == "distribution":
+    elif dependency.dependency_policy == "distribution":
         if dependency.basemirror.project.id != projectversion.basemirror.project.id:
             return ErrorResponse(400, "Cannot add a dependency from different distribution as per dependency policy")
-        elif dependency.dependency_policy == "any":
-            return ErrorResponse(400, "Cannot add a dependency with any dependency policy")
 
     # check for dependency loops
     deps = get_projectversion_deps(dependency.id, db)
@@ -212,11 +208,11 @@ async def add_projectversion_dependency(request):
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
     for dep_id in dep_ids:
         dep = get_projectversion_byid(dep_id, db)
-        if projectversion.dependency_policy == "strict":
-            if dep.basemirror_id != projectversion.basemirror_id:
+        if dep.dependency_policy == "strict":
+            if dep.basemirror_id != dependency.basemirror_id:
                 return ErrorResponse(400, "Cannot add a dependency with different basemirror as per dependency policy")
-        elif projectversion.dependency_policy == "distribution":
-            if dep.basemirror.project.id != projectversion.basemirror.project.id:
+        elif dep.dependency_policy == "distribution":
+            if dep.basemirror.project.id != dependency.basemirror.project.id:
                 return ErrorResponse(400, "Cannot add a dependency from different distribution as per dependency policy")
 
     # do not allow using a mirror for ci builds

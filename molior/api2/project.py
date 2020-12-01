@@ -288,20 +288,13 @@ async def edit_projectversion(request):
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
 
-    # check dependents
     for dep in projectversion.dependents:
-        if dep.dependency_policy == "strict" and dependency_policy != "strict":
+        if dependency_policy == "strict" and dep.basemirror_id != projectversion.basemirror_id:
             return ErrorResponse(400, "Cannot change dependency policy because strict policy demands \
                                        to use the same basemirror as all dependents")
-        elif dep.dependency_policy == "distribution" and dependency_policy == "any":
+        elif dependency_policy == "distribution" and dep.basemirror.project_id != projectversion.basemirror.project_id:
             return ErrorResponse(400, "Cannot change dependency policy because the same distribution \
                                        is required as for all dependents")
-    # check dependencies
-    for dep in projectversion.dependencies:
-        if dependency_policy == "strict" and dep.dependency_policy != "strict":
-            return ErrorResponse(400, "Cannot change dependency policy because  one of dependencies has non-strict policy")
-        elif dependency_policy == "distribution" and dep.dependency_policy == "any":
-            return ErrorResponse(400, "Cannot change dependency policy because one of dependecies has 'any' policy")
 
     db = request.cirrina.db_session
     projectversion.description = description
