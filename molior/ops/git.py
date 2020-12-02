@@ -285,7 +285,8 @@ async def GetBuildInfo(repo_path, git_ref):
 
     maintainer = await get_maintainer(repo_path)
     if not maintainer:
-        logger.warning("could not parse maintainer")
+        # FIXME: log to build log
+        logger.error("could not parse maintainer")
         return None
 
     info.firstname, info.lastname, info.email = maintainer
