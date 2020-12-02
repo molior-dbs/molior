@@ -176,7 +176,6 @@ else
   sudo cp /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
 fi
 
-echo
 log " - Extracting schroot"
 sudo rm -rf   /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
 sudo mkdir -p /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
