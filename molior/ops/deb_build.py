@@ -589,6 +589,11 @@ async def ScheduleBuilds():
                 continue
 
             pvname = projectversion.fullname
+            buildorder_projectversions = [build.projectversion_id]
+            for dep in projectversion.dependencies:
+                if dep.project.is_mirror:
+                    continue
+                buildorder_projectversions.append(dep.id)
 
             ready = True
             repo_deps = []
@@ -627,6 +632,7 @@ async def ScheduleBuilds():
                 # FIXME: buildconfig arch dependent!
 
                 # find running builds in the same projectversion
+                # FIXME: check also dependencies which are not mirrors
 
                 # check no build order dep is needs_build, building, publishing, ...
                 # FIXME: this needs maybe checking of source packages as well?
@@ -639,7 +645,7 @@ async def ScheduleBuilds():
                             Build.buildstate == "publishing",
                         ), Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
-                        Build.projectversion_id == build.projectversion_id).all()
+                        Build.projectversion_id.in_(buildorder_projectversions)).all()
 
                 if running_builds:
                     ready = False
@@ -655,7 +661,7 @@ async def ScheduleBuilds():
                         Build.buildstate == "successful",
                         Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
-                        Build.projectversion_id == build.projectversion_id).all()
+                        Build.projectversion_id.in_(buildorder_projectversions)).all()
 
                 if successful_builds:
                     found = True
