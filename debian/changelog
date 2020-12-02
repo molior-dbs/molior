@@ -1,3 +1,9 @@
+molior (1.4.0~alpha221) stretch; urgency=medium
+
+  * build: include projectversion dependencies
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Wed, 02 Dec 2020 10:43:35 +0000
+
 molior (1.4.0~alpha220) stretch; urgency=medium
 
   * dependency policy: fix
