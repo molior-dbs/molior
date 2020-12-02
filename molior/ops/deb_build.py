@@ -594,22 +594,27 @@ async def ScheduleBuilds():
                 if dep.project.is_mirror:
                     continue
                 buildorder_projectversions.append(dep.id)
+            logger.warning("scheduler: searching build order deps in %s" % buildorder_projectversions)
 
             ready = True
             repo_deps = []
             if build.parent.builddeps:
                 builddeps = build.parent.builddeps
                 for builddep in builddeps:
-                    repo_dep = session.query(SourceRepository).filter(SourceRepository.projectversions.any(
-                                             id=build.projectversion_id)).filter(or_(
-                                                SourceRepository.url == builddep,
-                                                SourceRepository.url.like("%/{}".format(builddep)),
-                                                SourceRepository.url.like("%/{}.git".format(builddep)))).first()
+                    repo_dep = None
+                    for buildorder_projectversion in buildorder_projectversions:
+                        repo_dep = session.query(SourceRepository).filter(SourceRepository.projectversions.any(
+                                                 id=buildorder_projectversion)).filter(or_(
+                                                    SourceRepository.url == builddep,
+                                                    SourceRepository.url.like("%/{}".format(builddep)),
+                                                    SourceRepository.url.like("%/{}.git".format(builddep)))).first()
+                        if repo_dep:
+                            break
 
                     if not repo_dep:
                         logger.error("build-{}: dependency {} not found in projectversion {}".format(build.id,
                                      builddep, build.projectversion_id))
-                        await build.log("W: waiting for build order dependency {} to be built in projectversion {}\n".format(
+                        await build.log("E: dependency {} not found in projectversion {} nor dependencies\n".format(
                                              builddep, pvname))
                         ready = False
                         break
@@ -650,7 +655,7 @@ async def ScheduleBuilds():
                 if running_builds:
                     ready = False
                     builds = [str(b.id) for b in running_builds]
-                    await build.log("W: waiting for repo {} to finish building ({}) in projectversion {}\n".format(
+                    await build.log("W: waiting for repo {} to finish building ({}) in projectversion {} or dependencies\n".format(
                                          dep_repo.name, ", ".join(builds), pvname))
                     continue
 
@@ -661,7 +666,9 @@ async def ScheduleBuilds():
                         Build.buildstate == "successful",
                         Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
-                        Build.projectversion_id.in_(buildorder_projectversions)).all()
+                        Build.projectversion_id.in_(buildorder_projectversions))
+                logger.warning(successful_builds)
+                successful_builds = successful_builds.all()
 
                 if successful_builds:
                     found = True
@@ -676,7 +683,7 @@ async def ScheduleBuilds():
                     else:
                         pvname = projectversion.fullname
 
-                    await build.log("W: waiting for repo {} to be built in projectversion {}\n".format(
+                    await build.log("W: waiting for repo {} to be built in projectversion {} or dependencies\n".format(
                                          dep_repo.name, pvname))
                     continue
 
