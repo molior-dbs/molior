@@ -708,8 +708,10 @@ async def delete_repository(request):
 
     builds = db.query(Build).filter(Build.sourcerepository_id == repository_id).all()
 
+    if repo.projectversions:
+        return ErrorResponse(400, "Repository cannot be deleted because it is used by project(s)")
     if repo.projectversions or builds:
-        return ErrorResponse(400, "Repository cannot be deleted")
+        return ErrorResponse(400, "Repository cannot be deleted because there are builds using it")
 
     args = {"delete_repo": [repository_id]}
     await enqueue_task(args)
