@@ -401,7 +401,7 @@ class Worker:
             logger.error("merge: repo %d not found", repository_id)
             return
 
-        if repo.state != "ready" or repo.state != "error":
+        if repo.state != "ready" and repo.state != "error":
             logger.info("worker: repo %d not ready, requeueing", repository_id)
             await enqueue_task({"delete_repo": args})
             await asyncio.sleep(2)
