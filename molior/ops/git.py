@@ -95,32 +95,33 @@ async def GitClone(build_id, repo_id, session):
 
 
 async def GitCleanLocal(repo_path, build):
-    if not await run_git_cmds(["git reset --hard", "git clean -dffx"], repo_path, build, write_output_log=False):
+    if not await run_git_cmds(["git reset --hard", "git clean -dffx", "git fetch -p"], repo_path, build, write_output_log=False):
         return False
 
-    githash = None
+    default_branch = None
 
     async def outh(line):
-        nonlocal githash
-        githash = line.strip()
+        nonlocal default_branch
+        default_branch = line.strip()
 
-    # find current git hash
-    process = Launchy(shlex.split("git show -s --format=%H"), outh, outh, cwd=str(repo_path))
+    # checkout remote default branch
+    process = Launchy(shlex.split("git symbolic-ref refs/remotes/origin/HEAD"), outh, outh, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
         logger.error("error getting current commit")
         return False
 
-    # checkout current git hash
     async def outh_null(line):
         pass
 
-    process = Launchy(shlex.split("git checkout {}".format(githash)), outh_null, outh_null, cwd=str(repo_path))
+    default_branch = default_branch.replace("refs/remotes/", "")
+
+    process = Launchy(shlex.split("git checkout {}".format(default_branch)), outh_null, outh_null, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        logger.error("error checking out '%s'", githash)
+        logger.error("error checking out '%s'", default_branch)
         return False
 
     # get all branches
