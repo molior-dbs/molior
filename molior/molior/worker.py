@@ -4,7 +4,7 @@ import giturlparse
 from shutil import rmtree
 
 from ..app import logger
-from ..ops import GitClone, get_latest_tag
+from ..ops import GitClone, GitChangeUrl, get_latest_tag
 from ..ops import BuildProcess, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
 from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, dequeue_task, enqueue_aptly
@@ -394,9 +394,7 @@ class Worker:
 
     async def _delete_repo(self, args, session):
         repository_id = args[0]
-
         repo = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
-
         if not repo:
             logger.error("merge: repo %d not found", repository_id)
             return
@@ -407,16 +405,41 @@ class Worker:
             await asyncio.sleep(2)
             return
 
-        repo.set_busy()
-        session.commit()
         logger.info("worker: deleting repo %d", repository_id)
-        session.commit()
         session.delete(repo)
+        session.commit()
+
         try:
             rmtree("/var/lib/molior/repositories/%d" % repository_id)
         except Exception as exc:
             logger.exception(exc)
+
+    async def _repo_change_url(self, args, session):
+        repository_id = args[0]
+        url = args[1]
+
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+        if not repo:
+            logger.error("repo_change_url: repo %d not found", repository_id)
+            return
+
+        if repo.state != "ready" and repo.state != "error":
+            logger.info("worker: repo %d not ready, requeueing", repository_id)
+            await enqueue_task({"repo_change_url": args})
+            await asyncio.sleep(2)
+            return
+
+        try:
+            repoinfo = giturlparse.parse(url)
+        except giturlparse.parser.ParserError:
+            logger.error("repo_change_url: invalid git url %s", url)
+            return
+
+        old_path = repo.src_path
+        repo.url = url
+        repo.name = repoinfo.name
         session.commit()
+        await GitChangeUrl(old_path, repo.name, repo.url)
 
     async def run(self):
         """
@@ -498,6 +521,12 @@ class Worker:
                         if args:
                             handled = True
                             await self._delete_repo(args, session)
+
+                    if not handled:
+                        args = task.get("repo_change_url")
+                        if args:
+                            handled = True
+                            await self._repo_change_url(args, session)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))

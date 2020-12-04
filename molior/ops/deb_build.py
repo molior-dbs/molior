@@ -655,8 +655,8 @@ async def ScheduleBuilds():
                 if running_builds:
                     ready = False
                     builds = [str(b.id) for b in running_builds]
-                    await build.log("W: waiting for repo {} to finish building ({}) in projectversion {} or dependencies\n"
-                                    .format(dep_repo.name, ", ".join(builds), pvname))
+                    await build.log("W: waiting for repo {} to finish building ({}) in \
+                            projectversion {} or dependencies\n".format(dep_repo.name, ", ".join(builds), pvname))
                     continue
 
                 # find successful builds in the same and dependent projectversions
