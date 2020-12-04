@@ -455,8 +455,6 @@ async def edit_repository(request):
         return ErrorResponse(400, "No architectures received")
 
     url = params.get("url", None)
-    if not url:
-        return ErrorResponse(400, "No url received")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -474,8 +472,18 @@ async def edit_repository(request):
     if not buildconfig:
         return ErrorResponse(404, "SourceRepository not found in project")
 
+    url_changed = False
+    if url:
+        sourcerepository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
+        if sourcerepository.url != url:
+            url_changed = True
+
     buildconfig.architectures = array2db(architectures)
     db.commit()
+
+    if url_changed:
+        args = {"repo_change_url": [sourcerepository_id, url]}
+        await enqueue_task(args)
 
     return OKResponse("SourceRepository changed")
 

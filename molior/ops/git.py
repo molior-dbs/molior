@@ -294,3 +294,10 @@ async def GetBuildInfo(repo_path, git_ref):
     info.plain_targets = get_target_config(repo_path)
 
     return info
+
+
+async def GitChangeUrl(old_repo_path, name, url):
+    process = Launchy(shlex.split("git remote set-url origin {}".format(url)), None, None, cwd=str(old_repo_path))
+    await process.launch()
+    await process.wait()
+    os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)
