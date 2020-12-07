@@ -1,3 +1,9 @@
+molior (1.4.0~alpha223) stretch; urgency=medium
+
+  * repository: add edit url
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Mon, 07 Dec 2020 17:05:09 +0000
+
 molior (1.4.0~alpha222) stretch; urgency=medium
 
   * repo: edit url
