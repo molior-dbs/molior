@@ -454,8 +454,6 @@ async def edit_repository(request):
     if not architectures:
         return ErrorResponse(400, "No architectures received")
 
-    url = params.get("url", None)
-
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(404, "Project not found")
@@ -472,19 +470,8 @@ async def edit_repository(request):
     if not buildconfig:
         return ErrorResponse(404, "SourceRepository not found in project")
 
-    url_changed = False
-    if url:
-        sourcerepository = db.query(SourceRepository).filter(SourceRepository.id == sourcerepository_id).first()
-        if sourcerepository.url != url:
-            url_changed = True
-
     buildconfig.architectures = array2db(architectures)
     db.commit()
-
-    if url_changed:
-        args = {"repo_change_url": [sourcerepository_id, url]}
-        await enqueue_task(args)
-
     return OKResponse("SourceRepository changed")
 
 
@@ -724,3 +711,27 @@ async def delete_repository(request):
     args = {"delete_repo": [repository_id]}
     await enqueue_task(args)
     return OKResponse("Repository deleted")
+
+
+@app.http_put("/api2/repository/{repository_id}")
+@req_admin
+async def edit_repository2(request):
+    repository_id = request.match_info["repository_id"]
+    try:
+        repository_id = int(repository_id)
+    except Exception:
+        return ErrorResponse(400, "Invalid parameter received")
+    params = await request.json()
+    url = params.get("url", "")
+    if not url:
+        return ErrorResponse(400, "No URL received")
+
+    db = request.cirrina.db_session
+    repo = db.query(SourceRepository).filter(SourceRepository.id == repository_id).first()
+    if not repo:
+        return ErrorResponse(404, "Repository not found")
+
+    if repo.url != url:
+        args = {"repo_change_url": [repository_id, url]}
+        await enqueue_task(args)
+    return OKResponse("Repository changed")
