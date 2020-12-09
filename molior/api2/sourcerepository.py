@@ -510,6 +510,7 @@ async def get_repository_hooks(request):
             "url": postbuildhook.hook.url,
             "skipssl": postbuildhook.hook.skip_ssl,
             "hooktype": hooktype,
+            "body": postbuildhook.hook.body,
             "enabled": postbuildhook.hook.enabled,
         })
     return OKResponse(data)
@@ -554,7 +555,6 @@ async def add_repository_hook(request):
         "400":
             description: Invalid data received.
     """
-    db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
     params = await request.json()
     url = params.get("url", "")
@@ -578,6 +578,7 @@ async def add_repository_hook(request):
     if projectversion.is_locked:
         return ErrorResponse(400, "Projectversion is locked")
 
+    db = request.cirrina.db_session
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
     if not buildconfig:
@@ -595,6 +596,99 @@ async def add_repository_hook(request):
     db.commit()
 
     return OKResponse("Hook added")
+
+
+@app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hook/{hook_id}")
+@req_role(["member", "owner"])
+async def edit_repository_hook(request):
+    """
+    Edits postbuild hook.
+
+    ---
+    description: Edits postbuild hook.
+    tags:
+        - ProjectVersions
+    consumes:
+        - application/json
+    parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: sourcerepository_id
+          in: path
+          required: true
+          type: integer
+        - name: id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                buildvariants:
+                    type: array
+                    example: [1, 2]
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid data received.
+    """
+    sourcerepository_id = request.match_info["sourcerepository_id"]
+    hook_id = request.match_info["hook_id"]
+    params = await request.json()
+    url = params.get("url", "")
+    skip_ssl = params.get("skipssl", "")
+    body = params.get("body", "")
+    hooktype = params.get("hooktype", "top")
+    method = params.get("method", "").lower()
+    hook_enabled = params.get("enabled", "")
+
+    if not url:
+        return ErrorResponse(400, "No URL received")
+    if not body:
+        return ErrorResponse(400, "No Body received")
+    if method not in ["post", "get"]:
+        return ErrorResponse(400, "Invalid method received")
+
+    skip_ssl = skip_ssl == "true"
+    hook_enabled = hook_enabled == "true"
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Project not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+
+    db = request.cirrina.db_session
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+    if not buildconfig:
+        return ErrorResponse(404, "SourceRepository not found in project")
+
+    notify_overall = "top" in hooktype
+    notify_deb = "deb" in hooktype
+    notify_src = "src" in hooktype
+    postbuildhook = db.query(PostBuildHook).filter_by(sourcerepositoryprojectversion_id=buildconfig.id, id=hook_id).first()
+    if not postbuildhook:
+        return ErrorResponse(404, "Hook not found")
+    postbuildhook.hook.method = method
+    postbuildhook.hook.body = body
+    postbuildhook.hook.url = url
+    postbuildhook.hook.skip_ssl = skip_ssl
+    postbuildhook.hook.notify_src = notify_src
+    postbuildhook.hook.notify_deb = notify_deb
+    postbuildhook.hook.notify_overall = notify_overall
+    postbuildhook.hook.enabled = hook_enabled
+    db.commit()
+
+    return OKResponse("Hook changed")
 
 
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hook/{hook_id}")
@@ -636,7 +730,6 @@ async def delete_repository_hook(request):
         "400":
             description: Invalid data received.
     """
-    db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
     hook_id = request.match_info["hook_id"]
 
@@ -646,6 +739,7 @@ async def delete_repository_hook(request):
     if projectversion.is_locked:
         return ErrorResponse(400, "Projectversion is locked")
 
+    db = request.cirrina.db_session
     buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == sourcerepository_id,
                                                 SouRepProVer.projectversion_id == projectversion.id).first()
     if not buildconfig:
