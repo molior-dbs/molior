@@ -206,6 +206,8 @@ async def add_projectversion_dependency(request):
     dep_ids = [d[0] for d in deps]
     if projectversion.id in dep_ids:
         return ErrorResponse(400, "Cannot add a dependency of a projectversion depending itself on this projectversion")
+    if dependency.id in dep_ids:
+        return ErrorResponse(400, "Dependency already exists")
     for dep_id in dep_ids:
         dep = get_projectversion_byid(dep_id, db)
         if dep.dependency_policy == "strict":
