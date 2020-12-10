@@ -359,8 +359,10 @@ async def add_repository(request):
             logger.info("found %d similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
                                                                                       repoinfo.owner, repoinfo.name))
         elif query.count() == 1:
-            logger.info("found similar repo {} for {} {} {}".format(repo.url, repoinfo.resource, repoinfo.owner, repoinfo.name))
             repo = query.first()
+            if not repo:
+                return ErrorResponse(400, "Repo not found")
+            logger.info("found similar repo {} for {} {} {}".format(repo.url, repoinfo.resource, repoinfo.owner, repoinfo.name))
         else:
             repo = SourceRepository(url=url, name=repoinfo.name, state="new")
             db.add(repo)
