@@ -90,10 +90,13 @@ class ProjectVersion(Base):
         if self.project.is_basemirror:
             url = "{0}/{1}/{2}".format(base_url, self.project.name, self.name)
             # Workaround for aptly ('/' not supported as mirror dist)
-            mirror_dist = ""
+            dist = "missing"
             if self.mirror_distribution:
-                mirror_dist = self.mirror_distribution.replace("/", "_-")
-            full = "deb {0} {1} {2}".format(url, mirror_dist, self.mirror_components.replace(",", " "))
+                dist = self.mirror_distribution.replace("/", "_-")
+            comp = "missing"
+            if self.mirror_components:
+                comp = self.mirror_components.replace(",", " ")
+            full = "deb {0} {1} {2}".format(url, dist, comp)
             return url if url_only else full
 
         if not self.basemirror:
@@ -105,8 +108,13 @@ class ProjectVersion(Base):
         if self.project.is_mirror:
             url = "{0}/{1}/mirrors/{2}/{3}".format(base_url, base_mirror, self.project.name, self.name)
             # Workaround for aptly ('/' not supported as mirror dist)
-            full = "deb {0} {1} {2}".format(url, self.mirror_distribution.replace("/", "_-"),
-                                            self.mirror_components.replace(",", " "))
+            dist = "missing"
+            if self.mirror_distribution:
+                dist = self.mirror_distribution.replace("/", "_-")
+            comp = "missing"
+            if self.mirror_components:
+                comp = self.mirror_components.replace(",", " ")
+            full = "deb {0} {1} {2}".format(url, dist, comp)
             return url if url_only else full
 
         url = "{0}/{1}/repos/{2}/{3}".format(base_url, base_mirror, self.project.name, self.name)
