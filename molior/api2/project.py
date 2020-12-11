@@ -171,7 +171,6 @@ async def create_projectversion(request):
         "500":
             description: internal server error
     """
-    db = request.cirrina.db_session
     params = await request.json()
 
     name = params.get("name")
@@ -196,6 +195,7 @@ async def create_projectversion(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 
+    db = request.cirrina.db_session
     project = db.query(Project).filter(Project.name == project_id).first()
     if not project:
         project = db.query(Project).filter(Project.id == project_id).first()
