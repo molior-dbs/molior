@@ -205,6 +205,8 @@ async def create_projectversion(request):
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot add projectversion to a mirror")
 
     projectversion = db.query(ProjectVersion).join(Project).filter(
             ProjectVersion.name == name, Project.id == project.id).first()
