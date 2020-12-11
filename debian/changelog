@@ -1,3 +1,9 @@
+molior (1.4.0~alpha227) stretch; urgency=medium
+
+  * projectversion: check basemirror archs while creating pv
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Fri, 11 Dec 2020 14:58:59 +0000
+
 molior (1.4.0~alpha226) stretch; urgency=medium
 
   * projeversion: add force build removal to pv delete
