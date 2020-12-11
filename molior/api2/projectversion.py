@@ -386,7 +386,8 @@ async def snapshot_projectversion(request):
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}")
 @req_role("owner")
 async def delete_projectversion(request):
-    db = request.cirrina.db_session
+    force = request.GET.getone("forceremoval", None)
+    force = force == "true"
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -403,16 +404,18 @@ async def delete_projectversion(request):
             return ErrorResponse(400, "Projectversions '{}' are still depending on this version, cannot delete it".format(
                                   ", ".join(blocking_dependents)))
 
-    # do not delete PV if builds are running
-    debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb", or_(
-                                       Build.buildstate == "needs_build",
-                                       Build.buildstate == "scheduled",
-                                       Build.buildstate == "building",
-                                       Build.buildstate == "needs_publish",
-                                       Build.buildstate == "publishing"
-                                       )).first()
-    if debbuilds:
-        return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
+    db = request.cirrina.db_session
+    if not force:
+        # do not delete PV if builds are running
+        debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb", or_(
+                                           Build.buildstate == "needs_build",
+                                           Build.buildstate == "scheduled",
+                                           Build.buildstate == "building",
+                                           Build.buildstate == "needs_publish",
+                                           Build.buildstate == "publishing"
+                                           )).first()
+        if debbuilds:
+            return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
 
     # remember configuration
     basemirror_name = projectversion.basemirror.project.name
