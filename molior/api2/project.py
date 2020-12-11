@@ -363,6 +363,8 @@ async def get_project_users2(request):
     project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot get permissions from project which is a mirror")
 
     filter_name = request.GET.getone("q", None)
     filter_role = request.GET.getone("role", None)
@@ -428,6 +430,8 @@ async def add_project_users2(request):
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot set permissions to project which is a mirror")
 
     user = db.query(User).filter(User.id == userid).first()
     if not user:
@@ -470,6 +474,8 @@ async def edit_project_users2(request):
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot edit permissions of project which is a mirror")
 
     user = db.query(User).filter(User.id == userid).first()
     if not user:
@@ -503,6 +509,8 @@ async def delete_project_users2(request):
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot delete permissions from project which is a mirror")
 
     user = db.query(User).filter(User.id == userid).first()
     if not user:

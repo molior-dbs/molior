@@ -180,6 +180,9 @@ async def add_projectversion_dependency(request):
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
 
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Cannot add dependencies to project which is a mirror")
+
     if projectversion.is_locked:
         return ErrorResponse(400, "Cannot add dependencies on a locked projectversion")
 
@@ -240,6 +243,9 @@ async def delete_projectversion_dependency(request):
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Cannot delete dependencies from project which is a mirror")
 
     if projectversion.is_locked:
         return ErrorResponse(400, "Projectversion is locked")
