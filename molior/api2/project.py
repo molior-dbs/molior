@@ -1,7 +1,7 @@
 from sqlalchemy.sql import or_
 
 from ..app import app
-from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int
+from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int, db2array
 from ..auth import req_role
 from ..molior.queues import enqueue_aptly
 
@@ -196,10 +196,6 @@ async def create_projectversion(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 
-    basemirror_name, basemirror_version = basemirror.split("/")
-
-    # FIXME: verify valid architectures
-
     project = db.query(Project).filter(Project.name == project_id).first()
     if not project:
         project = db.query(Project).filter(Project.id == project_id).first()
@@ -215,12 +211,17 @@ async def create_projectversion(request):
                                         name,
                                         ", and is marked as deleted" if projectversion.is_deleted else ""))
 
+    basemirror_name, basemirror_version = basemirror.split("/")
     basemirror = db.query(ProjectVersion).join(Project).filter(
                                     Project.id == ProjectVersion.project_id,
                                     Project.name == basemirror_name,
                                     ProjectVersion.name == basemirror_version).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+
+    for arch in architectures:
+        if arch not in db2array(basemirror.mirror_architectures):
+            return ErrorResponse(400, "Architecture not found in basemirror: {}".format(arch))
 
     projectversion = ProjectVersion(
             name=name,
