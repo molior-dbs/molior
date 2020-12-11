@@ -1,3 +1,11 @@
+molior (1.4.0~alpha225) stretch; urgency=medium
+
+  * project: do not add pv to mirror
+  * projectversion: do not add existing dependency
+  * handle errors
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Fri, 11 Dec 2020 08:19:40 +0000
+
 molior (1.4.0~alpha224) stretch; urgency=medium
 
   * aptly cleanup: dont start if mirroring active
