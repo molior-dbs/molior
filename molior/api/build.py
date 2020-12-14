@@ -308,6 +308,14 @@ async def get_build(request):
             build.maintainer.firstname, build.maintainer.surname
         )
 
+    project = {}
+    if build.projectversion:
+        project = {"id": build.projectversion.project.id,
+                   "name": build.projectversion.project.name,
+                   "version": {"id": build.projectversion.id,
+                               "name": build.projectversion.name,
+                               "is_locked": build.projectversion.is_locked}}
+
     data = {
         "id": build.id,
         "buildstate": build.buildstate,
@@ -320,7 +328,8 @@ async def get_build(request):
         # "can_rebuild": build.can_rebuild(request.cirrina.web_session, request.cirrina.db_session),
         "branch": build.ci_branch,
         "git_ref": build.git_ref,
-        "architecture": build.architecture
+        "architecture": build.architecture,
+        "project": project
     }
 
     if build.sourcerepository:
