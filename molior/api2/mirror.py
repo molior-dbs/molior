@@ -54,17 +54,18 @@ async def get_mirror2(request):
     mirrorkeyurl = ""
     mirrorkeyids = ""
     mirrorkeyserver = ""
-    if not mirror.project.is_basemirror and mirror.basemirror:
-        mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
-        if mirrorkey:
-            mirrorkeyurl = mirrorkey.keyurl
-            mirrorkeyids = mirrorkey.keyids[1:-1]
-            mirrorkeyserver = mirrorkey.keyserver
+    mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
+    if mirrorkey:
+        mirrorkeyurl = mirrorkey.keyurl
+        mirrorkeyids = mirrorkey.keyids[1:-1]
+        mirrorkeyserver = mirrorkey.keyserver
 
     apt_url = mirror.get_apt_repo(url_only=True)
     basemirror_url = ""
+    basemirror_id = -1
     basemirror_name = ""
     if not mirror.project.is_basemirror and mirror.basemirror:
+        basemirror_id = mirror.basemirror.id
         basemirror_url = mirror.basemirror.get_apt_repo(url_only=True)
         basemirror_name = mirror.basemirror.project.name + "/" + mirror.basemirror.name
 
@@ -73,6 +74,7 @@ async def get_mirror2(request):
         "name": mirror.project.name,
         "version": mirror.name,
         "url": mirror.mirror_url,
+        "basemirror_id": basemirror_id,
         "basemirror_url": basemirror_url,
         "basemirror_name": basemirror_name,
         "distribution": mirror.mirror_distribution,
