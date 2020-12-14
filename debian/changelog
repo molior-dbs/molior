@@ -1,3 +1,10 @@
+molior (1.4.0~alpha229) stretch; urgency=medium
+
+  * build info: add project info
+  * mirror: fix get
+
+ -- Karol Swiderski <szakalboss@gmail.com>  Mon, 14 Dec 2020 14:41:12 +0000
+
 molior (1.4.0~alpha228) stretch; urgency=medium
 
   * cleanup
