@@ -3,7 +3,7 @@ import operator
 
 from os import remove
 from shutil import rmtree
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from ..app import logger
 from ..tools import db2array, array2db
@@ -905,7 +905,84 @@ class AptlyWorker:
         project_version = args[3]
         architectures = args[4]
         snapshot_name = args[5]
-        packages = args[6]
+        projectversion_id = args[6]
+        new_projectversion_id = args[7]
+        packages = []
+        copybuilds = []
+        with Session() as session:
+            # find latest builds
+            latest_builds = session.query(func.max(Build.id).label("latest_id")).filter(
+                    Build.projectversion_id == projectversion_id,
+                    Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
+
+            builds = session.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
+                    Build.sourcename, Build.id.desc()).all()
+
+            pkgbuilds = []
+            build_source_names = []
+            for build in builds:
+                if build.buildstate != "successful":
+                    logger.error("snapshot: Not all latest builds are successful")
+                    return
+                if build.sourcename in build_source_names:
+                    logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
+                    continue
+                build_source_names.append(build.sourcename)
+                if not build.debianpackages:
+                    logger.error("snapshot: No debian packages found for %s/%s" % (build.sourcename, build.version))
+                    return
+                copybuilds.append(build)
+                pkgbuilds.append(build)
+                if build.parent not in pkgbuilds:  # add source package
+                    pkgbuilds.append(build.parent)
+
+            for build in pkgbuilds:
+                for deb in build.debianpackages:
+                    arch = deb.suffix
+                    if build.buildtype == "source":
+                        arch = "source"
+                    packages.append((deb.name, build.version, arch))
+
+            # copy builds
+            srcpackages = {}
+            toppackages = {}
+
+            def copybuild(build, parent_build_id):
+                copy = Build(
+                    version=build.version,
+                    git_ref=build.git_ref,
+                    ci_branch=build.ci_branch,
+                    is_ci=build.is_ci,
+                    sourcename=build.sourcename,
+                    buildstate=build.buildstate,
+                    buildtype=build.buildtype,
+                    parent_id=parent_build_id,
+                    sourcerepository_id=build.sourcerepository_id,
+                    maintainer_id=build.maintainer_id,
+                    architecture=build.architecture,
+                    createdstamp=build.createdstamp,
+                    startstamp=build.startstamp,
+                    buildendstamp=build.buildendstamp,
+                    endstamp=build.endstamp,
+                )
+                if copy.buildtype == "deb":
+                    copy.projectversion_id = new_projectversion_id
+                session.add(copy)
+                session.commit()
+                return copy
+
+            for build in copybuilds:
+                if build.parent.id not in srcpackages.values():
+                    if build.parent.parent.id not in toppackages.values():
+                        # create new top build
+                        newbuild = copybuild(build.parent.parent, None)
+                        toppackages[build.parent.parent.id] = newbuild.id
+
+                    # create new src build
+                    newbuild = copybuild(build.parent, toppackages[build.parent.parent_id])
+                    srcpackages[build.parent.id] = newbuild.id
+                copybuild(build, srcpackages[build.parent_id])
+
         await DebianRepository(basemirror_name, basemirror_version, project_name,
                                project_version, architectures).snapshot(snapshot_name, packages)
 

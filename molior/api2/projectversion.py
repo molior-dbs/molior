@@ -319,6 +319,8 @@ async def snapshot_projectversion(request):
             Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion '%s' already exists" % name)
 
+    # FIXME: check dependencies are locked
+
     # find latest builds
     latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
             Build.projectversion_id == projectversion.id,
@@ -327,7 +329,6 @@ async def snapshot_projectversion(request):
     builds = db.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
             Build.sourcename, Build.id.desc()).all()
 
-    packages = []
     build_source_names = []
     for build in builds:
         logger.info("snapshot: found latest build: %s/%s (%s)" % (build.sourcename, build.version, build.buildstate))
@@ -339,8 +340,6 @@ async def snapshot_projectversion(request):
         build_source_names.append(build.sourcename)
         if not build.debianpackages:
             return ErrorResponse(400, "No debian packages found for %s/%s" % (build.sourcename, build.version))
-        for deb in build.debianpackages:
-            packages.append((deb.name, build.version, deb.suffix))
 
     new_projectversion = ProjectVersion(
         name=name,
@@ -375,7 +374,8 @@ async def snapshot_projectversion(request):
                 projectversion.name,
                 db2array(projectversion.mirror_architectures),
                 new_projectversion.name,
-                packages
+                projectversion.id,
+                new_projectversion.id
             ]
         }
     )

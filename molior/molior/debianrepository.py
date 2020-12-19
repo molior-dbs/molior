@@ -101,7 +101,6 @@ class DebianRepository:
         """
         dist = "stable"
         repo_name = self.name + "-%s" % dist
-
         publish_name = "{}_{}_repos_{}_{}".format(self.basemirror_name, self.basemirror_version,
                                                   self.project_name, snapshot_version)
         snapshot_name = "{}-{}".format(publish_name, dist)
@@ -112,16 +111,15 @@ class DebianRepository:
         for package in packages:
             pkgs = await self.aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
                                                                                      package[1],   # version
-                                                                                     package[2]))  # arch
+                                                                                     package[2]))  # arch or "source"
             package_refs += pkgs
 
-        logger.info("snapshot: pkg refs %s" % package_refs)
         task_id = await self.aptly.snapshot_create(repo_name, snapshot_name, package_refs)
         await self.aptly.wait_task(task_id)
 
-        task_id = await self.aptly.snapshot_publish(snapshot_name, "main", self.archs, dist, publish_name)
+        archs = self.archs.extend(["source", "all"])
+        task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, publish_name)
         await self.aptly.wait_task(task_id)
-        return True
 
     async def delete(self):
         """
