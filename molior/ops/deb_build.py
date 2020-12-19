@@ -667,7 +667,6 @@ async def ScheduleBuilds():
                         Build.buildtype == "deb",
                         Build.sourcerepository_id == dep_repo_id,
                         Build.projectversion_id.in_(buildorder_projectversions))
-                logger.warning(successful_builds)
                 successful_builds = successful_builds.all()
 
                 if successful_builds:

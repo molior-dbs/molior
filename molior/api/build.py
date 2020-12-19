@@ -297,7 +297,6 @@ async def get_build(request):
     except (ValueError, TypeError):
         return web.Response(text="Incorrect value for build_id", status=400)
 
-    logger.info("get build %d" % build_id)
     build = request.cirrina.db_session.query(Build).filter(Build.id == build_id).first()
     if not build:
         return web.Response(text="Build not found", status=400)
@@ -368,8 +367,6 @@ async def get_build(request):
                 }
             }
         )
-
-    logger.info("get build %d done" % build_id)
 
     return web.json_response(data)
 
