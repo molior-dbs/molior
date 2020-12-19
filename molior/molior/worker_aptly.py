@@ -1,9 +1,10 @@
 import asyncio
 import operator
 
-from os import remove
+from os import remove, mkdir
 from shutil import rmtree
 from sqlalchemy import func, or_
+from shutil import copy2
 
 from ..app import logger
 from ..tools import db2array, array2db
@@ -13,6 +14,7 @@ from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
 from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone
+from ..molior.configuration import Configuration
 
 from ..model.database import Session
 from ..model.build import Build
@@ -909,6 +911,7 @@ class AptlyWorker:
         new_projectversion_id = args[7]
         packages = []
         copybuilds = []
+        buildlogs = []
         with Session() as session:
             # find latest builds
             latest_builds = session.query(func.max(Build.id).label("latest_id")).filter(
@@ -977,14 +980,26 @@ class AptlyWorker:
                         # create new top build
                         newbuild = copybuild(build.parent.parent, None)
                         toppackages[build.parent.parent.id] = newbuild.id
+                        buildlogs.append((build.parent.parent.id, newbuild.id))
 
                     # create new src build
                     newbuild = copybuild(build.parent, toppackages[build.parent.parent_id])
                     srcpackages[build.parent.id] = newbuild.id
-                copybuild(build, srcpackages[build.parent_id])
+                    buildlogs.append((build.parent.id, newbuild.id))
+                newbuild = copybuild(build, srcpackages[build.parent_id])
+                buildlogs.append((build.id, newbuild.id))
 
         await DebianRepository(basemirror_name, basemirror_version, project_name,
                                project_version, architectures).snapshot(snapshot_name, packages)
+
+        # copy build logs
+        buildout_path = Configuration().working_dir + "/buildout"
+        for old, new in buildlogs:
+            try:
+                mkdir(buildout_path + "/%d" % new)
+                copy2(buildout_path + "/%d/build.log" % old, buildout_path + "/%d/build.log" % new)
+            except Exception as exc:
+                logger.exception(exc)
 
     async def _delete_repository(self, args):
         basemirror_name = args[0]

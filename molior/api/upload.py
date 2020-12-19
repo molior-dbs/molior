@@ -14,8 +14,10 @@ from ..molior.queues import buildlog
 if not os.environ.get("IS_SPHINX", False):
     config = Configuration()
     upload_dir = config.working_dir + "/upload/"
+    buildout_path = Path(Configuration().working_dir) / "buildout"
 else:
     upload_dir = "/non/existent"
+    buildout_path = "/non/existent"
 
 
 @app.http_upload("/internal/buildupload/{token}", upload_dir=upload_dir)
@@ -31,10 +33,9 @@ async def file_upload(request, tempfile, filename, size):
             return web.Response(status=400, text="Invalid file upload.")
         build_id = build.id
 
-    buildout_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
     try:
         # FIXME: do not overwrite
-        os.rename(tempfile, str(buildout_path / filename))
+        os.rename(tempfile, str(buildout_path / str(build_id) / filename))
     except Exception as exc:
         logger.exception(exc)
 
