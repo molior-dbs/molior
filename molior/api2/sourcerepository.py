@@ -191,7 +191,7 @@ async def get_repositories2(request):
 
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/repositories")
-@app.authenticated
+# @app.authenticated
 async def get_projectversion_repositories(request):
     """
     Returns source repositories with the given filters applied.
@@ -274,7 +274,8 @@ async def get_projectversion_repositories(request):
                 "last_build": {
                     "id": build.id,
                     "version": build.version,
-                    "buildstate": build.buildstate
+                    "buildstate": build.buildstate,
+                    "sourcename": build.sourcename,
                 }
             })
         data["results"].append(result)
