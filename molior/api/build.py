@@ -11,7 +11,7 @@ from ..model.sourcerepository import SourceRepository
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
 from ..model.maintainer import Maintainer
-from ..tools import paginate
+from ..tools import paginate, ErrorResponse
 from ..molior.queues import enqueue_task
 
 
@@ -112,6 +112,7 @@ async def get_builds(request):
             description: internal server error
     """
     search = request.GET.getone("search", None)
+    search_project = request.GET.getone("search_project", None)
     project = request.GET.getone("project", None)
     maintainer = request.GET.getone("maintainer", None)
     commit = request.GET.getone("commit", None)
@@ -208,9 +209,9 @@ async def get_builds(request):
                 Build.architecture.like("%{}%".format(term)),
                 ))
 
-    if project:
+    if search_project:
         builds = builds.join(ProjectVersion).join(Project)
-        terms = re.split("[/ ]", project)
+        terms = re.split("[/ ]", search_project)
         for term in terms:
             if not term:
                 continue
@@ -218,6 +219,15 @@ async def get_builds(request):
                 ProjectVersion.name.like("%{}%".format(term)),
                 Project.name.like("%{}%".format(term)),
                 ))
+
+    if project:
+        if "/" not in project:
+            return ErrorResponse(400, "Project not found")
+        projectname, projectversion = project.split("/", 1)
+        builds = builds.join(ProjectVersion).join(Project).filter(Project.is_mirror.is_(False), or_(
+                                ProjectVersion.name == projectversion),
+                                Project.name == projectname)
+
     # FIXME:
     if version:
         builds = builds.filter(Build.version.like("%{}%".format(version)))
@@ -235,7 +245,7 @@ async def get_builds(request):
     if buildstates and set(buildstates).issubset(set(BUILD_STATES)):
         builds = builds.filter(or_(*[Build.buildstate == buildstate for buildstate in buildstates]))
 
-    if search or project:
+    if search or search_project or project:
         # make sure parents and grandparents are invited
         child_cte = builds.cte(name='childs')
         parentbuilds = request.cirrina.db_session.query(Build).filter(Build.id == child_cte.c.parent_id)
