@@ -383,14 +383,13 @@ class Worker:
                 sourepprover.sourcerepository_id = original.id
 
         session.delete(duplicate)
+        original.set_ready()
+        session.commit()
 
         try:
             rmtree("/var/lib/molior/repositories/%d" % duplicate_id)
-        except Exception as exc:
-            logger.exception(exc)
-
-        original.set_ready()
-        session.commit()
+        except Exception:
+            logger.warning("Error deleting /var/lib/molior/repositories/%d" % duplicate_id)
 
     async def _delete_repo(self, args, session):
         repository_id = args[0]
