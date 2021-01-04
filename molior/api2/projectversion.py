@@ -561,7 +561,7 @@ async def delete_repository2(request):
     return OKResponse("Sourcerepository removed from projectversion")
 
 
-@app.http_get("/api2/{project_name}/{projectver_name}/aptsources")
+@app.http_get("/api2/project/{project_name}/{projectver_name}/aptsources")
 async def get_apt_sources2(request):
     """
     Returns apt sources list for given project,
