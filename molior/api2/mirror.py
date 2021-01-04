@@ -438,8 +438,8 @@ async def edit_mirror(request):
     dependency_policy = params.get("dependencylevel")   # noqa: E221
 
     basemirror_name, basemirror_version = basemirror.split("/")
-    bm = db.query(ProjectVersion).filter(
-                ProjectVersion.project.name == basemirror_name,
+    bm = db.query(ProjectVersion).join(Project).filter(
+                Project.name == basemirror_name,
                 ProjectVersion.name == basemirror_version).first()
     if not bm:
         return ErrorResponse(400, "could not find a basemirror with '%s'", basemirror)
