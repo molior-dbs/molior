@@ -508,7 +508,8 @@ class AptlyWorker:
             basemirror_id,
             download_sources,
             download_installer,
-            external_repo
+            external_repo,
+            dependency_policy
         ) = args
 
         mirror_id = None
@@ -546,7 +547,8 @@ class AptlyWorker:
                 mirror_with_installer=download_installer,
                 mirror_state="new",
                 basemirror_id=basemirror_id,
-                external_repo=external_repo
+                external_repo=external_repo,
+                dependency_policy=dependency_policy
             )
 
             session.add(mirror)
