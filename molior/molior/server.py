@@ -1,5 +1,7 @@
 import asyncio
 import click
+import signal
+import functools
 
 from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
@@ -44,19 +46,12 @@ import molior.api2.user              # noqa: F401
 import molior.api2.mirror            # noqa: F401
 import molior.api2.build             # noqa: F401
 
-loop = asyncio.get_event_loop()
-
 
 async def cleanup_task():
     await enqueue_aptly({"cleanup": []})
 
 
 async def main():
-    # OBSOLETE schedule any missed builds
-    # logger.info("source repository scan: starting")
-    # await asyncio.ensure_future(startup_scan())
-    # logger.info("source repository scan: finished")
-
     worker = Worker()
     asyncio.ensure_future(worker.run())
 
@@ -94,23 +89,47 @@ def destroy_cirrina_context(cirrina):
 )
 @click.option("--port", default=8888, help="Listen port")
 @click.option("--debug", default=False, help="Enable debug")
-def mainloop(host, port, debug):
-    """
-    Starts the molior app.
-    """
-    app.set_context_functions(create_cirrina_context, destroy_cirrina_context)
-    app.run(host, port, logger=logger, debug=debug)
-
-
-if __name__ == "__main__":
+@click.option("--coverage", default=False, help="Enable coverage testing")
+def mainloop(host, port, debug, coverage):
     logger.info("molior v%s", MOLIOR_VERSION)
 
+    if coverage:
+        logger.warning("starting coverage measurement")
+        import coverage
+        cov = coverage.Coverage(source=["molior"])
+        cov.start()
+
+    loop = asyncio.get_event_loop()
     Launchy.attach_loop(loop)
+
+    def terminate(signame):
+        logger.info("terminating")
+        asyncio.run_coroutine_threadsafe(Launchy.stop(), loop)
+        try:
+            loop.stop()
+        except Exception:
+            pass
+        logger.info("event loop stopped")
+
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
 
     backend = Backend().init()
     if not backend:
         exit(1)
     if not Auth().init():
         exit(1)
+
     asyncio.ensure_future(main())
+    app.set_context_functions(create_cirrina_context, destroy_cirrina_context)
+    app.run(host, port, logger=logger, debug=debug)
+    logger.info("terminated")
+
+    if coverage:
+        logger.warning("saving coverage measurement")
+        cov.stop()
+        cov.html_report(directory='/var/lib/molior/buildout/coverage')
+
+
+if __name__ == "__main__":
     mainloop()
