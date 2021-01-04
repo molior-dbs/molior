@@ -149,7 +149,8 @@ async def create_mirror(request):
             basemirror_id,
             download_sources,
             download_installer,
-            False
+            False,
+            "strict"
         ]
     }
     await enqueue_aptly(args)
