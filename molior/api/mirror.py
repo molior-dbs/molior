@@ -285,7 +285,8 @@ async def get_mirrors(request):
                 "apt_url": apt_url,
                 "mirrorkeyurl": mirrorkeyurl,
                 "mirrorkeyids": mirrorkeyids,
-                "mirrorkeyserver": mirrorkeyserver
+                "mirrorkeyserver": mirrorkeyserver,
+                "dependency_policy": mirror.dependency_policy
             }
         )
     return web.json_response(data)
