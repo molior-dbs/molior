@@ -572,9 +572,6 @@ async def schedule_build(build, session):
 
 
 async def ScheduleBuilds():
-
-    logger.info("scheduler: checking for pending builds")
-
     with Session() as session:
 
         needed_builds = session.query(Build).filter(Build.buildstate == "needs_build", Build.buildtype == "deb").all()
@@ -594,7 +591,6 @@ async def ScheduleBuilds():
                 if dep.project.is_mirror:
                     continue
                 buildorder_projectversions.append(dep.id)
-            logger.warning("scheduler: searching build order deps in %s" % buildorder_projectversions)
 
             ready = True
             repo_deps = []
