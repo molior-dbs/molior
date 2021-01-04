@@ -6,6 +6,7 @@ from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse, db2array
 from ..molior.queues import enqueue_aptly
 
+from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
@@ -165,6 +166,62 @@ async def get_projectversion_dependents(request):
 
     data = {"total_result_count": nb_results, "results": results}
     return OKResponse(data)
+
+
+@app.http_get("/api2/mirror/{name}/{version}/aptsources")
+async def get_apt_sources2(request):
+    """
+    Returns apt sources list for given mirror.
+
+    ---
+    description: Returns apt sources list.
+    tags:
+        - Mirrors
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - mirror name: name
+          in: path
+          required: true
+          type: str
+        - mirror version: version
+          in: path
+          required: true
+          type: str
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Parameter missing
+    """
+    name = request.match_info["name"]
+    version = request.match_info["version"]
+
+    db = request.cirrina.db_session
+    query = db.query(ProjectVersion)
+    query = query.join(Project, Project.id == ProjectVersion.project_id)
+    query = query.filter(Project.is_mirror == "true",
+                         Project.name == name,
+                         ProjectVersion.name == version)
+    mirror = query.first()
+    if not mirror:
+        return ErrorResponse(404, "Mirror not found")
+
+    cfg = Configuration()
+    apt_url = cfg.aptly.get("apt_url")
+    keyfile = cfg.aptly.get("key")
+
+    sources_list = "# APT Sources for mirror {0} {1}\n".format(name, version)
+    sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
+    sources_list += "\n# Base Mirror\n"
+    if mirror.project.is_basemirror:
+        sources_list += "{}\n".format(mirror.get_apt_repo())
+    elif mirror.basemirror:
+        sources_list += "{}\n".format(mirror.basemirror.get_apt_repo())
+
+    return web.Response(status=200, text=sources_list)
 
 
 @app.http_post("/api2/mirror")
