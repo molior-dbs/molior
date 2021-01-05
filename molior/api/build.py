@@ -321,6 +321,7 @@ async def get_build(request):
     if build.projectversion:
         project = {"id": build.projectversion.project.id,
                    "name": build.projectversion.project.name,
+                   "is_mirror": build.projectversion.project.is_mirror,
                    "version": {"id": build.projectversion.id,
                                "name": build.projectversion.name,
                                "is_locked": build.projectversion.is_locked}}
