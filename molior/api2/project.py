@@ -128,7 +128,7 @@ async def get_projectversions2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/project/{project_id}/versions")
+@app.http_post("/api2/projectbase/{project_id}/versions")
 @req_role("owner")
 async def create_projectversion(request):
     """
