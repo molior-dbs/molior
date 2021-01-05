@@ -287,6 +287,7 @@ async def get_mirrors(request):
                 "mirrorkeyurl": mirrorkeyurl,
                 "mirrorkeyids": mirrorkeyids,
                 "mirrorkeyserver": mirrorkeyserver,
+                "external_repo": mirror.external_repo,
                 "dependency_policy": mirror.dependency_policy
             }
         )
