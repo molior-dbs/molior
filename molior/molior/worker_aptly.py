@@ -1014,13 +1014,12 @@ class AptlyWorker:
     async def _cleanup(self, args):
         logger.info("aptly worker: running cleanup")
         with Session() as session:
-            mirrors = session.query(ProjectVersion).filter(ProjectVersion.project.is_mirror).all()
-            if mirrors:
-                for mirror in mirrors:
-                    if mirror.mirror_state in ["updating", "publishing"]:
-                        # FIXME: postpone if mirroring is active
-                        logger.error("aptly cleanup: cannot start, mirroring is active for mirror with id %d", mirror.id)
-                        return
+            mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
+            for mirror in mirrors:
+                if mirror.mirror_state in ["updating", "publishing"]:
+                    # FIXME: postpone if mirroring is active
+                    logger.error("aptly cleanup: cannot start, mirroring is active for mirror with id %d", mirror.id)
+                    return
         aptly = get_aptly_connection()
         await aptly.cleanup()
 
