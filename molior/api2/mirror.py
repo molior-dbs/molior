@@ -220,6 +220,7 @@ async def get_apt_sources2(request):
         sources_list += "{}\n".format(mirror.get_apt_repo())
     elif mirror.basemirror:
         sources_list += "{}\n".format(mirror.basemirror.get_apt_repo())
+        sources_list += "{}\n".format(mirror.get_apt_repo())
 
     return web.Response(status=200, text=sources_list)
 
