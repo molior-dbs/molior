@@ -63,6 +63,7 @@ async def node_register(ws_client):
     ws_client.molior_node_name = node
     ws_client.molior_node_arch = arch
     ws_client.molior_cpu_cores = 0
+    ws_client.molior_load = 0
     ws_client.molior_ram_total = 0
     ws_client.molior_disk_total = 0
     ws_client.molior_nodeid = ""
@@ -73,6 +74,7 @@ async def node_register(ws_client):
     ws_client.molior_sourcename = ""
     ws_client.molior_sourceversion = ""
     ws_client.molior_sourcearch = ""
+    ws_client.molior_uptime_seconds = 0
 
     registry[arch].insert(0, ws_client)
     logger.info("backend: %s node registered: %s", arch, node)
