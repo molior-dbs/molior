@@ -412,20 +412,19 @@ async def get_project_users2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/project/{project_name}/permissions/{userid}")
+@app.http_post("/api2/project/{project_name}/permissions")
 @req_role("owner")
 async def add_project_users2(request):
     project_name = request.match_info["project_name"]
-    userid = request.match_info["userid"]
-    try:
-        userid = int(userid)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for userid")
     params = await request.json()
+    username = params.get("username")
     role = params.get("role")
 
     if role not in ["member", "manager", "owner"]:
         return ErrorResponse(400, "Invalid role")
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
@@ -434,13 +433,9 @@ async def add_project_users2(request):
     if project.is_mirror:
         return ErrorResponse(400, "Cannot set permissions to project which is a mirror")
 
-    user = db.query(User).filter(User.id == userid).first()
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         return ErrorResponse(404, "User not found")
-
-    username = user.username
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
 
     # check existing
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
@@ -456,20 +451,19 @@ async def add_project_users2(request):
     return OKResponse()
 
 
-@app.http_put("/api2/project/{project_name}/permissions/{userid}")
+@app.http_put("/api2/project/{project_name}/permissions")
 @req_role("owner")
 async def edit_project_users2(request):
     project_name = request.match_info["project_name"]
-    userid = request.match_info["userid"]
-    try:
-        userid = int(userid)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for userid")
     params = await request.json()
+    username = params.get("username")
     role = params.get("role")
 
     if role not in ["member", "manager", "owner"]:
         return ErrorResponse(400, "Invalid role")
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
@@ -478,16 +472,12 @@ async def edit_project_users2(request):
     if project.is_mirror:
         return ErrorResponse(400, "Cannot edit permissions of project which is a mirror")
 
-    user = db.query(User).filter(User.id == userid).first()
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         return ErrorResponse(404, "User not found")
 
-    username = user.username
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
-
     userrole = request.cirrina.db_session.query(UserRole).filter(UserRole.project_id == project.id,
-                                                                 UserRole.user_id == userid).first()
+                                                                 UserRole.usename == username).first()
     if not userrole:
         return ErrorResponse(400, "User Role not found")
     userrole.role = role
@@ -496,15 +486,15 @@ async def edit_project_users2(request):
     return OKResponse()
 
 
-@app.http_delete("/api2/project/{project_name}/permissions/{userid}")
+@app.http_delete("/api2/project/{project_name}/permissions")
 @req_role("owner")
 async def delete_project_users2(request):
     project_name = request.match_info["project_name"]
-    userid = request.match_info["userid"]
-    try:
-        userid = int(userid)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for userid")
+    params = await request.json()
+    username = params.get("username")
+
+    if username == "admin":
+        return ErrorResponse(400, "User not allowed")
 
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
@@ -513,15 +503,12 @@ async def delete_project_users2(request):
     if project.is_mirror:
         return ErrorResponse(400, "Cannot delete permissions from project which is a mirror")
 
-    user = db.query(User).filter(User.id == userid).first()
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         return ErrorResponse(404, "User not found")
 
-    username = user.username
-    if username == "admin":
-        return ErrorResponse(400, "User not allowed")
+    # FIXME: check existing role
 
-    # check existing
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
     query = query.filter(User.username == username)
     query = query.filter(Project.id == project.id)
