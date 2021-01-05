@@ -11,7 +11,7 @@ from ..model.user import User
 from ..model.userrole import UserRole, USER_ROLES
 
 
-@app.http_get("/api2/project/{project_name}")
+@app.http_get("/api2/projectbase/{project_name}")
 @app.authenticated
 async def get_project_byname(request):
     """
@@ -52,7 +52,7 @@ async def get_project_byname(request):
     return OKResponse(data)
 
 
-@app.http_get("/api2/project/{project_name}/versions")
+@app.http_get("/api2/projectbase/{project_name}/versions")
 @app.authenticated
 async def get_projectversions2(request):
     """
@@ -177,7 +177,7 @@ async def create_projectversion(request):
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
     if dependency_policy not in DEPENDENCY_POLICIES:
-        return ErrorResponse(400, "Wrong dependency policy")
+        return ErrorResponse(400, "Wrong dependency policy2")
     cibuilds = params.get("cibuilds")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
@@ -285,7 +285,7 @@ async def edit_projectversion(request):
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
     if dependency_policy not in DEPENDENCY_POLICIES:
-        return ErrorResponse(400, "Wrong dependency policy")
+        return ErrorResponse(400, "Wrong dependency policy1")
     cibuilds = params.get("cibuilds")
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -308,7 +308,7 @@ async def edit_projectversion(request):
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
 
-@app.http_delete("/api2/project/{project_id}")
+@app.http_delete("/api2/projectbase/{project_id}")
 @req_role("owner")
 async def delete_project2(request):
     """
@@ -353,7 +353,7 @@ async def delete_project2(request):
     return OKResponse("project {} deleted".format(project_name))
 
 
-@app.http_get("/api2/project/{project_name}/permissions")
+@app.http_get("/api2/projectbase/{project_name}/permissions")
 @app.authenticated
 async def get_project_users2(request):
     project_name = request.match_info["project_name"]
@@ -412,7 +412,7 @@ async def get_project_users2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/project/{project_name}/permissions")
+@app.http_post("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def add_project_users2(request):
     project_name = request.match_info["project_name"]
@@ -451,7 +451,7 @@ async def add_project_users2(request):
     return OKResponse()
 
 
-@app.http_put("/api2/project/{project_name}/permissions")
+@app.http_put("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def edit_project_users2(request):
     project_name = request.match_info["project_name"]
@@ -477,7 +477,7 @@ async def edit_project_users2(request):
         return ErrorResponse(404, "User not found")
 
     userrole = request.cirrina.db_session.query(UserRole).filter(UserRole.project_id == project.id,
-                                                                 UserRole.usename == username).first()
+                                                                 UserRole.user_id == user.id).first()
     if not userrole:
         return ErrorResponse(400, "User Role not found")
     userrole.role = role
@@ -486,7 +486,7 @@ async def edit_project_users2(request):
     return OKResponse()
 
 
-@app.http_delete("/api2/project/{project_name}/permissions")
+@app.http_delete("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def delete_project_users2(request):
     project_name = request.match_info["project_name"]

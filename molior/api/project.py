@@ -181,7 +181,7 @@ async def create_project(request):
     return web.json_response({"id": project.id, "name": project.name})
 
 
-@app.http_put("/api/project/{project_id}")
+@app.http_put("/api/projectbase/{project_id}")
 @app.http_put("/api/projects/{project_id}")
 @app.authenticated
 @req_role("owner")
