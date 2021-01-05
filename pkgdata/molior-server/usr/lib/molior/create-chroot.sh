@@ -31,7 +31,7 @@ build_chroot()
 {
   rm -f $target.tar.xz
   rm -rf $target
-  mkdir $target
+  mkdir -p $target
 
   echo
   message="Creating schroot $CHROOT_NAME"
