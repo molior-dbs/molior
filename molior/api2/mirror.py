@@ -324,7 +324,6 @@ async def create_mirror2(request):
         "501":
             description: database error occurred.
     """
-    db = request.cirrina.db_session
     params = await request.json()
 
     mirrorname        = params.get("mirrorname")        # noqa: E221
@@ -344,6 +343,13 @@ async def create_mirror2(request):
     dependency_policy = params.get("dependencylevel")   # noqa: E221
 
     mirrorcomponents = re.split(r"[, ]", mirrorcomponents)
+
+    db = request.cirrina.db_session
+    mirror = db.query(ProjectVersion).join(Project).filter(
+                ProjectVersion.name == mirrorversion,
+                Project.name == mirrorname).first()
+    if mirror:
+        return ErrorResponse(400, "Mirror {}/{} already exists".format(mirrorname, mirrorversion))
 
     basemirror_id = None
     if mirrortype == "2":
