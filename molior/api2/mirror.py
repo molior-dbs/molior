@@ -215,8 +215,7 @@ async def get_apt_sources2(request):
     keyfile = cfg.aptly.get("key")
 
     sources_list = "# APT Sources for mirror {0} {1}\n".format(name, version)
-    sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    sources_list += "\n# Base Mirror\n"
+    sources_list += "# GPG-Key: {0}/{1}\n\n".format(apt_url, keyfile)
     if mirror.project.is_basemirror:
         sources_list += "{}\n".format(mirror.get_apt_repo())
     elif mirror.basemirror:
