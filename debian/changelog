@@ -1,3 +1,9 @@
+molior (1.4.0~alpha235) stretch; urgency=medium
+
+  * case insensitive search
+
+ -- André Roth <neolynx@gmail.com>  Thu, 07 Jan 2021 22:03:51 +0000
+
 molior (1.4.0~alpha234) stretch; urgency=medium
 
   * fix project rest api
