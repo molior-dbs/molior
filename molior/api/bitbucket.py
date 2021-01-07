@@ -3,8 +3,7 @@ import logging
 
 from aiohttp import web
 
-from .app import app
-from ..molior.notifier import build_added
+from ..app import app
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository
@@ -118,7 +117,7 @@ async def bitbucket_trigger(request):
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     build_task = BuildTask(build=build, task_id=str(token))
