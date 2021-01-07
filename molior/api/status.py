@@ -143,7 +143,7 @@ async def get_nodes_info(request):
 
     results = []
     for node in build_nodes:
-        if search and search not in node["name"]:
+        if search and search.lower() not in node["name"].lower():
             continue
         results.append(node)
 

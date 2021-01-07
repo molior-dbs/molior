@@ -211,8 +211,8 @@ async def get_mirrors(request):
             if not term:
                 continue
             query = query.filter(or_(
-                 Project.name.like("%{}%".format(term)),
-                 ProjectVersion.name.like("%{}%".format(term))))
+                 Project.name.ilike("%{}%".format(term)),
+                 ProjectVersion.name.ilike("%{}%".format(term))))
 
     basemirror_ids = []
     if search_basemirror:
@@ -223,8 +223,8 @@ async def get_mirrors(request):
             if not term:
                 continue
             query2 = query2.filter(or_(
-                 Project.name.like("%{}%".format(term)),
-                 ProjectVersion.name.like("%{}%".format(term))))
+                 Project.name.ilike("%{}%".format(term)),
+                 ProjectVersion.name.ilike("%{}%".format(term))))
         basemirrors = query2.all()
         for b in basemirrors:
             if b.id not in basemirror_ids:
@@ -233,7 +233,7 @@ async def get_mirrors(request):
         query = query.filter(ProjectVersion.basemirror_id.in_(basemirror_ids))
 
     if url:
-        query = query.filter(ProjectVersion.mirror_url.like("%{}%".format(url)))
+        query = query.filter(ProjectVersion.mirror_url.ilike("%{}%".format(url)))
 
     if basemirror:
         query = query.filter(Project.is_basemirror == "true", ProjectVersion.mirror_state == "ready")

@@ -140,7 +140,7 @@ async def get_projectversion_dependencies(request):
                                                                                 Project.name,
                                                                                 ProjectVersion.name.asc())
         if filter_name:
-            cands = cands.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+            cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
 
         for cand in cands.all():
             results.append(cand.data())
@@ -158,7 +158,7 @@ async def get_projectversion_dependencies(request):
     for d in deps_unique:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
         if filter_name:
-            dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+            dep = dep.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
         dep = dep.first()
         if dep:
             data = dep.data()
@@ -716,7 +716,7 @@ async def get_projectversion_dependents(request):
                                                                                 Project.name,
                                                                                 ProjectVersion.name.asc())
         if filter_name:
-            cands = cands.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+            cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
 
         for cand in cands.all():
             results.append(cand.data())
@@ -729,7 +729,7 @@ async def get_projectversion_dependents(request):
     for d in deps:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
         if filter_name:
-            dep = dep.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+            dep = dep.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
         dep = dep.first()
         if dep:
             data = dep.data()

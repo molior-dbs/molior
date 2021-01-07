@@ -79,9 +79,9 @@ async def get_users(request):
     if admin.lower() == "true":
         query = query.filter(User.is_admin)
     if name:
-        query = query.filter(User.username.like("%{}%".format(name)))
+        query = query.filter(User.username.ilike("%{}%".format(name)))
     if email:
-        query = query.filter(User.email.like("%{}%".format(email)))
+        query = query.filter(User.email.ilike("%{}%".format(email)))
 
     query = query.order_by(User.username)
     data = {"total_result_count": query.count()}
