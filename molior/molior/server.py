@@ -24,6 +24,7 @@ from .queues import enqueue_aptly
 # import api handlers
 import molior.api.build              # noqa: F401
 import molior.api.gitlab             # noqa: F401
+import molior.api.bitbucket          # noqa: F401
 import molior.api.project            # noqa: F401
 import molior.api.buildstate         # noqa: F401
 import molior.api.mirror             # noqa: F401
