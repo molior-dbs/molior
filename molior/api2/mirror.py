@@ -154,7 +154,7 @@ async def get_projectversion_dependents(request):
     if mirror.project.is_basemirror:
         query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id)
         if filter_name:
-            query = query.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+            query = query.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
         nb_results = query.count()
         query = paginate(request, query)
         dependents = query.all()

@@ -110,7 +110,7 @@ async def get_sourcerepository_dependents(request):
     query = db.query(ProjectVersion).filter(SouRepProVer.projectversion_id == ProjectVersion.id,
                                             SouRepProVer.sourcerepository_id == repo.id)
     if filter_name:
-        query = query.filter(ProjectVersion.fullname.like("%{}%".format(filter_name)))
+        query = query.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
     query = query.order_by(ProjectVersion.fullname)
     nb_results = query.count()
     query = paginate(request, query)
@@ -165,10 +165,10 @@ async def get_repositories2(request):
         for term in terms:
             if not term:
                 continue
-            query = query.filter(SourceRepository.url.like("%{}%".format(term)))
+            query = query.filter(SourceRepository.url.ilike("%{}%".format(term)))
 
     if filter_name:
-        query = query.filter(SourceRepository.name.like("%{}%".format(filter_name)))
+        query = query.filter(SourceRepository.name.ilike("%{}%".format(filter_name)))
 
     if exclude_projectversion_id != -1:
         query = query.filter(~SourceRepository.projectversions.any(ProjectVersion.id == exclude_projectversion_id))
@@ -251,7 +251,7 @@ async def get_projectversion_repositories(request):
     query = query.filter(SourceRepository.projectversions.any(id=projectversion.id))
 
     if filter_url:
-        query = query.filter(SourceRepository.url.like("%{}%".format(filter_url)))
+        query = query.filter(SourceRepository.url.ilike("%{}%".format(filter_url)))
 
     count = query.count()
     query = query.order_by(SourceRepository.name)

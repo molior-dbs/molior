@@ -55,7 +55,7 @@ async def get_projects(request):
     query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
 
     if filter_name:
-        query = query.filter(Project.name.like("%{}%".format(filter_name)))
+        query = query.filter(Project.name.ilike("%{}%".format(filter_name)))
 
     nb_results = query.count()
     query = paginate(request, query)

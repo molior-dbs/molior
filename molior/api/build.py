@@ -204,9 +204,9 @@ async def get_builds(request):
             if not term:
                 continue
             builds = builds.filter(or_(
-                Build.sourcename.like("%{}%".format(term)),
-                Build.version.like("%{}%".format(term)),
-                Build.architecture.like("%{}%".format(term)),
+                Build.sourcename.ilike("%{}%".format(term)),
+                Build.version.ilike("%{}%".format(term)),
+                Build.architecture.ilike("%{}%".format(term)),
                 ))
 
     if search_project:
@@ -216,8 +216,8 @@ async def get_builds(request):
             if not term:
                 continue
             builds = builds.filter(Project.is_mirror.is_(False), or_(
-                ProjectVersion.name.like("%{}%".format(term)),
-                Project.name.like("%{}%".format(term)),
+                ProjectVersion.name.ilike("%{}%".format(term)),
+                Project.name.ilike("%{}%".format(term)),
                 ))
 
     if project:

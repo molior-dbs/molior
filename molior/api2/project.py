@@ -107,7 +107,7 @@ async def get_projectversions2(request):
     if project_id:
         query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
     if filter_name:
-        query = query.filter(ProjectVersion.name.like("%{}%".format(filter_name)))
+        query = query.filter(ProjectVersion.name.ilike("%{}%".format(filter_name)))
     if basemirror_id:
         query = query.filter(ProjectVersion.basemirror_id == basemirror_id)
     elif is_basemirror:
@@ -375,7 +375,7 @@ async def get_project_users2(request):
         query = query.filter(User.username != "admin")
         query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
         if filter_name:
-            query = query.filter(User.username.like("%{}%".format(filter_name)))
+            query = query.filter(User.username.ilike("%{}%".format(filter_name)))
         query = query.order_by(User.username)
         query = paginate(request, query)
         users = query.all()
@@ -391,11 +391,11 @@ async def get_project_users2(request):
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project).order_by(User.username)
 
     if filter_name:
-        query = query.filter(User.username.like("%{}%".format(filter_name)))
+        query = query.filter(User.username.ilike("%{}%".format(filter_name)))
 
     if filter_role:
         for r in USER_ROLES:
-            if filter_role in r:
+            if filter_role.lower() in r:
                 query = query.filter(UserRole.role == r)
 
     query = paginate(request, query)
