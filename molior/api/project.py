@@ -322,7 +322,9 @@ async def get_apt_sources(request):
     deps += get_projectversion_deps(projectversion.id, db)
 
     cfg = Configuration()
-    apt_url = cfg.aptly.get("apt_url")
+    apt_url = cfg.aptly.get("apt_url_public")
+    if not apt_url:
+        apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
 
     sources_list = "# APT Sources for project {0} {1}\n".format(project_name, projectver_name)
