@@ -1,0 +1,16 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE TYPE projectversiontype_enum AS ENUM (
+    'regular',
+    'overlay',
+    'snapshot'
+);
+ALTER TYPE projectversiontype_enum OWNER TO molior;
+
+ALTER TABLE projectversion ADD COLUMN projectversiontype projectversiontype_enum DEFAULT 'regular' NOT NULL;
+
+ALTER TABLE projectversion ADD COLUMN baseprojectversion_id integer REFERENCES projectversion(id);
+
+EOF

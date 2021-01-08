@@ -350,7 +350,8 @@ async def snapshot_projectversion(request):
         sourcerepositories=projectversion.sourcerepositories,
         ci_builds_enabled=False,
         is_locked=True,
-        # FIXME: is_snapshot=True, snapshot origin
+        projectversiontype="snapshot",
+        baseprojectversion_id=projectversion.id
     )
 
     for repo in new_projectversion.sourcerepositories:
