@@ -491,7 +491,9 @@ async def do_overlay(request, projectversion_id, name):
         basemirror=projectversion.basemirror,
         description=projectversion.description,
         dependency_policy=projectversion.dependency_policy,
-        ci_builds_enabled=projectversion.ci_builds_enabled
+        ci_builds_enabled=projectversion.ci_builds_enabled,
+        projectversiontype="overlay",
+        baseprojectversion_id=projectversion.id
     )
 
     db.add(overlay_projectversion)

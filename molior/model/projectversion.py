@@ -15,6 +15,7 @@ from . import mirrorkey    # noqa: F401
 
 MIRROR_STATES = ["undefined", "new", "created", "updating", "publishing", "init_error", "error", "ready"]
 DEPENDENCY_POLICIES = ["strict", "distribution", "any"]
+PROJECTVERSION_TYPES = ["regular", "overlay", "snapshot"]
 
 
 class ProjectVersion(Base):
@@ -53,6 +54,8 @@ class ProjectVersion(Base):
     ci_builds_enabled = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
     dependency_policy = Column(Enum(*DEPENDENCY_POLICIES, name="dependencypolicy_enum"), default="strict")
+    projectversiontype = Column(Enum(*PROJECTVERSION_TYPES, name="projectversion_enum"), default="regular")
+    baseprojectversion_id = Column(ForeignKey("projectversion.id"))
 
     @hybrid_property
     def fullname(self):
