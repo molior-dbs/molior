@@ -212,7 +212,9 @@ async def get_apt_sources2(request):
         return ErrorResponse(404, "Mirror not found")
 
     cfg = Configuration()
-    apt_url = cfg.aptly.get("apt_url")
+    apt_url = cfg.aptly.get("apt_url_public")
+    if not apt_url:
+        apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
 
     sources_list = "# APT Sources for mirror {0} {1}\n".format(name, version)
