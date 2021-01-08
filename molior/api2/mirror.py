@@ -446,12 +446,14 @@ async def edit_mirror(request):
     mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
     dependency_policy = params.get("dependencylevel")   # noqa: E221
 
-    basemirror_name, basemirror_version = basemirror.split("/")
-    bm = db.query(ProjectVersion).join(Project).filter(
-                Project.name == basemirror_name,
-                ProjectVersion.name == basemirror_version).first()
-    if not bm:
-        return ErrorResponse(400, "could not find a basemirror with '%s'", basemirror)
+    if basemirror:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                    Project.name == basemirror_name,
+                    ProjectVersion.name == basemirror_version).first()
+        if not bm:
+            return ErrorResponse(400, "Error finding basemirror '%s'", basemirror)
+        mirror.basemirror = bm
 
     mirror.mirror_url = mirrorurl
     mirror.mirror_distribution = mirrordist
@@ -460,7 +462,6 @@ async def edit_mirror(request):
     mirror.mirror_with_sources = mirrorsrc
     mirror.mirror_with_installer = mirrorinst
     mirror.is_basemirror = mirrortype == "1"
-    mirror.basemirror = bm
 
     if mirrortype == "2":
         mirror.dependency_policy = dependency_policy
