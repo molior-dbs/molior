@@ -3,7 +3,7 @@ from aiohttp import web
 
 from ..app import app, logger
 from ..auth import req_admin
-from ..tools import OKResponse, ErrorResponse, db2array
+from ..tools import OKResponse, ErrorResponse, db2array, escape_for_like
 from ..molior.queues import enqueue_aptly
 
 from ..molior.configuration import Configuration
@@ -17,27 +17,27 @@ from ..tools import paginate
 @app.authenticated
 async def get_mirror2(request):
     """
-    Returns all mirrors from database.
+    Returns all mirrors with given 'name' and 'version'.
 
     ---
-    description: Returns mirrors from database.
+    description: Returns all mirrors with given 'name' and 'version'.
     tags:
         - Mirrors
     consumes:
         - application/x-www-form-urlencoded
     parameters:
         - name: name
-          in: query
-          required: false
+          in: path
+          required: true
           type: string
-          description: filter criteria
+          description: Search for mirrors with this name
+        - name: version
+          in: path
+          required: true
+          type: string
+          description: Search for mirrors with this version
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: bad request
     """
     mirror_name = request.match_info["name"]
     mirror_version = request.match_info["version"]
@@ -102,31 +102,30 @@ async def get_mirror2(request):
 @app.authenticated
 async def get_projectversion_dependents(request):
     """
-    Returns a list of projectversions.
+    Returns a list of projectversions for the given mirror.
 
     ---
-    description: Returns a list of projectversions.
+    description: Returns a list of projectversions for the given mirror.
     tags:
         - ProjectVersions
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: basemirror_id
-          in: query
-          required: false
-          type: integer
-        - name: is_basemirror
-          in: query
-          required: false
-          type: bool
-        - name: project_id
-          in: query
-          required: false
-          type: integer
-        - name: project_name
+        - name: mirror_name
+          in: path
+          required: true
+          type: string
+          description: Mirror name
+        - name: mirror_version
+          in: path
+          required: true
+          type: string
+          description: Mirror version
+        - name: q
           in: query
           required: false
           type: string
+          description: String to filter project name
         - name: page
           in: query
           required: false
@@ -135,13 +134,12 @@ async def get_projectversion_dependents(request):
           in: query
           required: false
           type: integer
+        - name: per_page
+          in: query
+          required: false
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     db = request.cirrina.db_session
     filter_name = request.GET.getone("q", None)
@@ -155,7 +153,8 @@ async def get_projectversion_dependents(request):
     if mirror.project.is_basemirror:
         query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == mirror.id)
         if filter_name:
-            query = query.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+            escaped_filter_name = escape_for_like(filter_name)
+            query = query.filter(ProjectVersion.fullname.ilike(f"%{escaped_filter_name}%"))
         nb_results = query.count()
         query = paginate(request, query)
         dependents = query.all()
@@ -177,27 +176,22 @@ async def get_apt_sources2(request):
     Returns apt sources list for given mirror.
 
     ---
-    description: Returns apt sources list.
+    description: Returns apt sources list for given mirror.
     tags:
         - Mirrors
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - mirror name: name
+        - name: name
           in: path
           required: true
-          type: str
-        - mirror version: version
+          type: string
+          description: Mirror name
+        - name: version
           in: path
           required: true
-          type: str
+          type: string
+          description: Mirror version
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Parameter missing
     """
     name = request.match_info["name"]
     version = request.match_info["version"]
@@ -240,93 +234,81 @@ async def create_mirror2(request):
     description: Create a debian mirror.
     tags:
         - Mirrors
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: name
-          in: query
+        - in: body
+          name: body
+          description: Mirror data
           required: true
-          type: string
-          description: name of the mirror
-        - name: url
-          in: query
-          required: true
-          type: string
-          description: http://host of source
-        - name: distribution
-          in: query
-          required: true
-          type: string
-          description: trusty, wheezy, jessie, etc.
-        - name: components
-          in: query
-          required: false
-          type: array
-          description: components to be mirrored
-          default: main
-        - name: keys
-          in: query
-          required: false
-          type: array
-          uniqueItems: true
-          collectionFormat: multi
-          allowEmptyValue: true
-          minItems: 0
-          items:
-              type: string
-          description: repository keys
-        - name: keyserver
-          in: query
-          required: false
-          type: string
-          description: host name where the keys are
-        - name: is_basemirror
-          in: query
-          required: false
-          type: boolean
-          description: use this mirror for chroot
-        - name: architectures
-          in: query
-          required: false
-          type: array
-          description: i386,amd64,arm64,armhf,...
-        - name: version
-          in: query
-          required: false
-          type: string
-        - name: armored_key_url
-          in: query
-          required: false
-          type: string
-        - name: basemirror_id
-          in: query
-          required: false
-          type: string
-        - name: download_sources
-          in: query
-          required: false
-          type: boolean
-        - name: download_installer
-          in: query
-          required: false
-          type: boolean
+          schema:
+              type: object
+              properties:
+                  mirrorname:
+                      required: true
+                      type: string
+                      description: Mirror name
+                  mirrorversion:
+                      required: true
+                      type: string
+                      description: Mirror version
+                  mirrortype:
+                      required: false
+                      type: string
+                      description: Mirror type
+                  basemirror:
+                      required: false
+                      type: string
+                      description: Base mirror name, e.g. project/version
+                  external:
+                      required: false
+                      type: boolean
+                      description: Is it an external repository?
+                  mirrorurl:
+                      required: false
+                      type: string
+                      description: Mirror URL
+                  mirrordist:
+                      required: false
+                      type: string
+                      description: Mirror distribution
+                  mirrorcomponents:
+                      required: true
+                      type: array
+                      description: Components to be mirrored
+                      default: main
+                  architectures:
+                      required: false
+                      type: array
+                      items:
+                          type: string
+                      description: E.g. i386, amd64, arm64, armhf, ...
+                  mirrorsrc:
+                      required: false
+                      type: boolean
+                      description: Is a mirror with sources?
+                  mirrorinst:
+                      required: false
+                      type: boolean
+                      description: Is a mirror with installer?
+                  mirrorkeyserver:
+                      required: false
+                      type: string
+                      description: Host name where the keys are
+                  mirrorkeyurl:
+                      required: false
+                      type: string
+                      description: URL of the mirror key
+                  mirrorkeyids:
+                      required: false
+                      type: array
+                      items:
+                          type: string
+                      description: IDs of the mirror keys
+                  dependencylevel:
+                      required: false
+                      type: string
+                      description: Dependency policy, e.g. strict
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: mirror creation failed.
-        "412":
-            description: key error.
-        "409":
-            description: mirror already exists.
-        "500":
-            description: internal server error.
-        "503":
-            description: aptly not available.
-        "501":
-            description: database error occurred.
     """
     params = await request.json()
 
