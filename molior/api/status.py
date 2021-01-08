@@ -5,6 +5,7 @@ from ..app import app
 from ..auth import req_admin
 from ..version import MOLIOR_VERSION
 from ..molior.backend import Backend
+from ..molior.configuration import Configuration
 
 
 @app.http_get("/api/status")
@@ -48,11 +49,17 @@ async def get_status(request):
     except Exception:
         pass
 
+    cfg = Configuration()
+    apt_url = cfg.aptly.get("apt_url_public")
+    if not apt_url:
+        apt_url = cfg.aptly.get("apt_url")
+    gpgurl = apt_url + "/" + cfg.aptly.get("key")
     status = {
         "version": MOLIOR_VERSION,
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
         "sshkey": sshkey,
+        "gpgurl": gpgurl
     }
     return web.json_response(status)
 
