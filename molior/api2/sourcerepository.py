@@ -103,6 +103,8 @@ async def get_sourcerepository_dependents(request):
     """
     repository_id = request.match_info["repository_id"]
     filter_name = request.GET.getone("q", "")
+    unlocked = request.GET.getone("unlocked", "")
+    unlocked = unlocked == "true"
     db = request.cirrina.db_session
     repo = db.query(SourceRepository).filter_by(id=repository_id).first()
     if not repo:
@@ -111,6 +113,8 @@ async def get_sourcerepository_dependents(request):
                                             SouRepProVer.sourcerepository_id == repo.id)
     if filter_name:
         query = query.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+    if unlocked:
+        query = query.filter(ProjectVersion.is_locked.is_(False))
     query = query.order_by(ProjectVersion.fullname)
     nb_results = query.count()
     query = paginate(request, query)
