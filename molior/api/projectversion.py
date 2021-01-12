@@ -215,7 +215,7 @@ async def create_projectversions(request):
     if not project_id:
         return ErrorResponse(400, "No valid project id received")
     if not name:
-        return ErrorResponse(400, "No valid name for the projectversion recieived")
+        return ErrorResponse(400, "No valid name for the projectversion received")
     if not basemirror or not ("/" in basemirror):
         return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
     if not architectures:
@@ -372,7 +372,7 @@ async def clone_projectversion(request):
 
 async def do_clone(request, projectversion_id, name):
     if not name:
-        return ErrorResponse(400, "No valid name for the projectversion recieived")
+        return ErrorResponse(400, "No valid name for the projectversion received")
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
@@ -468,7 +468,7 @@ async def create_projectversion_overlay(request):
 
 async def do_overlay(request, projectversion_id, name):
     if not name:
-        return ErrorResponse(400, "No valid name for the projectversion recieived")
+        return ErrorResponse(400, "No valid name for the projectversion received")
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 

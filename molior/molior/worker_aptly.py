@@ -682,17 +682,12 @@ class AptlyWorker:
         mirror_id = args[0]
 
         with Session() as session:
-            mirror = session.query(ProjectVersion).filter(ProjectVersion.id == mirror_id).first()
-            if not mirror:
-                logger.error("aptly worker: mirror with id %d not found", mirror_id)
-                return
 
             build = session.query(Build).filter(Build.projectversion_id == mirror_id and Build.buildtype == "mirror").first()
             if not build:
+                await build.log("E: aptly worker: no build found for mirror with id %d\n" % str(mirror_id))
                 logger.error("aptly worker: no build found for mirror with id %d", str(mirror_id))
                 return
-
-            await build.log("I: updating mirror\n")
 
             mirror = session.query(ProjectVersion).filter(ProjectVersion.id == mirror_id).first()
             if not mirror:
@@ -700,11 +695,8 @@ class AptlyWorker:
                 logger.error("aptly worker: mirror with id %d not found", mirror_id)
                 return
 
-            build = session.query(Build).filter(Build.projectversion_id == mirror_id and Build.buildtype == "mirror").first()
-            if not build:
-                await build.log("E: aptly worker: no build found for mirror with id %d\n" % str(mirror_id))
-                logger.error("aptly worker: no build found for mirror with id %d", str(mirror_id))
-                return
+            # FIXME add timestamp
+            await build.log("I: updating mirror\n")
 
             if not mirror.external_repo:
                 await build.set_building()
