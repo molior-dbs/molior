@@ -7,18 +7,18 @@ from ..model.user import User
 @app.authenticated
 async def get_user_byname(request):
     """
-    Return a user by its id.
+    Return a user by its username.
 
     ---
-    description: Get a user
+    description: Return a user by its name.
     tags:
       - Users
     parameters:
-      - name: user_id
-        description: id of the user
+      - name: username
+        description: User name
         in: path
         required: true
-        type: integer
+        type: string
     responses:
       "200":
         description: Return a dict with results
@@ -27,12 +27,12 @@ async def get_user_byname(request):
           properties:
             username:
               type: string
+            email:
+              type: string
             user_id:
               type: integer
             is_admin:
               type: boolean
-      "400":
-        description: Invalid input where given
     """
     username = request.match_info["username"]
 

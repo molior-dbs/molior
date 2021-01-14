@@ -10,8 +10,9 @@ from ..api.projectversion import do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
 
-from ..model.projectversion import ProjectVersion, get_projectversion, get_projectversion_deps, get_projectversion_byname, \
-                                   get_projectversion_byid
+from ..model.projectversion import (
+    ProjectVersion, get_projectversion, get_projectversion_deps,
+    get_projectversion_byname, get_projectversion_byid)
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
@@ -31,8 +32,6 @@ async def get_projectversion2(request):
     description: Returns information about a project.
     tags:
         - Projects
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
         - name: project_name
           in: path
@@ -44,11 +43,6 @@ async def get_projectversion2(request):
           type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "404":
-            description: no entry found
     """
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -64,46 +58,36 @@ async def get_projectversion2(request):
 @app.authenticated
 async def get_projectversion_dependencies(request):
     """
-    Returns a list of projectversions.
+    Returns a list of project version dependencies.
 
     ---
-    description: Returns a list of projectversions.
+    description: Returns a list of project version dependencies.
     tags:
         - ProjectVersions
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
         - name: basemirror_id
           in: query
           required: false
           type: integer
-        - name: is_basemirror
+        - name: candidates
           in: query
           required: false
           type: bool
-        - name: project_id
-          in: query
-          required: false
-          type: integer
-        - name: project_name
+        - name: q
           in: query
           required: false
           type: string
-        - name: page
-          in: query
-          required: false
-          type: integer
-        - name: page_size
-          in: query
-          required: false
-          type: integer
+          description: Filter query
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     db = request.cirrina.db_session
     candidates = request.GET.getone("candidates", None)
@@ -172,6 +156,40 @@ async def get_projectversion_dependencies(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/dependencies")
 @req_role("owner")
 async def add_projectversion_dependency(request):
+    """
+    Add project version dependencies.
+
+    ---
+    description: Add project version dependencies.
+    tags:
+        - ProjectVersions
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          description: Dependency data
+          required: true
+          schema:
+              type: object
+              properties:
+                  dependency:
+                      required: false
+                      type: string
+                      description: Name of the dependency
+                  use_cibuilds:
+                      required: false
+                      type: bool
+                      description: Use CI builds?
+    produces:
+        - text/json
+    """
     params = await request.json()
     dependency_name = params.get("dependency")
     use_cibuilds = params.get("use_cibuilds")
@@ -236,6 +254,33 @@ async def add_projectversion_dependency(request):
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}/dependency/{dependency_name}/{dependency_version}")
 @req_role("owner")
 async def delete_projectversion_dependency(request):
+    """
+    Delete a project version dependency.
+
+    ---
+    description: Delete a project version dependency.
+    tags:
+        - ProjectVersions
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+        - name: dependecy_name
+          in: path
+          required: true
+          type: string
+        - name: dependecy_version
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
     db = request.cirrina.db_session
     dependency_name = request.match_info["dependency_name"]
     dependency_version = request.match_info["dependency_version"]
@@ -265,6 +310,25 @@ async def delete_projectversion_dependency(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/copy")
 @req_role("owner")
 async def clone_projectversion(request):
+    """
+    Clone a project version.
+
+    ---
+    description: Clone a project version.
+    tags:
+        - ProjectVersions
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
     db = request.cirrina.db_session
     params = await request.json()
     new_version = params.get("name")
@@ -312,6 +376,25 @@ async def clone_projectversion(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
 @req_role("owner")
 async def lock_projectversion(request):
+    """
+    Lock a project version.
+
+    ---
+    description: Clone a project version.
+    tags:
+        - Projects
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -322,6 +405,25 @@ async def lock_projectversion(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/overlay")
 @req_role("owner")
 async def overlay_projectversion(request):
+    """
+    Overlay a project version.
+
+    ---
+    description: Overlay a project version.
+    tags:
+        - Projects
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
     params = await request.json()
 
     name = params.get("name")

@@ -56,7 +56,7 @@ async def gitlab_event(request):
           in: body
           required: false
           type: string
-         - name: project_id
+        - name: project_id
           in: body
           required: false
           type: integer

@@ -235,8 +235,8 @@ async def create_mirror2(request):
     tags:
         - Mirrors
     parameters:
-        - in: body
-          name: body
+        - name: body
+          in: body
           description: Mirror data
           required: true
           schema:
@@ -281,6 +281,7 @@ async def create_mirror2(request):
                       items:
                           type: string
                       description: E.g. i386, amd64, arm64, armhf, ...
+                      example: ["amd64", "armhf"]
                   mirrorsrc:
                       required: false
                       type: boolean
@@ -397,6 +398,87 @@ async def create_mirror2(request):
 @req_admin
 # FIXME: req_role
 async def edit_mirror(request):
+    """
+    Edit a debian mirror.
+
+    ---
+    description: Edit a debian mirror.
+    tags:
+        - Mirrors
+    parameters:
+        - name: name
+          in: path
+          type: string
+          required: true
+          description: Mirror name
+        - name: version
+          in: path
+          type: string
+          required: true
+          description: Mirror version
+        - name: body
+          in: body
+          description: Mirror data
+          required: true
+          schema:
+              type: object
+              properties:
+                  mirrortype:
+                      required: true
+                      type: string
+                      description: Mirror type
+                  basemirror:
+                      required: false
+                      type: string
+                      description: Base mirror name, e.g. project/version
+                  mirrorurl:
+                      required: true
+                      type: string
+                      description: Mirror URL
+                  mirrordist:
+                      required: true
+                      type: string
+                      description: Mirror distribution
+                  mirrorcomponents:
+                      required: true
+                      type: array
+                      description: Components to be mirrored
+                      default: main
+                  architectures:
+                      required: true
+                      type: array
+                      items:
+                          type: string
+                      description: E.g. i386, amd64, arm64, armhf, ...
+                      example: ["amd64", "armhf"]
+                  mirrorsrc:
+                      required: false
+                      type: boolean
+                      description: Is a mirror with sources?
+                  mirrorinst:
+                      required: false
+                      type: boolean
+                      description: Is a mirror with installer?
+                  mirrorkeyserver:
+                      required: false
+                      type: string
+                      description: Host name where the keys are
+                  mirrorkeyurl:
+                      required: false
+                      type: string
+                      description: URL of the mirror key
+                  mirrorkeyids:
+                      required: false
+                      type: array
+                      items:
+                          type: string
+                      description: IDs of the mirror keys
+                  dependencylevel:
+                      required: false
+                      type: string
+                      description: Dependency policy
+                      example: strict
+    """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
     mirror_version = request.match_info["version"]
@@ -474,27 +556,19 @@ async def delete_mirror2(request):
     description: Delete a single mirror on aptly and from database.
     tags:
         - Mirrors
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: id
+        - name: name
           in: path
           required: true
-          type: integer
-          description: id of the mirror
+          type: string
+          description: Mirror name
+        - name: version
+          in: path
+          type: string
+          required: true
+          description: Mirror version
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: removal failed from aptly.
-        "404":
-            description: mirror not found on aptly.
-        "500":
-            description: internal server error.
-        "503":
-            description: removal failed from database.
     """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
