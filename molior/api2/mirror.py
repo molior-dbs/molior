@@ -58,7 +58,8 @@ async def get_mirror2(request):
     mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
     if mirrorkey:
         mirrorkeyurl = mirrorkey.keyurl
-        mirrorkeyids = mirrorkey.keyids[1:-1]
+        if mirrorkey.keyids:
+            mirrorkeyids = mirrorkey.keyids[1:-1]
         mirrorkeyserver = mirrorkey.keyserver
 
     apt_url = mirror.get_apt_repo(url_only=True)

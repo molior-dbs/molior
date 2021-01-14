@@ -258,7 +258,8 @@ async def get_mirrors(request):
         mirrorkey = request.cirrina.db_session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
         if mirrorkey:
             mirrorkeyurl = mirrorkey.keyurl
-            mirrorkeyids = mirrorkey.keyids[1:-1]
+            if mirrorkey.keyids:
+                mirrorkeyids = mirrorkey.keyids[1:-1]
             mirrorkeyserver = mirrorkey.keyserver
         if not mirror.project.is_basemirror and mirror.basemirror:
             base_mirror_id = mirror.basemirror.id
