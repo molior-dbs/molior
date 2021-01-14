@@ -1,7 +1,7 @@
 from sqlalchemy.sql import or_
 
 from ..app import app
-from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int, db2array
+from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int, db2array, escape_for_like
 from ..auth import req_role
 from ..molior.queues import enqueue_aptly
 
@@ -21,8 +21,6 @@ async def get_project_byname(request):
     description: Returns information about a project.
     tags:
         - Projects
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
         - name: project_name
           in: path
@@ -30,11 +28,6 @@ async def get_project_byname(request):
           type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
 
     project_name = request.match_info["project_name"]
@@ -62,9 +55,11 @@ async def get_projectversions2(request):
     description: Returns a list of projectversions.
     tags:
         - ProjectVersions
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
         - name: basemirror_id
           in: query
           required: false
@@ -73,14 +68,6 @@ async def get_projectversions2(request):
           in: query
           required: false
           type: bool
-        - name: project_id
-          in: query
-          required: false
-          type: integer
-        - name: project_name
-          in: query
-          required: false
-          type: string
         - name: page
           in: query
           required: false
@@ -89,13 +76,12 @@ async def get_projectversions2(request):
           in: query
           required: false
           type: integer
+        - name: per_page
+          in: query
+          required: false
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     db = request.cirrina.db_session
     project_id = request.match_info["project_name"]
@@ -132,16 +118,14 @@ async def get_projectversions2(request):
 @req_role("owner")
 async def create_projectversion(request):
     """
-    Create a Projectversion
+    Create a project version
 
     ---
-    description: Create a Projectversion
+    description: Create a project version
     tags:
-        - Projectversion
-    consumes:
-        - application/json
+        - ProjectVersions
     parameters:
-        - name: project
+        - name: project_id
           in: path
           required: true
           type: string
@@ -154,22 +138,25 @@ async def create_projectversion(request):
                 name:
                     type: string
                     example: "1.0.0"
+                description:
+                    type: string
+                    example: "This version does this and that"
                 basemirror:
                     type: string
                     example: "stretch/9.6"
                 architectures:
                     type: array
+                    items:
+                        type: string
                     example: ["amd64", "armhf"]
                     FIXME: only accept existing archs on mirror!
+                dependency_policy:
+                    required: false
+                    type: string
+                    description: Dependency policy
+                    example: strict
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: invalid data received
-        "500":
-            description: internal server error
     """
     params = await request.json()
 
@@ -249,16 +236,18 @@ async def create_projectversion(request):
 @req_role("owner")
 async def edit_projectversion(request):
     """
-    Modify a Projectversion
+    Modify a project version
 
     ---
-    description: Modify a Projectversion
+    description: Modify a project version
     tags:
-        - Projectversion
-    consumes:
-        - application/json
+        - ProjectVersions
     parameters:
-        - name: project
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
           in: path
           required: true
           type: string
@@ -268,18 +257,16 @@ async def edit_projectversion(request):
           schema:
             type: object
             properties:
-                name:
+                description:
                     type: string
-                    example: "1.0.0"
+                    example: "This version does this and that"
+                dependency_policy:
+                    required: false
+                    type: string
+                    description: Dependency policy
+                    example: strict
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: invalid data received
-        "500":
-            description: internal server error
     """
     params = await request.json()
     description = params.get("description")
@@ -318,8 +305,6 @@ async def delete_project2(request):
     description: Deletes a project with the given id.
     tags:
         - Projects
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
         - name: project_id
           in: path
@@ -327,11 +312,6 @@ async def delete_project2(request):
           type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: project name could not be found
     """
     db = request.cirrina.db_session
     project_name = request.match_info["project_id"]
@@ -356,6 +336,47 @@ async def delete_project2(request):
 @app.http_get("/api2/projectbase/{project_name}/permissions")
 @app.authenticated
 async def get_project_users2(request):
+    """
+    Get project user permissions.
+
+    ---
+    description: Get project user permissions.
+    tags:
+        - Projects
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: candidates
+          in: query
+          required: false
+          type: bool
+        - name: q
+          in: query
+          required: false
+          type: string
+          description: Filter query
+        - name: role
+          in: query
+          required: false
+          type: string
+          description: Filter role
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: page_size
+          in: query
+          required: false
+          type: integer
+        - name: per_page
+          in: query
+          required: false
+          type: integer
+    produces:
+        - text/json
+    """
     project_name = request.match_info["project_name"]
     candidates = request.GET.getone("candidates", None)
     if candidates:
@@ -375,7 +396,8 @@ async def get_project_users2(request):
         query = query.filter(User.username != "admin")
         query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
         if filter_name:
-            query = query.filter(User.username.ilike("%{}%".format(filter_name)))
+            escaped_filter_name = escape_for_like(filter_name)
+            query = query.filter(User.username.ilike(f"%{escaped_filter_name}%"))
         query = query.order_by(User.username)
         query = paginate(request, query)
         users = query.all()
@@ -415,6 +437,37 @@ async def get_project_users2(request):
 @app.http_post("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def add_project_users2(request):
+    """
+    Add permission for project
+
+    ---
+    description: Add permission for project
+    tags:
+        - Projects
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                username:
+                    type: string
+                    required: true
+                    description: Username
+                    example: "username"
+                role:
+                    type: string
+                    required: true
+                    description: User role, e.g. member, manager, owner, ...
+                    example: "member"
+    produces:
+        - text/json
+    """
     project_name = request.match_info["project_name"]
     params = await request.json()
     username = params.get("username")
@@ -454,6 +507,35 @@ async def add_project_users2(request):
 @app.http_put("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def edit_project_users2(request):
+    """
+    Edit project user permissions.
+
+    ---
+    description: Edit project user permissions.
+    tags:
+        - Projects
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                username:
+                    type: string
+                    required: true
+                    description: Username
+                    example: "username"
+                role:
+                    type: string
+                    required: true
+                    description: User role, e.g. member, manager, owner, ...
+                    example: "member"
+    """
     project_name = request.match_info["project_name"]
     params = await request.json()
     username = params.get("username")
@@ -489,6 +571,30 @@ async def edit_project_users2(request):
 @app.http_delete("/api2/projectbase/{project_name}/permissions")
 @req_role("owner")
 async def delete_project_users2(request):
+    """
+    Delete permissions for project
+
+    ---
+    description: Delete permissions for project
+    tags:
+        - Projects
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                username:
+                    type: string
+                    required: true
+                    description: Username
+                    example: "username"
+    """
     project_name = request.match_info["project_name"]
     params = await request.json()
     username = params.get("username")
