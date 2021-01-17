@@ -1,3 +1,9 @@
+molior (1.4.0~alpha240) stretch; urgency=medium
+
+  * mirror: fix mirror keyids
+
+ -- André Roth <neolynx@gmail.com>  Sun, 17 Jan 2021 22:25:21 +0000
+
 molior (1.4.0~alpha239) stretch; urgency=medium
 
   * cleanup
