@@ -6,7 +6,7 @@ from shutil import rmtree
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
-from ..api.projectversion import do_clone, do_lock, do_overlay
+from ..api.projectversion import do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
 
@@ -262,17 +262,51 @@ async def delete_projectversion_dependency(request):
     return OKResponse("Dependency deleted")
 
 
-@app.http_post("/api2/project/{project_id}/{projectversion_id}/clone")
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/copy")
 @req_role("owner")
 async def clone_projectversion(request):
+    db = request.cirrina.db_session
     params = await request.json()
+    new_version = params.get("name")
+    description = params.get("description")
+    dependency_policy = params.get("dependency_policy")
+    basemirror = params.get("basemirror")
+    architectures = params.get("architectures", [])
+    cibuilds = params.get("cibuilds", False)
 
-    name = params.get("name")
+    if not new_version:
+        return ErrorResponse(400, "No valid name for the projectversion received")
+    if not is_name_valid(new_version):
+        return ErrorResponse(400, "Invalid project name!")
+
     projectversion = get_projectversion(request)
     if not projectversion:
-        return ErrorResponse(400, "Projectversion not found")
+        return ErrorResponse(404, "Projectversion not found")
 
-    return await do_clone(request, projectversion.id, name)
+    if db.query(ProjectVersion).join(Project).filter(
+                ProjectVersion.name == new_version,
+                Project.id == projectversion.project_id).first():
+        return ErrorResponse(400, "Projectversion already exists.")
+
+    basemirror_name, basemirror_version = basemirror.split("/")
+    basemirror = db.query(ProjectVersion).join(Project).filter(Project.name == basemirror_name,
+                                                               ProjectVersion.name == basemirror_version).first()
+    if not basemirror:
+        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+
+    projectversion.copy(db, new_version, description, dependency_policy, basemirror.id, architectures, cibuilds)
+    await enqueue_aptly(
+        {
+            "init_repository": [
+                basemirror.project.name,
+                basemirror.name,
+                projectversion.project.name,
+                new_version,
+                architectures,
+            ]
+        }
+    )
+    return OKResponse()
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")

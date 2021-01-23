@@ -4,11 +4,12 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..app import logger
 from ..molior.configuration import Configuration
-from ..tools import db2array
+from ..tools import db2array, array2db
 
 from .database import Base
 from .project import Project
 from .projectversiondependency import ProjectVersionDependency
+from .sourepprover import SouRepProVer
 # reeded for relations:
 from . import sourcerepository    # noqa: F401
 from . import mirrorkey    # noqa: F401
@@ -171,6 +172,40 @@ class ProjectVersion(Base):
             data.update({"basemirror": self.basemirror.fullname})
 
         return data
+
+    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds):
+        new_projectversion = ProjectVersion(
+            name=version,
+            project=self.project,
+            description=description,
+            dependency_policy=dependency_policy,
+            mirror_architectures=array2db(architectures),
+            basemirror_id=basemirror_id,
+            sourcerepositories=self.sourcerepositories,
+            ci_builds_enabled=cibuilds,
+        )
+
+        for dependency in self.dependencies:
+            if basemirror_id != self.basemirror_id:
+                logger.error("base %d =? %d" % (new_projectversion.basemirror.project_id, self.basemirror.project_id))
+                if new_projectversion.basemirror.project_id != self.basemirror.project_id:
+                    if dependency.dependency_policy != "any":
+                        continue
+                if dependency.dependency_policy not in ["distribution", "any"]:
+                    continue
+            new_projectversion.dependencies.append(dependency)
+
+        for repo in new_projectversion.sourcerepositories:
+            sourepprover = db.query(SouRepProVer).filter(
+                    SouRepProVer.sourcerepository_id == repo.id,
+                    SouRepProVer.projectversion_id == self.id).first()
+            new_sourepprover = db.query(SouRepProVer).filter(
+                    SouRepProVer.sourcerepository_id == repo.id,
+                    SouRepProVer.projectversion_id == new_projectversion.id).first()
+            new_sourepprover.architectures = sourepprover.architectures
+
+        db.add(new_projectversion)
+        db.commit()
 
 
 def get_projectversion_deps(projectversion_id, session):
