@@ -1,7 +1,7 @@
 #!/bin/sh
-set -e
+set -x
 
-sleep 60
+sleep 30
 
 create-molior-keys "Molior Debsign" debsign@molior.info
 create-aptly-keys "Molior Reposign" reposign@molior.info
