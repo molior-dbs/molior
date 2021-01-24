@@ -83,8 +83,7 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy10.molior4),
   molior-tools,
 # development tools:
-  npm, python3-all, dh-python, debhelper, dh-exec, python3-sphinx,
-  python3-sphinx-rtd-theme, python3-sphinxcontrib.plantuml
+  dh-python, debhelper, dh-exec,
 Description: molior development virtual machine
  Development environment for molior
 
