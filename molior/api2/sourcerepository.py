@@ -27,18 +27,14 @@ async def get_repository(request):
     description: Returns a repository.
     tags:
         - SourceRepositories
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
         - name: repository_id
-          in: query
+          in: path
           required: true
           type: integer
+          description: id of the repository to get
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
     """
     repository_id = request.match_info["repository_id"]
 
@@ -60,31 +56,28 @@ async def get_repository(request):
 @app.authenticated
 async def get_sourcerepository_dependents(request):
     """
-    Returns a list of projectversions.
+    Returns a list of repository dependents.
 
     ---
-    description: Returns a list of projectversions.
+    description: Returns a list of repository dependents.
     tags:
-        - ProjectVersions
-    consumes:
-        - application/x-www-form-urlencoded
+        - SourceRepositories
     parameters:
-        - name: basemirror_id
-          in: query
-          required: false
+        - name: repository_id
+          in: path
+          required: true
           type: integer
-        - name: is_basemirror
-          in: query
-          required: false
-          type: bool
-        - name: project_id
-          in: query
-          required: false
-          type: integer
-        - name: project_name
+          description: id of the repository to get
+        - name: q
           in: query
           required: false
           type: string
+          description: String to filter project name
+        - name: unlocked
+          in: query
+          required: false
+          type: boolean
+          description: is this repository unlocked?
         - name: page
           in: query
           required: false
@@ -93,13 +86,12 @@ async def get_sourcerepository_dependents(request):
           in: query
           required: false
           type: integer
+        - name: per_page
+          in: query
+          required: false
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     repository_id = request.match_info["repository_id"]
     filter_name = request.GET.getone("q", "")
@@ -133,25 +125,24 @@ async def get_repositories2(request):
     Returns source repositories with the given filters applied.
 
     ---
-    description: Returns a repository.
+    description: Returns source repositories with the given filters applied.
     tags:
         - SourceRepositories
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: url
+        - name: filter_url
           in: query
           required: false
           type: string
-        - name: filter_name
+        - name: q
           in: query
           required: false
           type: string
+        - name: exclude_projectversion_id
+          in: query
+          required: false
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
     """
     db = request.cirrina.db_session
     url = request.GET.getone("filter_url", "")
@@ -198,31 +189,25 @@ async def get_repositories2(request):
 # @app.authenticated
 async def get_projectversion_repositories(request):
     """
-    Returns source repositories with the given filters applied.
+    Returns source repositories for given project version with the given filters applied.
 
     ---
-    description: Returns a repository.
+    description: Returns source repositories for given project version with the given filters applied.
     tags:
         - SourceRepositories
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: name
-          in: query
-          required: false
-          type: string
-        - name: url
-          in: query
-          required: false
-          type: string
-        - name: distinct
-          in: query
-          required: false
-          type: array
-        - name: project_version_id
-          in: query
-          required: false
+        - name: project_id
+          in: path
+          required: true
           type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: filter_url
+          in: query
+          required: false
+          type: string
         - name: page
           in: query
           required: false
@@ -231,17 +216,12 @@ async def get_projectversion_repositories(request):
           in: query
           required: false
           type: integer
-        - name: count_only
+        - name: per_page
           in: query
           required: false
-          type: boolean
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     db = request.cirrina.db_session
     filter_url = request.GET.getone("filter_url", "")
@@ -297,9 +277,7 @@ async def add_repository(request):
     ---
     description: Adds given sourcerepositories to given projectversion.
     tags:
-        - ProjectVersions
-    consumes:
-        - application/json
+        - SourceRepositories
     parameters:
         - name: projectversion_id
           in: path
@@ -315,9 +293,20 @@ async def add_repository(request):
           schema:
             type: object
             properties:
+                url:
+                    type: string
                 buildvariants:
                     type: array
                     example: [1, 2]
+                architectures:
+                    required: true
+                    type: array
+                    items:
+                        type: string
+                    description: E.g. i386, amd64, arm64, armhf, ...
+                    example: ["amd64", "armhf"]
+                startbuild:
+                    type: boolean
     produces:
         - text/json
     responses:
@@ -428,6 +417,30 @@ async def add_repository(request):
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
 async def get_projectversion_repository(request):
+    """
+    Returns source repository for a given project version.
+
+    ---
+    description: Returns source repository for a given project version.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+          description: id of the repository to get
+    produces:
+        - text/json
+    """
     db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
     projectversion = get_projectversion(request)
@@ -453,6 +466,43 @@ async def get_projectversion_repository(request):
 @app.http_put("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
 async def edit_repository(request):
+    """
+    Edit the source repositories of a given project version.
+
+    ---
+    description: Returns a repository.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+          description: id of the repository to get
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                architectures:
+                    required: true
+                    type: array
+                    items:
+                        type: string
+                    description: E.g. i386, amd64, arm64, armhf, ...
+                    example: ["amd64", "armhf"]
+    produces:
+        - text/json
+    """
     params = await request.json()
     sourcerepository_id = request.match_info["sourcerepository_id"]
     architectures = params.get("architectures", [])
@@ -483,6 +533,30 @@ async def edit_repository(request):
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}/hooks")
 @req_role(["member", "owner"])
 async def get_repository_hooks(request):
+    """
+    Returns hooks of the source repository of a given project version.
+
+    ---
+    description: Returns hooks of the source repository of a given project version.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+          description: id of the repository to get
+    produces:
+        - text/json
+    """
     db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
     projectversion = get_projectversion(request)
@@ -531,9 +605,7 @@ async def add_repository_hook(request):
     ---
     description: Adds given sourcerepositories to given projectversion.
     tags:
-        - ProjectVersions
-    consumes:
-        - application/json
+        - SourceRepositories
     parameters:
         - name: projectversion_id
           in: path
@@ -543,22 +615,30 @@ async def add_repository_hook(request):
           in: path
           required: true
           type: integer
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+          description: id of the repository to get
         - name: body
           in: body
           required: true
           schema:
             type: object
             properties:
-                buildvariants:
-                    type: array
-                    example: [1, 2]
+                url:
+                    type: string
+                skip_ssl:
+                    type: boolean
+                body:
+                    type: string
+                hooktype:
+                    type: string
+                method:
+                    type: string
+                    example: "post" or "get"
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid data received.
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     params = await request.json()
@@ -612,10 +692,12 @@ async def edit_repository_hook(request):
     ---
     description: Edits postbuild hook.
     tags:
-        - ProjectVersions
-    consumes:
-        - application/json
+        - SourceRepositories
     parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
         - name: projectversion_id
           in: path
           required: true
@@ -624,7 +706,7 @@ async def edit_repository_hook(request):
           in: path
           required: true
           type: integer
-        - name: id
+        - name: hook_id
           in: path
           required: true
           type: integer
@@ -634,16 +716,19 @@ async def edit_repository_hook(request):
           schema:
             type: object
             properties:
-                buildvariants:
-                    type: array
-                    example: [1, 2]
+                url:
+                    type: string
+                skip_ssl:
+                    type: boolean
+                body:
+                    type: string
+                hooktype:
+                    type: string
+                method:
+                    type: string
+                    example: "post" or "get"
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid data received.
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     hook_id = request.match_info["hook_id"]
@@ -700,16 +785,17 @@ async def edit_repository_hook(request):
 @req_role(["member", "owner"])
 async def delete_repository_hook(request):
     """
-    Adds given sourcerepositories to the given
-    projectversion.
+    Deletes given hook from sourcerepository.
 
     ---
-    description: Adds given sourcerepositories to given projectversion.
+    description: Deletes given hook from sourcerepository.
     tags:
-        - ProjectVersions
-    consumes:
-        - application/json
+        - SourceRepositories
     parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
         - name: projectversion_id
           in: path
           required: true
@@ -718,22 +804,12 @@ async def delete_repository_hook(request):
           in: path
           required: true
           type: integer
-        - name: body
-          in: body
+        - name: hook_id
+          in: path
           required: true
-          schema:
-            type: object
-            properties:
-                buildvariants:
-                    type: array
-                    example: [1, 2]
+          type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid data received.
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     hook_id = request.match_info["hook_id"]
@@ -763,6 +839,28 @@ async def delete_repository_hook(request):
 @app.http_put("/api2/repository/{repository_id}/merge")
 @req_admin
 async def merge_repository(request):
+    """
+    Merges repository.
+
+    ---
+    description: Merges repository.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                duplicate:
+                    type: integer
+                    description: duplicate repository id
+    """
     repository_id = request.match_info["repository_id"]
     try:
         repository_id = int(repository_id)
@@ -789,6 +887,19 @@ async def merge_repository(request):
 @app.http_delete("/api2/repository/{repository_id}")
 @req_admin
 async def delete_repository(request):
+    """
+    Deletes repository.
+
+    ---
+    description: Deletes repository.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+    """
     repository_id = request.match_info["repository_id"]
     try:
         repository_id = int(repository_id)
@@ -815,6 +926,27 @@ async def delete_repository(request):
 @app.http_put("/api2/repository/{repository_id}")
 @req_admin
 async def edit_repository2(request):
+    """
+    Edits repository.
+
+    ---
+    description: Edits repository.
+    tags:
+        - SourceRepositories
+    parameters:
+        - name: repository_id
+          in: path
+          required: true
+          type: integer
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                url:
+                    type: string
+    """
     repository_id = request.match_info["repository_id"]
     try:
         repository_id = int(repository_id)

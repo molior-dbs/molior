@@ -7,6 +7,22 @@ from ..tools import OKResponse, ErrorResponse
 @app.http_delete("/api2/build/{build_id}")
 @app.authenticated
 async def delete_build(request):
+    """
+    Delete build from the database.
+
+    ---
+    description: Delete build from database.
+    tags:
+        - Builds
+    parameters:
+        - name: build_id
+          description: id of the build to delete
+          in: path
+          required: true
+          type: integer
+    produces:
+        - text/json
+    """
     build_id = request.match_info["build_id"]
     try:
         build_id = int(build_id)

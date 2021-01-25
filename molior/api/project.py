@@ -138,26 +138,20 @@ async def create_project(request):
     description: Creates a new project.
     tags:
         - Projects
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: name
-          in: query
+        - in: body
+          name: body
+          description: Created user object
           required: true
-          type: string
-        - name: description
-          in: query
-          required: false
-          type: string
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: invalid data received
-        "500":
-            description: internal server error
     """
     db = request.cirrina.db_session
     params = await request.json()

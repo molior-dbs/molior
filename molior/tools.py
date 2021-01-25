@@ -305,3 +305,9 @@ def db2array(val):
     if not val:
         return []
     return val[1:-1].split(",")
+
+
+def escape_for_like(query: str) -> str:
+    """Escape query string for use in (I)LIKE database queries."""
+    # Escape characters that have a special meaning in "like" queries
+    return query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')

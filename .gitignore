@@ -45,7 +45,7 @@ doc/validation/report.pdf
 
 # Editor
 .vscode
-
+/.dir-locals.el
 
 **_minted-input
 *_minted-report

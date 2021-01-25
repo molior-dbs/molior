@@ -24,9 +24,11 @@ async def get_builds(request):
     description: Returns a list of builds.
     tags:
         - Builds
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
+        - name: search
+          in: query
+          required: false
+          type: string
         - name: page
           in: query
           required: false
@@ -105,11 +107,6 @@ async def get_builds(request):
           type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
     """
     search = request.GET.getone("search", None)
     search_project = request.GET.getone("search_project", None)
