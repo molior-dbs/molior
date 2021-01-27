@@ -15,6 +15,7 @@ Molior performs the following tasks:
 # Table of content
 <!-- vim-markdown-toc GFM -->
 
+* [Screenshots](#screenshots)
 * [Installation](#installation)
 * [Components](#components)
 * [Usage](#usage)
@@ -44,6 +45,29 @@ Molior performs the following tasks:
 * [Authors](#authors)
 
 <!-- vim-markdown-toc -->
+
+# Screenshots
+
+<div>
+  <h3>Build List</h3>
+  <img src="userdoc/img/builds.png" />
+  <h3>Build Log</h3>
+  <img src="userdoc/img/buildlog.png"/>
+  <h3>Build Context Menu</h3>
+  <img src="userdoc/img/builds-failed.png"/>
+  <h3>Build Errors</h3>
+  <img src="userdoc/img/build-failed.png"/>
+  <h3>Molior Project List</h3>
+  <img src="userdoc/img/projects.png"/>
+  <h3>Molior Project / Context Menu</h3>
+  <img src="userdoc/img/project.png"/>
+  <h3>Git Repositories</h3>
+  <img src="userdoc/img/repos.png"/>
+  <h3>APT Repository Mirrors</h3>
+  <img src="userdoc/img/mirrors.png"/>
+  <h3>Build Nodes</h3>
+  <img src="userdoc/img/nodes.png"/>
+</div>
 
 # Installation
 
