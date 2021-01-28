@@ -27,7 +27,7 @@ Molior performs the following tasks:
     * [Add a source repo](#add-a-source-repo)
     * [Create a non-base mirror (optional)](#create-a-non-base-mirror-optional)
     * [Integration](#integration)
-        * [Tigger builds from gitlab](#tigger-builds-from-gitlab)
+        * [Trigger builds from gitlab](#trigger-builds-from-gitlab)
         * [Build notification hooks](#build-notification-hooks)
 * [Contributing](#contributing)
     * [Clone the source repositories](#clone-the-source-repositories)
@@ -199,7 +199,7 @@ Key URL: https://download.docker.com/linux/debian/gpg
 
 ## Integration
 
-### Tigger builds from gitlab
+### Trigger builds from gitlab
 
 In GitLab:
 - Go to Settings/Integrations (or Administration/System-Hooks)
