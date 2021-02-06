@@ -89,3 +89,34 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         await enqueue_task(args)
 
         return True
+
+
+async def DeleteBuildEnv(dist, name, version, arch):
+    """
+    Delete sbuild chroot and other build environments.
+
+    Args:
+        dist (str): The distrelease
+        version (str): The version
+        arch (str): The architecture
+
+    Returns:
+        bool: True on success
+    """
+
+    logger.info("deleting build environments for %s-%s-%s", dist, version, arch)
+
+    async def outh(line):
+        pass
+
+    process = Launchy(["sudo", "run-parts", "-a", "remove", "-a", dist, "-a", name,
+                       "-a", version, "-a", arch,
+                       "/etc/molior/mirror-hooks.d"], outh, outh)
+    await process.launch()
+    ret = await process.wait()
+
+    if not ret == 0:
+        logger.error("error deleting build env")
+        return False
+
+    return True

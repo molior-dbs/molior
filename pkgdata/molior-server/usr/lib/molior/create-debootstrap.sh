@@ -11,6 +11,8 @@ if [ "$1" == "build" -a "$#" -lt 7 ]; then
   usage
 elif [ "$1" != "publish" -a "$#" -lt 4 ]; then
   usage
+elif [ "$1" != "remove" -a "$#" -lt 4 ]; then
+  usage
 fi
 
 ACTION=$1

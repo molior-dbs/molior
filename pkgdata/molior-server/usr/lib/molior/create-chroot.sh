@@ -11,6 +11,8 @@ if [ "$1" == "build" -a "$#" -lt 7 ]; then
   usage
 elif [ "$1" != "publish" -a "$#" -lt 4 ]; then
   usage
+elif [ "$1" != "remove" -a "$#" -lt 4 ]; then
+  usage
 fi
 
 ACTION=$1
@@ -22,6 +24,7 @@ COMPONENTS=$6 # separated by comma
 REPO_URL=$7
 KEYS="$8"  # separated by space
 
+CHROOT_D=/var/lib/schroot/chroots/chroot.d
 CHROOT_NAME="${DIST_NAME}-$DIST_VERSION-${ARCH}"
 target="/var/lib/schroot/chroots/${CHROOT_NAME}"
 
@@ -127,7 +130,6 @@ EOM
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
   echo I: Creating schroot config
-  CHROOT_D=/var/lib/schroot/chroots/chroot.d
   mkdir -p $CHROOT_D
   cat > $CHROOT_D/sbuild-$CHROOT_NAME <<EOM
 [$CHROOT_NAME]
@@ -167,6 +169,7 @@ case "$ACTION" in
     publish_chroot
     ;;
   remove)
+    rm -f $CHROOT_D/sbuild-$CHROOT_NAME
     rm -rf $target $target.tar.xz
     ;;
   *)

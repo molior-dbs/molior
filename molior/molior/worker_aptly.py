@@ -1,14 +1,14 @@
 import asyncio
 import operator
 
-from os import remove, mkdir
+from os import mkdir
 from shutil import rmtree
 from sqlalchemy import func, or_
 from shutil import copy2
 
 from ..app import logger
 from ..tools import db2array, array2db
-from ..ops import DebSrcPublish, DebPublish
+from ..ops import DebSrcPublish, DebPublish, DeleteBuildEnv
 from ..aptly import get_aptly_connection
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
@@ -1040,22 +1040,6 @@ class AptlyWorker:
             mirror_distribution = mirror.mirror_distribution
             mirror_components = mirror.mirror_components.split(",")
 
-        # FIXME: cleanup chroot table, debootstrap,
-
-        # remove schroots if needed
-        if is_basemirror:
-            archs = db2array(mirror_architectures)
-            for arch in archs:
-                m = mirror_name + "-" + mirror_version + "-" + arch
-                try:
-                    remove("/var/lib/schroot/chroots/%s.tar.xz" % m)
-                except Exception as exc:
-                    logger.exception(exc)
-                try:
-                    remove("/var/lib/schroot/chroots/chroot.d/sbuild-%s" % m)
-                except Exception as exc:
-                    logger.exception(exc)
-
         try:
             # FIXME: use altpy queue !
             await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_name,
@@ -1064,6 +1048,13 @@ class AptlyWorker:
             # mirror did not exist
             # FIXME: handle mirror has snapshots and cannot be deleted?
             logger.exception(exc)
+
+        archs = db2array(mirror_architectures)
+        for arch in archs:
+            try:
+                await DeleteBuildEnv(mirror_distribution, mirror_name, mirror_version, arch)
+            except Exception as exc:
+                logger.exception(exc)
 
         with Session() as session:
             mirror = session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == mirror_id,
@@ -1075,16 +1066,15 @@ class AptlyWorker:
             # remember for later
             project = mirror.project
 
-            if mirror.project.is_basemirror:
+            if is_basemirror:
                 chroots = session.query(Chroot).filter(Chroot.basemirror_id == mirror.id).all()
                 for chroot in chroots:
                     session.delete(chroot)
-                    # FIXME: delete files
 
             # FIXME: should this be Build.basemirror_id ?
             builds = session.query(Build) .filter(Build.projectversion_id == mirror.id).all()
             for build in builds:
-                # FIXME: remove buildout dir / debootstrap
+                # FIXME: remove buildout dir
                 session.delete(build)
 
             mirrorkey = session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
