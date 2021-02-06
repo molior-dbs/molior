@@ -28,8 +28,8 @@ async def watchdog(ws_client):
 
             # was pong recieved ?
             if hasattr(ws_client, "molior_pong_pending") and ws_client.molior_pong_pending == 1:
-                logger.warn("backend: ping timeout after %ds on %s/%s",
-                            PING_TIMEOUT, ws_client.molior_node_arch, ws_client.molior_node_name)
+                logger.warning("backend: ping timeout after %ds on %s/%s",
+                               PING_TIMEOUT, ws_client.molior_node_arch, ws_client.molior_node_name)
                 await deregister_node(ws_client)
                 # await ws_client.close()
                 break
@@ -149,7 +149,7 @@ async def deregister_node(ws_client):
 
     if ws_client in registry[arch]:
         registry[arch].remove(ws_client)
-        logger.warn("backend: node disconnected: %s/%s", arch, node)
+        logger.warning("backend: node disconnected: %s/%s", arch, node)
 
     elif ws_client in running_nodes[arch]:
         running_nodes[arch].remove(ws_client)
@@ -158,7 +158,7 @@ async def deregister_node(ws_client):
         await enqueue_backend({"failed": build_id})
 
     else:
-        logger.warn("backend: unknown node disconnect: %s/%s", arch, node)
+        logger.warning("backend: unknown node disconnect: %s/%s", arch, node)
 
 
 class HTTPBackend:

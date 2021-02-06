@@ -289,13 +289,13 @@ class AptlyApi:
                         data = json.loads(await resp.text())
                         await self.wait_task(data["ID"])
         except Exception:
-            logger.warn("Error deleting mirror publish  {}/{}".format(publish_name, mirror_distribution))
+            logger.warning("Error deleting mirror publish  {}/{}".format(publish_name, mirror_distribution))
 
         # remove snapshots (may fail)
         try:
             await self.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror, version, components)
         except Exception:
-            logger.warn("Error deleting mirror snapshot {}/{}".format(publish_name, mirror_distribution))
+            logger.warning("Error deleting mirror snapshot {}/{}".format(publish_name, mirror_distribution))
 
         # remove mirrors
         for component in components:
@@ -306,7 +306,7 @@ class AptlyApi:
                             data = json.loads(await resp.text())
                             await self.wait_task(data["ID"])
             except Exception:
-                logger.warn("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
+                logger.warning("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
 
         return True
 
@@ -385,7 +385,7 @@ class AptlyApi:
                             progress = json.loads(await resp.text())
                     break
                 except Exception:
-                    logger.warn("Error fetching mirror progress, retrying in 30s")
+                    logger.warning("Error fetching mirror progress, retrying in 30s")
                     await asyncio.sleep(30)
                     continue
 
