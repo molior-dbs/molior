@@ -398,6 +398,8 @@ async def lock_projectversion(request):
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
+    if projectversion.basemirror.external_repo:
+        return ErrorResponse(400, "Projectversion is based on external mirror")
 
     return do_lock(request, projectversion.id)
 
@@ -443,6 +445,8 @@ async def snapshot_projectversion(request):
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
+    if projectversion.basemirror.external_repo:
+        return ErrorResponse(400, "Projectversion is based on external mirror")
 
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
@@ -455,7 +459,10 @@ async def snapshot_projectversion(request):
             Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion '%s' already exists" % name)
 
-    # FIXME: check dependencies are locked
+    # check dependencies are locked
+    for dep in projectversion.dependencies:
+        if not dep.is_locked:
+            return ErrorResponse(400, "Dependency '%s/%s' is not locked" % (dep.project.name, dep.name))
 
     # find latest builds
     latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
