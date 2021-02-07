@@ -262,7 +262,10 @@ def get_projectversion(request, db=None):
         version = request.match_info["project_version"]
     elif "projectversion_id" in request.match_info:
         version = request.match_info["projectversion_id"]
-    pv = db.query(ProjectVersion).join(Project).filter(Project.name == name, ProjectVersion.name == version).first()
+    pv = db.query(ProjectVersion).join(Project).filter(
+            Project.name == name,
+            ProjectVersion.name == version,
+            Project.is_mirror.is_(False)).first()
     if not pv:
         logger.warning("projectversion not found: %s/%s" % (name, version))
     return pv
