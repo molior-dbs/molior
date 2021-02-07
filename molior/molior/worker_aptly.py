@@ -138,14 +138,7 @@ async def startup_mirror():
 
             m_task = max(m_tasks, key=operator.itemgetter("ID"))
 
-            build = (
-                session.query(Build)
-                .filter(
-                    Build.buildtype == "mirror",
-                    Build.projectversion_id == mirror.id,
-                )
-                .first()
-            )
+            build = session.query(Build).filter(Build.buildtype == "mirror", Build.projectversion_id == mirror.id).first()
             if not build:
                 logger.info("no build found for mirror")
                 mirror.mirror_state = "error"
@@ -961,6 +954,7 @@ class AptlyWorker:
                     startstamp=build.startstamp,
                     buildendstamp=build.buildendstamp,
                     endstamp=build.endstamp,
+                    snapshotbuild_id=build.id
                 )
                 if copy.buildtype == "deb":
                     copy.projectversion_id = new_projectversion_id

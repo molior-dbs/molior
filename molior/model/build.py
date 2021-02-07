@@ -62,6 +62,7 @@ class Build(Base):
     architecture = Column(String)
     debianpackages = relationship(Debianpackage, secondary=BuildDebianpackage)
     is_deleted = Column(Boolean, default=False)
+    snapshotbuild_id = Column(Integer)
 
     async def log(self, msg):
         await buildlog(self.id, msg)

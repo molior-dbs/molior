@@ -18,7 +18,7 @@ from ..molior.queues import enqueue_task
 @app.http_get("/api/builds")
 async def get_builds(request):
     """
-    Gets builds from the database.
+    Returns a list of builds.
 
     ---
     description: Returns a list of builds.
@@ -159,7 +159,8 @@ async def get_builds(request):
     except (ValueError, KeyError):
         sourcerepository_id = None
 
-    builds = request.cirrina.db_session.query(Build).outerjoin(Build.maintainer)
+    db = request.cirrina.db_session
+    builds = db.query(Build).outerjoin(Build.maintainer)
 
     if sourcerepository_id:
         builds = builds.filter(Build.sourcerepository_id == sourcerepository_id)
@@ -217,13 +218,23 @@ async def get_builds(request):
                 Project.name.ilike("%{}%".format(term)),
                 ))
 
+    projectversion = None
     if project:
         if "/" not in project:
             return ErrorResponse(400, "Project not found")
-        projectname, projectversion = project.split("/", 1)
-        builds = builds.join(ProjectVersion).join(Project).filter(Project.is_mirror.is_(False), or_(
-                                ProjectVersion.name == projectversion),
-                                Project.name == projectname)
+        project_name, project_version = project.split("/", 1)
+        projectversion = db.query(ProjectVersion).join(Project).filter(
+                                  Project.is_mirror.is_(False),
+                                  Project.name == project_name,
+                                  ProjectVersion.name == project_version,
+                                  ).first()
+
+    if projectversion:
+        builds = builds.join(ProjectVersion).filter(ProjectVersion.id == projectversion.id)
+
+    # do not shot snapshot builds, except for snapshot projects
+    if not projectversion or projectversion.projectversiontype != "snapshot":
+        builds = builds.filter(Build.snapshotbuild_id.is_(None))
 
     # FIXME:
     if version:
