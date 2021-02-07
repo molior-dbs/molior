@@ -641,15 +641,14 @@ async def delete_projectversion(request):
     return OKResponse("Deleted Project Version")
 
 
-@app.http_delete("/api2/project/{project_id}/{projectversion_id}/repositories/{sourcerepository_id}")
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
 @req_role(["member", "owner"])
-async def delete_repository2(request):
+async def remove_repository2(request):
     """
-    Adds given sourcerepositories to the given
-    projectversion.
+    Remove a sourcerepositories from a projectversion.
 
     ---
-    description: Adds given sourcerepositories to given projectversion.
+    description: Remove a sourcerepositories from a projectversion.
     tags:
         - ProjectVersions
     consumes:
@@ -665,11 +664,6 @@ async def delete_repository2(request):
           type: integer
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid data received.
     """
     db = request.cirrina.db_session
     projectversion = get_projectversion(request)
