@@ -78,7 +78,7 @@ class ProjectVersion(Base):
             cls.name,
         )
 
-    def get_apt_repo(self, url_only=False, dist="stable"):
+    def get_apt_repo(self, url_only=False, dist="stable", internal=False):
         """
         Returns the apt sources url string of the projectversion.
         """
@@ -89,10 +89,14 @@ class ProjectVersion(Base):
             return url if url_only else full
 
         cfg = Configuration()
-        base_url = cfg.aptly.get("apt_url")
+        apt_url = None
+        if not internal:
+            apt_url = cfg.aptly.get("apt_url_public")
+        if not apt_url:
+            apt_url = cfg.aptly.get("apt_url")
 
         if self.project.is_basemirror:
-            url = "{0}/{1}/{2}".format(base_url, self.project.name, self.name)
+            url = "{0}/{1}/{2}".format(apt_url, self.project.name, self.name)
             # Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
@@ -110,7 +114,7 @@ class ProjectVersion(Base):
         base_mirror = "{}/{}".format(self.basemirror.project.name, self.basemirror.name)
 
         if self.project.is_mirror:
-            url = "{0}/{1}/mirrors/{2}/{3}".format(base_url, base_mirror, self.project.name, self.name)
+            url = "{0}/{1}/mirrors/{2}/{3}".format(apt_url, base_mirror, self.project.name, self.name)
             # Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
@@ -121,7 +125,7 @@ class ProjectVersion(Base):
             full = "deb {0} {1} {2}".format(url, dist, comp)
             return url if url_only else full
 
-        url = "{0}/{1}/repos/{2}/{3}".format(base_url, base_mirror, self.project.name, self.name)
+        url = "{0}/{1}/repos/{2}/{3}".format(apt_url, base_mirror, self.project.name, self.name)
         full = "deb {0} {1} {2}".format(url, dist, "main")
         return url if url_only else full
 
