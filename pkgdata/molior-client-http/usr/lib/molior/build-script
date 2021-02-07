@@ -114,7 +114,7 @@ log "Builder : `hostname`"
 echo
 
 log "APT Sources:"
-wget -q -O- $MOLIOR_SERVER/api/projectsources/$PROJECT/$PROJECTVERSION | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
+wget -q -O- "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources?internal=true" | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 echo
 
 cd # why are we not in $HOME ?
@@ -173,6 +173,7 @@ if [ ! -e /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$
   sudo mkdir -p /var/lib/schroot/chroots/
   sudo mv $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz /var/lib/schroot/chroots/
 else
+  log " - Using existing $PLATFORM-$PLATFORM_VERSION-$ARCH.tar.xz"
   sudo cp /var/lib/schroot/chroots/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH /etc/schroot/chroot.d/
 fi
 

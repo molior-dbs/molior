@@ -209,15 +209,15 @@ def get_apt_repos(project_version, session, is_ci=False):
     urls = []
     deps = get_projectversion_deps(project_version.id, session)
 
-    urls.append(project_version.get_apt_repo())
+    urls.append(project_version.get_apt_repo(internal=True))
     if is_ci:
-        urls.append(project_version.get_apt_repo(dist="unstable"))
+        urls.append(project_version.get_apt_repo(dist="unstable", internal=True))
 
     for p in deps:
         dependency = session.query(ProjectVersion).filter(ProjectVersion.id == p[0]).first()
-        urls.append(dependency.get_apt_repo())
+        urls.append(dependency.get_apt_repo(internal=True))
         if is_ci and p[1]:  # use unstable dependency for ci builds
-            urls.append(dependency.get_apt_repo(dist="unstable"))
+            urls.append(dependency.get_apt_repo(dist="unstable", internal=True))
 
     return urls
 

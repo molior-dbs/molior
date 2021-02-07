@@ -730,7 +730,12 @@ async def get_apt_sources2(request):
     db = request.cirrina.db_session
     project_name = request.match_info.get("project_name")
     projectver_name = request.match_info.get("projectver_name")
-    unstable = request.GET.getone("unstable", "")
+    unstable = request.GET.getone("unstable", False)
+    if unstable == "true":
+        unstable = True
+    internal = request.GET.getone("internal", False)
+    if internal == "true":
+        internal = True
 
     if not project_name or not projectver_name:
         return ErrorResponse(400, "Parameter missing")
@@ -749,7 +754,9 @@ async def get_apt_sources2(request):
     deps += get_projectversion_deps(projectversion.id, db)
 
     cfg = Configuration()
-    apt_url = cfg.aptly.get("apt_url_public")
+    apt_url = None
+    if not internal:
+        apt_url = cfg.aptly.get("apt_url_public")
     if not apt_url:
         apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
@@ -758,17 +765,17 @@ async def get_apt_sources2(request):
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
     if not project.is_basemirror and projectversion.basemirror:
         sources_list += "\n# Base Mirror\n"
-        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
+        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo(internal=internal))
 
     sources_list += "\n# Project Sources\n"
     for d in deps:
         dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
         if not dep:
             logger.error("projectsources: projecversion %d not found", d[0])
-        sources_list += "{}\n".format(dep.get_apt_repo())
+        sources_list += "{}\n".format(dep.get_apt_repo(internal=internal))
         # ci builds requested & use ci builds from this dep & dep has ci builds
-        if unstable == "true" and d[1] and dep.ci_builds_enabled:
-            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
+        if unstable and d[1] and dep.ci_builds_enabled:
+            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable", internal=internal))
 
     return web.Response(status=200, text=sources_list)
 
