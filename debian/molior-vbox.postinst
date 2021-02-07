@@ -39,8 +39,9 @@ case "$1" in
         sed -i "s/^\"set background=dark/set background=dark/" /etc/vim/vimrc
 
         sed -i "s/^#force_color_prompt=yes/force_color_prompt=yes/" $SYSHOME/.bashrc
-        echo "set mouse=" > $SYSHOME/.vimrc
-        echo "set mouse=" > /root/.vimrc
+
+        test -f $SYSHOME/.vimrc || echo "set mouse=" > $SYSHOME/.vimrc
+        test -f /root/.vimrc || echo "set mouse=" > /root/.vimrc
 
         if ! grep -q WELCOME_MARKER $SYSHOME/.bashrc; then
             cat >> $SYSHOME/.bashrc <<EOF
@@ -67,4 +68,3 @@ esac
 db_stop
 
 exit 0
-
