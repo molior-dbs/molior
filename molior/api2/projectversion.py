@@ -447,6 +447,8 @@ async def snapshot_projectversion(request):
         return ErrorResponse(400, "Projectversion not found")
     if projectversion.basemirror.external_repo:
         return ErrorResponse(400, "Projectversion is based on external mirror")
+    if projectversion.projectversiontype in ['overlay', 'snapshot']:
+        return ErrorResponse(400, "Projectversion is of type overlay/snapshot")
 
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
