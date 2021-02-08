@@ -293,7 +293,7 @@ async def post_repositories(request):
     """
     params = await request.json()
 
-    url = params.get("url").lower()
+    url = params.get("url")
     dependencies = params.get("dependency_id", [])
 
     if request.cirrina.db_session.query(SourceRepository).filter(SourceRepository.url == url).first():
@@ -325,7 +325,7 @@ async def post_repositories(request):
     data = {
         "status": 1,
         "message": "SourceRepository successfully created",
-        "data": {"id": db_repo.id, "name": db_repo.name, "url": db_repo.url},
+        "data": {"id": db_repo.id, "name": db_repo.name.lower(), "url": db_repo.url},
     }
 
     return web.json_response(data)
