@@ -293,7 +293,7 @@ async def post_repositories(request):
     """
     params = await request.json()
 
-    url = params.get("url")
+    url = params.get("url").lower()
     dependencies = params.get("dependency_id", [])
 
     if request.cirrina.db_session.query(SourceRepository).filter(SourceRepository.url == url).first():
