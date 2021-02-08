@@ -316,7 +316,7 @@ async def add_repository(request):
             description: Invalid data received.
     """
     params = await request.json()
-    url = params.get("url", "")
+    url = params.get("url", "").lower()
     architectures = params.get("architectures", [])
     startbuild = params.get("startbuild", "true")
     startbuild = startbuild == "true"
@@ -953,7 +953,7 @@ async def edit_repository2(request):
     except Exception:
         return ErrorResponse(400, "Invalid parameter received")
     params = await request.json()
-    url = params.get("url", "")
+    url = params.get("url", "").lower()
     if not url:
         return ErrorResponse(400, "No URL received")
 
