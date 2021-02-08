@@ -1,3 +1,9 @@
+molior (1.4.0~alpha252) stretch; urgency=medium
+
+  * project(version): fix string comparison
+
+ -- André Roth <neolynx@gmail.com>  Mon, 08 Feb 2021 12:00:12 +0000
+
 molior (1.4.0~alpha251) stretch; urgency=medium
 
   * sourcerepository: fix url
