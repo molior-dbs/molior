@@ -1,4 +1,4 @@
-from sqlalchemy.sql import or_
+from sqlalchemy.sql import or_, func
 
 from ..app import app
 from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int, db2array, escape_for_like
@@ -192,7 +192,7 @@ async def create_projectversion(request):
         return ErrorResponse(400, "Cannot add projectversion to a mirror")
 
     projectversion = db.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.name.lower() == name.lower(), Project.id == project.id).first()
+            func.lower(ProjectVersion.name) == name.lower(), Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion '{}' already exists{}".format(
                                         name,

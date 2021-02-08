@@ -1,4 +1,5 @@
 from aiohttp import web
+from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_role, req_admin
@@ -163,7 +164,7 @@ async def create_project(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 
-    if db.query(Project).filter(Project.name.lower() == name.lower()).first():
+    if db.query(Project).filter(func.lower(Project.name) == name.lower()).first():
         return ErrorResponse(400, "Projectname is already taken")
 
     project = Project(name=name, description=description)

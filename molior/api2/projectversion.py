@@ -348,7 +348,7 @@ async def clone_projectversion(request):
         return ErrorResponse(404, "Projectversion not found")
 
     if db.query(ProjectVersion).join(Project).filter(
-                ProjectVersion.name.lower() == new_version.lower(),
+                func.lower(ProjectVersion.name) == new_version.lower(),
                 Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
@@ -457,7 +457,7 @@ async def snapshot_projectversion(request):
 
     db = request.cirrina.db_session
     if db.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.name.lower() == name.lower(),
+            func.lower(ProjectVersion.name) == name.lower(),
             Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion '%s' already exists" % name)
 
