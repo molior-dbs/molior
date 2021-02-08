@@ -192,7 +192,7 @@ async def create_projectversion(request):
         return ErrorResponse(400, "Cannot add projectversion to a mirror")
 
     projectversion = db.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.name == name, Project.id == project.id).first()
+            ProjectVersion.name.lower() == name.lower(), Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion '{}' already exists{}".format(
                                         name,

@@ -234,7 +234,8 @@ async def create_projectversions(request):
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = db.query(ProjectVersion).filter(ProjectVersion.name == name, Project.id == project.id).first()
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.name.lower() == name.lower(),
+                                                     Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion already exists{}".format(
                 ", and is marked as deleted!" if projectversion.is_deleted else ""))
@@ -380,7 +381,7 @@ async def do_overlay(request, projectversion_id, name):
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
 
-    overlay_projectversion = db.query(ProjectVersion).filter(ProjectVersion.name == name,
+    overlay_projectversion = db.query(ProjectVersion).filter(ProjectVersion.name.lower() == name.lower(),
                                                              ProjectVersion.project_id == projectversion.project_id).first()
     if overlay_projectversion:
         return ErrorResponse(400, "Overlay already exists")
