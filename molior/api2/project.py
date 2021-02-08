@@ -184,7 +184,7 @@ async def create_projectversion(request):
 
     db = request.cirrina.db_session
     project = db.query(Project).filter(Project.name == project_id).first()
-    if not project:
+    if not project and isinstance(project_id, int):
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
