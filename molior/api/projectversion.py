@@ -1,3 +1,5 @@
+from sqlalchemy import func
+
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db
@@ -234,7 +236,7 @@ async def create_projectversions(request):
         if not project:
             return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
 
-    projectversion = db.query(ProjectVersion).filter(ProjectVersion.name.lower() == name.lower(),
+    projectversion = db.query(ProjectVersion).filter(func.lower(ProjectVersion.name) == name.lower(),
                                                      Project.id == project.id).first()
     if projectversion:
         return ErrorResponse(400, "Projectversion already exists{}".format(
@@ -381,7 +383,7 @@ async def do_overlay(request, projectversion_id, name):
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
 
-    overlay_projectversion = db.query(ProjectVersion).filter(ProjectVersion.name.lower() == name.lower(),
+    overlay_projectversion = db.query(ProjectVersion).filter(func.lower(ProjectVersion.name) == name.lower(),
                                                              ProjectVersion.project_id == projectversion.project_id).first()
     if overlay_projectversion:
         return ErrorResponse(400, "Overlay already exists")
