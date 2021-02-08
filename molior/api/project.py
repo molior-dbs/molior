@@ -163,7 +163,7 @@ async def create_project(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
 
-    if db.query(Project).filter(Project.name == name).first():
+    if db.query(Project).filter(Project.name.lower() == name.lower()).first():
         return ErrorResponse(400, "Projectname is already taken")
 
     project = Project(name=name, description=description)
