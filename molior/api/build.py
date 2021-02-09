@@ -225,8 +225,8 @@ async def get_builds(request):
         project_name, project_version = project.split("/", 1)
         projectversion = db.query(ProjectVersion).join(Project).filter(
                                   Project.is_mirror.is_(False),
-                                  Project.name == project_name,
-                                  ProjectVersion.name == project_version,
+                                  func.lower(Project.name) == project_name.lower(),
+                                  func.lower(ProjectVersion.name) == project_version.lower(),
                                   ).first()
 
     if projectversion:

@@ -1,5 +1,6 @@
 import re
 from aiohttp import web
+from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_admin
@@ -45,8 +46,8 @@ async def get_mirror2(request):
     query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
     query = query.filter(Project.is_mirror == "true",
-                         Project.name == mirror_name,
-                         ProjectVersion.name == mirror_version)
+                         func.lower(Project.name) == mirror_name.lower(),
+                         func.lower(ProjectVersion.name) == mirror_version.lower())
 
     mirror = query.first()
     if not mirror:
@@ -200,8 +201,8 @@ async def get_apt_sources2(request):
     query = db.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
     query = query.filter(Project.is_mirror == "true",
-                         Project.name == name,
-                         ProjectVersion.name == version)
+                         func.lower(Project.name) == name.lower(),
+                         func.lower(ProjectVersion.name) == version.lower())
     mirror = query.first()
     if not mirror:
         return ErrorResponse(404, "Mirror not found")
@@ -333,8 +334,8 @@ async def create_mirror2(request):
 
     db = request.cirrina.db_session
     mirror = db.query(ProjectVersion).join(Project).filter(
-                ProjectVersion.name == mirrorversion,
-                Project.name == mirrorname).first()
+                func.lower(ProjectVersion.name) == mirrorversion.lower(),
+                func.lower(Project.name) == mirrorname.lower()).first()
     if mirror:
         return ErrorResponse(400, "Mirror {}/{} already exists".format(mirrorname, mirrorversion))
 
@@ -344,8 +345,8 @@ async def create_mirror2(request):
         query = db.query(ProjectVersion)
         query = query.join(Project, Project.id == ProjectVersion.project_id)
         query = query.filter(Project.is_mirror.is_(True))
-        query = query.filter(Project.name == base_project)
-        query = query.filter(ProjectVersion.name == base_version)
+        query = query.filter(func.lower(Project.name) == base_project.lower())
+        query = query.filter(func.lower(ProjectVersion.name) == base_version.lower())
         entry = query.first()
 
         if not entry:
@@ -486,8 +487,8 @@ async def edit_mirror(request):
 
     mirror = db.query(ProjectVersion).join(Project).filter(
                 ProjectVersion.project_id == Project.id,
-                ProjectVersion.name == mirror_version,
-                Project.name == mirror_name).first()
+                func.lower(ProjectVersion.name) == mirror_version.lower(),
+                func.lower(Project.name) == mirror_name.lower()).first()
     if not mirror:
         return ErrorResponse(400, "Mirror not found {}/{}".format(mirror_name, mirror_version))
 
@@ -514,8 +515,8 @@ async def edit_mirror(request):
     if basemirror:
         basemirror_name, basemirror_version = basemirror.split("/")
         bm = db.query(ProjectVersion).join(Project).filter(
-                    Project.name == basemirror_name,
-                    ProjectVersion.name == basemirror_version).first()
+                    func.lower(Project.name) == basemirror_name.lower(),
+                    func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
         if not bm:
             return ErrorResponse(400, "Error finding basemirror '%s'", basemirror)
         mirror.basemirror = bm
@@ -576,8 +577,8 @@ async def delete_mirror2(request):
 
     mirror = db.query(ProjectVersion).join(Project).filter(
                 ProjectVersion.project_id == Project.id,
-                ProjectVersion.name == mirror_version,
-                Project.name == mirror_name,
+                func.lower(ProjectVersion.name) == mirror_version.lower(),
+                func.lower(Project.name) == mirror_name.lower(),
                 Project.is_mirror.is_(True)).first()
     if not mirror:
         return ErrorResponse(400, "Mirror not found {}/{}".format(mirror_name, mirror_version))
