@@ -21,6 +21,7 @@ class BackendWorker:
     async def _schedule(self, job):
         b = Backend()
         backend = b.get_backend()
+        logger.warning("build job: {}".format(job))
         await backend.build(*job)
 
     async def _started(self, build_id):

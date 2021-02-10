@@ -13,6 +13,7 @@
 : ${PROJECTVERSION?"set PROJECTVERSION before running this script"}
 : ${APT_SERVER?"set APT_SERVER before running this script"}
 : ${APT_URLS?"set APT_URLS before running this script"}
+: ${APT_KEYS?"set APT_KEYS before running this script"}
 : ${RUN_LINTIAN?"set RUN_LINTIAN before running this script"}
 
 if [ -f /etc/default/molior-client ]; then
@@ -116,6 +117,8 @@ echo
 log "APT Sources:"
 wget -q -O- "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources?internal=true" | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 echo
+echo APT KEYS:
+echo $APT_KEYS
 
 cd # why are we not in $HOME ?
 

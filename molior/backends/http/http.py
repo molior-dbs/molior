@@ -173,7 +173,7 @@ class HTTPBackend:
         asyncio.ensure_future(self.notifier(), loop=self.loop)
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
-                    project_dist, sourcename, project_name, project_version, apt_urls, run_lintian=True):
+                    project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian=True):
         task_id = "build_%d" % build_id
         if arch == "i386" or arch == "amd64":
             queue_arch = "amd64"
@@ -196,6 +196,7 @@ class HTTPBackend:
                                              "project": project_name,
                                              "projectversion": project_version,
                                              "apt_urls": apt_urls,
+                                             "apt_keys": apt_keys,
                                              "task_id": task_id,
                                              "run_lintian": run_lintian})
 

@@ -29,13 +29,14 @@ async def build(params, masterws):
     try:
         build_id = params.get("build_id")
         apt_urls = params.get("apt_urls")
+        apt_keys = params.get("apt_keys")
         token = params.get("token")
 
         logger.info("starting build_%d", build_id)
 
         await masterws.send_str(json.dumps({"status": "building", "build_id": build_id}))
 
-        sbuild_args = ["--extra-repository=\"{}\"".format(url) for url in apt_urls]
+        sbuild_apt_urls = ["--extra-repository=\"{}\"".format(url) for url in apt_urls]
         # set env for build script
         env = os.environ.copy()
         env["BUILD_ID"] = str(build_id)
@@ -46,7 +47,8 @@ async def build(params, masterws):
         env["PLATFORM_VERSION"] = params.get("distversion")
         env["ARCH"] = params.get("architecture")
         env["ARCH_ANY_ONLY"] = str(int(params.get("arch_any_only")))
-        env["APT_URLS"] = " ".join(sbuild_args)
+        env["APT_URLS"] = " ".join(sbuild_apt_urls)
+        env["APT_KEYS"] = " ".join(apt_keys)
         env["APT_URLS_PLAIN"] = "\n".join([" - {}".format(url) for url in apt_urls])
         env["APT_URLS_PLAIN"] += "\n"
         env["PROJECT"] = params.get("project")
