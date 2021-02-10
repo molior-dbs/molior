@@ -96,6 +96,7 @@ finish ()
     log " - cleaning up /var/lib/schroot/chroots"
     sudo rm -rf /var/lib/schroot/chroots/$PLATFORM-$PLATFORM_VERSION-$ARCH
     sudo rm -f /etc/schroot/chroot.d/sbuild-$PLATFORM-$PLATFORM_VERSION-$ARCH
+    sudo rm -f /tmp/molior-repo-*.asc
 
     rm -f ~/build/*
 
@@ -115,10 +116,8 @@ log "Builder : `hostname`"
 echo
 
 log "APT Sources:"
-wget -q -O- "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources?internal=true" | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
+wget --timeout=30 -q -O- "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources?internal=true" | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 echo
-echo APT KEYS:
-echo $APT_KEYS
 
 cd # why are we not in $HOME ?
 
@@ -208,15 +207,22 @@ fi
 
 # FIXME: signature verification inside sbuild schroot
 
-APT_KEYS=""
-# FIXME: add extra keys from external repositories
-# --extra-repository-key=
+# add extra keys from external repositories
+SBUILD_APT_KEYS=""
+idx=1
+for aptkey in $APT_KEYS
+do
+    tmpkey="/tmp/molior-repo-$idx.asc"
+    wget --timeout=30 -q -O $tmpkey $aptkey
+    SBUILD_APT_KEYS="$SBUILD_APT_KEYS --extra-repository-key=/tmp/molior-repo-$idx.asc"
+    idx=$((i + 1))
+done
 
 eval sbuild $SBUILD_ARGS -d $PLATFORM-$PLATFORM_VERSION \
             --purge=never --verbose --no-clean-source --no-apt-clean --build-dep-resolver=aptitude \
             $SBUILD_ARCH_ARGS \
             $APT_URLS \
-            $APT_KEYS \
+            $SBUILD_APT_KEYS \
             ${REPO_NAME}_$VERSION.dsc
 RET=$?
 
