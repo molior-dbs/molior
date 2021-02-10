@@ -20,7 +20,7 @@ from ..model.buildtask import BuildTask
 from ..model.maintainer import Maintainer
 from ..model.chroot import Chroot
 from ..model.projectversion import ProjectVersion
-from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos
+from ..molior.core import get_target_arch, get_targets, get_buildorder, get_apt_repos, get_apt_keys
 from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, enqueue_aptly, enqueue_backend, buildlog, buildlogtitle, buildlogdone
 
@@ -533,6 +533,7 @@ async def schedule_build(build, session):
 
     project_version = build.projectversion
     apt_urls = get_apt_repos(project_version, session, is_ci=build.is_ci)
+    apt_keys = get_apt_keys(project_version, session)
 
     arch_any_only = False if arch == get_target_arch(build, session) else True
 
@@ -564,6 +565,7 @@ async def schedule_build(build, session):
                 project_version.project.name,
                 project_version.name,
                 apt_urls,
+                apt_keys,
                 run_lintian
             ]
         }

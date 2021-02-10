@@ -222,6 +222,43 @@ def get_apt_repos(project_version, session, is_ci=False):
     return urls
 
 
+def get_apt_keys(project_version, session):
+    """
+    Returns a list of all needed apt key urls
+    for the given project_version.
+
+    Args:
+        base_mirror (str): The base mirror name ("jessie-8.9").
+        projectversion (ProjectVersion): The project_version.
+        distribution (str): The distribution
+
+    Returns:
+        list: List of apt urls.
+    """
+    urls = []
+    deps = get_projectversion_deps(project_version.id, session)
+
+    if project_version.external_repo:
+        for key in project_version.mirror_keys:
+            if key.keyurl:
+                if key.keyurl not in urls:
+                    urls.append(key.keyurl)
+            else:
+                logger.error("building with external gog server keys not implemented")
+
+    for p in deps:
+        dependency = session.query(ProjectVersion).filter(ProjectVersion.id == p[0]).first()
+        if dependency.external_repo:
+            for key in dependency.mirror_keys:
+                if key.keyurl:
+                    if key.keyurl not in urls:
+                        urls.append(key.keyurl)
+                else:
+                    logger.error("building with external gog server keys not implemented")
+
+    return urls
+
+
 def get_buildorder(path):
     """
     Reads the build order configuration
