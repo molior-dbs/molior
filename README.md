@@ -2,16 +2,16 @@
 
 # About
 
-Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and sbuild for building Debian packages on multiple distributions and architectures.
+Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and [sbuild](https://wiki.debian.org/sbuild) for building Debian packages on multiple distributions and architectures.
 
 Molior allows the following via WebUI, REST API or commandline tools:
 
-    Manage Debian repository mirrors
-    Manage Debian repositories grouped in projects and versions
-    Manage project dependencies between base mirrors and other projects
-    Provide build nodes (amd64, arm64) on VMs or bare metal for running sbuild
-    Build debianized git repositories for multiple projects and architectures (i386, amd64, armhf, arm64)
-    Create project deployments (ISO Installers, VM images, containers, ...)
+* Manage Debian repository mirrors
+* Manage Debian repositories grouped in projects and versions
+* Manage project dependencies between base mirrors and other projects
+* Provide build nodes (amd64, arm64) on VMs or bare metal for running sbuild
+* Build debianized git repositories for multiple projects and architectures (i386, amd64, armhf, arm64)
+* Create project deployments (ISO Installers, VM images, containers, ...)
 
 # Table of content
 <!-- vim-markdown-toc GFM -->
