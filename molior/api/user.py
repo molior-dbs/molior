@@ -1,5 +1,4 @@
 from aiohttp import web
-from sqlalchemy.exc import IntegrityError
 
 from ..app import app
 from ..auth import Auth, req_admin
@@ -389,6 +388,6 @@ async def create_user(request):
 
     try:
         Auth().add_user(username, password, email, is_admin)
-    except IntegrityError as exc:
-        return ErrorResponse(400, str(exc.orig))
+    except Exception as exc:
+        return ErrorResponse(400, str(exc))
     return web.Response(status=200)
