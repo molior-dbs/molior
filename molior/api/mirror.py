@@ -2,6 +2,7 @@ import re
 
 from aiohttp import web
 from sqlalchemy.sql import or_
+from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_admin
@@ -240,7 +241,7 @@ async def get_mirrors(request):
     elif is_basemirror:
         query = query.filter(Project.is_basemirror == "true")
 
-    query = query.order_by(Project.name, ProjectVersion.name.desc())
+    query = query.order_by(func.lower(Project.name), func.lower(ProjectVersion.name).desc())
     nb_results = query.count()
 
     query = paginate(request, query)
@@ -327,8 +328,8 @@ async def get_mirror(request):
     query = request.cirrina.db_session.query(ProjectVersion)
     query = query.join(Project, Project.id == ProjectVersion.project_id)
     query = query.filter(Project.is_mirror == "true",
-                         Project.name == mirror_name,
-                         ProjectVersion.name == mirror_version)
+                         func.lower(Project.name) == mirror_name.lower(),
+                         func.lower(ProjectVersion.name) == mirror_version.lower())
 
     mirror = query.first()
 

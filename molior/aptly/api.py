@@ -792,7 +792,6 @@ class AptlyApi:
                 if not self.__check_status_code(resp.status):
                     self.__raise_aptly_error(resp)
                 data = json.loads(await resp.text())
-        logger.info(data)
 
         ret = False
         task_id = data.get("ID")

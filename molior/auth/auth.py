@@ -150,7 +150,7 @@ class req_role(object):
             else:
                 # try finting project by name
                 p = request.cirrina.db_session.query(Project).filter(
-                                    Project.name == project_id).first()
+                                    func.lower(Project.name) == project_id.lower()).first()
                 if p:
                     project_id = p.id
                 else:

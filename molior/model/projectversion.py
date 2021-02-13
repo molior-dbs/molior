@@ -227,7 +227,7 @@ def get_projectversion_deps(projectversion_id, session):
             dependencies for.
 
     Returns:
-        list: A list of ProjectVersions.
+        list: A list of ProjectVersions).
     """
     query = """
     WITH RECURSIVE getparents(projectversion_id, dependency_id) AS (
@@ -263,8 +263,8 @@ def get_projectversion(request, db=None):
     elif "projectversion_id" in request.match_info:
         version = request.match_info["projectversion_id"]
     pv = db.query(ProjectVersion).join(Project).filter(
-            Project.name == name,
-            ProjectVersion.name == version,
+            func.lower(Project.name) == name.lower(),
+            func.lower(ProjectVersion.name) == version.lower(),
             Project.is_mirror.is_(False)).first()
     if not pv:
         logger.warning("projectversion not found: %s/%s" % (name, version))
@@ -277,8 +277,8 @@ def get_projectversion_byname(fullname, session):
         return None
     name, version = parts
     return session.query(ProjectVersion).join(Project).filter(
-            Project.name == name,
-            ProjectVersion.name == version,
+            func.lower(Project.name) == name.lower(),
+            func.lower(ProjectVersion.name) == version.lower(),
         ).first()
 
 
@@ -295,8 +295,8 @@ def get_mirror(request):
     mirror_version = request.match_info["mirror_version"]
 
     return request.cirrina.db_session.query(ProjectVersion).join(Project).filter(
-            ProjectVersion.name == mirror_version,
-            Project.name == mirror_name,
+            func.lower(ProjectVersion.name) == mirror_version.lower(),
+            func.lower(Project.name) == mirror_name.lower(),
             Project.is_mirror.is_(True),
             ProjectVersion.is_deleted.is_(False)
         ).first()

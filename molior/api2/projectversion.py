@@ -121,8 +121,8 @@ async def get_projectversion_dependencies(request):
                                                    ProjectVersion.id != projectversion.id,
                                                    ProjectVersion.id.notin_(dep_ids))
         cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
-                                                                                Project.name,
-                                                                                ProjectVersion.name.asc())
+                                                                                func.lower(Project.name),
+                                                                                func.lower(ProjectVersion.name))
         if filter_name:
             cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
 
@@ -353,8 +353,9 @@ async def clone_projectversion(request):
         return ErrorResponse(400, "Projectversion already exists.")
 
     basemirror_name, basemirror_version = basemirror.split("/")
-    basemirror = db.query(ProjectVersion).join(Project).filter(Project.name == basemirror_name,
-                                                               ProjectVersion.name == basemirror_version).first()
+    basemirror = db.query(ProjectVersion).join(Project).filter(
+            func.lower(Project.name) == basemirror_name.lower(),
+            func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
@@ -701,7 +702,7 @@ async def remove_repository2(request):
     return OKResponse("Sourcerepository removed from projectversion")
 
 
-@app.http_get("/api2/project/{project_name}/{projectver_name}/aptsources")
+@app.http_get("/api2/project/{project_name}/{project_version}/aptsources")
 async def get_apt_sources2(request):
     """
     Returns apt sources list for given project,
@@ -718,7 +719,7 @@ async def get_apt_sources2(request):
           in: path
           required: true
           type: str
-        - name: projectver_name
+        - name: project_version
           in: path
           required: true
           type: str
@@ -731,8 +732,6 @@ async def get_apt_sources2(request):
             description: Parameter missing
     """
     db = request.cirrina.db_session
-    project_name = request.match_info.get("project_name")
-    projectver_name = request.match_info.get("projectver_name")
     unstable = request.GET.getone("unstable", False)
     if unstable == "true":
         unstable = True
@@ -740,16 +739,7 @@ async def get_apt_sources2(request):
     if internal == "true":
         internal = True
 
-    if not project_name or not projectver_name:
-        return ErrorResponse(400, "Parameter missing")
-
-    project = db.query(Project).filter(Project.name == project_name).first()
-    if not project:
-        return ErrorResponse(400, "project not found")
-
-    projectversion = db.query(ProjectVersion).join(Project).filter(
-            Project.id == project.id,
-            ProjectVersion.name == projectver_name).first()
+    projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "projectversion not found")
 
@@ -764,9 +754,9 @@ async def get_apt_sources2(request):
         apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
 
-    sources_list = "# APT Sources for project {0} {1}\n".format(project_name, projectver_name)
+    sources_list = "# APT Sources for project {0} {1}\n".format(projectversion.project.name, projectversion.name)
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not project.is_basemirror and projectversion.basemirror:
+    if not projectversion.project.is_basemirror and projectversion.basemirror:
         sources_list += "\n# Base Mirror\n"
         sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo(internal=internal))
 
@@ -862,8 +852,8 @@ async def get_projectversion_dependents(request):
                                                    ProjectVersion.id != projectversion.id,
                                                    ProjectVersion.id.notin_(dep_ids))
         cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
-                                                                                Project.name,
-                                                                                ProjectVersion.name.asc())
+                                                                                func.lower(Project.name),
+                                                                                func.lower(ProjectVersion.name))
         if filter_name:
             cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
 
