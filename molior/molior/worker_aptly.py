@@ -206,8 +206,8 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
             query = session.query(ProjectVersion)
             query = query.join(Project, Project.id == ProjectVersion.project_id)
             query = query.filter(Project.is_mirror.is_(True))
-            query = query.filter(ProjectVersion.name == mirror_version)
-            mirror = query.filter(Project.name == mirror_project).first()
+            query = query.filter(func.lower(ProjectVersion.name) == mirror_version.lower())
+            mirror = query.filter(func.lower(Project.name) == mirror_project.lower()).first()
 
             if not mirror:
                 logger.error("finalize mirror: mirror '%s' not found", mirrorname)
@@ -509,7 +509,8 @@ class AptlyWorker:
 
         with Session() as session:
             # FIXME: the following db checking should happen in api
-            mirror_project = session.query(Project).filter(Project.name == mirror_name, Project.is_mirror.is_(True)).first()
+            mirror_project = session.query(Project).filter(func.lower(Project.name) == mirror_name.lower(),
+                                                           Project.is_mirror.is_(True)).first()
             if not mirror_project:
                 mirror_project = Project(name=mirror_name, is_mirror=True, is_basemirror=is_basemirror)
                 session.add(mirror_project)
@@ -517,8 +518,8 @@ class AptlyWorker:
             project_version = (
                 session.query(ProjectVersion)
                 .join(Project)
-                .filter(Project.name == mirror_name, Project.is_mirror.is_(True))
-                .filter(ProjectVersion.name == mirror_version)
+                .filter(func.lower(Project.name) == mirror_name.lower(), Project.is_mirror.is_(True))
+                .filter(func.lower(ProjectVersion.name) == mirror_version.lower())
                 .first()
             )
 

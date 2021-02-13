@@ -173,7 +173,7 @@ async def get_builds(request):
     if to_date:
         builds = builds.filter(Build.startstamp < to_date)
     if distrelease:
-        builds = builds.filter(Project.name.like("%{}%".format(distrelease)))
+        builds = builds.filter(Project.name.ilike("%{}%".format(distrelease)))
 
 #    if buildvariant:
 #        buildvariant_ids = [

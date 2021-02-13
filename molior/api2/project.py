@@ -91,7 +91,7 @@ async def get_projectversions2(request):
 
     query = db.query(ProjectVersion).join(Project).filter(Project.is_mirror.is_(False), ProjectVersion.is_deleted.is_(False))
     if project_id:
-        query = query.filter(or_(Project.name == project_id, Project.id == parse_int(project_id)))
+        query = query.filter(or_(func.lower(Project.name) == project_id.lower(), Project.id == parse_int(project_id)))
     if filter_name:
         query = query.filter(ProjectVersion.name.ilike("%{}%".format(filter_name)))
     if basemirror_id:
@@ -183,7 +183,7 @@ async def create_projectversion(request):
         return ErrorResponse(400, "Invalid project name")
 
     db = request.cirrina.db_session
-    project = db.query(Project).filter(Project.name == project_id).first()
+    project = db.query(Project).filter(func.lower(Project.name) == project_id.lower()).first()
     if not project and isinstance(project_id, int):
         project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -201,8 +201,8 @@ async def create_projectversion(request):
     basemirror_name, basemirror_version = basemirror.split("/")
     basemirror = db.query(ProjectVersion).join(Project).filter(
                                     Project.id == ProjectVersion.project_id,
-                                    Project.name == basemirror_name,
-                                    ProjectVersion.name == basemirror_version).first()
+                                    func.lower(Project.name) == basemirror_name.lower(),
+                                    func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 

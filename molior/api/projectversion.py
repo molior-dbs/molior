@@ -74,7 +74,7 @@ async def get_projectversions(request):
         query = query.filter(Project.id == project_id)
 
     if project_name:
-        query = query.filter(Project.name == project_name)
+        query = query.filter(func.lower(Project.name) == project_name.lower())
 
     if basemirror_id:
         query = query.filter(ProjectVersion.base_mirror_id == basemirror_id)
@@ -89,7 +89,7 @@ async def get_projectversions(request):
             projectversions = [p_version.basemirror]
         nb_projectversions = len(projectversions)
     else:
-        query = query.order_by(Project.name, ProjectVersion.name)
+        query = query.order_by(func.lower(Project.name), func.lower(ProjectVersion.name))
         projectversions = query.all()
         nb_projectversions = query.count()
 
@@ -242,8 +242,9 @@ async def create_projectversions(request):
         return ErrorResponse(400, "Projectversion already exists{}".format(
                 ", and is marked as deleted!" if projectversion.is_deleted else ""))
 
-    basemirror = db.query(ProjectVersion).join(Project).filter(Project.name == basemirror_name,
-                                                               ProjectVersion.name == basemirror_version).first()
+    basemirror = db.query(ProjectVersion).join(Project).filter(
+            func.lower(Project.name) == basemirror_name.lower(),
+            func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
     if not basemirror:
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 

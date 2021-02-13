@@ -1,5 +1,7 @@
 import re
 
+from sqlalchemy import func
+
 from ..app import logger
 from ..tools import get_changelog_attr, db2array
 from .configuration import Configuration
@@ -146,8 +148,8 @@ def get_targets(plain_targets, repo, custom_targets, session):
                 .join(ProjectVersion)
                 .join(Project)
                 .filter(SouRepProVer.sourcerepository_id == repo.id)
-                .filter(ProjectVersion.name == project_version)
-                .filter(Project.name == project_name)
+                .filter(func.lower(ProjectVersion.name) == project_version.lower())
+                .filter(func.lower(Project.name) == project_name.lower())
                 .all()
             )
 
@@ -159,8 +161,8 @@ def get_targets(plain_targets, repo, custom_targets, session):
                 .join(ProjectVersion)
                 .join(Project)
                 .filter(SouRepProVer.sourcerepository_id == repo.id)
-                .filter(ProjectVersion.name == project_version)
-                .filter(Project.name == project_name)
+                .filter(func.lower(ProjectVersion.name) == project_version.lower())
+                .filter(func.lower(Project.name) == project_name.lower())
                 .all()
             )
 

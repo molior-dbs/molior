@@ -5,7 +5,7 @@ from ..app import app, logger
 from ..auth import req_role, req_admin
 from ..molior.configuration import Configuration
 from ..model.project import Project
-from ..model.projectversion import ProjectVersion, get_projectversion_deps
+from ..model.projectversion import ProjectVersion, get_projectversion_deps, get_projectversion
 from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse
 
 
@@ -114,7 +114,7 @@ async def get_project(request):
         return ErrorResponse(404, "Project with id {} could not be found!".format(project_id))
 
     versions = db.query(ProjectVersion).filter_by(project_id=project.id,
-                                                  is_deleted=show_deleted).order_by(ProjectVersion.name.desc()).all()
+                                                  is_deleted=show_deleted).order_by(func.lower(ProjectVersion.name).desc()).all()
     data = {
         "id": project.id,
         "name": project.name,
@@ -266,7 +266,7 @@ async def delete_project(request):
     return OKResponse("project {} deleted".format(project_id))
 
 
-@app.http_get("/api/projectsources/{project_name}/{projectver_name}")
+@app.http_get("/api/projectsources/{project_name}/{project_version}")
 async def get_apt_sources(request):
     """
     Returns apt sources list for given project,
@@ -283,7 +283,7 @@ async def get_apt_sources(request):
           in: path
           required: true
           type: str
-        - name: projectver_name
+        - name: project_version
           in: path
           required: true
           type: str
@@ -296,20 +296,9 @@ async def get_apt_sources(request):
             description: Parameter missing
     """
     db = request.cirrina.db_session
-    project_name = request.match_info.get("project_name")
-    projectver_name = request.match_info.get("projectver_name")
     unstable = request.GET.getone("unstable", "")
 
-    if not project_name or not projectver_name:
-        return ErrorResponse(400, "Parameter missing")
-
-    project = db.query(Project).filter(Project.name == project_name).first()
-    if not project:
-        return ErrorResponse(400, "project not found")
-
-    projectversion = db.query(ProjectVersion).join(Project).filter(
-            Project.id == project.id,
-            ProjectVersion.name == projectver_name).first()
+    projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "projectversion not found")
 
@@ -322,9 +311,9 @@ async def get_apt_sources(request):
         apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
 
-    sources_list = "# APT Sources for project {0} {1}\n".format(project_name, projectver_name)
+    sources_list = "# APT Sources for project {0} {1}\n".format(projectversion.project.name, projectversion.name)
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not project.is_basemirror and projectversion.basemirror:
+    if not projectversion.project.is_basemirror and projectversion.basemirror:
         sources_list += "# Base Mirror\n"
         sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
 
