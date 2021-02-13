@@ -346,8 +346,8 @@ async def add_repository(request):
     repo = db.query(SourceRepository).filter(SourceRepository.url == url).first()
     if not repo:
         query = db.query(SourceRepository).filter(or_(
-                    SourceRepository.url.like("%{}%{}%/{}".format(repoinfo.resource, repoinfo.owner, repoinfo.name)),
-                    SourceRepository.url.like("%{}%{}%/{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
+                    SourceRepository.url.ilike("%{}%{}%/{}".format(repoinfo.resource, repoinfo.owner, repoinfo.name)),
+                    SourceRepository.url.ilike("%{}%{}%/{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
         if query.count() > 1:
             repo = query.first()
             logger.info("found %d similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
