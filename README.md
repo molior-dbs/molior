@@ -1,16 +1,17 @@
 <div align="center"><img src="doc/img/moliorlogo_large.png"/><p>Debian Build System</p></div>
 
-# Purpose
+# About
 
-The purpose of molior is to build Debian packages out of git repositories based on a mirror of a specific Debian version
-and therefore creating repeatable builds. Build environments are structured into projects and versions,
-which may include mirrors and versions of other projects.
+Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and sbuild for building Debian packages on multiple distributions and architectures.
 
-Molior performs the following tasks:
-- create mirrors of Debian repositories
-- create projects based on a Debian mirror, include dependencies to other projects or mirrors
-- build packages into project repositories (i386, amd64, armhf, arm64)
-- create deployments of projects (ISO Installer, VirtualBox, images, ...)
+Molior allows the following via WebUI, REST API or commandline tools:
+
+    Manage Debian repository mirrors
+    Manage Debian repositories grouped in projects and versions
+    Manage project dependencies between base mirrors and other projects
+    Provide build nodes (amd64, arm64) on VMs or bare metal for running sbuild
+    Build debianized git repositories for multiple projects and architectures (i386, amd64, armhf, arm64)
+    Create project deployments (ISO Installers, VM images, containers, ...)
 
 # Table of content
 <!-- vim-markdown-toc GFM -->
