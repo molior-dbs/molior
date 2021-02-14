@@ -228,18 +228,26 @@ class Build(Base):
         }
 
         if self.projectversion:
-            if self.projectversion.project.is_mirror:
+            pv = self.projectversion
+            if pv.project.is_mirror:
                 if self.buildtype == "mirror":
-                    data.update({"architectures": db2array(self.projectversion.mirror_architectures)})
+                    data.update({"architectures": db2array(pv.mirror_architectures)})
             elif self.buildtype == "deb" or self.buildtype == "chroot":
                 data.update({"architecture": self.architecture})
-                data.update({"project": {
-                                "name": self.projectversion.project.name,
-                                "version": self.projectversion.name,
-                                },
-                             "buildvariant": self.projectversion.basemirror.project.name + "-" +
-                             self.projectversion.basemirror.name + "/" + self.architecture
-                             })
+                data.update({
+                    "project": {
+                        "name": pv.project.name,
+                        "version": pv.name,
+                        },
+                    "buildvariant": {
+                        "architecture": self.architecture,
+                        "base_mirror": {
+                            "name": pv.basemirror.project.name,
+                            "version": pv.basemirror.name
+                            },
+                        "name": pv.basemirror.project.name + "-" + pv.basemirror.name + "/" + self.architecture
+                        }
+                    })
 
         if self.sourcerepository:
             data.update({"sourcerepository_id": self.sourcerepository.id})
