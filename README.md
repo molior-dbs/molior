@@ -22,21 +22,16 @@ Molior allows the following via WebUI, REST API or commandline tools:
 * [Usage](#usage)
     * [Login to the Web UI](#login-to-the-web-ui)
     * [Creating Mirrors](#creating-mirrors)
-        * [Use apt-cacher-ng (optional)](#use-apt-cacher-ng-optional)
-        * [Debian base mirror](#debian-base-mirror)
+        * [Example Debian base mirror](#example-debian-base-mirror)
+    * [Example a non-base mirrors](#example-a-non-base-mirrors)
     * [Create a project](#create-a-project)
     * [Add a source repo](#add-a-source-repo)
-    * [Create a non-base mirror (optional)](#create-a-non-base-mirror-optional)
     * [Integration](#integration)
         * [Trigger builds from gitlab](#trigger-builds-from-gitlab)
         * [Build notification hooks](#build-notification-hooks)
 * [Contributing](#contributing)
     * [Clone the source repositories](#clone-the-source-repositories)
-    * [Login to the Web UI](#login-to-the-web-ui-1)
-    * [Build molior](#build-molior)
-    * [Demo Project](#demo-project)
-    * [Watch the logs](#watch-the-logs)
-    * [Toubleshooting](#toubleshooting)
+    * [Build](#build)
 * [Authors](#authors)
 
 <!-- vim-markdown-toc -->
@@ -110,16 +105,7 @@ Point your browser to the URL of the molior server, login with admin and the pas
 
 ## Creating Mirrors
 
-### Use apt-cacher-ng (optional)
-
-Install apt-cacher-ng in order to speed up mirroring.
-
-For mirroring stretch, you might want to add the following to /etc/apt-cacher-ng/acng.conf:
-```
-PfilePatternEx: \.asc$
-```
-
-### Debian base mirror
+### Example Debian base mirror
 
 The following will mirror Debian/stretch for amd64 and arm64. It will take approx. 73GB of disk space.
 
@@ -144,26 +130,7 @@ Depending on the network and disk performance, this might take a 2-3 hours.
 
 Note: if you are mirroring Debian/buster use these keys: 04EE7237B7D453EC 648ACFD622F3D138 DCC9EFBF77E11517)
 
-## Create a project
-
-
-- Name: test
-- Click new
-- Project Version: 1.0
-- Choose base mirror
-- Choose amd64, arm64 arhcitecutres
-
-## Add a source repo
-
-- Click project: test
-- Click project version: 1.0
-- Click Repositories
-- Click NEW REPOSITORY
-- URL: https://github.com/neolynx/sold.git
-- Click Continue
-- Click Continue
-
-## Create a non-base mirror (optional)
+## Example a non-base mirrors
 
 Molior can create mirror of APT repositories, for example mono:
 
@@ -191,6 +158,23 @@ Source: https://download.docker.com/linux/debian
 Key URL: https://download.docker.com/linux/debian/gpg
 ```
 
+## Create a project
+
+- Name: test
+- Click new
+- Project Version: 1.0
+- Choose base mirror
+- Choose amd64, arm64 arhcitecutres
+
+## Add a source repo
+
+- Click project: test
+- Click project version: 1.0
+- Click Repositories
+- Click NEW REPOSITORY
+- URL: https://github.com/neolynx/sold.git
+- Click Continue
+- Click Continue
 
 ## Integration
 
@@ -246,59 +230,42 @@ For building Debian packages in molior, the creation of a Debian mirror is requi
 The following source respositories are needed:
 
 ```shell
-mkdir molior-dev
-cd molior-dev
+# molior
 git clone https://github.com/molior-dbs/molior.git
 git clone https://github.com/molior-dbs/molior-web.git
-git clone https://github.com/molior-dbs/aptlydeb.git
 
+# aptly
+git clone https://github.com/molior-dbs/aptlydeb.git
+cd aptlydeb
+git submodule init
+git submodule update
+cd ..
+
+# optionally:
 git clone https://github.com/neolynx/launchy.git
 git clone https://github.com/neolynx/cirrina.git
 git clone https://github.com/neolynx/aiohttp_jrpc.git
 git clone https://github.com/neolynx/aiohttp-session.git
 git clone https://github.com/neolynx/aiohttp-swagger.git
-
-cd aptlydeb
-git submodule init
-git submodule update
-cd ..
+git clone https://github.com/molior-dbs/aiofile.git
+git clone https://github.com/molior-dbs/async-cron.git
+git clone https://github.com/molior-dbs/git-url-parse.git
 ```
 
-## Login to the Web UI
+## Build
 
-Username: admin
-Password: see /etc/molior/molior.yml
-
-## Build molior
-
-The following command will build all molior components:
+All git repositories are debianized. Build dependencies can be installed by running the following in a git repo:
 ```
-build
+apt-get build-dep .
 ```
 
-Alternatively the components can be built individually:
+Debian packages can be build with:
 ```
-build molior-web # or molior, aptlydeb
-```
-
-## Demo Project
-```
-git clone https://github.com/molior-dbs/curitiba.git
-```
-
-## Watch the logs
-```
-log
-```
-
-## Toubleshooting
-
-See output of aptly tasks:
-```
-wget -O- -q http://localhost:8000/api/tasks/11/output
+debuild -us -uc -b
 ```
 
 # Authors
 
 - André Roth
+- Karol Swiderski
 - Benjamin Fassbind
