@@ -280,8 +280,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
         maintainer = session.query(Maintainer).filter(Maintainer.email == email).first()
         if not maintainer:
-            repo.log_state("creating new maintainer: %s %s <%s>" % (firstname, lastname, email))
-            await parent.log("I: creating new maintainer: %s %s <%s>\n" % (firstname, lastname, email))
             maintainer = Maintainer(firstname=firstname, surname=lastname, email=email)
             session.add(maintainer)
             session.commit()

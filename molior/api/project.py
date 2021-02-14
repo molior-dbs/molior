@@ -171,8 +171,6 @@ async def create_project(request):
     db.add(project)
     db.commit()
 
-    logger.info("Project '%s' with id '%s' created", project.name, project.id)
-
     return web.json_response({"id": project.id, "name": project.name})
 
 
