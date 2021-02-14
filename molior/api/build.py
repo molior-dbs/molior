@@ -284,6 +284,7 @@ async def get_builds(request):
     return web.json_response(data)
 
 
+@app.http_get("/api2/build/{build_id:\\d+}")
 @app.http_get("/api/builds/{build_id:\\d+}")
 @app.authenticated
 async def get_build(request):
@@ -390,6 +391,7 @@ async def get_build(request):
     return web.json_response(data)
 
 
+@app.http_put("/api2/build/{build_id}")
 @app.http_put("/api/builds/{build_id}")
 @app.authenticated
 # FIXME: req_role
