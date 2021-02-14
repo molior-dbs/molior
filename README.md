@@ -32,12 +32,6 @@ Molior allows the following via WebUI, REST API or commandline tools:
         * [Build notification hooks](#build-notification-hooks)
 * [Contributing](#contributing)
     * [Clone the source repositories](#clone-the-source-repositories)
-    * [Create a development environment](#create-a-development-environment)
-        * [Debian stretch](#debian-stretch)
-        * [Ubuntu 18.04](#ubuntu-1804)
-        * [Ubuntu 19.04 Vagrant fixes](#ubuntu-1904-vagrant-fixes)
-    * [Create the vagrant machines](#create-the-vagrant-machines)
-    * [Login to the molior machine](#login-to-the-molior-machine)
     * [Login to the Web UI](#login-to-the-web-ui-1)
     * [Build molior](#build-molior)
     * [Demo Project](#demo-project)
@@ -270,145 +264,10 @@ git submodule update
 cd ..
 ```
 
-## Create a development environment
-
-The molior development environment currently consists of two LXC containers managed by vagrant (>= 2.0.0):
-- node (build node i386/amd64)
-- molior (molior server, aptly server)
-
-The source repositories cloned above will be mounted into the vagrant machines (via bind mounts). They will be built and installed with the steps below.
-
-- Apparmor and LXC might need to be configured depending on your distribution. The following chapters describe the configuration for the supported distributions.
-
-### Debian stretch
-
-On Debian stretch make sure the stretch-backports APT source is available and perform the following steps:
-- Make sure the following packages are installed:
-
-```shell
-sudo apt-get install vagrant/stretch-backports apparmor lxc lxc-templates ruby-dev
-```
-
-- Download the LXC vagrant image (from the molior source code directory):
-```shell
-cd molior
-vagrant box update
-```
-
-- Edit the following file accordignly (rename utsname, uncomment selinux line):
-~/.vagrant.d/boxes/debian-VAGRANTSLASH-stretch64/9.1.0/lxc/lxc-config
-```
-...
-# Container specific configuration
-lxc.tty.max = 4
-lxc.utsname = stretch-base
-lxc.arch = amd64
-#lxc.selinux.context = unconfined_u:unconfined_r:lxc_t:s0-s0:c0.c1023
-```
-
-- Create a LXC default network by creating the following file:
-/etc/lxc/default.conf
-```
-lxc.network.type = empty
-lxc.network.type = veth
-lxc.network.link = lxcbr0
-lxc.network.flags = up
-lxc.network.hwaddr = 00:16:3e:xx:xx:xx
-```
-
-### Ubuntu 18.04
-
-On Ubuntu 18.04 perform the following steps:
-- Make sure the following packages are installed:
-
-```shell
-sudo apt-get install vagrant apparmor lxc lxc-templates ruby-dev
-```
-
-- Add the following configuration to /etc/apparmor.d/lxc/lxc-default-cgns:
-```
-profile lxc-container-default-cgns flags=(attach_disconnected,mediate_deleted) {
-[...]
-
-  # molior vagrant-lxc
-  mount options=(rw,private), # schroot /sys
-  mount options=(rw,bind),    # schroot /proc
-  mount options=(rw,rbind),   # timedatectl
-  mount options=(rw,rslave),  # timedatectl
-  mount options=(ro,remount,noatime,nodiratime,bind),  # timedatectl
-  mount options=(ro,remount,bind),  # timedatectl
-  mount options=(ro,nosuid,nodev,remount,bind),  # timedatectl
-  mount options=(ro,nosuid,nodev,noexec,remount,bind),  # timedatectl
-  mount options=(rw,rshared),  # timedatectl
-
-}
-```
-
-- Reload apparmor:
-```shell
-sudo service apparmor reload
-```
-
-### Ubuntu 19.04 Vagrant fixes
-
-On Ubuntu 19.04 perform the following steps:
-- Make sure the following packages are installed:
-
-```shell
-sudo apt-get install vagrant apparmor lxc lxc-templates ruby-dev
-```
-
-- Fix the systemd networkd control of the Debian node in vagrant.
-
-```shell
-sudo vim /usr/share/rubygems-integration/all/gems/vagrant-2.2.3/plugins/guests/debian/cap/change_host_name.rb
-```
-
-- Set the nettools detection to systemd_networkd and cut the given interface name.
-
-Change the first if statement and the first restart_command accordingly:
-```ruby
-        def self.restart_each_interface(machine, logger)
-          comm = machine.communicate
-          interfaces = VagrantPlugins::GuestLinux::Cap::NetworkInterfaces.network_interfaces(machine)
-          nettools = true
-          if systemd_networkd?(comm)
-            @logger.debug("Attempting to restart networking with systemctl")
-            nettools = false
-          else
-            @logger.debug("Attempting to restart networking with ifup/down nettools")
-          end
-
-          interfaces.each do |iface|
-            logger.debug("Restarting interface #{iface} on guest #{machine.name}")
-            if nettools
-             restart_command = "ifdown #{iface[/[^@]+/]};ifup #{iface[/[^@]+/]}"
-            else
-             restart_command = "systemctl stop ifup@#{iface}.service;systemctl start ifup@#{iface}.service"
-            end
-            comm.sudo(restart_command)
-          end
-        end
-
-```
-
-## Create the vagrant machines
-
-This will create two vagrant boxes, a build node and the molior server. It will also build and install all molior components.
-
-```shell
-cd molior
-make
-```
-
-## Login to the molior machine
-```
-vagrant ssh molior
-```
-
 ## Login to the Web UI
 
-Point your browser to the URL shown after login.
+Username: admin
+Password: see /etc/molior/molior.yml
 
 ## Build molior
 

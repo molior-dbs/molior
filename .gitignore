@@ -21,12 +21,6 @@ debian/molior-vbox/
 molior.egg-info
 debian/debhelper-build-stamp
 
-# Vagrant
-!Vagrantfile
-.vagrant
-.cache
-vagrant/sshkeys/
-
 # Doc build
 userdoc/_build
 /doc/_build
