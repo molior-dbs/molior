@@ -21,7 +21,6 @@ Contents:
     statemachines.rst
     buildnodes.rst
     logging.rst
-    vagrant.rst
     molior/modules.rst
 
 
