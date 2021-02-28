@@ -16,7 +16,7 @@ operation in a unpriviledged container (i.e. docker, lxd) is currently not suppo
     * [Install build node](#install-build-node)
     * [Install molior-tools](#install-molior-tools)
 * [ISO Installers / VMs](#iso-installers--vms)
-    * [Molior and aptly server](#molior-and-aptly-server)
+    * [Development Environemnt](#development-environemnt)
     * [Build nodes](#build-nodes)
 * [Configuration](#configuration)
     * [Configure molior server](#configure-molior-server)
@@ -94,7 +94,9 @@ Install molior/aptly server and build node on VMs or bare metal and follow the C
 
 User and Password for these installers is: admin/molior-dev (please change password after first login)
 
-### Molior and aptly server
+### Development Environemnt
+
+For development on molior or aptly, the following VM can be used:
 
 Download molior and aptly server as VirtualBox Appliance:
 - http://molior.info/installers/molior_1.4-buster_1.4.0_vbox-dev.ova
@@ -102,11 +104,13 @@ Download molior and aptly server as VirtualBox Appliance:
 ### Build nodes
 
 Download amd64 build node installer:
-- http://molior.info/installers/molior_1.4-buster_1.4.0_iso-installer-node-amd64.iso
+- http://molior.info/installers/molior_1.4_1.4.0_iso-installer-node-amd64.iso
 
 Download EFI installer for amd64 or arm64:
-- http://molior.info/installers/molior_1.4-buster_1.4.0_efi-installer-node-amd64.iso
-- http://molior.info/installers/molior_1.4-buster_1.4.0_efi-installer-node-arm64.iso
+- http://molior.info/installers/molior_1.4_1.4.0_efi-installer-node-amd64-UNATTENDED.iso
+- http://molior.info/installers/molior_1.4_1.4.0_efi-installer-node-arm64-UNATTENDED.iso
+
+Note: these are unattended installers, overwriting the disk without asking when booted
 
 ## Configuration
 
