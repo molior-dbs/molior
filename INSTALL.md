@@ -99,7 +99,7 @@ User and Password for these installers is: admin/molior-dev (please change passw
 For development on molior or aptly, the following VM can be used:
 
 Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.4-buster_1.4.0_vbox-dev.ova
+- http://molior.info/installers/molior_1.4_1.4.0_vbox-dev.ova
 
 ### Build nodes
 
