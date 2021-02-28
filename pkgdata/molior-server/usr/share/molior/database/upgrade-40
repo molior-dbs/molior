@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# set maintainer for parents and grandparents
+
+psql molior <<EOF
+
+update build set maintainer_id = (select maintainer_id from build b2 where parent_id = build.id and maintainer_id is not null limit 1) where build.maintainer_id is null;
+
+update build set maintainer_id = (select maintainer_id from build b2 where parent_id = build.id and maintainer_id is not null limit 1) where build.maintainer_id is null;
+
+EOF

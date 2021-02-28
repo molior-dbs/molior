@@ -1,10 +1,8 @@
 import asyncio
 import importlib
 
-from .logger import get_logger
+from ..app import logger
 from .configuration import Configuration
-
-logger = get_logger()
 
 
 class Backend:
@@ -13,7 +11,7 @@ class Backend:
     def get_backend(self):
         return Backend.backend
 
-    def init(self, backend_queue):
+    def init(self):
         cfg = Configuration()
         try:
             plugin = cfg.backend
@@ -26,7 +24,7 @@ class Backend:
         try:
             module = importlib.import_module(".backends.%s" % plugin, package="molior")
             loop = asyncio.get_event_loop()
-            Backend.backend = module.backend(backend_queue, loop)
+            Backend.backend = module.backend(loop)
         except Exception as exc:
             logger.error("error loading backend plugin '%s'", plugin)
             logger.exception(exc)

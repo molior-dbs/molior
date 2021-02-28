@@ -2,7 +2,7 @@ Source: molior
 Section: misc
 Priority: optional
 Standards-Version: 3.9.8
-Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-systemd (>= 1.5), dh-exec, python3-setuptools,
+Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-exec, python3-setuptools,
     python3-pytest, python3-pytest-cov, python3-coverage, python3-mock, python3-yaml, python3-sqlalchemy,
     python3-jinja2, python3-sphinx, python3-sphinx-rtd-theme, python3-sphinxcontrib.plantuml,
     python3-cirrina, python3-launchy, flake8, git
@@ -14,21 +14,22 @@ Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf
     postgresql, postgresql-contrib, python3-psycopg2, sudo, expect, tcl, sbuild, schroot,
     binfmt-support, qemu-user-static, python3-sqlalchemy, python3-yaml, python3-tz,
     python3-jinja2, python3-cirrina, python3-click, devscripts, sensible-utils,
-    bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, debootstrap (>= 1.0.110~bpo9+1)
+    bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, python3-async-cron,
+    python3-giturlparse, python3-aiofile,
+    debootstrap (>= 1.0.110~bpo9+1)
 Conflicts: molior-backend-http
-Description: debian package auto builder
+Tag: devel::buildtools
+Description: Debian Build System
  Debian Build System based on sbuild, schroot and aptly
- .
- Molior checks git repositories for release tags and
- runs sbuild when needed. The resulting packages are
- pushed to an aptly repository.
 
 Package: molior-client-http
 Architecture: all
 Section: misc
 Depends: ${misc:Depends}, ${perl:Depends}, dpkg-dev, lsb-base (>= 3.0-6), adduser, lsb-release, fakeroot,
   haveged, gcc, debhelper, tcl, expect, dh-systemd | debhelper (>= 9.20160709), sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
-  python3-yaml, python3-aiohttp, python3-websocket, schroot, gnupg1, devscripts, pxz | xz-utils (>= 5.2.4-1), python3-launchy
+  schroot, gnupg1, devscripts, pxz | xz-utils (>= 5.2.4-1),
+  python3, python3-launchy, python3-yaml, python3-aiohttp, python3-websocket, python3-psutil, python3-netifaces
+Tag: devel::buildtools
 Description: Molior build node client
  Build node client for molior-server nodes (amd64 or arm64)
 
@@ -56,12 +57,12 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
   net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
   openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, bash-completion, haveged,
-# editors
+# editor
   vim-nox,
 # add some tools:
   tree, bzip2, wget, telnet, man, psmisc,
 # molior:
-  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy7)
+  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy10.molior4)
 Description: molior ISO installer for testing
  Testing setup for molior
 
@@ -69,60 +70,54 @@ Package: molior-vbox
 Architecture: all
 Pre-Depends: molior-os-config
 Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
-  systemd-sysv, libpam-systemd,
-  net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
-  openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
-  dialog, bsdmainutils, less, gawk, bash-completion, haveged,
-# editors
-  vim-nox,
+  systemd-sysv, libpam-systemd, bash-completion,
+  net-tools, ifupdown, isc-dhcp-client, iputils-ping,
+  openssh-server, acpi-support-base, acpid, sudo, locales,
+  dialog, bsdmainutils, less, haveged,
+# vim:
+  vim-nox, python3-flake8, flake8, cmake, python3-pytest, python3-pytest-cov,
+  libpython3-dev, fonts-hack-ttf, build-essential, exuberant-ctags,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
-# add browser (stretch, buster)
-  chromium-sandbox | chromium (<< 73.0),
-  chromium (<< 73.0) | chromium (>= 73.0),
-# VirtualBox need kernel headers for guest additions
-  linux-headers-amd64,
-# add desktop dependencies
-  xserver-xorg-video-vesa, xserver-xorg-input-evdev, libgl1-mesa-dri,
-  xserver-xorg-video-modesetting, xserver-xorg, lightdm, lxde, policykit-1,
-  lxterminal,
+  htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xauth,
 # molior:
-  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy7),
-  molior-tools
-Description: molior ISO installer for testing
- Testing setup for molior
+  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy10.molior4),
+  molior-tools,
+# development tools:
+  dh-python, debhelper, dh-exec,
+Description: molior development virtual machine
+ Development environment for molior
 
 Package: molior-node-amd64
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
   linux-image-amd64, grub-pc,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
-  libpam-systemd,
+  libpam-systemd, open-vm-tools,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing
- Testing setup for molior
+ Molior build node installation for amd64/i386 builds
 
 Package: molior-node-amd64-efi
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
-  linux-image-amd64, grub-efi-amd64,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
+  linux-image-amd64, grub-efi-amd64, efibootmgr,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
-  libpam-systemd,
+  libpam-systemd, open-vm-tools,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing
@@ -131,16 +126,16 @@ Description: molior build node ISO installer for testing
 Package: molior-node-arm64-efi
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, net-tools, ifupdown, htop, isc-dhcp-client,
-  iputils-ping, bash-completion, vim, openssh-server,
+Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
+  iputils-ping, openssh-server,
   linux-image-arm64, grub-efi-arm64,
-  rsyslog, acpi-support-base, acpid, sudo, locales,
+  acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
   libpam-systemd,
 # editors
   vim-nox,
 # add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
+  htop, tree, bzip2, wget, telnet, man, psmisc,
 # molior:
   molior-client-http
 Description: molior build node ISO installer for testing

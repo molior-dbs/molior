@@ -1,19 +1,11 @@
-"""
-Provides API function to interact with the User database Model
-"""
-import logging
 from aiohttp import web
-import sqlalchemy.exc
 
-from molior.model.user import User
-from molior.model.userrole import UserRole
-from molior.model.project import Project
-
-from .app import app
-from .messagetypes import Subject, Event
-from molior.molior.auth import Auth
-
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+from ..app import app
+from ..auth import Auth, req_admin
+from ..model.user import User
+from ..model.userrole import UserRole
+from ..model.project import Project
+from ..tools import paginate, ErrorResponse
 
 
 @app.http_get("/api/users")
@@ -39,20 +31,21 @@ async def get_users(request):
         in: query
         required: false
         type: integer
-      - name: q
+      - name: name
         description: query to filter username
         in: query
         required: false
         type: string
-      - name: filter_admin
+      - name: email
+        description: query to filter email
+        in: query
+        required: false
+        type: string
+      - name: admin
         description: return only admin if true
         in: query
         required: false
         type: boolean
-      - name: count_only
-        description: If the items should only be counted
-        type: boolean
-        required: false
     produces:
       - text/json
     responses:
@@ -77,53 +70,27 @@ async def get_users(request):
       "400":
         description: invalid input where given
     """
-
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
-    filter_name = request.GET.getone("q", "")
-    filter_admin = request.GET.getone("filter_admin", "false")
-
-    try:
-        count_only = request.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
-
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page", status=400)
-        page = 1 if page < 1 else page
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page_size", status=400)
-        page_size = 1 if page_size < 1 else page_size
+    name = request.GET.getone("name", "")
+    email = request.GET.getone("email", "")
+    admin = request.GET.getone("admin", "false")
 
     query = request.cirrina.db_session.query(User)
-
-    if filter_admin.lower() == "true":
+    if admin.lower() == "true":
         query = query.filter(User.is_admin)
+    if name:
+        query = query.filter(User.username.ilike("%{}%".format(name)))
+    if email:
+        query = query.filter(User.email.ilike("%{}%".format(email)))
 
-    if filter_name:
-        query = query.filter(User.username.like("%{}%".format(filter_name)))
-
-    nb_users = query.count()
     query = query.order_by(User.username)
+    data = {"total_result_count": query.count()}
 
-    if page and page_size:
-        users = query.limit(page_size).offset((page - 1) * page_size).all()
-    else:
-        users = query.all()
-
-    data = {"total_result_count": nb_users}
-    if not count_only:
-        data["results"] = [
-            {"id": user.id, "username": user.username, "is_admin": user.is_admin}
-            for user in users
-        ]
+    query = paginate(request, query)
+    users = query.all()
+    data["results"] = [
+        {"id": user.id, "username": user.username, "email": user.email, "is_admin": user.is_admin}
+        for user in users
+    ]
 
     return web.json_response(data)
 
@@ -163,7 +130,7 @@ async def get_user_byid(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for user_id", status=400)
+        return ErrorResponse(400, "Incorrect value for user_id")
 
     currentuser = (
         request.cirrina.db_session.query(User)
@@ -177,14 +144,15 @@ async def get_user_byid(request):
         user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
 
     if not user:
-        return web.Response(status=404, text="User not found")
+        return ErrorResponse(404, "User not found")
 
     data = {"username": user.username, "user_id": user.id, "is_admin": user.is_admin}
     return web.json_response(data)
 
 
+@app.http_put("/api/user/{user_id}")
 @app.http_put("/api/users/{user_id}")
-@app.req_admin
+@req_admin
 async def put_user_byid(request):
     """
     Update a user by id (not yet implemented).
@@ -222,53 +190,31 @@ async def put_user_byid(request):
         description: Database problem
     """
     user_id = request.match_info["user_id"]
+
+    params = await request.json()
+
+    is_admin = params.get("is_admin")        # noqa: E221
+    email    = params.get("email")           # noqa: E221
+    password = params.get("password")        # noqa: E221
+
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for user_id", status=400)
+        return ErrorResponse(400, "Incorrect value for user_id")
 
-    user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
-    if not user:
-        return web.Response(status=404, text="User not found")
-
-    if user.username == "admin":
-        return web.Response(status=400, text="Cannot change admin")
-
-    is_admin = request.GET.getone("is_admin", None)  # str "true" or "flase"
-    if not is_admin:  # if None
-        return web.Response(text="Nothing to change", status=204)
-
-    if is_admin.lower() == "true":
-        user.is_admin = True
-        data = {"result": "{u} is now admin ".format(u=user.username)}
-    elif is_admin.lower() == "false":
-        user.is_admin = False
-        data = {"result": "{u} is no longer admin ".format(u=user.username)}
-
-    try:
-        request.cirrina.db_session.commit()  # pylint: disable=no-member
-    except sqlalchemy.exc.DataError:
-        request.cirrina.db_session.rollback()  # pylint: disable=no-member
-        return web.Response(status=500, text="Database error")
-
-    # TODO : change to a multicast group
-    await app.websocket_broadcast(
-        {
-            "event": Event.changed.value,
-            "subject": Subject.user.value,
-            "changed": {"id": user_id, "is_admin": user.is_admin},
-        }
-    )
-
-    return web.json_response(data)
+    ret = Auth().edit_user(user_id, password, email, is_admin)
+    if not ret:
+        return ErrorResponse(400, "Error modifying user")
+    return web.Response(status=200)
 
 
+@app.http_delete("/api/user/{user_id}")
 @app.http_delete("/api/users/{user_id}")
-@app.req_admin
+@req_admin
 # FIXME: req_role
-async def delete_user_byid(*_):
+async def delete_user_byid(request):
     """
-    Delete a user by id (not yet implemented).
+    Delete a user by id.
 
     ---
     description: Delete a user
@@ -281,14 +227,34 @@ async def delete_user_byid(*_):
         required: true
         type: integer
     responses:
-      "501":
-        description: Sorry, not implememted
+      "200":
+        description: Sucess
+        schema:
+          type: object
+          properties:
+            result:
+              type: string
+      "400":
+        description: Invalid parameter
+      "404":
+        description: User not found
+      "500":
+        description: Database problem
     """
-    return web.Response(text="PUT project not implemented", status=501)
+    user_id = request.match_info["user_id"]
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return ErrorResponse(400, "Incorrect value for user_id")
+
+    ret = Auth().delete_user(user_id)
+    if not ret:
+        return ErrorResponse(400, "Error deleting user")
+    return web.Response(status=200)
 
 
 @app.http_get("/api/users/{user_id}/roles")
-@app.req_admin
+@req_admin
 async def get_user_roles(request):
     """
     Return a list of project/role for a user.
@@ -329,11 +295,11 @@ async def get_user_roles(request):
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
-        return web.Response(status=400, text="Incorrect user_id")
+        return ErrorResponse(400, "Incorrect user_id")
 
     user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
     if not user:
-        return web.Response(status=404, text="User not found")
+        return ErrorResponse(404, "User not found")
 
     data = {
         "username": user.username,
@@ -357,7 +323,7 @@ async def get_user_roles(request):
 
 
 @app.http_post("/api/users")
-@app.req_admin
+@req_admin
 async def create_user(request):
     """
     Create a user
@@ -409,14 +375,19 @@ async def create_user(request):
     params = await request.json()
 
     username = params.get("name")
-    password = params.get("password")
     email = params.get("email")
+    is_admin = params.get("is_admin", False)
+    password = params.get("password")
     if not username:
-        return web.Response(status=400, text="Invalid username")
-    if not password:
-        return web.Response(status=400, text="Invalid password")
+        return ErrorResponse(400, "Invalid username")
     if not email:
-        return web.Response(status=400, text="Invalid email")
+        return ErrorResponse(400, "Invalid email")
+    if not password:
+        return ErrorResponse(400, "Invalid password")
+    # FIXME: check if user already exists
 
-    Auth().add_user(username, password)
+    try:
+        Auth().add_user(username, password, email, is_admin)
+    except Exception as exc:
+        return ErrorResponse(400, str(exc))
     return web.Response(status=200)

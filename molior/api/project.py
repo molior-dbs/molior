@@ -1,19 +1,12 @@
-"""
-Provides functions to interact with the Project
-database model.
-"""
 from aiohttp import web
+from sqlalchemy import func
 
-from molior.molior.configuration import Configuration
-from molior.model.project import Project
-from molior.model.projectversion import ProjectVersion
-from molior.molior.logger import get_logger
-
-from .projectversion import get_projectversion_deps_manually
-from .helper.validator import is_name_valid
-from .app import app
-
-logger = get_logger()
+from ..app import app, logger
+from ..auth import req_role, req_admin
+from ..molior.configuration import Configuration
+from ..model.project import Project
+from ..model.projectversion import ProjectVersion, get_projectversion_deps, get_projectversion
+from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse
 
 
 @app.http_get("/api/projects")
@@ -53,49 +46,27 @@ async def get_projects(request):
         "500":
             description: internal server error
     """
-    page = request.GET.getone("page", None)
-    page_size = request.GET.getone("page_size", None)
+    db = request.cirrina.db_session
     filter_name = request.GET.getone("q", "")
     try:
         count_only = request.GET.getone("count_only").lower() == "true"
     except (ValueError, KeyError):
         count_only = False
 
-    if page:
-        try:
-            page = int(page)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page", status=400)
-        page = 1 if page < 1 else page
-
-    if page_size:
-        try:
-            page_size = int(page_size)
-        except (ValueError, TypeError):
-            return web.Response(text="Incorrect value for page_size", status=400)
-        page_size = 1 if page_size < 1 else page_size
-
-    query = (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter(Project.is_mirror.is_(False))
-        .order_by(Project.name)
-    )
+    query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
 
     if filter_name:
-        query = query.filter(Project.name.like("%{}%".format(filter_name)))
+        query = query.filter(Project.name.ilike("%{}%".format(filter_name)))
 
     nb_results = query.count()
-
-    if page and page_size:
-        results = query.limit(page_size).offset((page - 1) * page_size).all()
-    else:
-        results = query.all()
+    query = paginate(request, query)
+    results = query.all()
 
     data = {"total_result_count": nb_results}
     if not count_only:
         data["results"] = [
-            {"id": project.id, "name": project.name, "description": project.description}
-            for project in results
+            {"id": item.id, "name": item.name, "description": item.description}
+            for item in results
         ]
 
     return web.json_response(data)
@@ -130,28 +101,20 @@ async def get_project(request):
         "500":
             description: internal server error
     """
-
+    db = request.cirrina.db_session
     project_id = request.match_info["project_id"]
     show_deleted = request.GET.getone("show_deleted", "").lower() == "true"
     try:
         project_id = int(project_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for project_id", status=400)
+        return ErrorResponse(400, "Incorrect value for project_id")
 
-    project = request.cirrina.db_session.query(Project).filter_by(id=project_id).first()
+    project = db.query(Project).filter_by(id=project_id).first()
     if not project:
-        return web.Response(
-            status=404, text="Project with id {} could not be found!".format(project_id)
-        )
+        return ErrorResponse(404, "Project with id {} could not be found!".format(project_id))
 
-    versions = (
-        request.cirrina.db_session.query(ProjectVersion)
-        .filter_by(project_id=project.id)
-        .filter_by(is_deleted=show_deleted)
-        .order_by(ProjectVersion.name.desc())
-        .all()
-    )
-
+    versions = db.query(ProjectVersion).filter_by(project_id=project.id,
+                                                  is_deleted=show_deleted).order_by(func.lower(ProjectVersion.name).desc()).all()
     data = {
         "id": project.id,
         "name": project.name,
@@ -162,12 +125,11 @@ async def get_project(request):
         ],
         "versions_map": {version.id: version.name for version in versions},
     }
-
     return web.json_response(data)
 
 
 @app.http_post("/api/projects")
-@app.req_admin
+@req_admin
 # FIXME: req_role
 async def create_project(request):
     """
@@ -177,55 +139,45 @@ async def create_project(request):
     description: Creates a new project.
     tags:
         - Projects
-    consumes:
-        - application/x-www-form-urlencoded
     parameters:
-        - name: name
-          in: query
+        - in: body
+          name: body
+          description: Created user object
           required: true
-          type: string
-        - name: description
-          in: query
-          required: false
-          type: string
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
     produces:
         - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: invalid data received
-        "500":
-            description: internal server error
     """
+    db = request.cirrina.db_session
     params = await request.json()
     name = params.get("name")
     description = params.get("description")
     if not name:
-        return web.Response(status=400, text="No project name given.")
+        return ErrorResponse(400, "No project name given")
 
     if not is_name_valid(name):
-        return web.Response(status=400, text="Invalid project name!")
+        return ErrorResponse(400, "Invalid project name")
 
-    if (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter(Project.name == name)
-        .first()
-    ):
-        return web.Response(status=400, text="Projectname is already taken")
+    if db.query(Project).filter(func.lower(Project.name) == name.lower()).first():
+        return ErrorResponse(400, "Projectname is already taken")
 
     project = Project(name=name, description=description)
-    request.cirrina.db_session.add(project)
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
-
-    logger.info("Project '%s' with id '%s' created", project.name, project.id)
+    db.add(project)
+    db.commit()
 
     return web.json_response({"id": project.id, "name": project.name})
 
 
+@app.http_put("/api/projectbase/{project_id}")
 @app.http_put("/api/projects/{project_id}")
 @app.authenticated
-@app.req_role("owner")
+@req_role("owner")
 async def update_project(request):
     """
     Update a project.
@@ -253,6 +205,7 @@ async def update_project(request):
         "500":
             description: internal server error
     """
+    db = request.cirrina.db_session
     # TODO: Implement this api method.
     project_id = request.match_info["project_id"]
     params = await request.json()
@@ -261,18 +214,14 @@ async def update_project(request):
     try:
         project_id = int(project_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for project_id", status=400)
+        return ErrorResponse(400, "Incorrect value for project_id")
 
-    project = (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter_by(id=project_id)
-        .first()
-    )
-
+    project = db.query(Project).filter_by(id=project_id).first()
+    if not project:
+        return ErrorResponse(404, "project {} not found".format(project_id))
     project.description = description
-
-    request.cirrina.db_session.commit()  # pylint: disable=no-member
-    return web.Response(status=200)
+    db.commit()
+    return OKResponse("project updated")
 
 
 @app.http_delete("/api/projects/{project_id}")
@@ -301,25 +250,21 @@ async def delete_project(request):
         "400":
             description: project id could not be found
     """
-
+    db = request.cirrina.db_session
     project_id = request.match_info["project_id"]
     try:
         project_id = int(project_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for project_id", status=400)
+        return ErrorResponse(400, "Incorrect value for project_id")
 
-    project = (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter_by(id=project_id)
-        .first()
-    )
+    project = db.query(Project).filter_by(id=project_id).first()
     if project:
         project.delete()
 
-    return web.Response(text="project {} deleted".format(project_id), status=200)
+    return OKResponse("project {} deleted".format(project_id))
 
 
-@app.http_get("/api/projectsources/{project_name}/{projectver_name}")
+@app.http_get("/api/projectsources/{project_name}/{project_version}")
 async def get_apt_sources(request):
     """
     Returns apt sources list for given project,
@@ -336,7 +281,7 @@ async def get_apt_sources(request):
           in: path
           required: true
           type: str
-        - name: projectver_name
+        - name: project_version
           in: path
           required: true
           type: str
@@ -348,48 +293,36 @@ async def get_apt_sources(request):
         "400":
             description: Parameter missing
     """
-    project_name = request.match_info.get("project_name")
-    projectver_name = request.match_info.get("projectver_name")
+    db = request.cirrina.db_session
+    unstable = request.GET.getone("unstable", "")
 
-    if not project_name or not projectver_name:
-        return web.Response(text="Parameter missing", status=400)
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "projectversion not found")
 
-    project = (
-        request.cirrina.db_session.query(Project)  # pylint: disable=no-member
-        .filter(Project.name == project_name)
-        .first()
-    )
-    if not project:
-        return web.Response(text=str(), status=400)
-
-    version = (
-        request.cirrina.db_session.query(ProjectVersion)  # pylint: disable=no-member
-        .filter_by(project_id=project.id)
-        .filter(ProjectVersion.name == projectver_name)
-        .first()
-    )
-
-    if not version:
-        return web.Response(text=str(), status=400)
-
-    deps = [version]
-    deps += get_projectversion_deps_manually(version, to_dict=False)
+    deps = [(projectversion.id, projectversion.ci_builds_enabled)]
+    deps += get_projectversion_deps(projectversion.id, db)
 
     cfg = Configuration()
-    apt_url = cfg.aptly.get("apt_url")
+    apt_url = cfg.aptly.get("apt_url_public")
+    if not apt_url:
+        apt_url = cfg.aptly.get("apt_url")
     keyfile = cfg.aptly.get("key")
 
-    sources_list = "# APT Sources for project {0} {1}\n".format(
-        project_name, projectver_name
-    )
+    sources_list = "# APT Sources for project {0} {1}\n".format(projectversion.project.name, projectversion.name)
     sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not project.is_basemirror and version.buildvariants:
+    if not projectversion.project.is_basemirror and projectversion.basemirror:
         sources_list += "# Base Mirror\n"
-        base_mirror = version.buildvariants[0].base_mirror
-        sources_list += "{}\n".format(base_mirror.get_apt_repo())
+        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
 
     sources_list += "# Project Sources\n"
-    for dep in deps:
+    for d in deps:
+        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
+        if not dep:
+            logger.error("projectsources: projecversion %d not found", d[0])
         sources_list += "{}\n".format(dep.get_apt_repo())
+        # ci builds requested & use ci builds from this dep & dep has ci builds
+        if unstable == "true" and d[1] and dep.ci_builds_enabled:
+            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
 
-    return web.Response(text=sources_list, status=200)
+    return web.Response(status=200, text=sources_list)

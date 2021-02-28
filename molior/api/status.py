@@ -1,13 +1,11 @@
-"""
-Provides functions to check the current status
-of the molior packages and their version
-"""
-
 from aiohttp import web
+from os.path import expanduser
 
-from .app import app
-from molior.version import MOLIOR_VERSION
-from molior.molior.backend import Backend
+from ..app import app
+from ..auth import req_admin
+from ..version import MOLIOR_VERSION
+from ..molior.backend import Backend
+from ..molior.configuration import Configuration
 
 
 @app.http_get("/api/status")
@@ -43,16 +41,31 @@ async def get_status(request):
         maintenance_message = value[0]
         break
 
+    sshkey_file = expanduser("~/.ssh/id_rsa.pub")
+    sshkey = ""
+    try:
+        with open(sshkey_file) as f:
+            sshkey = f.read()
+    except Exception:
+        pass
+
+    cfg = Configuration()
+    apt_url = cfg.aptly.get("apt_url_public")
+    if not apt_url:
+        apt_url = cfg.aptly.get("apt_url")
+    gpgurl = apt_url + "/" + cfg.aptly.get("key")
     status = {
-        "versions": {"molior-server": [MOLIOR_VERSION]},
+        "version": MOLIOR_VERSION,
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
+        "sshkey": sshkey,
+        "gpgurl": gpgurl
     }
     return web.json_response(status)
 
 
 @app.http_post("/api/status/maintenance")
-@app.req_admin
+@req_admin
 async def set_maintenance(request):
     """
     Set maintenance mode and message
@@ -127,19 +140,55 @@ async def get_nodes_info(request):
         "500":
             description: internal server error
     """
+    search = request.GET.getone("q", None)
+    page = int(request.GET.getone("page", 1))
+    page_size = int(request.GET.getone("page_size", 10))
+
     b = Backend()
     backend = b.get_backend()
     build_nodes = backend.get_nodes_info()
-    # uptime_string = str(timedelta(seconds = uptime_seconds))
-    results = []
-    for name in build_nodes:
-        load = ""
-        for l in build_nodes[name]["load"]:
-            if load:
-                load += ", "
-            load += str(l)
-        build_nodes[name]["load"] = load
-        results.append({**build_nodes[name], **{"name": name}})
 
-    data = {"total_result_count": len(build_nodes), "results": results}
+    results = []
+    for node in build_nodes:
+        if search and search.lower() not in node["name"].lower():
+            continue
+        results.append(node)
+
+    def sortBy(node):
+        return node["name"]
+    results.sort(key=sortBy)
+
+    # FIXME: sort?
+
+    # paginate
+    result_page = results[page_size * (page - 1):page_size*page]
+
+    data = {"total_result_count": len(results), "results": result_page}
     return web.json_response(data)
+
+
+@app.http_get("/api/node/{machineID}")
+async def get_node(request):
+    """
+    Returns info about the build node
+
+    ---
+    description: Returns info about the build nodes
+    tags:
+        - Status
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    machine_id = request.match_info["machineID"]
+    b = Backend()
+    backend = b.get_backend()
+    build_nodes = backend.get_nodes_info()
+    for node in build_nodes:
+        if machine_id == node["id"]:
+            return web.json_response(node)
+    return web.Response(text="Node not found", status=404)

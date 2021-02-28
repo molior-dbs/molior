@@ -1,66 +1,26 @@
-"""
-This module provides the molior SourceRepository
-database model.
-"""
 from pathlib import Path
-
 from sqlalchemy import Column, String, Integer, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.hybrid import hybrid_property
 
-# Needed imports for relatioships
-import molior.model.projectversion  # pylint: disable=unused-import
-import molior.model.hook  # noqa: F401, pylint: disable=unused-import
-
-from molior.molior.logger import get_logger
+from ..app import logger
+from ..molior.configuration import Configuration
 from .database import Base
-from .sourepprover import SouRepProVer
-from .buildorder import BuildOrder
-from .sourcerepositoryhook import SourceRepositoryHook
-
-from molior.molior.utils import parse_repository_name
-from molior.molior.configuration import Configuration
 
 REPO_STATES = ["new", "cloning", "error", "ready", "busy"]
 DEFAULT_CWD = "/var/lib/molior"
 
-logger = get_logger()
 
-
-class SourceRepository(Base):  # pylint: disable=too-few-public-methods
-    """
-    Database model for a SourceRepository.
-    """
-
+class SourceRepository(Base):
     __tablename__ = "sourcerepository"
 
-    id = Column(Integer, primary_key=True)  # pylint: disable=invalid-name
+    id = Column(Integer, primary_key=True)
     url = Column(String)
-    state = Column(
-        "state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new"
-    )
-    dependencies = relationship(
-        "SourceRepository",
-        secondary=BuildOrder,
-        primaryjoin=id == BuildOrder.c.sourcerepository,
-        secondaryjoin=id == BuildOrder.c.dependency,
-    )
-    projectversions = relationship("ProjectVersion", secondary=SouRepProVer)
-    hooks = relationship("Hook", secondary=SourceRepositoryHook)
+    name = Column(String)
+    state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
+    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
 
-    def __init__(self, url):
-        self.url = url
-
-    @hybrid_property
-    def name(self):
-        """
-        Returns the name of the Repository by parsing
-        the url.
-
-        Returns:
-            name (str): The name of the repository
-        """
-        return parse_repository_name(str(self.url))
+#    def __init__(self, url):
+#        self.url = url
 
     @property
     def path(self):

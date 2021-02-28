@@ -1,0 +1,45 @@
+# Molior configuration
+
+hostname: 'molior'
+working_dir: '/var/lib/molior'
+database: '/molior'
+
+# GPG email for signing the source packages
+debsign_gpg_email: 'debsign@molior.info'
+
+email_notifications:
+    enabled: False
+    sender: 'molior <noreply@molior.info>'
+    server: 'localhost'
+
+ci_builds:
+    enabled: True
+    # Remove ci packages which are older than <ci_packages_ttl> days
+    packages_ttl: 7
+
+admin:
+    pass: 'molior-dev'
+
+auth_backend: 'db'
+
+backend: 'http'
+
+backend_http:
+    ping_timeout: 5
+
+# Molior server settings
+max_parallel_chroots: 2
+
+# Aptly settings
+aptly:
+    # apt_url_public: 'http://molior:3142'
+    apt_url: 'http://molior:3142'
+    api_url: 'http://127.0.0.1:8080/api'
+    gpg_key: 'reposign@molior.info'
+    user: 'molior'
+    pass: 'molior-dev'
+    key: 'archive-keyring.asc'
+
+# Gitlab-API settings
+#gitlab:
+#    auth_token: '<top_secret_token>'

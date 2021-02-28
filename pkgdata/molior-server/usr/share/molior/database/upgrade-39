@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+update build b1 set version = (select version from build b2 where b2.parent_id = b1.id and b2.buildtype = 'source' and b2.version != '') where b1.buildtype = 'build' and b1.version is null;
+
+EOF

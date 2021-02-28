@@ -1,55 +1,64 @@
-"""
-Provides the git clone operation
-"""
 import shutil
 import shlex
 import operator
+import os
+# import asyncio
+
 from launchy import Launchy
-from datetime import datetime
 
-from molior.model.database import Session
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.molior.buildlogger import write_log, write_log_title
-from molior.molior.logger import get_logger
-from molior.molior.errors import MaintainerParseError
-from molior.molior.core import get_maintainer, get_target_config
-from molior.molior.utils import get_changelog_attr
-from molior.api.helper.validator import validate_version_format
-
-logger = get_logger()
+from ..app import logger
+from ..tools import get_changelog_attr, validate_version_format
+from ..model.database import Session
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..molior.core import get_maintainer, get_target_config
+from ..molior.queues import enqueue_task
 
 
-async def run_git(cmd, cwd, build_id):
+async def run_git(cmd, cwd, build, write_output_log=True):
+    await build.log("$: %s\n" % cmd)
 
     async def outh(line):
-        write_log(build_id, "%s\n" % line)
+        if write_output_log:
+            await build.log(line + "\n")
 
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=cwd)
+    async def errh(line):
+        await build.log(line + "\n")
+
+    env = os.environ.copy()
+    env["GIT_SSL_NO_VERIFY"] = ""
+    process = Launchy(shlex.split(cmd), outh, errh, cwd=cwd, env=env)
     await process.launch()
-    return await process.wait()
+    ret = await process.wait()
+    return ret == 0
 
 
-async def GitClone(build_id, repo_id, task_queue):
+async def run_git_cmds(git_commands, repo_path, build, write_output_log=True):
+    for git_command in git_commands:
+        if not await run_git(git_command, str(repo_path), build, write_output_log):
+            logger.error("error running git command: %s", git_command)
+            return False
+    return True
 
+
+async def GitClone(build_id, repo_id, session):
     with Session() as session:
-        repo = (
-            session.query(SourceRepository)
-            .filter(SourceRepository.id == repo_id)
-            .first()
-        )
-
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("BuildProcess: build %d not found", build_id)
+            logger.error("get_latest_tag: build %d not found", build_id)
+            return
+
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
+        if not repo:
+            logger.error("buildlatest: repo %d not found", repo_id)
             return
 
         repo.set_busy()
         session.commit()
 
-        write_log_title(build_id, "Clone Respository")
+        await build.logtitle("Clone Respository")
         logger.info("cloning repository '%s' into '%s'", repo.url, str(repo.src_path))
-        write_log(build_id, "I: cloning repository '{}'\n".format(repo.url))
+        await build.log("I: cloning repository '{}'\n".format(repo.url))
 
         if not repo.path.exists():
             repo.path.mkdir()
@@ -58,51 +67,138 @@ async def GitClone(build_id, repo_id, task_queue):
             logger.info("clone task: removing git repo %s", str(repo.src_path))
             shutil.rmtree(str(repo.src_path))
 
-        ret = await run_git("git clone --config http.sslVerify=false {}".format(repo.url), str(repo.path), build_id)
-        if ret != 0:
+        if not await run_git("git clone --config http.sslVerify=false {}".format(repo.url), str(repo.path), build):
             logger.error("error running git clone")
             repo.set_error()
             await build.set_failed()
+            await build.logdone()
             session.commit()
             return
 
         git_commands = ["git config http.sslverify false", "git lfs install"]
         for git_command in git_commands:
-            ret = await run_git(git_command, str(repo.src_path), build_id)
-            if ret != 0:
+            if not await run_git(git_command, str(repo.src_path), build):
                 logger.error("error running git command: %s", git_command)
+                repo.set_error()
+                await build.set_failed()
+                await build.logdone()
+                session.commit()
                 return
 
-        write_log(build_id, "\n")
+        await build.log("\n")
 
         repo.set_ready()
         session.commit()
 
-        args = {"buildlatest": [repo.id, build_id]}
-        await task_queue.put(args)
+        args = {"buildlatest": [repo.id, build.id]}
+        await enqueue_task(args)
 
 
-async def GitCheckout(src_repo_path, git_ref, build_id):
+async def GitCleanLocal(repo_path, build):
+    if not await run_git_cmds(["git reset --hard", "git clean -dffx", "git fetch -p"], repo_path, build, write_output_log=False):
+        return False
 
-    git_commands = ["git fetch --tags --force",
-                    "git reset --hard",
-                    "git clean -dffx",
-                    "git checkout --force {}".format(git_ref),
-                    "git submodule sync --recursive",
-                    "git submodule update --init --recursive",
-                    "git clean -dffx",
-                    "git lfs pull"]
+    default_branch = None
 
-    for git_command in git_commands:
-        ret = await run_git(git_command, str(src_repo_path), build_id)
+    async def outh(line):
+        nonlocal default_branch
+        default_branch = line.strip()
+
+    # checkout remote default branch
+    process = Launchy(shlex.split("git symbolic-ref refs/remotes/origin/HEAD"), outh, outh, cwd=str(repo_path))
+    await process.launch()
+    ret = await process.wait()
+    if ret != 0:
+        logger.error("error getting current commit")
+        return False
+
+    async def outh_null(line):
+        pass
+
+    default_branch = default_branch.replace("refs/remotes/", "")
+
+    process = Launchy(shlex.split("git checkout {}".format(default_branch)), outh_null, outh_null, cwd=str(repo_path))
+    await process.launch()
+    ret = await process.wait()
+    if ret != 0:
+        logger.error("error checking out '%s'", default_branch)
+        return False
+
+    # get all branches
+    branches = []
+
+    async def outh3(line):
+        nonlocal branches
+        if "HEAD detached" not in line:
+            branches.append(line.strip())
+
+    process = Launchy(shlex.split("git branch"), outh3, outh3, cwd=str(repo_path))
+    await process.launch()
+    ret = await process.wait()
+    if ret != 0:
+        logger.error("error getting all branches")
+        return False
+
+    # get all tags
+    tags = []
+
+    async def outh4(line):
+        nonlocal tags
+        tags.append(line.strip())
+
+    process = Launchy(shlex.split("git tag"), outh4, outh4, cwd=str(repo_path))
+    await process.launch()
+    ret = await process.wait()
+    if ret != 0:
+        logger.error("error getting all tags")
+        return False
+
+    # delete all local branches and tags
+    for branch in branches:
+        process = Launchy(shlex.split("git branch -D {}".format(branch)), outh_null, outh_null, cwd=str(repo_path))
+        await process.launch()
+        ret = await process.wait()
         if ret != 0:
-            logger.error("error running git command: %s", git_command)
+            logger.error("error deleting local branch '%s'", branch)
+            return False
+
+    for tag in tags:
+        process = Launchy(shlex.split("git tag -d {}".format(tag)), outh_null, outh_null, cwd=str(repo_path))
+        await process.launch()
+        ret = await process.wait()
+        if ret != 0:
+            logger.error("error deleting local tag '%s'", branch)
             return False
 
     return True
 
 
-async def get_latest_tag(path, build_id):
+async def GitCheckout(repo_path, git_ref, build_id):
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("checkout: build %d not found", build_id)
+            return False
+
+        if not await GitCleanLocal(repo_path, build):
+            return False
+        if not await run_git("git fetch --tags --prune --prune-tags --force", repo_path, build, write_output_log=False):
+            return False
+        if not await run_git("git checkout --force {}".format(git_ref), repo_path, build, write_output_log=False):
+            return False
+
+        git_commands = ["git submodule sync --recursive",
+                        "git submodule update --init --recursive",
+                        "git clean -dffx",
+                        "git lfs pull"]
+        if not await run_git_cmds(git_commands, repo_path, build):
+            logger.error("Error checking out git ref '%s'" % git_ref)
+            return False
+
+    return True
+
+
+async def get_latest_tag(repo_path, build_id):
     """
     Returns latest tag from given git
     repository.
@@ -113,41 +209,52 @@ async def get_latest_tag(path, build_id):
     Returns:
         tag (Git.tag): The latest git tag
     """
-    ret = await run_git("git fetch --tags --force", str(path), build_id)
-    if ret != 0:
-        logger.error("error running git fetch: %s", str(path))
-        return None
-
-    git_tags = []
-
-    async def outh(line):
-        nonlocal git_tags
-        git_tags.append(line.strip())
-
-    process = Launchy(shlex.split("git tag"), outh, outh, cwd=str(path))
-    await process.launch()
-    await process.wait()
-
     valid_tags = {}
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("get_latest_tag: build %d not found", build_id)
+            return None
 
-    # get commit timestamps
-    for tag in git_tags:
-        timestamp = None
+        if not await GitCleanLocal(repo_path, build):
+            return None
 
-        async def outh2(line):
-            nonlocal timestamp
-            timestamp = line.strip()
+        if not await run_git("git fetch --tags --prune --prune-tags --force", str(repo_path), build, write_output_log=False):
+            logger.error("error running git fetch: %s", str(repo_path))
+            return None
 
-        process = Launchy(shlex.split("git show -s --format=%ct {}".format(tag)), outh2, outh2, cwd=str(path))
+        git_tags = []
+
+        async def outh(line):
+            nonlocal git_tags
+            git_tags.append(line.strip())
+
+        process = Launchy(shlex.split("git tag"), outh, outh, cwd=str(repo_path))
         await process.launch()
         await process.wait()
 
-        if timestamp and validate_version_format(tag):
-            valid_tags[timestamp] = tag
+        # get commit timestamps
+        for tag in git_tags:
+            timestamp = None
 
-    if valid_tags:
-        return max(valid_tags.items(), key=operator.itemgetter(0))[1]
-    return None
+            async def outh2(line):
+                nonlocal timestamp
+                line = line.strip()
+                if line:
+                    timestamp = line
+
+            process = Launchy(shlex.split("git log -1 --format=%ct {}".format(tag)), outh2, outh2, cwd=str(repo_path))
+            await process.launch()
+            await process.wait()
+
+            if timestamp and validate_version_format(tag):
+                valid_tags[timestamp] = tag
+
+        if not valid_tags:
+            logger.warning("no valid git tags found")
+            return None
+
+    return max(valid_tags.items(), key=operator.itemgetter(0))[1]
 
 
 async def GetBuildInfo(repo_path, git_ref):
@@ -164,32 +271,33 @@ async def GetBuildInfo(repo_path, git_ref):
         nonlocal gitinfo
         gitinfo = line.strip()
 
-    process = Launchy(shlex.split("git show -s --format='%H %cI %ae %an'"), outh, outh, cwd=str(repo_path))
+    process = Launchy(shlex.split("git show -s --format='%H %ae %an'"), outh, outh, cwd=str(repo_path))
     await process.launch()
     await process.wait()
 
-    gitinfos = gitinfo.split(" ", 3)
-    if len(gitinfos) != 4:
+    gitinfos = gitinfo.split(" ", 2)
+    if len(gitinfos) != 3:
         logger.error("Error parsing git info '%s'", gitinfos)
         return None
 
     info.commit_hash = gitinfos[0]
-    d = gitinfos[1]
-    info.author_email = gitinfos[2]
-    info.author_name = gitinfos[3]
+    info.author_email = gitinfos[1]
+    info.author_name = gitinfos[2]
 
-    ts = d[0:19] + d[19:25].replace(":", "")
-    tag_dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z")
-
-    info.tag_stamp = tag_dt.strftime("%Y-%m-%d %T%z")
-    info.tag_dt = tag_dt
-
-    try:
-        info.firstname, info.lastname, info.email = await get_maintainer(repo_path)
-    except MaintainerParseError as exc:
-        logger.warning("could not get maintainer: %s" % str(exc))
+    maintainer = await get_maintainer(repo_path)
+    if not maintainer:
+        # FIXME: log to build log
+        logger.error("could not parse maintainer")
         return None
 
+    info.firstname, info.lastname, info.email = maintainer
     info.plain_targets = get_target_config(repo_path)
 
     return info
+
+
+async def GitChangeUrl(old_repo_path, name, url):
+    process = Launchy(shlex.split("git remote set-url origin {}".format(url)), None, None, cwd=str(old_repo_path))
+    await process.launch()
+    await process.wait()
+    os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)

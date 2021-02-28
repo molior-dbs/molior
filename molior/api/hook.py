@@ -1,15 +1,9 @@
-"""
-Provides api functions to interact with the hook database
-model.
-"""
 from aiohttp import web
 
-from molior.model.hook import Hook
-from molior.model.sourcerepository import SourceRepository
-
-from .app import app
-from .inputparser import parse_int
-from .helper.hook import get_hook_triggers
+from ..app import app
+from ..model.hook import Hook
+from ..model.sourcerepository import SourceRepository
+from ..tools import parse_int, get_hook_triggers
 
 
 @app.http_get("/api/hooks")
@@ -46,7 +40,7 @@ async def get_webhooks(request):
         request.cirrina.db_session.query(SourceRepository)
         .filter(SourceRepository.id == repository_id)
         .first()
-    )  # pylint: disable=no-member
+    )
 
     data = {
         "total_result_count": len(repo.hooks),
@@ -168,8 +162,8 @@ async def create_webhook(request):
 
 
 @app.http_put("/api/hooks/{hook_id}")
-# FIXME: req_role
 @app.authenticated
+# FIXME: req_role
 async def update_hook(request):
     """
     Updates a hook

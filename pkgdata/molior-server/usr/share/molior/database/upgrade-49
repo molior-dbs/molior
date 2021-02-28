@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE build ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+CREATE INDEX ix_build_is_deleted ON build USING btree (is_deleted);
+
+EOF

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE build ADD COLUMN snapshotbuild_id integer;
+
+EOF

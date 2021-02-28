@@ -1,0 +1,9 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE sourcerepository ADD CONSTRAINT unique_sourcerepository UNIQUE (url);
+
+ALTER TABLE build DROP COLUMN versiontimestamp;
+
+EOF

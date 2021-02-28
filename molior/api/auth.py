@@ -1,16 +1,9 @@
-"""
-Provides the moliorweb authentication module.
-"""
-import logging
-
 from aiohttp import web
 
-from molior.molior.configuration import Configuration
-from molior.model.user import User
-from molior.molior.auth import Auth
-from .app import app
-
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+from ..app import app, logger
+from ..molior.configuration import Configuration
+from ..model.user import User
+from ..auth import Auth
 
 
 @app.auth_handler
@@ -25,6 +18,8 @@ async def auth_admin(request, user, passwd):
     Returns:
         bool: True if successfully authenticated, otherwise False.
     """
+    if not user:
+        return False
     user = user.lower()
     if user == "admin":
         config = Configuration()
@@ -50,9 +45,11 @@ async def authenticate(request, user, passwd):
     Returns:
         bool: True if successfully authenticated, otherwise False.
     """
-    user = user.lower()
+    if not user:
+        return False
+    user = user.lower()  # FIXME: move to cirrina
     if user == "admin":
-        logger.info("admin account from LDAP not allowed")
+        logger.error("admin account not allowed via auth plugin")
         return False
 
     return Auth().login(user, passwd)

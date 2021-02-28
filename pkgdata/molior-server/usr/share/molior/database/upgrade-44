@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+update projectversion set dependency_policy = 'strict';
+
+EOF

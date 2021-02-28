@@ -1,4 +1,4 @@
 #! /usr/bin/dh-exec
 
-pkgs/molior-server/* .
+pkgdata/molior-server/* .
 

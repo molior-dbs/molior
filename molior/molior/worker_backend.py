@@ -1,20 +1,11 @@
-"""
-Async Backend Worker Task
-"""
-
-import asyncio
+from ..app import logger
+from .backend import Backend
+from .notifier import send_mail_notification
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend, buildlogdone
 
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-from .logger import get_logger
-from .notifier import send_mail_notification
-from molior.molior.backend import Backend
-from molior.molior.buildlogger import write_log
-
-
-logger = get_logger()
-backend_queue = asyncio.Queue()
 
 
 class BackendWorker:
@@ -23,48 +14,66 @@ class BackendWorker:
 
     """
 
-    def __init__(self, task_queue, aptly_queue):
-        self.task_queue = task_queue
-        self.aptly_queue = aptly_queue
+    def __init__(self):
+        self.logging_done = []
+        self.build_outcome = {}  # build_id: outcome
 
     async def _schedule(self, job):
         b = Backend()
         backend = b.get_backend()
-        backend.build(*job)
+        await backend.build(*job)
 
-    async def _started(self, session, build_id):
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("build_started: no build found for %d", build_id)
-            return
-        write_log(build.parent.parent.id, "I: started build %d\n" % build_id)
-        await build.set_building()
-        session.commit()
+    async def _started(self, build_id):
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("build_started: no build found for %d", build_id)
+                return
+            await build.parent.parent.log("I: started build %d\n" % build_id)
+            await build.set_building()
+            session.commit()
 
-    async def _succeeded(self, session, build_id):
-        await self.aptly_queue.put({"publish": [build_id]})
+    async def _succeeded(self, build_id):
+        self.build_outcome[build_id] = True
+        if build_id in self.logging_done:
+            await enqueue_backend({"terminate": build_id})
 
-    async def _failed(self, session, build_id):
-        build = session.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("build_failed: no build found for %d", build_id)
-            return
-        write_log(build.parent.parent.id, "E: build %d failed\n" % build_id)
-        await build.set_failed()
-        session.commit()
+    async def _failed(self, build_id):
+        self.build_outcome[build_id] = False
+        if build_id in self.logging_done:
+            await enqueue_backend({"terminate": build_id})
 
-        buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-        session.delete(buildtask)
-        session.commit()
+    async def _logging_done(self,  build_id):
+        self.logging_done.append(build_id)
+        if build_id in self.build_outcome:
+            await enqueue_backend({"terminate": build_id})
 
-        # FIXME: do not remove the logs!
-        # src_repo = build.buildconfiguration.sourcerepositories[0]
-        # for _file in src_repo.path.glob("*_{}*.*".format(build.version)):
-        #    logger.info("removing: %s", _file)
-        #    os.remove(str(_file))
+    async def _terminate(self, build_id):
+        outcome = self.build_outcome[build_id]
+        del self.build_outcome[build_id]
+        self.logging_done.remove(build_id)
 
-        if not build.is_ci:
-            send_mail_notification(build)
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == build_id).first()
+            if not build:
+                logger.error("build_failed: no build found for %d", build_id)
+                return
+
+            if outcome:  # build successful
+                await build.set_needs_publish()
+                await enqueue_aptly({"publish": [build_id]})
+            else:        # build failed
+                await build.parent.parent.log("E: build %d failed\n" % build_id)
+                await build.set_failed()
+                await buildlogdone(build.id)
+                session.commit()
+
+                buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
+                session.delete(buildtask)
+                session.commit()
+
+                if not build.is_ci:
+                    send_mail_notification(build)
 
     async def run(self):
         """
@@ -72,35 +81,48 @@ class BackendWorker:
         """
 
         while True:
-            try:
-                task = await backend_queue.get()
-                if task is None:
-                    logger.info("backend:: got emtpy task, aborting...")
-                    break
+            task = await dequeue_backend()
+            if task is None:
+                logger.info("backend: got emtpy task, aborting...")
+                break
 
-                with Session() as session:
-                    handled = False
-                    job = task.get("schedule")
-                    if job:
-                        handled = True
-                        await self._schedule(job)
-                    build_id = task.get("started")
-                    if build_id:
-                        handled = True
-                        await self._started(session, build_id)
-                    build_id = task.get("succeeded")
-                    if build_id:
-                        handled = True
-                        await self._succeeded(session, build_id)
-                    build_id = task.get("failed")
-                    if build_id:
-                        handled = True
-                        await self._failed(session, build_id)
+                logger.debug("backend: got task {}".format(task))
+
+            try:
+                handled = False
+                job = task.get("schedule")
+                if job:
+                    handled = True
+                    await self._schedule(job)
+                build_id = task.get("started")
+                if build_id:
+                    handled = True
+                    await self._started(build_id)
+                build_id = task.get("succeeded")
+                if build_id:
+                    handled = True
+                    await self._succeeded(build_id)
+                build_id = task.get("failed")
+                if build_id:
+                    handled = True
+                    await self._failed(build_id)
+                build_id = task.get("terminate")
+                if build_id:
+                    handled = True
+                    await self._terminate(build_id)
+                build_id = task.get("logging_done")
+                if build_id:
+                    handled = True
+                    await self._logging_done(build_id)
+                node_dummy = task.get("node_registered")
+                if node_dummy:
+                    # Schedule builds
+                    args = {"schedule": []}
+                    await enqueue_task(args)
+                    handled = True
 
                 if not handled:
                     logger.error("backend: got unknown task %s", str(task))
-
-                backend_queue.task_done()
 
             except Exception as exc:
                 logger.exception(exc)

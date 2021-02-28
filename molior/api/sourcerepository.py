@@ -1,45 +1,31 @@
-"""
-Provides api functions to interact with the SourceRepository
-database model.
-"""
 import json
-import logging
-from aiohttp import web
 import uuid
 
-from molior.model.sourcerepository import SourceRepository
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.buildvariant import BuildVariant
-from molior.model.buildconfiguration import BuildConfiguration
-from molior.model.projectversion import ProjectVersion
-from molior.model.sourepprover import SouRepProVer
-from molior.molior.notifier import build_added
+from aiohttp import web
 
-from .app import app
-from .inputparser import parse_int
-from .helper.hook import get_hook_triggers
-
-logger = logging.getLogger("molior-web")  # pylint: disable=invalid-name
+from ..app import app, logger
+from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate, db2array
+from ..model.sourcerepository import SourceRepository
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.projectversion import ProjectVersion
+from ..model.sourepprover import SouRepProVer
+from ..molior.queues import enqueue_task
 
 
-def get_last_gitref(db_session, repo, projectversion):
-    last_build = (
-        db_session.query(Build)
-        .join(BuildConfiguration)
-        .filter(
-            BuildConfiguration.sourcerepositories.any(SourceRepository.id == repo.id),
-            BuildConfiguration.projectversions.any(
-                ProjectVersion.id == projectversion.id
-            ),
-        )
-        .order_by(Build.id.desc())
-        .first()
-    )
-
+def get_last_gitref(repo, db):
+    last_build = db.query(Build).filter(Build.sourcerepository_id == repo.id,
+                                        Build.buildtype == "source").order_by(Build.id.desc()).first()
     if last_build:
         return last_build.git_ref
     return None
+
+
+def get_last_build(db, projectversion, repository):
+    last_build = db.query(Build).filter(Build.sourcerepository_id == repository.id,
+                                        Build.projectversion_id == projectversion.id,
+                                        Build.buildtype == "deb").order_by(Build.id.desc()).first()
+    return last_build
 
 
 def get_dependencies_by_sourcerepository(db_session, repository_id):
@@ -71,18 +57,14 @@ def get_dependencies_by_sourcerepository(db_session, repository_id):
     ]
 
 
-def get_architectures(db_session, repo, projectversion):
+def get_architectures(db, repo, projectversion):
     """
     Returns all architectures a repository is configured to build for
     """
-    buildconfigs = (
-        db_session.query(BuildConfiguration)
-        .join(SouRepProVer)
-        .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-        .filter(SouRepProVer.c.projectversion_id == projectversion.id)
-    ).all()
-    # remove multiple occurences of the same architecture
-    return list(set([b.buildvariant.architecture.name for b in buildconfigs]))
+    buildconfig = db.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == repo.id,
+                                                SouRepProVer.projectversion_id == projectversion.id).first()
+
+    return db2array(buildconfig.architectures)
 
 
 @app.http_get("/api/repositories", threaded=True)
@@ -98,10 +80,14 @@ async def get_repositories(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: q
+        - name: name
           in: query
           required: false
-          type: object
+          type: string
+        - name: url
+          in: query
+          required: false
+          type: string
         - name: distinct
           in: query
           required: false
@@ -114,7 +100,7 @@ async def get_repositories(request):
           in: query
           required: false
           type: integer
-        - name: per_page
+        - name: page_size
           in: query
           required: false
           type: integer
@@ -152,23 +138,7 @@ async def get_repositories(request):
     except (ValueError, KeyError):
         count_only = False
 
-    try:
-        page = int(custom_filter.GET.getone("page"))
-    except (ValueError, KeyError):
-        page = None
-    if page:
-        page = 0 if page < 1 else page
-
-    try:
-        per_page = int(custom_filter.GET.getone("per_page"))
-    except (ValueError, KeyError):
-        per_page = None
-    if per_page:
-        per_page = 1 if per_page < 1 else per_page
-
-    repositories = request.cirrina.db_session.query(
-        SourceRepository
-    )  # pylint: disable=no-member
+    repositories = request.cirrina.db_session.query(SourceRepository)
 
     # Apply project version
     if project_version_id is not None:
@@ -197,107 +167,94 @@ async def get_repositories(request):
     # Count entries
     nb_repositories = repositories.count()  # pylint: disable=no-member
     repositories = repositories.order_by(SourceRepository.name)
-
-    # Apply pagination
-    if page and per_page:
-        repositories = repositories.offset(page * per_page)
-    if per_page:
-        repositories = repositories.limit(per_page)
+    repositories = paginate(request, repositories)
 
     data = {"total_result_count": nb_repositories}
 
+    projectversion = None
+    if project_version_id is not None:
+        projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == project_version_id).first()
+
     if not count_only:
-        if project_version_id is not None:
-            projectversion = (
-                request.cirrina.db_session.query(ProjectVersion)
-                .filter(ProjectVersion.id == project_version_id)
-                .first()
-            )
-            data["results"] = [
-                {
-                    "id": repository.id,
-                    "name": repository.name,
-                    "url": repository.url,
-                    "state": repository.state,
-                    "hooks": [
-                        {
-                            "id": hook.id,
-                            "url": hook.url,
-                            "body": hook.body,
-                            "method": hook.method,
-                            "enabled": hook.enabled,
-                            "triggers": get_hook_triggers(hook),
-                        }
-                        for hook in repository.hooks
-                    ],
-                    "dependencies": [
-                        {
-                            "id": dependency.id,
-                            "name": dependency.name,
-                            "url": dependency.url,
-                            "dependencies": get_dependencies_by_sourcerepository(
-                                request.cirrina.db_session, dependency.id
-                            ),
-                        }
-                        for dependency in repository.dependencies
-                    ],
+        data["results"] = []
+        for repository in repositories:
+            repoinfo = {
+                "id": repository.id,
+                "name": repository.name,
+                "url": repository.url,
+                "state": repository.state,
+                "dependencies": [
+                    {
+                        "id": dependency.id,
+                        "name": dependency.name,
+                        "url": dependency.url,
+                        "dependencies": get_dependencies_by_sourcerepository(request.cirrina.db_session, dependency.id),
+                    }
+                    for dependency in repository.dependencies
+                ],
+            }
+            if projectversion:
+                build = get_last_build(request.cirrina.db_session, projectversion, repository)
+                repoinfo.update({
                     "projectversion": {
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
-                        "last_gitref": get_last_gitref(
-                            request.cirrina.db_session, repository, projectversion
-                        ),
-                        "architectures": get_architectures(
-                            request.cirrina.db_session, repository, projectversion
-                        ),
-                    },
-                }
-                for repository in repositories
-            ]
-        else:
-            data["results"] = [
-                {
-                    "id": repository.id,
-                    "name": repository.name,
-                    "url": repository.url,
-                    "state": repository.state,
-                    "hooks": [
-                        {
-                            "id": hook.id,
-                            "url": hook.url,
-                            "body": hook.body,
-                            "method": hook.method,
-                            "enabled": hook.enabled,
-                            "triggers": get_hook_triggers(hook),
+                        "last_gitref": get_last_gitref(request.cirrina.db_session, repository),
+                        "architectures": get_architectures(request.cirrina.db_session, repository, projectversion),
+                        "last_build": {
+                            "id": build.id,
+                            "version": build.version,
+                            "buildstate": build.buildstate
                         }
-                        for hook in repository.hooks
-                    ],
-                    "dependencies": [
-                        {
-                            "id": dependency.id,
-                            "name": dependency.name,
-                            "url": dependency.url,
-                            "dependencies": get_dependencies_by_sourcerepository(
-                                request.cirrina.db_session, dependency.id
-                            ),
-                        }
-                        for dependency in repository.dependencies
-                    ],
-                    "projectversions": [
-                        {
+                    }
+                })
+            else:
+                repoinfo.update({"projectversions": [{
                             "id": projectversion.id,
                             "name": projectversion.project.name,
                             "version": projectversion.name,
-                            "last_gitref": get_last_gitref(
-                                request.cirrina.db_session, repository, projectversion
-                            ),
+                            # "last_gitref": get_last_gitref(
+                            #     request.cirrina.db_session, repository, projectversion
+                            # ),
                         }
                         for projectversion in repository.projectversions
-                    ],
-                }
-                for repository in repositories
-            ]
+                    ]})
+            data["results"].append(repoinfo)
+        return web.json_response(data)
+
+        # FIXME: ????
+        data["results"] = [
+            {
+                "id": repository.id,
+                "name": repository.name,
+                "url": repository.url,
+                "state": repository.state,
+                "dependencies": [
+                    {
+                        "id": dependency.id,
+                        "name": dependency.name,
+                        "url": dependency.url,
+                        "dependencies": get_dependencies_by_sourcerepository(
+                            request.cirrina.db_session, dependency.id
+                        ),
+                    }
+                    for dependency in repository.dependencies
+                ],
+                "projectversions": [
+                    {
+                        "id": projectversion.id,
+                        "name": projectversion.project.name,
+                        "version": projectversion.name,
+                        # "last_gitref": get_last_gitref(
+                        #     request.cirrina.db_session, repository, projectversion
+                        # ),
+                    }
+                    for projectversion in repository.projectversions
+                ],
+            }
+            for repository in repositories
+        ]
 
     return web.json_response(data)
 
@@ -339,18 +296,14 @@ async def post_repositories(request):
     url = params.get("url")
     dependencies = params.get("dependency_id", [])
 
-    if (
-        request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
-        .filter(SourceRepository.url == url)
-        .first()
-    ):
-        return web.Response(status=400, text="SourceRepoistory already exists.")
+    if request.cirrina.db_session.query(SourceRepository).filter(SourceRepository.url == url).first():
+        return ErrorResponse(400, "SourceRepoistory already exists.")
 
     db_deps = []
     for dep in dependencies:
         dep_id = parse_int(dep)
         if not dep_id:
-            return web.Response(status=400, text="Invalid data received.")
+            return ErrorResponse(400, "Invalid data received.")
 
         db_dep = (
             request.cirrina.db_session.query(
@@ -372,7 +325,7 @@ async def post_repositories(request):
     data = {
         "status": 1,
         "message": "SourceRepository successfully created",
-        "data": {"id": db_repo.id, "name": db_repo.name, "url": db_repo.url},
+        "data": {"id": db_repo.id, "name": db_repo.name.lower(), "url": db_repo.url},
     }
 
     return web.json_response(data)
@@ -419,14 +372,12 @@ async def get_repository(request):
     try:
         repository_id = int(repository_id)
     except (ValueError, TypeError):
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     repository = (
-        request.cirrina.db_session.query(SourceRepository)  # pylint: disable=no-member
+        request.cirrina.db_session.query(SourceRepository)
         .join(SouRepProVer)
         .join(ProjectVersion)
-        .join(BuildConfiguration)
-        .join(BuildVariant)
     )
 
     if repository_id:
@@ -447,7 +398,7 @@ async def get_repository(request):
         versions = repository.projectversions
 
     if not repository:
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
     data = {
         "id": repository.id,
@@ -527,7 +478,7 @@ async def trigger_clone(request):
         repository_id = int(repository_id)
     except (ValueError, TypeError):
         logger.error("trigger_clone error: invalid repository_id received")
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     logger.info("trigger_clone build for repo %d" % repository_id)
 
@@ -538,30 +489,26 @@ async def trigger_clone(request):
     )
     if not repository:
         logger.error("trigger_clone error: repo %d not found" % repository_id)
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
     if repository.state != "error":
         logger.error("trigger_clone error: repo %d not in error state" % repository_id)
-        return web.Response(text="Repository not in error state", status=400)
+        return ErrorResponse(400, "Repository not in error state")
 
     build = Build(
         version=None,
         git_ref=None,
         ci_branch=None,
         is_ci=None,
-        versiontimestamp=None,
         sourcename=repository.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repository,
         maintainer=None,
     )
 
     request.cirrina.db_session.add(build)
-    await build_added(build)
-
-    await build.set_building()
+    await build.build_added()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
@@ -569,7 +516,7 @@ async def trigger_clone(request):
     request.cirrina.db_session.commit()
 
     args = {"clone": [build.id, repository.id]}
-    await request.cirrina.task_queue.put(args)
+    await enqueue_task(args)
     return web.Response(status=200, text="Clone job started")
 
 
@@ -607,7 +554,7 @@ async def trigger_build(request):
         repository_id = int(repository_id)
     except (ValueError, TypeError):
         logger.error("trigger_build_latest error: invalid repository_id received")
-        return web.Response(text="Incorrect value for repository_id", status=400)
+        return ErrorResponse(400, "Incorrect value for repository_id")
 
     repository = (
         request.cirrina.db_session.query(SourceRepository)
@@ -616,29 +563,25 @@ async def trigger_build(request):
     )
     if not repository:
         logger.error("trigger_build_latest error: repo %d not found" % repository_id)
-        return web.Response(text="Repository not found", status=400)
+        return ErrorResponse(400, "Repository not found")
 
-    logger.info("trigger_build_latest for repo %d" % repository_id)
+    logger.debug("trigger_build_latest for repo %d" % repository_id)
 
     build = Build(
         version=None,
         git_ref=None,
         ci_branch=None,
         is_ci=None,
-        versiontimestamp=None,
         sourcename=repository.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repository,
         maintainer=None,
     )
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
-
-    await build.set_building()
+    await build.build_added()
 
     token = uuid.uuid4()
     buildtask = BuildTask(build=build, task_id=str(token))
@@ -646,6 +589,6 @@ async def trigger_build(request):
     request.cirrina.db_session.commit()
 
     args = {"buildlatest": [repository_id, build.id]}
-    await request.cirrina.task_queue.put(args)
+    await enqueue_task(args)
 
     return web.json_response({"build_token": str(token)})

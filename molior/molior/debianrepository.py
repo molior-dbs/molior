@@ -1,16 +1,10 @@
-"""
-Provides the DebianRepository class to interact
-with a debian repository server.
-"""
 import asyncio
+
 from datetime import datetime, timedelta
 
-from .logger import get_logger
-from .utils import get_aptly_connection
+from ..app import logger
+from ..aptly import get_aptly_connection, get_snapshot_name
 from .configuration import Configuration
-from molior.aptly import TaskState
-
-logger = get_logger()
 
 
 class DebianRepository:
@@ -23,16 +17,14 @@ class DebianRepository:
     CI_PACKAGES_TTL = 7
     DATETIME_FORMAT = "%Y%m%d%H%M%S"
 
-    def __init__(
-        self, basemirror_name, basemirror_version, project_name, project_version, archs
-    ):
+    def __init__(self, basemirror_name, basemirror_version, project_name, project_version, archs):
         self.basemirror_name = basemirror_name
         self.basemirror_version = basemirror_version
         self.project_name = project_name
         self.project_version = project_version
         self.archs = archs
 
-        self.__api = get_aptly_connection()
+        self.aptly = get_aptly_connection()
         ci_cfg = Configuration().ci_builds
         ci_ttl = ci_cfg.get("packages_ttl") if ci_cfg else None
         self.__ci_packages_ttl = ci_ttl if ci_ttl else self.CI_PACKAGES_TTL
@@ -48,12 +40,7 @@ class DebianRepository:
             stretch_9.2_repos_test_2
         """
 
-        return "{}_{}_repos_{}_{}".format(
-            self.basemirror_name,
-            self.basemirror_version,
-            self.project_name,
-            self.project_version,
-        )
+        return "{}_{}_repos_{}_{}".format(self.basemirror_name, self.basemirror_version, self.project_name, self.project_version)
 
     @property
     def name(self):
@@ -64,12 +51,7 @@ class DebianRepository:
             jessie-8.8-test-1
             stretch-9.2-test-2
         """
-        return "{}-{}-{}-{}".format(
-            self.basemirror_name,
-            self.basemirror_version,
-            self.project_name,
-            self.project_version,
-        )
+        return "{}-{}-{}-{}".format(self.basemirror_name, self.basemirror_version, self.project_name, self.project_version)
 
     async def init(self):
         """
@@ -77,84 +59,105 @@ class DebianRepository:
         if they don't already exist.
         """
         logger.debug("init repository called for '%s'", self.name)
-        snapshots = await self.__api.snapshot_get()
-        repos = await self.__api.repo_get()
-
-        exists = [repo for repo in repos if repo.get("Name") == self.name]
-        if not exists:
-            logger.info("creating repository '%s'", self.name)
-            await self.__api.repo_create(self.name)
-        else:
-            logger.debug("repository '%s' already exists", self.name)
+        snapshots = await self.aptly.snapshot_get()
+        repos = await self.aptly.repo_get()
 
         for dist in self.DISTS:
-            snapshot_base_name = self.__generate_snapshot_name(
-                dist, without_timestamp=True
-            )
-            exists = [
-                sst
-                for sst in snapshots
-                if sst.get("Name").startswith(snapshot_base_name)
-            ]
-            if exists:
-                logger.debug(
-                    "publish point based on '%s' already exists", snapshot_base_name
-                )
-                continue
+            repo_name = self.name + "-%s" % dist
+            for repo in repos:
+                if repo.get("Name") == repo_name:
+                    logger.error("aptly repo '%s' already exists", repo_name)
+                    return False
+            snapshot_name = get_snapshot_name(self.publish_name, dist)
+            for snapshot in snapshots:
+                if snapshot.get("Name") == snapshot_name:
+                    logger.error("publish point for '%s' already exists", snapshot_name)
+                    return False
 
-            snapshot_name = self.__generate_snapshot_name(dist)
+        for dist in self.DISTS:
+            repo_name = self.name + "-%s" % dist
+            logger.info("creating repository '%s'", repo_name)
+            await self.aptly.repo_create(repo_name)  # not a background task
+
+            snapshot_name = get_snapshot_name(self.publish_name, dist)
 
             logger.debug("creating empty snapshot: '%s'", snapshot_name)
 
-            package_refs = await self.__get_packages(dist == "unstable")
-            task_id = await self.__api.snapshot_create(snapshot_name, package_refs)
-            await self.__api.wait_task(task_id)
+            # package_refs = await self.__get_packages(dist == "unstable")
+            task_id = await self.aptly.snapshot_create(repo_name, snapshot_name)
+            await self.aptly.wait_task(task_id)
 
             # Add source and all archs per default
             archs = self.archs + ["source", "all"]
 
-            logger.debug(
-                "publishing snapshot: '%s' archs: '%s'", snapshot_name, str(archs)
-            )
-            task_id = await self.__api.snapshot_publish(
-                snapshot_name, "main", archs, dist, self.publish_name
-            )
-            await self.__api.wait_task(task_id)
+            logger.debug("publishing snapshot: '%s' archs: '%s'", snapshot_name, str(archs))
+            task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, self.publish_name)
+            await self.aptly.wait_task(task_id)
+        return True
 
-    def __generate_snapshot_name(self, dist, without_timestamp=False):
+    async def snapshot(self, snapshot_version, packages):
         """
-            Generates a snapshot name for the repository.
-
-            Args:
-                dist (str): The distribution to be used.
-                    e.g. stable, unstable
-                without_timestamp (bool): Excludes timestamp if True.
+        Create a snapshot of a reporitory with latest builds.
         """
-        if without_timestamp:
-            return "{}-{}-".format(self.publish_name, dist)
+        dist = "stable"
+        repo_name = self.name + "-%s" % dist
+        publish_name = "{}_{}_repos_{}_{}".format(self.basemirror_name, self.basemirror_version,
+                                                  self.project_name, snapshot_version)
+        snapshot_name = "{}-{}".format(publish_name, dist)
 
-        timestamp = datetime.now().strftime(self.DATETIME_FORMAT)
-        return "{}-{}-{}".format(self.publish_name, dist, timestamp)
+        logger.info("creating release snapshot: '%s'", snapshot_name)
 
-    async def __await_task(self, task_id):
-        while True:
+        package_refs = []
+        for package in packages:
+            pkgs = await self.aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                     package[1],   # version
+                                                                                     package[2]))  # arch or "source"
+            package_refs += pkgs
+
+        task_id = await self.aptly.snapshot_create(repo_name, snapshot_name, package_refs)
+        await self.aptly.wait_task(task_id)
+
+        archs = self.archs.extend(["source", "all"])
+        task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, publish_name)
+        await self.aptly.wait_task(task_id)
+
+    async def delete(self):
+        """
+        Delete a repository including publish point amd snapshots
+        """
+        for dist in self.DISTS:
+            repo_name = self.name + "-%s" % dist
             try:
-                task_state = await self.__api.get_task_state(task_id)
-            except Exception as exc:
-                logger.warning(
-                    "error occured while awaiting task finish: '%s'", str(exc)
-                )
-                return False
-
-            if task_state.get("State") == TaskState.SUCCESSFUL.value:
-                await self.__api.delete_task(task_id)
-                return True
-
-            if task_state.get("State") == TaskState.FAILED.value:
-                await self.__api.delete_task(task_id)
-                return False
-
+                # FIXME: should this aptly task run in background?
+                await self.aptly.publish_drop(self.basemirror_name,
+                                              self.basemirror_version,
+                                              self.project_name,
+                                              self.project_version, dist)
+            except Exception:
+                logger.warning("Error deleting publish point of repo '%s'" % repo_name)
             await asyncio.sleep(2)
+
+            # FIXME: delete also old timestamped snapshots
+            snapshot_name = get_snapshot_name(self.publish_name, dist)
+            try:
+                task_id = await self.aptly.snapshot_delete(snapshot_name)
+                await self.aptly.wait_task(task_id)
+            except Exception:
+                logger.warning("Error deleting snapshot '%s'" % snapshot_name)
+
+            # delete leftover tmp snapshot
+            snapshot_name = get_snapshot_name(self.publish_name, dist, temporary=True)
+            try:
+                task_id = await self.aptly.snapshot_delete(snapshot_name)
+                await self.aptly.wait_task(task_id)
+            except Exception:
+                pass
+
+            try:
+                # FIXME: should this aptly task run in background?
+                await self.aptly.repo_delete(repo_name)
+            except Exception:
+                logger.warning("Error deleting repo '%s'" % repo_name)
 
     async def __remove_old_packages(self, packages):
         """
@@ -187,47 +190,18 @@ class DebianRepository:
         if not old_packages:
             return packages
 
+        repo_name = self.name + "-unstable"
         try:
             for old_package in old_packages[:1]:
                 logger.info("removing old package from aptly: '%s'", old_package)
-                task_id = await self.__api.repo_packages_delete(
-                    self.name, [old_package]
-                )
-                ret = await self.__await_task(task_id)
+                task_id = await self.aptly.repo_packages_delete(repo_name, [old_package])
+                ret = await self.aptly.wait_task(task_id)
                 if not ret:
-                    logger.error(
-                        "Error deleting package: %s (task %d)", old_package, task_id
-                    )
+                    logger.error("Error deleting package: %s (task %d)", old_package, task_id)
         except Exception as exc:
             logger.exception(exc)
 
         return list(set(packages) - set(old_packages))
-
-    async def __get_packages(self, ci_build=False):
-        """
-        Gets all packages from the current local
-        repo.
-
-        Args:
-            ci_build (bool): Gets ci packages if set to True.
-
-        Returns:
-            list: List of package refs.
-        """
-        pkgs = await self.__api.repo_packages_get(self.name)
-
-        logger.debug("got '%s' packages from the '%s' repository", len(pkgs), self.name)
-
-        ci_packages = [pkg for pkg in pkgs if "+git" in pkg]
-        non_ci_packages = [pkg for pkg in pkgs if "+git" not in pkg]
-        package_refs = ci_packages if ci_build else non_ci_packages
-
-        ci_packages = await self.__remove_old_packages(ci_packages)
-
-        logger.debug("non-ci packages: %s", str(non_ci_packages))
-        logger.debug("ci packages: %s", str(ci_packages))
-
-        return package_refs
 
     async def add_packages(self, files, ci_build=False):
         """
@@ -239,52 +213,17 @@ class DebianRepository:
             ci_build (bool): Packages will be pushed to the unstable
                 publish point if set to True.
         """
-        task_id, upload_dir = await self.__api.repo_add(self.name, files)
+        dist = "unstable" if ci_build else "stable"
+        repo_name = self.name + "-%s" % dist
+        task_id, upload_dir = await self.aptly.repo_add(repo_name, files)
 
-        logger.debug(
-            "repo add returned aptly task id '%s' and upload dir '%s'",
-            task_id,
-            upload_dir,
-        )
+        logger.debug("repo add returned aptly task id '%s' and upload dir '%s'", task_id, upload_dir)
         logger.debug("waiting for repo add task with id '%s' to finish", task_id)
 
-        await self.__await_task(task_id)
+        await self.aptly.wait_task(task_id)
 
         logger.debug("repo add task with id '%s' has finished", task_id)
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
-        await self.__api.delete_directory(upload_dir)
-
-        snapshot_dist = "unstable" if ci_build else "stable"
-        snapshot_name = self.__generate_snapshot_name(snapshot_dist)
-        snapshot_base_name = "{}-{}-".format(self.publish_name, snapshot_dist)
-
-        package_refs = await self.__get_packages(ci_build)
-        logger.debug(
-            "creating snapshot with name '%s' and the packages: '%s'",
-            snapshot_name,
-            str(package_refs),
-        )
-
-        task_id = await self.__api.snapshot_create(snapshot_name, package_refs)
-        await self.__await_task(task_id)
-
-        logger.debug(
-            "switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
-            self.publish_name,
-            snapshot_dist,
-            snapshot_name,
-        )
-
-        task_id = await self.__api.snapshot_publish_update(
-            snapshot_name, "main", snapshot_dist, self.publish_name
-        )
-        await self.__await_task(task_id)
-
-        snapshots = await self.__api.snapshot_get()
-        for snapshot in snapshots:
-            if "Name" not in snapshot:
-                continue
-            name = snapshot.get("Name")
-            if name.startswith(snapshot_base_name) and name != snapshot_name:
-                await self.__api.snapshot_delete(snapshot.get("Name"))
+        await self.aptly.delete_directory(upload_dir)
+        await self.aptly.republish(dist, repo_name, self.publish_name)

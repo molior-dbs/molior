@@ -1,0 +1,20 @@
+[Unit]
+Wants=postgresql.service
+Description=Molior Debian Build System.
+After=network.target postgresql.service
+
+[Service]
+User=molior
+PermissionsStartOnly=true
+LimitNOFILE=8192
+ExecStartPre=/usr/lib/molior/db-upgrade.sh
+Environment="LANG=C.UTF-8"
+ExecStart=/usr/bin/python3 -m molior.molior.server --host=localhost --port=8888
+Type=simple
+KillSignal=SIGTERM
+KillMode=process
+TimeoutSec=900
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

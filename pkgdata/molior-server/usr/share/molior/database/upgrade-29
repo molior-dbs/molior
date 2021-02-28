@@ -1,0 +1,15 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE build ADD COLUMN projectversions integer[];
+ALTER TABLE build ADD COLUMN architectures architecture_enum[];
+
+CREATE TABLE mirrorkey (
+    projectversion_id integer REFERENCES projectversion(id),
+    keyurl character varying,
+    keyids character varying,
+    keyserver character varying
+);
+
+EOF

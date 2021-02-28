@@ -1,12 +1,7 @@
-"""
-Provides functions to interact with the BuildState
-database model.
-"""
 from aiohttp import web
 
-from molior.model.build import BUILD_STATES
-
-from .app import app
+from ..app import app
+from ..model.build import BUILD_STATES
 
 
 @app.http_get("/api/buildstates")

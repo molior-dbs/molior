@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE sourcerepository ADD COLUMN name character varying;
+
+EOF

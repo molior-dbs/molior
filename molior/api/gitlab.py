@@ -1,20 +1,15 @@
-"""
-Provides api functions to interact with the GitLab interface.
-"""
-from aiohttp import web
-import logging
 import uuid
 
-from molior.model.build import Build
-from molior.model.buildtask import BuildTask
-from molior.model.sourcerepository import SourceRepository
-from molior.molior.notifier import build_added
-from molior.molior.configuration import Configuration
+from aiohttp import web
 
-from .app import app
+from ..app import app, logger
+from ..model.build import Build
+from ..model.buildtask import BuildTask
+from ..model.sourcerepository import SourceRepository
+from ..molior.configuration import Configuration
+from ..molior.queues import enqueue_task
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("molior-web")
 
 
 @app.http_post("/api/build/gitlab")
@@ -61,7 +56,7 @@ async def gitlab_event(request):
           in: body
           required: false
           type: string
-         - name: project_id
+        - name: project_id
           in: body
           required: false
           type: integer
@@ -246,18 +241,16 @@ async def process_tag_push(request, data):
         git_ref=git_ref,
         ci_branch=ui_branch,
         is_ci=False,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     build_task = BuildTask(build=build, task_id=str(token))
@@ -266,12 +259,9 @@ async def process_tag_push(request, data):
 
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if git_ref and repo.id:
-        args = {"build": [build.id, repo.id, git_ref, ui_branch]}
-
-        # Queue new build job
-        if await request.cirrina.task_queue.put(args):
-            logger.info("GitLab-API: BUILD triggered (sourcename): %s", build.sourcename)
-            return "OK", 200
+        args = {"build": [build.id, repo.id, git_ref, ui_branch, None]}
+        await enqueue_task(args)
+        return "OK", 200
 
     return "Unprocessable Entity", 422
 
@@ -379,18 +369,16 @@ async def process_push(request, data):
         git_ref=checkout_sha,       # Use pure hash for CI-builds, instead of git_ref/branch
         ci_branch=ci_branch,
         is_ci=False,
-        versiontimestamp=None,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
-        buildconfiguration=None,
         sourcerepository=repo,
         maintainer=None,
     )
 
     request.cirrina.db_session.add(build)
     request.cirrina.db_session.commit()
-    await build_added(build)
+    await build.build_added()
 
     token = uuid.uuid4()
     build_task = BuildTask(build=build, task_id=str(token))
@@ -399,11 +387,8 @@ async def process_push(request, data):
 
     logger.debug("GitLab-API: CI-BUILD  (build_id): %s", build.id)
     if checkout_sha and repo.id:
-        args = {"build": [build.id, repo.id, checkout_sha, ci_branch]}
-
-        # Queue new build job
-        if await request.cirrina.task_queue.put(args):
-            logger.info("GitLab-API: CI-BUILD triggered (sourcename): %s", build.sourcename)
-            return "OK", 200
+        args = {"build": [build.id, repo.id, checkout_sha, ci_branch, None, False]}
+        await enqueue_task(args)
+        return "OK", 200
 
     return "Unprocessable Entity", 422

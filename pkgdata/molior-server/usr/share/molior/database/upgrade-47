@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TYPE mirror_stateenum ADD VALUE 'init_error';
+ALTER TYPE mirror_stateenum RENAME TO mirrorstate_enum;
+
+EOF

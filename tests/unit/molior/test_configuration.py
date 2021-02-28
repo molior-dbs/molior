@@ -15,7 +15,7 @@ def test_config():
     cfg = Configuration()
     with patch("molior.molior.configuration.Configuration._load_config"):
         cfg._config = {"test": "config"}
-        assert cfg.config() == {"test": "config"}
+        assert cfg.test == "config"
 
 
 def test_load_config_non_existent():
@@ -23,7 +23,8 @@ def test_load_config_non_existent():
     Test load config non-existent
     """
     cfg = Configuration()
-    assert cfg._load_config(Path("/non/existent")) is None
+    with patch("molior.molior.configuration.logger"):
+        assert cfg._load_config(Path("/non/existent")) is None
 
 
 def test_load_config():
@@ -31,12 +32,10 @@ def test_load_config():
     Test load config
     """
     cfg = Configuration()
-    with patch(
-        "molior.molior.configuration.open", mock_open(read_data="{'test': 'config'}")
-    ):
+    with patch("molior.molior.configuration.open", mock_open(read_data="{'test': 'config'}")):
         path = "/"
         cfg._load_config(path)
-        assert cfg._config == {"test": "config"}
+        assert cfg.test == "config"
 
 
 def test_get_config_attr():

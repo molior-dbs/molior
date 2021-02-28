@@ -1,21 +1,17 @@
-"""
-This module provides the molior core.
-"""
 import re
 
-from .logger import get_logger
+from sqlalchemy import func
+
+from ..app import logger
+from ..tools import get_changelog_attr, db2array
 from .configuration import Configuration
-from .errors import MaintainerParseError
-from .utils import get_changelog_attr
 
-from molior.model.project import Project
-from molior.model.buildvariant import BuildVariant
-from molior.model.architecture import Architecture
-from molior.model.sourepprover import SouRepProVer
-from molior.model.projectversion import ProjectVersion
-from molior.model.buildconfiguration import BuildConfiguration
+from ..model.project import Project
+from ..model.sourepprover import SouRepProVer
+from ..model.projectversion import ProjectVersion
+from ..model.projectversion import get_projectversion_deps
 
-logger = get_logger()
+
 TARGET_ARCH_ORDER = ["amd64", "i386", "arm64", "armhf"]
 
 
@@ -114,18 +110,15 @@ async def get_maintainer(path):
         path (Pathlib.Path): Path to git repository.
 
     Returns:
-        molior.model.maintainer.Maintainer: An instance of Maintainer
-            database model.
+        tuple (firstname, surname, email)
 
-    Raises:
-        MaintainerParseError: If the maintainer could not be parsed.
     """
     full = await get_changelog_attr("Maintainer", path)
     if not full:
-        raise MaintainerParseError("Maintainer not found.")
+        return None
     search = re.search("(.*)<([^>]*)", full)
     if not search:
-        raise MaintainerParseError("Maintainer could not be parsed.")
+        return None
     email = search.group(2)
     full_name = search.group(1)
     firstname = full_name.split(" ")[0]
@@ -134,7 +127,7 @@ async def get_maintainer(path):
     return (firstname, surname, email)
 
 
-def get_targets(plain_targets, repo, session):
+def get_targets(plain_targets, repo, custom_targets, session):
     """
     Gets the target repo versions and returns them as
     sourcerepositoryprojectversion model objects.
@@ -142,56 +135,38 @@ def get_targets(plain_targets, repo, session):
     Args:
         repo (SourceRepository): Source repository model.
     """
-    project_version = get_projectversion(repo.src_path)
-
-    if project_version:
-        return (
-            session.query(SouRepProVer)  # pylint: disable=no-member
-            .join(ProjectVersion)
-            .join(Project)
-            .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-            .filter(ProjectVersion.name == project_version)
-            .all()
-        )
-
     targets = []
-    for target in plain_targets:
-        project, project_version = target
-        targets += (
-            session.query(SouRepProVer)  # pylint: disable=no-member
-            .join(ProjectVersion)
-            .join(Project)
-            .filter(SouRepProVer.c.sourcerepository_id == repo.id)
-            .filter(ProjectVersion.name == project_version)
-            .filter(Project.name == project)
-            .all()
-        )
+    if custom_targets:
+        for t in custom_targets:
+            try:
+                project_name, project_version = t.split("/")
+            except Exception as exc:
+                logger.exception(exc)
+                continue
+            targets += (
+                session.query(SouRepProVer)
+                .join(ProjectVersion)
+                .join(Project)
+                .filter(SouRepProVer.sourcerepository_id == repo.id)
+                .filter(func.lower(ProjectVersion.name) == project_version.lower())
+                .filter(func.lower(Project.name) == project_name.lower())
+                .all()
+            )
+
+    else:
+        for target in plain_targets:
+            project_name, project_version = target
+            targets += (
+                session.query(SouRepProVer)
+                .join(ProjectVersion)
+                .join(Project)
+                .filter(SouRepProVer.sourcerepository_id == repo.id)
+                .filter(func.lower(ProjectVersion.name) == project_version.lower())
+                .filter(func.lower(Project.name) == project_name.lower())
+                .all()
+            )
 
     return targets
-
-
-def get_buildconfigs(targets, session):
-    """
-    Gets all buildconfiguration models
-    for the given list of targets (sourcerepositoryprojectversion models).
-
-    Args:
-        targets (list): List of targets.
-
-    Returns:
-        list: List of build configurations.
-    """
-    build_configs = []
-    for target in targets:
-        build_configs += (
-            session.query(BuildConfiguration)
-            .join(BuildVariant)
-            .join(Architecture)
-            .filter(BuildConfiguration.sourcerepositoryprojectversion_id == target.id)
-            .filter(Architecture.name != "all")
-            .all()
-        )
-    return build_configs
 
 
 def get_target_arch(build, session):
@@ -208,19 +183,82 @@ def get_target_arch(build, session):
     Returns:
         str: The target architecture
     """
-    buildconfigs = (
-        session.query(BuildConfiguration)
-        .filter(
-            BuildConfiguration.sourcerepositoryprojectversion_id
-            == build.buildconfiguration.sourcerepositoryprojectversion_id
-        )
-        .all()
-    )
-    repo_archs = [bcf.buildvariant.architecture.name for bcf in buildconfigs]
-
     for arch in TARGET_ARCH_ORDER:
-        if arch in repo_archs:
+        if arch in db2array(build.projectversion.mirror_architectures):
+            if build.buildtype == "deb":
+                sourepprover = session.query(SouRepProVer).filter(
+                        SouRepProVer.sourcerepository_id == build.sourcerepository.id,
+                        SouRepProVer.projectversion_id == build.projectversion.id).first()
+                if arch not in db2array(sourepprover.architectures):
+                    continue
             return arch
+    return None
+
+
+def get_apt_repos(project_version, session, is_ci=False):
+    """
+    Returns a list of all needed apt sources urls
+    for the given project_version.
+
+    Args:
+        base_mirror (str): The base mirror name ("jessie-8.9").
+        projectversion (ProjectVersion): The project_version.
+        distribution (str): The distribution
+
+    Returns:
+        list: List of apt urls.
+    """
+    urls = []
+    deps = get_projectversion_deps(project_version.id, session)
+
+    urls.append(project_version.get_apt_repo(internal=True))
+    if is_ci:
+        urls.append(project_version.get_apt_repo(dist="unstable", internal=True))
+
+    for p in deps:
+        dependency = session.query(ProjectVersion).filter(ProjectVersion.id == p[0]).first()
+        urls.append(dependency.get_apt_repo(internal=True))
+        if is_ci and p[1]:  # use unstable dependency for ci builds
+            urls.append(dependency.get_apt_repo(dist="unstable", internal=True))
+
+    return urls
+
+
+def get_apt_keys(project_version, session):
+    """
+    Returns a list of all needed apt key urls
+    for the given project_version.
+
+    Args:
+        base_mirror (str): The base mirror name ("jessie-8.9").
+        projectversion (ProjectVersion): The project_version.
+        distribution (str): The distribution
+
+    Returns:
+        list: List of apt urls.
+    """
+    urls = []
+    deps = get_projectversion_deps(project_version.id, session)
+
+    if project_version.external_repo:
+        for key in project_version.mirror_keys:
+            if key.keyurl:
+                if key.keyurl not in urls:
+                    urls.append(key.keyurl)
+            else:
+                logger.error("building with external gog server keys not implemented")
+
+    for p in deps:
+        dependency = session.query(ProjectVersion).filter(ProjectVersion.id == p[0]).first()
+        if dependency.external_repo:
+            for key in dependency.mirror_keys:
+                if key.keyurl:
+                    if key.keyurl not in urls:
+                        urls.append(key.keyurl)
+                else:
+                    logger.error("building with external gog server keys not implemented")
+
+    return urls
 
 
 def get_buildorder(path):

@@ -1,21 +1,12 @@
-"""
-Provides test molior core class.
-"""
 import pytest
 import asyncio
-from pathlib import Path
-# from datetime import datetime
 
+from pathlib import Path
 from mock import patch, MagicMock
 
-from molior.molior.errors import MaintainerParseError
-from molior.api.helper.validator import (
-    is_name_valid,
-    validate_version_format)
-from molior.molior.core import (
-    get_projectversion,
-    get_target_config)
+from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
+from molior.tools import is_name_valid, validate_version_format
 
 
 def test_get_projectversion_no_cfg():
@@ -23,15 +14,18 @@ def test_get_projectversion_no_cfg():
     Test get_projectversion if config dict is empty
     """
     path = Path("/foo/bar")
-    result = get_projectversion(path)
-    assert result == ""
+    with patch("molior.molior.core.logger"):
+        result = get_projectversion(path)
+        assert result == ""
 
 
 def test_get_projectversion_v_set():
     """
     Test get_projectversion if a cfg version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
 
         cfg = MagicMock()
         cfg.config_version = "1"
@@ -47,7 +41,9 @@ def test_get_projectversion_n_v_set():
     """
     Test get_projectversion if no cfg version is set but no target_repo_version
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = None
@@ -63,7 +59,9 @@ def test_get_projectversion_tgt_inv():
     """
     Test get_projectversion if no cfg version is set and an invalid target_repo_version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = 1
@@ -79,7 +77,9 @@ def test_get_projectversion_tgt_set():
     """
     Test get_projectversion if no cfg version is set and a valid target_repo_version is set
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config_version = None
         cfg.target_repo_version = "foo-next"
@@ -97,15 +97,18 @@ def test_get_target_config_no_cfg():
     """
     path = Path("/foo/bar")
     setattr(path.__class__, "exists", MagicMock(return_value=False))
-    result = get_target_config(path)
-    assert result == []
+    with patch("molior.molior.core.logger"):
+        result = get_target_config(path)
+        assert result == []
 
 
 def test_get_target_cfg_empty_cfg():
     """
     Test get target config if config is empty
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config.return_value = {}
         mock.return_value = cfg
@@ -120,7 +123,9 @@ def test_get_target_config():
     """
     Test get target config
     """
-    with patch("molior.molior.core.Configuration") as mock:
+    with patch(
+           "molior.molior.core.Configuration") as mock, patch(
+           "molior.molior.core.logger"):
         cfg = MagicMock()
         cfg.config.return_value = {"targets": {"testproject": ["1", "next"]}}
         mock.return_value = cfg
@@ -153,9 +158,9 @@ def test_get_maintainer_none():
     with patch("molior.molior.core.get_changelog_attr",
                side_effect=asyncio.coroutine(lambda a, b: "")):
 
-        with pytest.raises(MaintainerParseError):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(get_maintainer(path))
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(get_maintainer(path))
+        assert res is None
 
 
 def test_get_maintainer_invalid():
@@ -166,9 +171,9 @@ def test_get_maintainer_invalid():
     with patch("molior.molior.core.get_changelog_attr",
                side_effect=asyncio.coroutine(lambda a, b: "Jon Doe")):
 
-        with pytest.raises(MaintainerParseError):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(get_maintainer(path))
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(get_maintainer(path))
+        assert res is None
 
 
 def test_get_target_arch():
@@ -177,17 +182,8 @@ def test_get_target_arch():
     """
     build = MagicMock()
     session = MagicMock()
-
-    buildconfig1 = MagicMock()
-    buildconfig1.buildvariant.architecture.name = "i386"
-
-    buildconfig2 = MagicMock()
-    buildconfig2.buildvariant.architecture.name = "armhf"
-    session.query.return_value.filter.return_value.all.return_value = [
-        buildconfig1,
-        buildconfig2,
-    ]
-
+    build.projectversion.mirror_architectures = "{armhf,i386}"
+    build.buildtype = "build"
     ret = get_target_arch(build, session)
     assert ret == "i386"
 

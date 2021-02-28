@@ -1,198 +1,49 @@
-"""
-Provides functions to send notifications to molior-web clients
-"""
 import socket
-from pathlib import Path
+import json
 import aiohttp
 
-import json
-from jinja2 import Template
+from pathlib import Path
+from enum import Enum
 
-from molior.api.messagetypes import Subject, Event
+from ..app import logger
 from .emailer import send_mail
 from .configuration import Configuration
-from .worker_notification import notification_queue
-
-from .logger import get_logger
-
-logger = get_logger()
+from .queues import enqueue_notification
 
 
-def _get_build_data(build):
-    """
-    Returns the given build model
-    as formatted dict.
+class Subject(Enum):
+    """Provides the molior subject types"""
 
-    Args:
-        build (molior.model.build.Build): The build model.
-
-    Returns:
-        dict: The data dict.
-    """
-    maintainer = "-"
-    if build.maintainer:
-        maintainer = "{} {}".format(
-            build.maintainer.firstname, build.maintainer.surname
-        )
-
-    data = {
-        "id": build.id,
-        "startstamp": str(build.startstamp),
-        "endstamp": str(build.endstamp),
-        "buildstate": build.buildstate,
-        "buildtype": build.buildtype,
-        "branch": build.ci_branch,
-        "git_ref": build.git_ref,
-        "sourcename": build.sourcename,
-        "version": build.version,
-        "maintainer": maintainer,
-    }
-    if build.sourcerepository:
-        data.update(
-            {
-                "sourcerepository": {
-                    "id": build.sourcerepository.id,
-                    "url": build.sourcerepository.url,
-                    "name": build.sourcerepository.name,
-                }
-            }
-        )
-    if build.buildconfiguration:
-        data.update(
-            {
-                "buildvariant": {
-                    "architecture": {
-                        "id": build.buildconfiguration.buildvariant.architecture.id,
-                        "name": build.buildconfiguration.buildvariant.architecture.name,
-                    },
-                    "basemirror": {
-                        "id": build.buildconfiguration.buildvariant.base_mirror.id,
-                        "version": build.buildconfiguration.buildvariant.base_mirror.name,
-                        "name": build.buildconfiguration.buildvariant.base_mirror.project.name,
-                    },
-                    "name": build.buildconfiguration.buildvariant.name,
-                },
-                "projectversion_id": build.buildconfiguration.projectversions[0].id,
-            }
-        )
-    return data
+    websocket = 1
+    eventwatch = 2
+    userrole = 3
+    user = 4
+    project = 5
+    projectversion = 6
+    build = 7
+    buildlog = 8
+    mirror = 9
+    node = 10
 
 
-async def build_added(build):
-    """
-    Sends a `build_added` notification to the web clients
+class Event(Enum):
+    """Provides the molior event types"""
 
-    Args:
-        build (molior.model.build.Build): The build model.
-    """
-    logger.debug(
-        "notifying web clients that build with id '%s' was added with state '%s'",
-        build.id,
-        build.buildstate,
-    )
-    data = _get_build_data(build)
-    args = {
-        "notify": {
-            "event": Event.added.value,
-            "subject": Subject.build.value,
-            "data": data,
-        }
-    }
-    await notification_queue.put(args)
+    added = 1
+    changed = 2
+    removed = 3
+    connected = 4
+    done = 5
 
 
-async def build_changed(build):
-    """
-    Sends a `build_changed` notification to the web clients
+class Action(Enum):
+    """Provides the molior action types"""
 
-    Args:
-        build (molior.model.build.Build): The build model.
-    """
-    logger.debug(
-        "notifying web client that build with id '%s' was changed to '%s'",
-        build.id,
-        build.buildstate,
-    )
-    data = _get_build_data(build)
-    args = {
-        "notify": {
-            "event": Event.changed.value,
-            "subject": Subject.build.value,
-            "data": data,
-        }
-    }
-    await notification_queue.put(args)
-
-    # only run hooks for deb builds
-    if build.buildtype != "deb":
-        return
-
-    # only send building, ok, nok
-    if (
-        build.buildstate != "building"
-        and build.buildstate != "successful"
-        and build.buildstate != "build_failed"
-        and build.buildstate != "publish_failed"
-    ):
-        return
-
-    maintainer = build.maintainer
-
-    cfg_host = Configuration().hostname
-    hostname = cfg_host if cfg_host else socket.getfqdn()
-
-    class ResultObject:
-        pass
-
-    repository = ResultObject()
-    if build.sourcerepository:
-        repository.url = build.sourcerepository.url
-        repository.name = build.sourcerepository.name
-
-    buildres = ResultObject()
-    buildres.id = build.id
-    buildres.status = build.buildstate
-    buildres.version = build.version
-    buildres.url = "http://{}/build/{}".format(hostname, build.id)
-    buildres.raw_log_url = "http://{}/buildout/{}/build.log".format(hostname, build.id)
-    buildres.commit = build.git_ref
-    buildres.branch = build.ci_branch
-
-    platform = ResultObject()
-    if build.buildconfiguration:
-        platform.distrelease = (
-            build.buildconfiguration.buildvariant.base_mirror.project.name
-        )
-        platform.version = build.buildconfiguration.buildvariant.base_mirror.name
-        platform.architecture = build.buildconfiguration.buildvariant.architecture.name
-
-    project = ResultObject()
-    if build.buildconfiguration:
-        project.name = build.buildconfiguration.projectversions[0].project.name
-        project.version = build.buildconfiguration.projectversions[0].name
-
-    args = {
-        "repository": repository,
-        "build": buildres,
-        "platform": platform,
-        "maintainer": maintainer,
-        "project": project,
-    }
-
-    if build.sourcerepository:
-        for hook in build.sourcerepository.hooks:
-            if not hook.enabled:
-                continue
-
-            try:
-                url = Template(hook.url).render(**args)
-                body = Template(hook.body).render(**args)
-
-                await trigger_hook(hook.method, url, skip_ssl=hook.skip_ssl, body=body)
-            except Exception as exc:
-                logger.error(
-                    "could not trigger web hook '%s' to '%s': %s", hook.method, url, exc
-                )
+    add = 1
+    change = 2
+    remove = 3
+    start = 4
+    stop = 5
 
 
 async def trigger_hook(method, url, skip_ssl, body=None):
@@ -212,7 +63,7 @@ async def trigger_hook(method, url, skip_ssl, body=None):
     try:
         data = json.loads(body)
     except Exception as exc:
-        logger.error("could not trigger web hook '%s' to '%s': %s", method, url, exc)
+        logger.error("hook: error parsing json body: {}".format(exc))
         return
 
     connector = aiohttp.TCPConnector(verify_ssl=verify)
@@ -221,23 +72,13 @@ async def trigger_hook(method, url, skip_ssl, body=None):
         async with aiohttp.ClientSession(connector=connector) as http:
             async with http.post(url, headers=headers, data=json.dumps(data)) as resp:
                 if resp.status != 200:
-                    logger.warning(
-                        "trigger web hook '%s' to '%s' returned %d ",
-                        method,
-                        url,
-                        resp.status,
-                    )
+                    logger.warning("trigger web hook '%s' to '%s' returned %d ", method, url, resp.status)
 
     elif method.lower() == "get":
         async with aiohttp.ClientSession() as http:
             async with http.get(url) as resp:
                 if resp.status != 200:
-                    logger.warning(
-                        "trigger web hook '%s' to '%s' returned %d ",
-                        method,
-                        url,
-                        resp.status,
-                    )
+                    logger.warning("trigger web hook '%s' to '%s' returned %d ", method, url, resp.status)
 
 
 def send_mail_notification(build):
@@ -272,26 +113,20 @@ def send_mail_notification(build):
     r_name = build.maintainer.fullname
 
     version = build.version
-    arch = build.buildconfiguration.buildvariant.architecture.name
-    distrelease_version = build.buildconfiguration.buildvariant.base_mirror.name
-    distrelease = build.buildconfiguration.buildvariant.base_mirror.project.name
+    arch = build.architecture
+    distrelease_version = build.projectversion.basemirror.name
+    distrelease = build.projectversion.basemirror.project.name
     hostname = cfg.hostname if cfg.hostname else socket.getfqdn()
     link = "http://{}/#!/build/{}".format(hostname, build.id)
 
     if build.buildstate == "build_failed":
-        subject = "Build Failed: {pkg_name} {version} ({distrelease}-{arch})".format(
-            pkg_name=pkg_name, version=version, distrelease=distrelease, arch=arch
-        )
+        subject = "Build Failed: {} {} ({}-{})".format(pkg_name, version, distrelease, arch)
         message = "Unfortunately the build failed for:"
     elif build.buildstate == "successful":
-        subject = "Released: {pkg_name} {version} ({distrelease}-{arch})".format(
-            pkg_name=pkg_name, version=version, distrelease=distrelease, arch=arch
-        )
+        subject = "Released: {} {} ({}-{})".format(pkg_name, version, distrelease, arch)
         message = "I've just finished building the debian packages for:"
     else:
-        logger.warning(
-            "not sending notification: build has state '%s'", str(build.buildstate)
-        )
+        logger.warning("not sending notification: build has state '%s'", str(build.buildstate))
         return
 
     content = template.format(
@@ -305,3 +140,11 @@ def send_mail_notification(build):
         build_log_link=link,
     )
     send_mail(receiver, subject, content, [str(log_file)])
+
+
+async def notify(subject, event, data):
+    await enqueue_notification({"notify": {"subject": subject, "event": event, "data": data}})
+
+
+async def run_hooks(build_id):
+    await enqueue_notification({"hooks": {"build_id": build_id}})
