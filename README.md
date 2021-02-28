@@ -2,7 +2,7 @@
 
 # About
 
-Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and [sbuild](https://wiki.debian.org/sbuild) for building Debian packages on multiple distributions and architectures.
+Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and [sbuild](https://wiki.debian.org/sbuild) for building Debian packages for multiple distributions and architectures.
 
 Molior allows the following via WebUI, REST API or commandline tools:
 

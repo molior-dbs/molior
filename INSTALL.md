@@ -10,15 +10,14 @@ operation in a unpriviledged container (i.e. docker, lxd) is currently not suppo
 * [Prerequisites](#prerequisites)
 * [Installation via APT sources](#installation-via-apt-sources)
     * [Debian buster](#debian-buster)
-    * [Debian stretch](#debian-stretch)
     * [Configure APT](#configure-apt)
     * [Install molior](#install-molior)
     * [Install aptly](#install-aptly)
     * [Install build node](#install-build-node)
     * [Install molior-tools](#install-molior-tools)
 * [ISO Installers / VMs](#iso-installers--vms)
-    * [Debian buster](#debian-buster-1)
-    * [Debian stretch](#debian-stretch-1)
+    * [Molior and aptly server](#molior-and-aptly-server)
+    * [Build nodes](#build-nodes)
 * [Configuration](#configuration)
     * [Configure molior server](#configure-molior-server)
     * [Configure aptly server](#configure-aptly-server)
@@ -40,22 +39,7 @@ Debian stretch installations with stretch-backports, depending on the setup:
 - Add the molior apt source:
 ```
 cat >/etc/apt/sources.list.d/molior.list <<EOF
-deb [arch=amd64,arm64] http://molior.info/1.3/buster stable main
-EOF
-```
-
-### Debian stretch
-
-- Make sure you have stretch-backports configured
-```
-cat >/etc/apt/sources.list.d/stretch-backports.list <<EOF
-deb http://deb.debian.org/debian stretch-backports main
-EOF
-```
-- Add the molior apt source:
-```
-cat >/etc/apt/sources.list.d/molior.list <<EOF
-deb [arch=amd64,arm64] http://molior.info/1.3/stretch stable main
+deb [arch=amd64,arm64] http://molior.info/1.4/buster stable main
 EOF
 ```
 
@@ -74,7 +58,7 @@ apt update
 ### Install molior
 
 ```
-apt install debootstrap/stretch-backports molior-server molior-web
+apt install molior-server molior-web
 ```
 
 ### Install aptly
@@ -108,43 +92,21 @@ Molior is available as ISO installer for test and development purposes.
 
 Install molior/aptly server and build node on VMs or bare metal and follow the Configuration chapter below.
 
-User and Password for these installers is: admin/molior-dev
+User and Password for these installers is: admin/molior-dev (please change password after first login)
 
-In order to see the IP address aquired via DHCP, login in the text console and run:
-```
-ip addr show eth0
-```
-
-### Debian buster
-
-Download molior and aptly server installer:
-- http://molior.info/installers/molior_1.3-buster_1.3.3_installer-dev.iso
+### Molior and aptly server
 
 Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.3-buster_1.3.3_vbox-dev.ova
+- http://molior.info/installers/molior_1.4-buster_1.4.0_vbox-dev.ova
+
+### Build nodes
 
 Download amd64 build node installer:
-- http://molior.info/installers/molior_1.3-buster_1.3.3_iso-installer-node-amd64.iso
+- http://molior.info/installers/molior_1.4-buster_1.4.0_iso-installer-node-amd64.iso
 
 Download EFI installer for amd64 or arm64:
-- http://molior.info/installers/molior_1.3-buster_1.3.3_efi-installer-node-amd64.iso
-- http://molior.info/installers/molior_1.3-buster_1.3.3_efi-installer-node-arm64.iso
-
-### Debian stretch
-
-Download molior and aptly server installer:
-- http://molior.info/installers/molior_1.3_1.3.3_installer-dev.iso
-
-Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.3_1.3.3_vbox-dev.ova
-
-Download amd64 build node installer:
-- http://molior.info/installers/molior_1.3_1.3.3_iso-installer-node-amd64.iso
-
-Download EFI installer for amd64 or arm64:
-- http://molior.info/installers/molior_1.3_1.3.3_efi-installer-node-amd64.iso
-- http://molior.info/installers/molior_1.3_1.3.3_efi-installer-node-arm64.iso
-
+- http://molior.info/installers/molior_1.4-buster_1.4.0_efi-installer-node-amd64.iso
+- http://molior.info/installers/molior_1.4-buster_1.4.0_efi-installer-node-arm64.iso
 
 ## Configuration
 
@@ -154,16 +116,6 @@ Download EFI installer for amd64 or arm64:
 - Change password:
 ```
 passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
-
-# list postgresql timezones:
-sudo -u postgres psql molior -c "SELECT * FROM pg_timezone_names"
-# set molior database timezone:
-sudo -u postgres psql molior -c "ALTER DATABASE molior SET timezone TO 'Europe/Zurich'"
-sudo service molior-server restart
 ```
 - Create SSH and GPG Keys
   Molior uses 2 GPG key pairs, one for signing the source package (molior user) and one for signing the Debian repositories (aptly user).
@@ -252,5 +204,3 @@ do
   sudo -u molior gpg1 --armor --export $DEBSIGN_KEY | sudo -u molior ssh -o StrictHostKeyChecking=no $molior_node "gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg"
 done
 ```
-
-
