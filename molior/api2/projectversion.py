@@ -631,6 +631,11 @@ async def delete_projectversion(request):
     for d in todelete:
         db.delete(d)
 
+    # delete references from copies and snapshots
+    relatives = db.query(ProjectVersion).filter(ProjectVersion.baseprojectversion_id == projectversion.id).all()
+    for relative in relatives:
+        relative.baseprojectversion_id = None
+
     db.commit()
 
     # delete projectversion
