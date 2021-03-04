@@ -71,7 +71,7 @@ The molior Debian Build System consists of the following components:
   - based on aiohttp
   - manages git repositories
   - manages project and versions
-  - manages Debien repositories (aptly)
+  - manages Debian repositories (aptly)
   - creates Debian source packages
   - provides REST API
   - provides build and deployment environments (schroot, debootstrap)
