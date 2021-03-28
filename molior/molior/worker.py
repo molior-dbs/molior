@@ -14,6 +14,7 @@ from ..model.build import Build
 from ..model.chroot import Chroot
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
+from ..model.postbuildhook import PostBuildHook
 
 
 async def cleanup_builds():
@@ -367,21 +368,27 @@ class Worker:
         for build in builds:
             build.sourcerepository_id = original.id
 
-        # find all projectversion contaning duplicate
+        # find all projectversions contaning duplicate
         sourepprovers = session.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == duplicate.id).all()
         for sourepprover in sourepprovers:
             # we check if original is in the projectversion already
+
             t = session.query(SouRepProVer).filter(
                 SouRepProVer.sourcerepository_id == original.id,
                 SouRepProVer.projectversion_id == sourepprover.projectversion_id).first()
             if t:
+                phs = session.query(PostBuildHook).filter(
+                      PostBuildHook.sourcerepositoryprojectversion_id == sourepprover.id).all()
+                for p in phs:
+                    p.sourcerepositoryprojectversion_id = t.id
                 # delete duplicate from projectversion
                 session.delete(sourepprover)
             else:
                 # replace duplicate with original
                 sourepprover.sourcerepository_id = original.id
 
+        session.commit() # workaround for sql alchemy
         session.delete(duplicate)
         original.set_ready()
         session.commit()
