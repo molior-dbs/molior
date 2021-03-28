@@ -25,17 +25,20 @@ REPO_URL=$7
 KEYS="$8"  # separated by space
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
-DEBOOTSTRAP="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME"
+DEBOOTSTRAP_DIR="/var/lib/molior/upload/debootstrap/$DEBOOTSTRAP_NAME"
+DEBOOTSTRAP_TAR="/var/lib/molior/debootstrap/$DEBOOTSTRAP_NAME.tar.xz"
 
 set -e
+#set -x
 
 build_debootstrap()
 {
-  target=$DEBOOTSTRAP
+  target=$DEBOOTSTRAP_DIR
 
   if [ -d $target ]; then
     rm -rf $target
   fi
+  mkdir -p $target
 
   echo
   message="Creating debootstrap $DEBOOTSTRAP_NAME"
@@ -122,15 +125,15 @@ build_debootstrap()
 
 publish_debootstrap()
 {
-  rm -f $DEBOOTSTRAP.tar.xz
+  rm -f $DEBOOTSTRAP_TAR
 
   echo I: Creating debootstrap tar
-  cd $DEBOOTSTRAP
-  XZ_OPT="--threads=`nproc --ignore=1`" tar -cJf ../$DEBOOTSTRAP_NAME.tar.xz .
+  cd $DEBOOTSTRAP_DIR
+  XZ_OPT="--threads=`nproc --ignore=1`" tar -cJf $DEBOOTSTRAP_TAR .
   cd - > /dev/null
-  rm -rf $DEBOOTSTRAP
+  rm -rf $DEBOOTSTRAP_DIR
 
-  echo I: debootstrap $DEBOOTSTRAP is ready
+  echo I: debootstrap $DEBOOTSTRAP_DIR is ready
 }
 
 case "$ACTION" in
@@ -144,7 +147,7 @@ case "$ACTION" in
     publish_debootstrap
     ;;
   remove)
-    rm -rf $DEBOOTSTRAP $DEBOOTSTRAP.tar.xz
+    rm -rf $DEBOOTSTRAP_DIR $DEBOOTSTRAP_TAR
     ;;
   *)
     echo "Unknown action $ACTION"
