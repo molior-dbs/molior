@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from aiohttp import web
 from pathlib import Path
@@ -35,7 +36,7 @@ async def file_upload(request, tempfile, filename, size):
 
     try:
         # FIXME: do not overwrite
-        os.rename(tempfile, str(buildout_path / str(build_id) / filename))
+        shutil.move(tempfile, str(buildout_path / str(build_id) / filename))
     except Exception as exc:
         logger.exception(exc)
 
