@@ -441,7 +441,7 @@ async def rebuild_build(request):
 
 
 @app.http_post("/api/build")
-@app.authenticated
+#@app.authenticated
 async def trigger_build(request):
     """
     Triggers a build.
