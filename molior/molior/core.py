@@ -156,6 +156,8 @@ def get_targets(plain_targets, repo, custom_targets, session):
     else:
         for target in plain_targets:
             project_name, project_version = target
+            if not project_name or not project_version:
+                continue
             targets += (
                 session.query(SouRepProVer)
                 .join(ProjectVersion)
