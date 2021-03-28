@@ -54,7 +54,8 @@ async def startup_migration():
                 for dist in ["stable", "unstable"]:
                     snapshot_name = "{}-{}-".format(publish_name, dist)
                     if aptly_snapshot_name.startswith(snapshot_name):
-                        await aptly.snapshot_rename(aptly_snapshot_name, "{}-{}".format(publish_name, dist))
+                        task_id = await aptly.snapshot_rename(aptly_snapshot_name, "{}-{}".format(publish_name, dist))
+                        await aptly.wait_task(task_id)
 
             found = False
             for a in aptly_repos:
@@ -63,15 +64,24 @@ async def startup_migration():
                     break
             if not found:
                 continue
+
             try:
-                task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")
-                await aptly.wait_task(task_id)
+                await aptly.repo_rename(repo_name, repo_name + "-stable")
+            except Exception as exc:
+                logger.exception(exc)
+                #task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")                                                             
+                ########await aptly.wait_task(task_id)
                 # FIXME: delete task
-                task_id = await aptly.repo_create(repo_name + "-unstable")
-                await aptly.wait_task(task_id)
+
+            await asyncio.sleep(2)
+            try:
+                await aptly.repo_create(repo_name + "-unstable")
+                # task_id = await aptly.repo_create(repo_name + "-unstable")
+                ####### FIMXE await aptly.wait_task(task_id)
                 # FIXME: delete task
             except Exception as exc:
                 logger.exception(exc)
+            await asyncio.sleep(2)
 
 
 async def startup_mirror():
@@ -1197,8 +1207,11 @@ class AptlyWorker:
         Run the worker task.
         """
 
-        await startup_mirror()
-        await startup_migration()
+        try:
+            await startup_mirror()
+            await startup_migration()
+        except:
+            pass
 
         while True:
             try:
