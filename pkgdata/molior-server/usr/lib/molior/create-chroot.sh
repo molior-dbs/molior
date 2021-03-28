@@ -86,6 +86,7 @@ build_chroot()
   echo I: Configuring chroot
   echo 'APT::Install-Recommends "false";' >$target/etc/apt/apt.conf.d/77molior
   echo 'APT::Install-Suggests "false";'  >>$target/etc/apt/apt.conf.d/77molior
+  echo 'APT::Acquire::Retries "3";'      >>$target/etc/apt/apt.conf.d/77molior
   echo 'Acquire::Languages "none";'      >>$target/etc/apt/apt.conf.d/77molior
 
   # Disable debconf questions so that automated builds won't prompt
