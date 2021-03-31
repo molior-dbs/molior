@@ -2,6 +2,7 @@ import importlib
 
 from functools import wraps
 from aiohttp import web
+from sqlalchemy.sql import func
 
 from ..app import logger
 from ..tools import check_admin, check_user_role, parse_int
@@ -67,7 +68,7 @@ class Auth:
         return auth_backend.delete_user(user_id)
 
 
-def req_admin(func):
+def req_admin(function):
     """
     Decorator to enforce admin privilege for a function
 
@@ -79,11 +80,11 @@ def req_admin(func):
             pass
     """
 
-    @wraps(func)
+    @wraps(function)
     async def _wrapper(request):
-        """Wrapper func for req_admin decorator."""
+        """Wrapper function for req_admin decorator."""
         if check_admin(request.cirrina.web_session, request.cirrina.db_session):
-            return await func(request)
+            return await function(request)
 
         return web.Response(status=403)
 
@@ -115,10 +116,10 @@ class req_role(object):
         self.role = role
         self.allow_admin = allow_admin
 
-    def __call__(self, func):
-        """Wrapper func for req_admin decorator."""
+    def __call__(self, function):
+        """Wrapper function for req_admin decorator."""
 
-        @wraps(func)
+        @wraps(function)
         async def _wrapper(request):
             maintenance_mode = False
             query = "SELECT value from metadata where name = :key"
@@ -131,7 +132,7 @@ class req_role(object):
                 break
 
             if check_admin(request.cirrina.web_session, request.cirrina.db_session):
-                return await func(request)
+                return await function(request)
 
             if maintenance_mode:
                 return web.Response(status=503, text="Maintenance Mode")
@@ -167,7 +168,7 @@ class req_role(object):
                                project_id,
                                self.role,
                                self.allow_admin):
-                return await func(request)
+                return await function(request)
 
             return web.Response(status=403)
 
