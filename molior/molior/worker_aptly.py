@@ -69,15 +69,15 @@ async def startup_migration():
                 await aptly.repo_rename(repo_name, repo_name + "-stable")
             except Exception as exc:
                 logger.exception(exc)
-                #task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")                                                             
-                ########await aptly.wait_task(task_id)
+                # task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")
+                # await aptly.wait_task(task_id)
                 # FIXME: delete task
 
             await asyncio.sleep(2)
             try:
                 await aptly.repo_create(repo_name + "-unstable")
                 # task_id = await aptly.repo_create(repo_name + "-unstable")
-                ####### FIMXE await aptly.wait_task(task_id)
+                # FIMXE await aptly.wait_task(task_id)
                 # FIXME: delete task
             except Exception as exc:
                 logger.exception(exc)
