@@ -300,4 +300,5 @@ async def GitChangeUrl(old_repo_path, name, url):
     process = Launchy(shlex.split("git remote set-url origin {}".format(url)), None, None, cwd=str(old_repo_path))
     await process.launch()
     await process.wait()
-    os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)
+    if os.path.exists(old_repo_path):
+        os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)
