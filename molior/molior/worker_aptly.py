@@ -561,7 +561,7 @@ class AptlyWorker:
             mirrorkey = MirrorKey(
                     projectversion_id=mirror.id,
                     keyurl=key_url,
-                    keyids=array2db(keys),
+                    keyids=array2db(keys),  # FIXME: keyids should be array
                     keyserver=keyserver)
 
             session.add(mirrorkey)
@@ -1210,7 +1210,7 @@ class AptlyWorker:
         try:
             await startup_mirror()
             await startup_migration()
-        except:
+        except Exception:
             pass
 
         while True:

@@ -260,7 +260,7 @@ async def get_mirrors(request):
         if mirrorkey:
             mirrorkeyurl = mirrorkey.keyurl
             if mirrorkey.keyids:
-                mirrorkeyids = mirrorkey.keyids[1:-1]
+                mirrorkeyids = db2array(mirrorkey.keyids)
             mirrorkeyserver = mirrorkey.keyserver
         if not mirror.project.is_basemirror and mirror.basemirror:
             base_mirror_id = mirror.basemirror.id
@@ -287,7 +287,7 @@ async def get_mirrors(request):
                 "state": mirror.mirror_state,
                 "apt_url": apt_url,
                 "mirrorkeyurl": mirrorkeyurl,
-                "mirrorkeyids": mirrorkeyids,
+                "mirrorkeyids": " ".join(mirrorkeyids),
                 "mirrorkeyserver": mirrorkeyserver,
                 "external_repo": mirror.external_repo,
                 "dependency_policy": mirror.dependency_policy
