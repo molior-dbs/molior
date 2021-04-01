@@ -388,7 +388,7 @@ class Worker:
                 # replace duplicate with original
                 sourepprover.sourcerepository_id = original.id
 
-        session.commit() # workaround for sql alchemy
+        session.commit()  # workaround for sql alchemy
         session.delete(duplicate)
         original.set_ready()
         session.commit()
