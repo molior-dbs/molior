@@ -11,7 +11,7 @@ from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
-from ..tools import paginate
+from ..tools import paginate, array2db
 
 
 @app.http_get("/api2/mirror/{name}/{version}")
@@ -532,8 +532,19 @@ async def edit_mirror(request):
     if mirrortype == "2":
         mirror.dependency_policy = dependency_policy
 
+    if mirrorkeyurl != "":
+        mirrorkeyids = []
+        mirrorkeyserver = ""
+    elif mirrorkeyids:
+        mirrorkeyurl = ""
+        mirrorkeyids = re.split(r"[, ]", mirrorkeyids)
+    else:
+        mirrorkeyurl = ""
+        mirrorkeyids = []
+        mirrorkeyserver = ""
+
     mirrorkey.keyurl = mirrorkeyurl
-    mirrorkey.keyids = mirrorkeyids
+    mirrorkey.keyids = array2db(mirrorkeyids)
     mirrorkey.keyserver = mirrorkeyserver
 
     db.commit()
