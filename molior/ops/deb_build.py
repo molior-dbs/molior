@@ -571,6 +571,14 @@ async def schedule_build(build, session):
     return True
 
 
+def get_dependencies_recursive(dependencies, array):
+    for dep in dependencies:
+        if dep.project.is_mirror:
+            continue
+        if dep.id not in array:
+            array.append(dep.id)
+        get_dependencies_recursive(dep.dependencies, array)
+
 async def ScheduleBuilds():
     with Session() as session:
 
@@ -587,10 +595,7 @@ async def ScheduleBuilds():
 
             pvname = projectversion.fullname
             buildorder_projectversions = [build.projectversion_id]
-            for dep in projectversion.dependencies:
-                if dep.project.is_mirror:
-                    continue
-                buildorder_projectversions.append(dep.id)
+            get_dependencies_recursive(projectversion.dependencies, buildorder_projectversions)
 
             ready = True
             repo_deps = []
