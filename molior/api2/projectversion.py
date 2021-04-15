@@ -55,7 +55,7 @@ async def get_projectversion2(request):
 
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/dependencies")
-@app.authenticated
+# @app.authenticated
 async def get_projectversion_dependencies(request):
     """
     Returns a list of project version dependencies.
