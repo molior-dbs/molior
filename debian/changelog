@@ -1,3 +1,9 @@
+molior (1.4.1~rc15) stretch; urgency=medium
+
+  * bump version 1.4.1~rc15
+
+ -- André Roth <neolynx@gmail.com>  Fri, 07 May 2021 22:05:13 +0200
+
 molior (1.4.1~rc14) stretch; urgency=medium
 
   * bump version 1.4.1~rc14
