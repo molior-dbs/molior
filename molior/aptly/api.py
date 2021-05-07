@@ -399,7 +399,8 @@ class AptlyApi:
         state.update(progress)
         return state
 
-    async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components, architectures):
+    async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version,
+                             mirror_distribution, components, architectures):
         """
         Publish a previously created snapshot from a debian archive mirror.
 

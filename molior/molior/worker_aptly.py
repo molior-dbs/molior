@@ -384,7 +384,8 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         await build.set_publish_failed()
                         session.commit()
 
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version, components)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
+                                                           mirror_project, mirror_version, components)
                         return
 
                     # States:
@@ -396,7 +397,8 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version, components)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
+                                                           mirror_project, mirror_version, components)
                         return
 
                     if upd_progress["TotalNumberOfPackages"] > 0:
