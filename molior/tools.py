@@ -176,7 +176,7 @@ def validate_version_format(version: str):
         version (str): the version string to check
     """
 
-    version_pattern = "^v?[0-9]([0-9a-zA-Z]*\\.?[0-9a-zA-Z]+)*([~+-]*[0-9a-zA-Z\\.]*[0-9a-zA-Z]+)?$"
+    version_pattern = "^v[0-9]"
     pattern = re.compile(version_pattern)
     return pattern.match(version) is not None
 
