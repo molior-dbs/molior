@@ -399,7 +399,7 @@ class AptlyApi:
         state.update(progress)
         return state
 
-    async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components):
+    async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components, architectures):
         """
         Publish a previously created snapshot from a debian archive mirror.
 
@@ -418,6 +418,7 @@ class AptlyApi:
             "Distribution": mirror_distribution.replace("/", "_-"),
             "SourceKind": "snapshot",
             "Sources": [],
+            "Architectures": architectures,
             "Signing": {
                 "Batch": True,
                 "GpgKey": self.gpg_key,

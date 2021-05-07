@@ -172,13 +172,14 @@ async def startup_mirror():
                     mirror.project.name,
                     mirror.name,
                     components,
+                    db2array(mirror.mirror_architectures),
                     # FIXME: add all running tasks
                     [m_task.get("ID")],
                 )
             )
 
 
-async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components):
+async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components, architectures):
     """
     Creates an update task in the asyncio event loop.
 
@@ -196,11 +197,11 @@ async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, vers
     logger.debug("start update progress: aptly tasks %s", str(task_ids))
     loop = asyncio.get_event_loop()
     loop.create_task(finalize_mirror(build_id, base_mirror, base_mirror_version,
-                                     mirror, version, components, task_ids))
+                                     mirror, version, components, architectures, task_ids))
 
 
 async def finalize_mirror(build_id, base_mirror, base_mirror_version,
-                          mirror_project, mirror_version, components, task_ids):
+                          mirror_project, mirror_version, components, architectures, task_ids):
     try:
         mirrorname = "{}-{}".format(mirror_project, mirror_version)
         logger.debug("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
@@ -361,7 +362,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                 logger.debug("publishing snapshot: %s", mirrorname)
                 try:
                     task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror_project, mirror_version,
-                                                         mirror.mirror_distribution, components)
+                                                         mirror.mirror_distribution, components, architectures)
                 except Exception as exc:
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
                     mirror.mirror_state = "error"
@@ -383,7 +384,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         await build.set_publish_failed()
                         session.commit()
 
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version, components)
                         return
 
                     # States:
@@ -395,7 +396,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version, components)
                         return
 
                     if upd_progress["TotalNumberOfPackages"] > 0:
@@ -561,7 +562,7 @@ class AptlyWorker:
             mirrorkey = MirrorKey(
                     projectversion_id=mirror.id,
                     keyurl=key_url,
-                    keyids=array2db(keys),  # FIXME: keyids should be array
+                    keyids=array2db(keys),
                     keyserver=keyserver)
 
             session.add(mirrorkey)
@@ -715,6 +716,7 @@ class AptlyWorker:
                         mirror.project.name,
                         mirror.name,
                         mirror.mirror_components.split(","),
+                        db2array(mirror.mirror_architectures)
                     )
                 except NotFoundError as exc:
                     await build.log("E: aptly seems to be not available: %s\n" % str(exc))
