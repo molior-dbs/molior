@@ -67,7 +67,7 @@ async def main():
 
     cfg = Configuration()
     daily_cleanup = cfg.aptly.get("daily_cleanup")
-    if daily_cleanup == False or daily_cleanup == "off" or daily_cleanup == "disabled":
+    if daily_cleanup is False or daily_cleanup == "off" or daily_cleanup == "disabled":
         return
 
     if not daily_cleanup:

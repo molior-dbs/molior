@@ -194,7 +194,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             logger.error("error running git describe: %s" % gittag.strip())
         else:
             v = strip_epoch_version(info.version)
-            if not re.match("^v?{}$".format(v.replace("~", "-").replace("+","\\+")), gittag) or "+git" in v:
+            if not re.match("^v?{}$".format(v.replace("~", "-").replace("+", "\\+")), gittag) or "+git" in v:
                 is_ci = True
 
     ci_cfg = Configuration().ci_builds
@@ -578,6 +578,7 @@ def get_dependencies_recursive(dependencies, array):
         if dep.id not in array:
             array.append(dep.id)
         get_dependencies_recursive(dep.dependencies, array)
+
 
 async def ScheduleBuilds():
     with Session() as session:
