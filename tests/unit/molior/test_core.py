@@ -6,7 +6,7 @@ from mock import patch, MagicMock
 
 from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
-from molior.tools import is_name_valid, validate_version_format
+from molior.tools import is_name_valid
 
 
 def test_get_projectversion_no_cfg():
