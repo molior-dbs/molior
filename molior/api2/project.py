@@ -411,6 +411,7 @@ async def get_project_users2(request):
         return OKResponse(data)
 
     query = request.cirrina.db_session.query(UserRole).join(User).join(Project).order_by(User.username)
+    query - query.filter(Project.id == project.id)
 
     if filter_name:
         query = query.filter(User.username.ilike("%{}%".format(filter_name)))
