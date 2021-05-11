@@ -383,12 +383,13 @@ class Worker:
                 for p in phs:
                     p.sourcerepositoryprojectversion_id = t.id
                 # delete duplicate from projectversion
+                session.flush()
                 session.delete(sourepprover)
             else:
                 # replace duplicate with original
                 sourepprover.sourcerepository_id = original.id
 
-        session.commit()  # workaround for sql alchemy
+        session.flush()
         session.delete(duplicate)
         original.set_ready()
         session.commit()
