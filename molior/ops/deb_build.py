@@ -257,7 +257,10 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.logdone()
             repo.set_ready()
-            await parent.set_already_exists()
+            if build.parent and build.parent.buildstate == "successful":
+                await parent.set_already_exists()
+            else:
+                await parent.set_already_failed()
             session.commit()
             args = {"schedule": []}
             await enqueue_task(args)
@@ -597,6 +600,10 @@ async def ScheduleBuilds():
             pvname = projectversion.fullname
             buildorder_projectversions = [build.projectversion_id]
             get_dependencies_recursive(projectversion.dependencies, buildorder_projectversions)
+#            for dep in projectversion.dependencies:
+#                if dep.project.is_mirror:
+#                    continue
+#                buildorder_projectversions.append(dep.id)
 
             ready = True
             repo_deps = []

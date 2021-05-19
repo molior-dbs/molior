@@ -25,6 +25,7 @@ BUILD_STATES = [
     "publish_failed",
     "successful",
     "already_exists",
+    "already_failed",
     "nothing_done",
 ]
 
@@ -167,6 +168,12 @@ class Build(Base):
     async def set_already_exists(self):
         self.log_state("version already exists")
         self.buildstate = "already_exists"
+        self.endstamp = get_local_tz().localize(datetime.now(), is_dst=None)
+        await self.build_changed()
+
+    async def set_already_failed(self):
+        self.log_state("version already exists and build failed")
+        self.buildstate = "already_failed"
         self.endstamp = get_local_tz().localize(datetime.now(), is_dst=None)
         await self.build_changed()
 
