@@ -1,0 +1,39 @@
+version: '3'
+services:
+  molior:
+    image: neolynx/molior:1.4.1-rc16
+    entrypoint:
+      - /usr/bin/supervisord
+    volumes:
+      - molior_data:/var/lib/molior:rw
+      - postgres_data:/var/lib/postgresql:rw
+    ports:
+      - "8000:80"
+    depends_on:
+      - aptly
+    environment:
+      - DEBSIGN_NAME=Molior
+      - DEBSIGN_EMAIL=debsign@docker
+      - REPOSIGN_EMAIL=reposign@docker
+      - MOLIOR_ADMIN_PASSWD=secret77
+      - APTLY_USER=molior
+      - APTLY_PASS=secret77
+      - APTLY_PUBLIC_URL=http://localhost:3142
+  aptly:
+    image: neolynx/molior-aptly:1.4.1-rc16
+    entrypoint:
+      - /usr/bin/supervisord
+    volumes:
+      - aptly_data:/var/lib/aptly:rw
+    ports:
+      - "3142:3142"
+    environment:
+      - REPOSIGN_NAME=Molior
+      - REPOSIGN_EMAIL=reposign@docker
+      - APTLY_USER=molior
+      - APTLY_PASS=secret77
+
+volumes:
+  aptly_data:
+  molior_data:
+  postgres_data:
