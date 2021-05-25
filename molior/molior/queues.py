@@ -82,18 +82,17 @@ async def buildlog_writer(build_id):
         del buildlogs[build_id]
         return
     try:
-        afp = AIOFile(filename, 'a')
-        await afp.open()
-        writer = Writer(afp)
-        while True:
-            msg = await dequeue(buildlogs[build_id])
-            if msg is None:
-                await enqueue_backend({"logging_done": build_id})
-                continue
-            elif msg is False:
-                break
-            await writer(msg)
-            await afp.fsync()
+        async with AIOFile(filename, 'a') as afp:
+            writer = Writer(afp)
+            while True:
+                msg = await dequeue(buildlogs[build_id])
+                if msg is None:
+                    await enqueue_backend({"logging_done": build_id})
+                    continue
+                elif msg is False:
+                    break
+                await writer(msg)
+                await afp.fsync()
     except Exception as exc:
         logger.exception(exc)
 
