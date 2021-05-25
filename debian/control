@@ -5,7 +5,7 @@ Standards-Version: 3.9.8
 Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-exec, python3-setuptools,
     python3-pytest, python3-pytest-cov, python3-coverage, python3-mock, python3-yaml, python3-sqlalchemy,
     python3-jinja2, python3-sphinx, python3-sphinx-rtd-theme, python3-sphinxcontrib.plantuml,
-    python3-cirrina, python3-launchy, flake8, git
+    python3-cirrina, python3-launchy, flake8, git, python3-apt
 Maintainer: André Roth <neolynx@gmail.com>
 
 Package: molior-server

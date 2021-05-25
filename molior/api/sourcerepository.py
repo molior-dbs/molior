@@ -1,5 +1,7 @@
 import json
 import uuid
+import apt_pkg
+import functools
 
 from aiohttp import web
 
@@ -11,6 +13,8 @@ from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 from ..model.sourepprover import SouRepProVer
 from ..molior.queues import enqueue_task
+
+apt_pkg.init_system()
 
 
 def get_last_gitref(repo, db):
@@ -26,6 +30,16 @@ def get_last_build(db, projectversion, repository):
                                         Build.projectversion_id == projectversion.id,
                                         Build.buildtype == "deb").order_by(Build.id.desc()).first()
     return last_build
+
+
+def get_latest_release(db, projectversion, repository):
+    candidates = db.query(Build).filter(Build.sourcerepository_id == repository.id,
+                                        Build.projectversion_id == projectversion.id,
+                                        Build.buildtype == "deb", Build.buildstate == "successful").all()
+    m = max(candidates, key=lambda item: functools.cmp_to_key(apt_pkg.version_compare)(item.version), default=None)
+    if not m:
+        return None
+    return db.query(Build).filter(Build.id == m.id).first()
 
 
 def get_dependencies_by_sourcerepository(db_session, repository_id):

@@ -6,7 +6,7 @@ from sqlalchemy.sql import or_
 from ..app import app, logger
 from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
-from ..api.sourcerepository import get_last_gitref, get_last_build
+from ..api.sourcerepository import get_last_gitref, get_last_build, get_latest_release
 from ..molior.queues import enqueue_task
 
 from ..model.sourcerepository import SourceRepository
@@ -256,6 +256,16 @@ async def get_projectversion_repositories(request):
         if build:
             result.update({
                 "last_build": {
+                    "id": build.id,
+                    "version": build.version,
+                    "buildstate": build.buildstate,
+                    "sourcename": build.sourcename,
+                }
+            })
+        build = get_latest_release(request.cirrina.db_session, projectversion, repo)
+        if build:
+            result.update({
+                "latest_release": {
                     "id": build.id,
                     "version": build.version,
                     "buildstate": build.buildstate,
