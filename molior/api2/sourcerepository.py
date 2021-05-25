@@ -1,7 +1,7 @@
 import re
 import giturlparse
 
-from sqlalchemy.sql import or_
+from sqlalchemy.sql import func, or_
 
 from ..app import app, logger
 from ..auth import req_role, req_admin
@@ -247,6 +247,16 @@ async def get_projectversion_repositories(request):
     query = paginate(request, query)
     results = query.all()
 
+    def get_last_successful_build(db, projectversion, repository):
+        latest_build_subq = db.query(func.max(Build.id).label("latest_id")).filter(
+                Build.projectversion_id == projectversion.id,
+                Build.is_ci.is_(False),
+                Build.sourcerepository_id == repository.id,
+                Build.buildtype == "deb",
+                Build.buildstate == "successful").group_by(Build.id).subquery()
+
+        return db.query(Build).join(latest_build_subq, Build.id == latest_build_subq.c.latest_id).first()
+
     data = {"total_result_count": count, "results": []}
     for repo, srpv in results:
         result = {
@@ -266,7 +276,18 @@ async def get_projectversion_repositories(request):
                     "buildstate": build.buildstate,
                     "sourcename": build.sourcename,
                 }
-            })
+                })
+            if build.buildstate != "successful":
+                build = get_last_successful_build(request.cirrina.db_session, projectversion, repo)
+                if build:
+                    result.update({
+                        "last_successful_build": {
+                            "id": build.id,
+                            "version": build.version,
+                            "buildstate": build.buildstate,
+                            "sourcename": build.sourcename,
+                        }
+                    })
         data["results"].append(result)
 
     return OKResponse(data)
