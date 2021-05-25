@@ -192,3 +192,28 @@ async def get_node(request):
         if machine_id == node["id"]:
             return web.json_response(node)
     return web.Response(text="Node not found", status=404)
+
+
+@app.http_get("/api/server")
+async def get_ServerInfo(request):
+    """
+    Returns info about the molior server
+
+    ---
+    description: Returns info about the molior server
+    tags:
+        - Status
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "500":
+            description: internal server error
+    """
+    b = Backend()
+    backend = b.get_backend()
+    server_info = backend.get_server_info()
+    if server_info:
+        return web.json_response(server_info)
+    return web.Response(text="Internal server error", status=500)

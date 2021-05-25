@@ -1,5 +1,9 @@
 import asyncio
 import json
+import os
+
+from psutil import virtual_memory, disk_usage, disk_partitions
+from multiprocessing import cpu_count
 
 from ...app import app, logger
 from ...molior.configuration import Configuration
@@ -244,6 +248,23 @@ class HTTPBackend:
                     "sourcearch": node.molior_sourcearch
                 })
         return build_nodes
+
+    def get_server_info(self):
+        uptime_seconds = ""
+        with open('/proc/uptime', 'r') as f:
+            uptime_seconds = float(f.readline().split()[0])
+        disk = {}
+        for p in disk_partitions():
+            if p.device.startswith("/dev/"):
+                disk[p.mountpoint] = disk_usage(p.mountpoint).percent
+        server_info = {
+                    "uptime_seconds": uptime_seconds,
+                    "load": os.getloadavg(),
+                    "cpu_cores": cpu_count(),
+                    "ram": virtual_memory().percent,
+                    "disk": disk
+                    }
+        return server_info
 
     async def scheduler(self, arch):
         while True:
