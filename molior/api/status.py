@@ -195,7 +195,7 @@ async def get_node(request):
 
 
 @app.http_get("/api/server")
-async def get_ServerInfo(request):
+async def get_server_info(request):
     """
     Returns info about the molior server
 
