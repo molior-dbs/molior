@@ -58,6 +58,9 @@ async def delete_build(request):
     if not topbuild:
         return ErrorResponse(400, "Build of type %s cannot be deleted" % build.buildtype)
 
+    if build.projectversion and build.projectversion.is_locked:
+        return ErrorResponse(400, "Build from locked projectversion cannot be deleted")
+
     if topbuild.buildstate == "new" or \
        topbuild.buildstate == "scheduled" or \
        topbuild.buildstate == "building" or \
