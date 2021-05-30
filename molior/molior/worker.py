@@ -288,6 +288,7 @@ class Worker:
                     await asyncio.sleep(2)
                     return
                 await enqueue_task({"src_build": [build.id]})
+                ok = True
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
