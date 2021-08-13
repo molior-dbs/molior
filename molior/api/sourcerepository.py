@@ -4,7 +4,7 @@ import uuid
 from aiohttp import web
 
 from ..app import app, logger
-from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate, db2array
+from ..tools import ErrorResponse, OKResponse, parse_int, get_hook_triggers, paginate, db2array
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -517,7 +517,7 @@ async def trigger_clone(request):
 
     args = {"clone": [build.id, repository.id]}
     await enqueue_task(args)
-    return web.Response(status=200, text="Clone job started")
+    return OKResponse("Clone job started")
 
 
 @app.http_post("/api/repositories/{repository_id}/build")
