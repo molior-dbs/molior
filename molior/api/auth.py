@@ -47,7 +47,7 @@ async def authenticate(request, user, passwd):
     """
     if not user:
         return False
-    user = user.lower()  # FIXME: move to cirrina
+    user = user.lower().strip()  # FIXME: move to cirrina
     if user == "admin":
         logger.error("admin account not allowed via auth plugin")
         return False
