@@ -1,4 +1,6 @@
 import re
+import asyncio
+import os
 from aiohttp import web
 from sqlalchemy import func
 
@@ -101,7 +103,7 @@ async def get_mirror2(request):
 
 @app.http_get("/api2/mirror/{mirror_name}/{mirror_version}/dependents")
 @app.authenticated
-async def get_projectversion_dependents(request):
+async def get_mirror_dependents(request):
     """
     Returns a list of projectversions for the given mirror.
 
@@ -624,3 +626,63 @@ async def delete_mirror2(request):
     await enqueue_aptly(args)
 
     return OKResponse("Successfully deleted mirror: {}".format(mirrorname))
+
+
+@app.http_get("/api2/mirror/{mirror_name}/{mirror_version}/gpg")
+# @app.authenticated
+async def get_mirror_gpg(request):
+    """
+    Returns a gpg key for the given mirror.
+
+    ---
+    description: Returns a gpg key for the given mirror.
+    tags:
+        - Mirror
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - name: mirror_name
+          in: path
+          required: true
+          type: string
+          description: Mirror name
+        - name: mirror_version
+          in: path
+          required: true
+          type: string
+          description: Mirror version
+    produces:
+        - text/json
+    """
+    # curl -s http://debian.roche.com/buster/10.0/dists/buster/Release.gpg | gpg --list-packets |  sed -n 's/.*keyid //p'
+    mirror = get_mirror(request)
+    if not mirror:
+        return ErrorResponse(400, "Mirror not found")
+    apt_url = mirror.get_apt_repo(url_only=True)
+    mirror_distribution = mirror.mirror_distribution
+    try:
+        read, write = os.pipe()
+        proc1 = await asyncio.create_subprocess_exec("curl", "-s", apt_url + "/dists/" + mirror_distribution + "/Release.gpg",
+                                                     stdout=write)
+        os.close(write)
+        read2, write2 = os.pipe()
+        proc2 = await asyncio.create_subprocess_exec("gpg", "--list-packets",
+                                                     stdout=write2, stdin=read)
+        os.close(read)
+        os.close(write2)
+        proc3 = await asyncio.create_subprocess_exec("sed", "-n", "s/.*keyid //p",
+                                                     stdout=asyncio.subprocess.PIPE, stdin=read2)
+        os.close(read2)
+    except Exception as exc:
+        logger.exception(exc)
+        return ErrorResponse(400, "")
+    try:
+        output = await asyncio.wait_for(proc3.stdout.read(), timeout=5)
+    except asyncio.TimeoutError:
+        proc3.kill()
+        proc2.kill()
+        proc1.kill()
+        return ErrorResponse(408, "")
+
+    gpg = str(output, "utf-8").split("\n")[0]
+    return OKResponse(gpg)
