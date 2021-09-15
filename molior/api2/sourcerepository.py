@@ -628,7 +628,7 @@ async def add_repository_hook(request):
             properties:
                 url:
                     type: string
-                skip_ssl:
+                skipssl:
                     type: boolean
                 body:
                     type: string
@@ -636,7 +636,7 @@ async def add_repository_hook(request):
                     type: string
                 method:
                     type: string
-                    example: "post" or "get"
+                    example: post/get/...
     produces:
         - text/json
     """
@@ -718,7 +718,7 @@ async def edit_repository_hook(request):
             properties:
                 url:
                     type: string
-                skip_ssl:
+                skipssl:
                     type: boolean
                 body:
                     type: string
@@ -726,7 +726,7 @@ async def edit_repository_hook(request):
                     type: string
                 method:
                     type: string
-                    example: "post" or "get"
+                    example: post/get/...
     produces:
         - text/json
     """
