@@ -1,4 +1,5 @@
 from sqlalchemy.sql import or_, func
+from secrets import token_hex
 
 from ..app import app
 from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate, parse_int, db2array, escape_for_like
@@ -6,6 +7,8 @@ from ..auth import req_role
 from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
+from ..model.authtoken import Authtoken
+from ..model.authtoken_project import Authtoken_Project
 from ..model.projectversion import ProjectVersion, get_projectversion, DEPENDENCY_POLICIES
 from ..model.user import User
 from ..model.userrole import UserRole, USER_ROLES
@@ -34,7 +37,7 @@ async def get_project_byname(request):
 
     project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
     if not project:
-        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
+        return ErrorResponse(404, "Project {} not found".format(project_name))
 
     data = {
         "id": project.id,
@@ -93,7 +96,7 @@ async def get_projectversions2(request):
     if project_id:
         query = query.filter(or_(func.lower(Project.name) == project_id.lower(), Project.id == parse_int(project_id)))
     if filter_name:
-        query = query.filter(ProjectVersion.name.ilike("%{}%".format(filter_name)))
+        query = query.filter(ProjectVersion.name.ilike("%{}%".format(escape_for_like(filter_name))))
     if basemirror_id:
         query = query.filter(ProjectVersion.basemirror_id == basemirror_id)
     elif is_basemirror:
@@ -187,7 +190,7 @@ async def create_projectversion(request):
     if not project and isinstance(project_id, int):
         project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
-        return ErrorResponse(400, "Project '{}' could not be found".format(project_id))
+        return ErrorResponse(400, "Project '{}' not found".format(project_id))
     if project.is_mirror:
         return ErrorResponse(400, "Cannot add projectversion to a mirror")
 
@@ -384,7 +387,7 @@ async def get_project_users2(request):
 
     project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
     if not project:
-        return ErrorResponse(404, "Project with name {} could not be found!".format(project_name))
+        return ErrorResponse(404, "Project {} not found".format(project_name))
     if project.is_mirror:
         return ErrorResponse(400, "Cannot get permissions from project which is a mirror")
 
@@ -396,8 +399,7 @@ async def get_project_users2(request):
         query = query.filter(User.username != "admin")
         query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
         if filter_name:
-            escaped_filter_name = escape_for_like(filter_name)
-            query = query.filter(User.username.ilike(f"%{escaped_filter_name}%"))
+            query = query.filter(User.username.ilike("%{}%").format(escape_for_like(filter_name)))
         query = query.order_by(User.username)
         query = paginate(request, query)
         users = query.all()
@@ -414,7 +416,7 @@ async def get_project_users2(request):
     query = query.filter(Project.id == project.id)
 
     if filter_name:
-        query = query.filter(User.username.ilike("%{}%".format(filter_name)))
+        query = query.filter(User.username.ilike("%{}%".format(escape_for_like(filter_name))))
 
     if filter_role:
         for r in USER_ROLES:
@@ -483,7 +485,7 @@ async def add_project_users2(request):
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
-        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+        return ErrorResponse(404, "Project {} not found".format(project_name))
     if project.is_mirror:
         return ErrorResponse(400, "Cannot set permissions to project which is a mirror")
 
@@ -551,7 +553,7 @@ async def edit_project_users2(request):
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
-        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+        return ErrorResponse(404, "Project {} not found".format(project_name))
     if project.is_mirror:
         return ErrorResponse(400, "Cannot edit permissions of project which is a mirror")
 
@@ -606,7 +608,7 @@ async def delete_project_users2(request):
     db = request.cirrina.db_session
     project = db.query(Project).filter_by(name=project_name).first()
     if not project:
-        return ErrorResponse(404, "Project with name {} could not be found".format(project_name))
+        return ErrorResponse(404, "Project {} not found".format(project_name))
     if project.is_mirror:
         return ErrorResponse(400, "Cannot delete permissions from project which is a mirror")
 
@@ -621,6 +623,124 @@ async def delete_project_users2(request):
     query = query.filter(Project.id == project.id)
     userrole = query.first()
     db.delete(userrole)
+    db.commit()
+
+    return OKResponse()
+
+
+@app.http_get("/api2/projectbase/{project_name}/tokens")
+@app.authenticated
+async def get_tokens(request):
+    project_name = request.match_info["project_name"]
+    description = request.GET.getone("description", "")
+
+    project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project {} not found".format(project_name))
+
+    query = request.cirrina.db_session.query(Authtoken).outerjoin(Authtoken_Project).outerjoin(Project)
+    query = query.filter(Project.id == project.id)
+    if description:
+        query = query.filter(Authtoken.description.ilike("%{}%".format(escape_for_like(description))))
+    query = paginate(request, query)
+    tokens = query.all()
+    data = {
+        "total_result_count": query.count(),
+        "results": [
+            {"id": token.id, "description": token.description}
+            for token in tokens
+        ],
+    }
+    return OKResponse(data)
+
+
+@app.http_post("/api2/projectbase/{project_name}/token")
+@req_role("owner")
+async def create_token(request):
+    """
+    Create project auth token
+    ---
+    """
+    project_name = request.match_info["project_name"]
+    params = await request.json()
+    description = params.get("description")
+
+    db = request.cirrina.db_session
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project {} not found".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot create auth token for mirrors")
+
+    # FIXME: check existing
+
+    auth_token = token_hex(32)
+
+    token = Authtoken(description=description, token=auth_token)
+    db.add(token)
+    db.commit()
+    mapping = Authtoken_Project(project_id=project.id, authtoken_id=token.id, roles=array2db(['owner']))
+    db.add(mapping)
+    db.commit()
+
+    return OKResponse({"token": auth_token})
+
+
+@app.http_put("/api2/projectbase/{project_name}/token")
+@req_role("owner")
+async def add_token(request):
+    """
+    Add existing auth token to project
+    ---
+    """
+    project_name = request.match_info["project_name"]
+    params = await request.json()
+    description = params.get("description")
+
+    db = request.cirrina.db_session
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project {} not found".format(project_name))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot create auth token for mirrors")
+    token = db.query(Authtoken).filter_by(description=description).first()
+    if not token:
+        return ErrorResponse(404, "Authtoken '{}' not found".format(description))
+
+    # FIXME: check already added
+
+    mapping = Authtoken_Project(project_id=project.id, authtoken_id=token.id, roles=array2db(['owner']))
+    db.add(mapping)
+    db.commit()
+
+    return OKResponse()
+
+
+@app.http_delete("/api2/projectbase/{project_name}/tokens")
+@req_role("owner")
+async def delete_project_token(request):
+    """
+    Delete project auth token
+    """
+    project_name = request.match_info["project_name"]
+    params = await request.json()
+    token_id = params.get("id")
+
+    db = request.cirrina.db_session
+    project = db.query(Project).filter_by(name=project_name).first()
+    if not project:
+        return ErrorResponse(404, "Project {} not found".format(project_name))
+
+    query = request.cirrina.db_session.query(Authtoken_Project)
+    query = query.filter(Authtoken_Project.authtoken_id == token_id)
+    query = query.filter(Authtoken_Project.project_id == project.id)
+    token = query.first()
+
+    if not token:
+        return ErrorResponse(404, "Token not found in {}".format(project_name))
+
+    # FIXME: delete Authtoken if not referenced by other projects
+    db.delete(token)
     db.commit()
 
     return OKResponse()
