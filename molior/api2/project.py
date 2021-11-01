@@ -326,11 +326,17 @@ async def delete_project2(request):
     if project.projectversions:
         return ErrorResponse(400, "Cannot delete project containing projectversions")
 
-    query = request.cirrina.db_session.query(UserRole).join(User).join(Project)
+    query = db.query(UserRole).join(User).join(Project)
     query = query.filter(Project.id == project.id)
     userroles = query.all()
     for userrole in userroles:
         db.delete(userrole)
+
+    tokens = db.query(Authtoken_Project).filter(Authtoken_Project.project_id == project.id).all()
+    for token in tokens:
+        db.delete(token)
+    # FIXME: delete unreferenced project tokens
+
     db.delete(project)
     db.commit()
     return OKResponse("project {} deleted".format(project_name))
@@ -380,12 +386,13 @@ async def get_project_users2(request):
     produces:
         - text/json
     """
+    db = request.cirrina.db_session
     project_name = request.match_info["project_name"]
     candidates = request.GET.getone("candidates", None)
     if candidates:
         candidates = candidates == "true"
 
-    project = request.cirrina.db_session.query(Project).filter_by(name=project_name).first()
+    project = db.query(Project).filter_by(name=project_name).first()
     if not project:
         return ErrorResponse(404, "Project {} not found".format(project_name))
     if project.is_mirror:
@@ -395,7 +402,7 @@ async def get_project_users2(request):
     filter_role = request.GET.getone("role", None)
 
     if candidates:
-        query = request.cirrina.db_session.query(User).outerjoin(UserRole).outerjoin(Project)
+        query = db.query(User).outerjoin(UserRole).outerjoin(Project)
         query = query.filter(User.username != "admin")
         query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
         if filter_name:
@@ -412,7 +419,7 @@ async def get_project_users2(request):
         }
         return OKResponse(data)
 
-    query = request.cirrina.db_session.query(UserRole).join(User).join(Project).order_by(User.username)
+    query = db.query(UserRole).join(User).join(Project).order_by(User.username)
     query = query.filter(Project.id == project.id)
 
     if filter_name:

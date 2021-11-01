@@ -18,9 +18,13 @@ from ..model.projectversion import ProjectVersion
 from ..model.debianpackage import Debianpackage
 
 
-async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
+def get_debchanges_filename(sourcepath, sourcename, version, arch="source"):
     v = strip_epoch_version(version)
-    changes_file = "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
+    return "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
+
+
+async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
+    changes_file = get_debchanges_filename(sourcepath, sourcename, version, arch)
     files = []
     try:
         async with AIOFile(changes_file, "rb") as f:
@@ -57,8 +61,22 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
     await buildlog(build_id, "\n")
     await buildlogtitle(build_id, "Publishing")
-    sourcepath = Path(Configuration().working_dir) / "repositories" / str(repo_id)
-    srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
+
+    if repo_id:
+        sourcepath = Path(Configuration().working_dir) / "repositories" / str(repo_id)
+    else:
+        sourcepath = Path(Configuration().working_dir) / "buildout" / str(build_id)
+
+    srcfiles = []
+    if Path(get_debchanges_filename(sourcepath, sourcename, version, "source")).exists():
+        # check exists
+        srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
+    else:  # source build without changes file, i.e. external build upload
+        for sourcefile in sourcepath.glob("*.*"):
+            filename = sourcefile.name
+            if filename != "build.log":
+                srcfiles.append(filename)
+
     if not srcfiles:
         logger.error("DebSrcPublish: no source files found")
         return False
@@ -75,7 +93,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
     for projectversion_id in projectversions:
         fullname = None
         with Session() as session:
-            projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
+            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id) .first()
             if projectversion:
                 fullname = projectversion.fullname
                 basemirror_name = projectversion.basemirror.project.name
