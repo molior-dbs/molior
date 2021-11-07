@@ -35,8 +35,7 @@ Description: Molior build node client
 Package: molior-doc
 Architecture: all
 Section: doc
-Depends: ${sphinxdoc:Depends}, ${misc:Depends}
-Suggests: ${sphinxdoc:Built-Using}
+Depends: ${misc:Depends}
 Description: Molior package documentation
  This package provides the molior
   documentation.
