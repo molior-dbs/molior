@@ -131,10 +131,10 @@ class MoliorServer:
 
 
 @click.command()
-@click.option("--host", default="localhost", help="Hostname, examples: 'localhost' or '0.0.0.0'")
-@click.option("--port", default=8888, help="Listen port")
-@click.option("--debug", default=False, help="Enable debug")
-@click.option("--coverage", default=False, help="Enable coverage testing")
+@click.option("--host",     default="localhost",         help="Hostname, examples: 'localhost' or '0.0.0.0'")
+@click.option("--port",     default=8888,                help="Listen port")
+@click.option("--debug",    default=False, is_flag=True, help="Enable debug")
+@click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
 def main(host, port, debug, coverage):
     logger.info("starting molior v%s", MOLIOR_VERSION)
 
