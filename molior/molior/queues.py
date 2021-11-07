@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime
 from aiofile import AIOFile, Writer
 from pathlib import Path
+from concurrent.futures._base import CancelledError
 
 from ..app import logger
 from ..tools import get_local_tz
@@ -26,8 +27,12 @@ async def enqueue(queue, item):
 
 
 async def dequeue(queue):
-    ret = await queue.get()
-    queue.task_done()
+    ret = None
+    try:
+        ret = await queue.get()
+        queue.task_done()
+    except (RuntimeError, CancelledError):
+        pass
     return ret
 
 

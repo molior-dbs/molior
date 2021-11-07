@@ -1,6 +1,8 @@
 import asyncio
 import json
 
+from concurrent.futures._base import CancelledError
+
 from ...app import app, logger
 from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_backend, enqueue_buildtask, dequeue_buildtask
@@ -42,7 +44,10 @@ async def watchdog(ws_client):
                 ws_client.send_str(json.dumps({"ping": 1}))
 
             # wait for pong
-            await asyncio.sleep(PING_TIMEOUT)
+            try:
+                await asyncio.sleep(PING_TIMEOUT)
+            except CancelledError:
+                break
 
     except Exception as exc:
         logger.exception(exc)
@@ -78,7 +83,7 @@ async def node_register(ws_client):
 
     registry[arch].insert(0, ws_client)
     logger.info("backend: %s node registered: %s", arch, node)
-    asyncio.ensure_future(watchdog(ws_client))
+    ws_client.molior_watchdog = asyncio.ensure_future(watchdog(ws_client))
     await enqueue_backend({"node_registered": 1})
 
 
@@ -160,6 +165,8 @@ async def deregister_node(ws_client):
     else:
         logger.warning("backend: unknown node disconnect: %s/%s", arch, node)
 
+    await ws_client.molior_watchdog
+
 
 class HTTPBackend:
     """
@@ -168,9 +175,9 @@ class HTTPBackend:
 
     def __init__(self, loop):
         self.loop = loop
-        asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
-        asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
-        asyncio.ensure_future(self.notifier(), loop=self.loop)
+        self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
+        self.task_scheduler_arm64 = asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
+        self.task_notifier = asyncio.ensure_future(self.notifier(), loop=self.loop)
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian=True):
@@ -245,12 +252,23 @@ class HTTPBackend:
                 })
         return build_nodes
 
+    async def stop(self):
+        self.task_scheduler_amd64.cancel()
+        await self.task_scheduler_amd64
+        self.task_scheduler_arm64.cancel()
+        await self.task_scheduler_arm64
+        self.task_notifier.cancel()
+        await self.task_notifier
+
+        for arch in registry.keys():
+            for node in registry[arch]:
+                await deregister_node(node)
+
     async def scheduler(self, arch):
         while True:
             try:
                 task = await dequeue_buildtask(arch)
                 if task is None:
-                    logger.error("backend: got emtpy task, aborting...")
                     break
 
                 build_id = task["build_id"]
@@ -279,6 +297,8 @@ class HTTPBackend:
 
             await asyncio.sleep(1)
 
+        logger.info("scheduler %s task terminated", arch)
+
     async def notifier(self):
         while True:
             nodes = []
@@ -301,4 +321,8 @@ class HTTPBackend:
                     "sourcearch": node.molior_sourcearch
                     })
             await notify(Subject.node.value, Event.changed.value, data)
-            await asyncio.sleep(4)
+            try:
+                await asyncio.sleep(4)
+            except Exception:
+                break
+        logger.info("notifier task terminated")

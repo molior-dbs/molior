@@ -4,7 +4,7 @@ Priority: optional
 Standards-Version: 3.9.8
 Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-exec, python3-setuptools,
     python3-pytest, python3-pytest-cov, python3-coverage, python3-mock, python3-yaml, python3-sqlalchemy,
-    python3-jinja2, python3-cirrina, python3-launchy, flake8, git
+    python3-jinja2, python3-cirrina (>= 0.4.7), python3-launchy, flake8, git
 Maintainer: André Roth <neolynx@gmail.com>
 
 Package: molior-server
@@ -12,7 +12,7 @@ Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf, git, git-lfs,
     postgresql, postgresql-contrib, python3-psycopg2, sudo, expect, tcl, sbuild, schroot,
     binfmt-support, qemu-user-static, python3-sqlalchemy, python3-yaml, python3-tz,
-    python3-jinja2, python3-cirrina, python3-click, devscripts, sensible-utils,
+    python3-jinja2, python3-cirrina (>= 0.4.7), python3-click, devscripts, sensible-utils,
     bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, python3-async-cron,
     python3-giturlparse, python3-aiofile, openssh-client,
     debootstrap (>= 1.0.110~bpo9+1)

@@ -48,54 +48,95 @@ import molior.api2.mirror            # noqa: F401
 import molior.api2.build             # noqa: F401
 
 
-async def cleanup_task():
-    await enqueue_aptly({"cleanup": []})
+class MoliorServer:
 
+    def __init__(self, loop, host, port, logger, debug):
+        self.loop = loop
+        self.host = host
+        self.port = port
+        self.logger = logger
+        self.debug = debug
+        self.task_worker = None
+        self.task_backend_worker = None
+        self.task_aptly_worker = None
+        self.task_notification_worker = None
+        self.task_cron = None
 
-async def main():
-    worker = Worker()
-    asyncio.ensure_future(worker.run())
+    @staticmethod
+    def create_cirrina_context(cirrina):
+        maker = sessionmaker(bind=database.engine)
+        cirrina.add_context("db_session", maker())
 
-    backend_worker = BackendWorker()
-    asyncio.ensure_future(backend_worker.run())
+    @staticmethod
+    def destroy_cirrina_context(cirrina):
+        cirrina.db_session.close()
 
-    aptly_worker = AptlyWorker()
-    asyncio.ensure_future(aptly_worker.run())
+    async def cleanup_task(self):
+        await enqueue_aptly({"cleanup": []})
 
-    notification_worker = NotificationWorker()
-    asyncio.ensure_future(notification_worker.run())
+    def run(self):
+        self.backend = Backend().init()
+        if not self.backend:
+            return
+        if not Auth().init():
+            return
 
-    cfg = Configuration()
-    daily_cleanup = cfg.aptly.get("daily_cleanup")
-    if daily_cleanup is False or daily_cleanup == "off" or daily_cleanup == "disabled":
-        return
+        Launchy.attach_loop(self.loop)
 
-    if not daily_cleanup:
-        daily_cleanup = "04:00"
-    cleanup_sched = Scheduler(locale="en_US")
-    cleanup_job = CronJob(name='cleanup').every().day.at(daily_cleanup).go(cleanup_task)
-    cleanup_sched.add_job(cleanup_job)
-    asyncio.ensure_future(cleanup_sched.start())
+        worker = Worker()
+        self.task_worker = asyncio.ensure_future(worker.run())
 
+        backend_worker = BackendWorker()
+        self.task_backend_worker = asyncio.ensure_future(backend_worker.run())
 
-def create_cirrina_context(cirrina):
-    maker = sessionmaker(bind=database.engine)
-    cirrina.add_context("db_session", maker())
+        aptly_worker = AptlyWorker()
+        self.task_aptly_worker = asyncio.ensure_future(aptly_worker.run())
 
+        notification_worker = NotificationWorker()
+        self.task_notification_worker = asyncio.ensure_future(notification_worker.run())
 
-def destroy_cirrina_context(cirrina):
-    cirrina.db_session.close()
+        cfg = Configuration()
+        daily_cleanup = cfg.aptly.get("daily_cleanup")
+        if daily_cleanup is False or daily_cleanup == "off" or daily_cleanup == "disabled":
+            return
+
+        if not daily_cleanup:
+            daily_cleanup = "04:00"
+        cleanup_sched = Scheduler(locale="en_US")
+        cleanup_job = CronJob(name='cleanup').every().day.at(daily_cleanup).go(self.cleanup_task)
+        cleanup_sched.add_job(cleanup_job)
+        self.task_cron = asyncio.ensure_future(cleanup_sched.start())
+
+        app.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
+        app.run(self.host, self.port, logger=self.logger, debug=self.debug)
+
+    async def terminate(self):
+        logger.info("terminating tasks")
+        self.task_worker.cancel()
+        await self.task_worker
+        self.task_backend_worker.cancel()
+        await self.task_backend_worker
+        self.task_aptly_worker.cancel()
+        await self.task_aptly_worker
+        self.task_notification_worker.cancel()
+        await self.task_notification_worker
+
+        logger.info("terminating backend")
+        await self.backend.stop()
+
+        logger.info("terminating launchy")
+        await Launchy.stop()
+        logger.info("terminating app")
+        app.stop()
 
 
 @click.command()
-@click.option(
-    "--host", default="localhost", help="Hostname, examples: 'localhost' or '0.0.0.0'"
-)
+@click.option("--host", default="localhost", help="Hostname, examples: 'localhost' or '0.0.0.0'")
 @click.option("--port", default=8888, help="Listen port")
 @click.option("--debug", default=False, help="Enable debug")
 @click.option("--coverage", default=False, help="Enable coverage testing")
-def mainloop(host, port, debug, coverage):
-    logger.info("molior v%s", MOLIOR_VERSION)
+def main(host, port, debug, coverage):
+    logger.info("starting molior v%s", MOLIOR_VERSION)
 
     if coverage:
         logger.warning("starting coverage measurement")
@@ -104,36 +145,32 @@ def mainloop(host, port, debug, coverage):
         cov.start()
 
     loop = asyncio.get_event_loop()
-    Launchy.attach_loop(loop)
+    moliorserver = MoliorServer(loop, host, port, logger=logger, debug=debug)
 
     def terminate(signame):
-        logger.info("terminating")
-        asyncio.run_coroutine_threadsafe(Launchy.stop(), loop)
-        try:
-            loop.stop()
-        except Exception:
-            pass
-        logger.info("event loop stopped")
+        logger.info("received %s, terminating...", signame)
+        asyncio.run_coroutine_threadsafe(moliorserver.terminate(), loop)
+        # tasks = [task for task in asyncio.all_tasks() if task is not asyncio.tasks.current_task()]
+        # list(map(lambda task: task.cancel(), tasks))
+        # await asyncio.gather(*tasks, return_exceptions=True)
+        # try:
+        #     loop.stop()
+        # except Exception as exc:
+        #     logger.exception(exc)
+        # logger.info("event loop stopped")
 
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
 
-    backend = Backend().init()
-    if not backend:
-        exit(1)
-    if not Auth().init():
-        exit(1)
-
-    asyncio.ensure_future(main())
-    app.set_context_functions(create_cirrina_context, destroy_cirrina_context)
-    app.run(host, port, logger=logger, debug=debug)
-    logger.info("terminated")
+    moliorserver.run()  # server up and running ...
 
     if coverage:
         logger.warning("saving coverage measurement")
         cov.stop()
         cov.html_report(directory='/var/lib/molior/buildout/coverage')
 
+    logger.info("terminated")
+
 
 if __name__ == "__main__":
-    mainloop()
+    main()
