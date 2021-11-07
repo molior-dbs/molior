@@ -495,7 +495,7 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, session)
 
 class AptlyWorker:
     """
-    Source Packaging worker thread
+    Aptly worker thread
 
     """
 
@@ -773,21 +773,17 @@ class AptlyWorker:
             is_ci = build.is_ci
             parent_id = build.parent_id
 
-        await buildlog(parent_id, "I: publishing source package\n")
-
         ret = False
         try:
             ret = await DebSrcPublish(build_id, repo_id, sourcename, version, projectversions, is_ci)
         except Exception as exc:
             logger.exception(exc)
 
-        if not ret:
-            await buildlog(parent_id, "E: publishing source package failed\n")
+        if not ret:  # src publish failed, no more logs for parent
             await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
             await buildlogdone(parent_id)
-        else:
-            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
 
+        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
         await buildlogdone(build_id)
 
         found_childs = False
@@ -801,6 +797,7 @@ class AptlyWorker:
                 session.commit()
                 return False
 
+            # publish succeded
             await build.set_successful()
             session.commit()
 
@@ -819,7 +816,6 @@ class AptlyWorker:
         if not found_childs:
             await buildlog(parent_id, "E: no deb builds found\n")
             await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlogdone(build_id)
             await buildlogdone(parent_id)
             return False
 

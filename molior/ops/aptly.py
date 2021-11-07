@@ -97,7 +97,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
             await debian_repo.add_packages(publish_files, ci_build=is_ci)
             ret = True
         except Exception as exc:
-            await buildlog(build_id, "E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
 
     await buildlog(build_id, "\n")

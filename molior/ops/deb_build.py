@@ -363,7 +363,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                         found = True
                         continue
                     logger.warning("already built %s", repo.name)
-                    await parent.log("E: already built {}\n".format(repo.name))
+                    await parent.log("W: already built for {} {}\n".format(projectversion.fullname, architecture))
                     continue
 
                 found = True
