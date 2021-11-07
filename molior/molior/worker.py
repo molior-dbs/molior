@@ -469,7 +469,6 @@ class Worker:
             try:
                 task = await dequeue_task()
                 if task is None:
-                    logger.info("worker: got emtpy task, aborting...")
                     break
 
                 logger.debug("worker: got task {}".format(task))
@@ -541,4 +540,4 @@ class Worker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating worker task")
+        logger.info("worker terminated")

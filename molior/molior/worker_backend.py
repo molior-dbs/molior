@@ -83,10 +83,7 @@ class BackendWorker:
         while True:
             task = await dequeue_backend()
             if task is None:
-                logger.info("backend: got emtpy task, aborting...")
                 break
-
-                logger.debug("backend: got task {}".format(task))
 
             try:
                 handled = False
@@ -127,4 +124,4 @@ class BackendWorker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating backend task")
+        logger.info("backend task terminated")

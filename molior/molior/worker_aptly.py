@@ -1221,7 +1221,6 @@ class AptlyWorker:
             try:
                 task = await dequeue_aptly()
                 if task is None:
-                    logger.error("aptly worker: got emtpy task, aborting...")
                     break
 
                 handled = False
@@ -1303,4 +1302,4 @@ class AptlyWorker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating aptly worker task")
+        logger.info("aptly task terminated")

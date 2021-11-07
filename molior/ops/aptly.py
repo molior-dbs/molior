@@ -244,7 +244,7 @@ def add_files(build_id, buildtype, version, files):
 
         if buildtype == "deb":
             if len(p) != 3:
-                logger.error("build: unknown file: {}".format(f))
+                logger.error("build: unknown debian package file: {}".format(f))
                 continue
             name, version, suffix = p
             s = suffix.split(".", 2)
@@ -260,7 +260,7 @@ def add_files(build_id, buildtype, version, files):
             if len(p) == 3:  # $pkg_$ver_source.buildinfo
                 continue
             if len(p) != 2:
-                logger.error("build: unknown file: {}".format(f))
+                logger.error("build: unknown source package file: {}".format(f))
                 continue
 
             name, suffix = p
