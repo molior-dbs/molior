@@ -13,7 +13,6 @@ from ..molior.configuration import Configuration
 from ..molior.queues import buildlog, buildlogtitle
 
 from ..model.database import Session
-from ..model.build import build_logstate
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
@@ -65,15 +64,13 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
         logger.error("DebSrcPublish: no source files found")
         return False
 
-    add_files(build_id, buildtype, version, srcfiles)
-
+    await buildlog(build_id, "I: uploading files to aptly\n")
     publish_files = []
     for f in srcfiles:
-        logger.debug("publisher: adding %s", f)
+        await buildlog(build_id, " - %s\n" % f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
-    build_logstate(build_id, buildtype, sourcename, version,
-                   "publishing {} for projectversion ids {}".format(sourcename, str(projectversions)))
+    add_files(build_id, buildtype, version, srcfiles)
 
     ret = False
     for projectversion_id in projectversions:
@@ -93,7 +90,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
             await buildlog(build_id, "E: error finding projectversion {}\n".format(projectversion_id))
             continue
 
-        await buildlog(build_id, "I: publishing for %s\n" % fullname)
+        await buildlog(build_id, "I: publishing for project %s\n" % fullname)
 
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
@@ -120,7 +117,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
     return ret
 
 
-async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+async def publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                            basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
     """
     Publishes given packages to given
@@ -147,7 +144,6 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build_id)
         await buildlog(build_id, "E: no debian packages found to upload\n")
-        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
     # FIXME: check on startup
@@ -155,7 +151,6 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     if not key:
         logger.error("Signing key not defined in configuration")
         await buildlog(build_id, "E: no signinig key defined in configuration\n")
-        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
     await buildlog(build_id, "Signing packages:\n")
@@ -195,7 +190,7 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     return ret
 
 
-async def DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
                      basemirror_name, basemirror_version, project_name, project_version, archs):
     """
     Publishes given src_files/src package to given
@@ -210,11 +205,10 @@ async def DebPublish(build_id, parent_parent_id, buildtype, sourcename, version,
     """
 
     out_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
-    await buildlog(parent_parent_id, "I: publishing build %d\n" % build_id)
     await buildlogtitle(build_id, "Publishing", no_header_newline=False)
 
     try:
-        if not await publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+        if not await publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                                       basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
             logger.error("publisher: error publishing build %d" % build_id)
             return False

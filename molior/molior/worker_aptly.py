@@ -773,6 +773,8 @@ class AptlyWorker:
             is_ci = build.is_ci
             parent_id = build.parent_id
 
+        await buildlog(parent_id, "I: publishing source package\n")
+
         ret = False
         try:
             ret = await DebSrcPublish(build_id, repo_id, sourcename, version, projectversions, is_ci)
@@ -785,7 +787,6 @@ class AptlyWorker:
             await buildlogdone(parent_id)
         else:
             await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlog(parent_id, "I: scheduling deb package builds\n")
 
         await buildlogdone(build_id)
 
@@ -851,9 +852,11 @@ class AptlyWorker:
             architecture = build.architecture
             is_ci = build.is_ci
 
+        await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
+
         ret = False
         try:
-            ret = await DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+            ret = await DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
                                    basemirror_name, basemirror_version, project_name, project_version, archs)
         except Exception as exc:
             logger.exception(exc)
@@ -861,9 +864,8 @@ class AptlyWorker:
         if not ret:
             await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
             await buildlog(build_id, "E: publishing build failed\n")
-        else:
-            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
 
+        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await buildlogdone(build_id)
 
         with Session() as session:
