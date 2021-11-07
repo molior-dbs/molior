@@ -61,8 +61,7 @@ async def delete_build(request):
     if build.projectversion and build.projectversion.is_locked:
         return ErrorResponse(400, "Build from locked projectversion cannot be deleted")
 
-    if topbuild.buildstate == "new" or \
-       topbuild.buildstate == "scheduled" or \
+    if topbuild.buildstate == "scheduled" or \
        topbuild.buildstate == "building" or \
        topbuild.buildstate == "needs_publish" or \
        topbuild.buildstate == "publishing":
