@@ -118,7 +118,7 @@ class Worker:
         git_ref = args[2]
         ci_branch = args[3]
         targets = args[4]
-        force_ci = args[4]
+        force_ci = args[5]
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:

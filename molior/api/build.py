@@ -499,13 +499,13 @@ async def trigger_build(request):
     if not repo:
         return web.Response(text="Repo not found", status=400)
 
-    repo.log_state("build triggered: %s(%s) force_ci=%s, targets=%s" % (git_ref, git_branch, force_ci, str(targets)))
+    repo.log_state("build triggered: %s, branch=%s, force_ci=%s, targets=%s" % (git_ref, git_branch, force_ci, str(targets)))
 
     build = Build(
         version=None,
         git_ref=git_ref,
         ci_branch=git_branch,
-        is_ci=None,
+        is_ci=False,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",
