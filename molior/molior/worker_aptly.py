@@ -911,34 +911,16 @@ class AptlyWorker:
         project_version = args[3]
         architectures = args[4]
         snapshot_name = args[5]
-        projectversion_id = args[6]
-        new_projectversion_id = args[7]
+        new_projectversion_id = args[6]
+        latest_debbuilds_ids = args[7]
         packages = []
         copybuilds = []
         buildlogs = []
         with Session() as session:
-            # find latest builds
-            latest_builds = session.query(func.max(Build.id).label("latest_id")).filter(
-                    Build.projectversion_id == projectversion_id,
-                    Build.is_ci.is_(False),
-                    Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
-
-            builds = session.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
-                    Build.sourcename, Build.id.desc()).all()
+            builds = session.query(Build).filter(Build.id.in_(latest_debbuilds_ids)).all()
 
             pkgbuilds = []
-            build_source_names = []
             for build in builds:
-                if build.buildstate != "successful":
-                    logger.error("snapshot: Not all latest builds are successful")
-                    return
-                if build.sourcename in build_source_names:
-                    logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
-                    continue
-                build_source_names.append(build.sourcename)
-                if not build.debianpackages:
-                    logger.error("snapshot: No debian packages found for %s/%s" % (build.sourcename, build.version))
-                    return
                 copybuilds.append(build)
                 pkgbuilds.append(build)
                 if build.parent not in pkgbuilds:  # add source package

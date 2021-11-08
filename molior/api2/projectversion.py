@@ -468,25 +468,25 @@ async def snapshot_projectversion(request):
             return ErrorResponse(400, "Dependency '%s/%s' is not locked" % (dep.project.name, dep.name))
 
     # find latest builds
-    latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
+    latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
             Build.projectversion_id == projectversion.id,
             Build.is_ci.is_(False),
             Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
 
-    builds = db.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
-            Build.sourcename, Build.id.desc()).all()
+    latest_builds = db.query(Build).join(latest_builds_subq, Build.id == latest_builds_subq.c.latest_id).order_by(
+                    Build.sourcename, Build.id.desc()).all()
 
-    build_source_names = []
-    for build in builds:
-        logger.info("snapshot: found latest build: %s/%s (%s)" % (build.sourcename, build.version, build.buildstate))
-        if build.buildstate != "successful":
-            return ErrorResponse(400, "Not all latest builds are successful")
-        if build.sourcename in build_source_names:
-            logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
-            continue
-        build_source_names.append(build.sourcename)
-        if not build.debianpackages:
-            return ErrorResponse(400, "No debian packages found for %s/%s" % (build.sourcename, build.version))
+    # get top level build for each latest build
+    latest_debbuilds_ids = []
+    for latest_build in latest_builds:
+        if latest_build.buildstate != "successful":
+            return ErrorResponse(400, "Not all latest builds are successful: %d" % latest_build.id)
+        for debbuild in latest_build.parent.children:
+            if debbuild.projectversion_id != projectversion.id:
+                continue
+            if not debbuild.debianpackages:
+                return ErrorResponse(400, "No debian packages found for %s/%s" % (debbuild.sourcename, debbuild.version))
+            latest_debbuilds_ids.append(debbuild.id)
 
     new_projectversion = ProjectVersion(
         name=name,
@@ -522,8 +522,8 @@ async def snapshot_projectversion(request):
                 projectversion.name,
                 db2array(projectversion.mirror_architectures),
                 new_projectversion.name,
-                projectversion.id,
-                new_projectversion.id
+                new_projectversion.id,
+                latest_debbuilds_ids
             ]
         }
     )
