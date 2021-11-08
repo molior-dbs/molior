@@ -920,6 +920,7 @@ class AptlyWorker:
             # find latest builds
             latest_builds = session.query(func.max(Build.id).label("latest_id")).filter(
                     Build.projectversion_id == projectversion_id,
+                    Build.is_ci.is_(False),
                     Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
 
             builds = session.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(

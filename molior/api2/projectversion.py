@@ -470,6 +470,7 @@ async def snapshot_projectversion(request):
     # find latest builds
     latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
             Build.projectversion_id == projectversion.id,
+            Build.is_ci.is_(False),
             Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
 
     builds = db.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
