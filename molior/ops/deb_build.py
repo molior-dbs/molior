@@ -2,11 +2,15 @@ import asyncio
 import uuid
 import os
 import re
+import aiohttp
 
 from launchy import Launchy
 from sqlalchemy import or_
 from pathlib import Path
 from datetime import datetime
+from aiofile import AIOFile, Writer
+from tempfile import mkdtemp
+from shutil import rmtree
 
 from ..app import logger
 from ..tools import get_changelog_attr, strip_epoch_version, db2array, array2db
@@ -84,6 +88,139 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
 
     logger.debug("%s (%d): source package v%s created", src_package_name, repo_id, version)
     return True
+
+
+async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, projectversion):
+    await buildlogtitle(build_id, "Source Package Republish")
+    await buildlog(build_id, "I: downloading source package from {} ({})\n".format(projectversion, basemirror))
+    cfg = Configuration()
+    apt_url = cfg.aptly.get("apt_url")
+    sources_url = "{}/{}/repos/{}/dists/stable/main/source/Sources".format(apt_url, basemirror, projectversion)
+
+    # download Sources file
+    Sources = ""
+    async with aiohttp.ClientSession() as http:
+        async with http.get(sources_url) as resp:
+            if not resp.status == 200:
+                await buildlog(build_id, "E: Error downloading {}\n".format(sources_url))
+                return False
+            Sources = await resp.text()
+
+    if not Sources:
+        await buildlog(build_id, "E: Invalid Sources file: {}\n".format(sources_url))
+        return False
+
+    # parse Soures file
+    files = []
+    directory = None
+    found_package_entry = False
+    found_directory_entry = False
+    found_files_section = False
+    for line in Sources.split('\n'):
+        if not found_package_entry:
+            if line != "Package: {}".format(sourcename):
+                continue
+            found_package_entry = True
+            continue
+        else:  # Package section
+            if not found_directory_entry:
+                if line == "":
+                    break
+                if not line.startswith("Directory: "):
+                    continue
+                found_directory_entry = True
+                directory = line.split(" ")[1]
+                continue
+            elif not found_files_section:
+                if line == "":
+                    break
+                if line != "Files:":
+                    continue
+                found_files_section = True
+                continue
+            else:  # Files section
+                if line.startswith(" "):
+                    files.append(line[1:].split(" "))
+                else:
+                    break
+
+    if not found_directory_entry:
+        await buildlog(build_id, "E: Could not find {}/{} in Sources file: {}\n".format(sourcename, version, sources_url))
+        return False
+
+    await buildlog(build_id, "I: found directory: {}\n".format(directory))
+    await buildlog(build_id, "I: downloading source files:\n")
+    sourcefile = None
+    sourcetype = None
+    for f in files:
+        await buildlog(build_id, " - {}\n".format(f[2]))
+
+        file_url = "{}/{}/repos/{}/{}/{}".format(apt_url, basemirror, projectversion, directory, f[2])
+        body = None
+        async with aiohttp.ClientSession() as http:
+            async with http.get(file_url) as resp:
+                if not resp.status == 200:
+                    await buildlog(build_id, "E: Error downloading {}\n".format(file_url))
+                    return False
+                body = await resp.read()
+
+        filepath = "/var/lib/molior/repositories/{}/{}".format(repo_id, f[2])
+        async with AIOFile(filepath, "wb") as afp:
+            writer = Writer(afp)
+            await writer(body)
+
+        if filepath.endswith(".git"):
+            sourcetype = "git"
+            sourcefile = filepath
+        elif filepath.endswith(".tar.gz") or filepath.endswith(".tar.xz"):
+            sourcetype = "tar"
+            sourcefile = filepath
+
+    # extract source, if git, checkout version tag
+    ret = None
+    if sourcetype:
+        tmpdir = mkdtemp(dir="/var/lib/molior/repositories/{}/".format(repo_id))
+        output = ""
+
+        async def outh(line):
+            nonlocal output
+            await buildlog(build_id, "{}\n".format(line))
+            output += line
+
+        if sourcetype == "tar":
+            cmd = "tar xf {}".format(sourcefile)
+            await buildlog(build_id, "$ {}\n".format(cmd))
+            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            await process.launch()
+            ret = await process.wait()
+        elif sourcetype == "git":
+            cmd = "git clone -b v{} {} .".format(version, filepath)
+            await buildlog(build_id, "$ {}\n".format(cmd))
+            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            await process.launch()
+            ret = await process.wait()
+            output = ""
+
+        if ret == 0:
+            cmd = "dpkg-genchanges -S"
+            await buildlog(build_id, "$ {}\n".format(cmd))
+            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            await process.launch()
+            ret = await process.wait()
+
+        if ret == 0:
+            cmd = "dpkg-genbuildinfo --build=source"
+            await buildlog(build_id, "$ {}\n".format(cmd))
+            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            await process.launch()
+            ret = await process.wait()
+
+        try:
+            rmtree(tmpdir)
+        except Exception:
+            pass
+
+    return ret == 0
 
 
 async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
@@ -230,7 +367,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             found = False
             for target in targets:
                 projectversion = session.query(ProjectVersion).filter(
-                        ProjectVersion.ci_builds_enabled == True,  # noqa: E712
+                        ProjectVersion.ci_builds_enabled.is_(True),
                         ProjectVersion.id == target.projectversion_id).first()
                 if projectversion:
                     found = True
@@ -245,24 +382,38 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 session.commit()
                 return
 
+        missing_builds = False
         # Check if source build already exists
-        build = session.query(Build).filter(Build.buildtype == "source",
-                                            Build.sourcerepository == repo,
-                                            Build.version == info.version).first()
-        if build:
-            repo.log_state("source package already exists for version {}".format(info.version))
-            await parent.log("E: source package already exists for version {}\n".format(info.version))
-            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await parent.logdone()
-            repo.set_ready()
-            if build.parent and build.parent.buildstate == "successful":
-                await parent.set_already_exists()
-            else:
-                await parent.set_already_failed()
-            session.commit()
-            args = {"schedule": []}
-            await enqueue_task(args)
-            return
+        existing_src_build = session.query(Build).filter(Build.buildtype == "source",
+                                                         Build.sourcerepository == repo,
+                                                         Build.version == info.version,
+                                                         Build.buildstate == "successful").first()
+        if existing_src_build:
+            # check for missing successful deb builds
+            for target in targets:
+                for arch in db2array(target.architectures):
+                    # FIXME: check buildstates
+                    deb_build = session.query(Build).filter(Build.buildtype == "deb",
+                                                            Build.sourcerepository == repo,
+                                                            Build.version == info.version,
+                                                            Build.projectversion_id == target.projectversion_id,
+                                                            Build.architecture == arch).first()
+                    if not deb_build:
+                        missing_builds = True
+
+            if not missing_builds:
+                await parent.log("E: all debian builds already existing for version {}\n".format(info.version))
+                await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+                await parent.logdone()
+                repo.set_ready()
+                if existing_src_build.parent and existing_src_build.parent.buildstate == "successful":
+                    await parent.set_already_exists()
+                else:
+                    await parent.set_already_failed()
+                session.commit()
+                args = {"schedule": []}
+                await enqueue_task(args)
+                return
 
         # Use commiter name as maintainer for CI builds
         if is_ci:
@@ -356,10 +507,9 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                     if deb_build.buildstate != "successful":
                         deb_build.buildstate = "needs_build"
                         session.commit()
-                        found = True
+                        found = True  # FIXME: should this be here ?
                         continue
-                    logger.warning("already built %s", repo.name)
-                    await parent.log("W: already built for {} {}\n".format(projectversion.fullname, architecture))
+                    await parent.log("W: packages already built for {} {}\n".format(projectversion.fullname, architecture))
                     continue
 
                 found = True
@@ -412,8 +562,9 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
 
 async def BuildSourcePackage(build_id):
-    with Session() as session:
-        build = session.query(Build).filter(Build.id == build_id).first()
+    source_exists = False
+    with Session() as db:
+        build = db.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("BuildProcess: build {} not found".format(build_id))
             return
@@ -427,39 +578,60 @@ async def BuildSourcePackage(build_id):
         email = build.maintainer.email
 
         await build.set_building()
-        session.commit()
+        db.commit()
 
-        await build.parent.log("I: building source package\n")
+        src_build = db.query(Build).filter(Build.sourcerepository_id == repo_id,
+                                           Build.version == version,
+                                           Build.buildtype == "source",
+                                           Build.buildstate == "successful",
+                                           Build.is_deleted.is_(False)).first()
+        if src_build:
+            projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == src_build.projectversions[0]).first()
+            if projectversion:
+                basemirror = projectversion.basemirror.fullname
+                projectversion = projectversion.fullname
+                sourcename = src_build.sourcename
+                source_exists = True
 
-        # Build Source Package
-        await build.logtitle("Source Build")
+        if source_exists:
+            await build.parent.log("I: downloading source package\n")
+        else:
+            await build.parent.log("I: building source package\n")
+            await build.logtitle("Source Build")
 
     async def fail():
-        with Session() as session:
-            build = session.query(Build).filter(Build.id == build_id).first()
+        with Session() as db:
+            build = db.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("BuildProcess: build {} not found".format(build_id))
                 return
-            parent = session.query(Build).filter(Build.id == build.parent_id).first()
+            parent = db.query(Build).filter(Build.id == build.parent_id).first()
             if not parent:
                 logger.error("BuildProcess: parent build {} not found".format(build.parent_id))
                 return
-            repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+            repo = db.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
             if not repo:
                 logger.error("source repository %d not found", repo_id)
                 return
 
-            await parent.log("E: building source package failed\n")
+            if source_exists:
+                await parent.log("E: downloading source package failed\n")
+            else:
+                await parent.log("E: building source package failed\n")
             await build.logtitle("Done", no_footer_newline=True, no_header_newline=True)
+            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=True)
             await parent.logdone()
             repo.set_ready()
             await build.set_failed()
-            session.commit()
+            db.commit()
             # FIXME: cancel deb builds, or only create deb builds after source build ok
 
     try:
-        ret = await BuildDebSrc(repo_id, src_path, build_id, version, is_ci,
-                                "{} {}".format(firstname, lastname), email)
+        if not source_exists:
+            ret = await BuildDebSrc(repo_id, src_path, build_id, version, is_ci,
+                                    "{} {}".format(firstname, lastname), email)
+        else:
+            ret = await DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, projectversion)
     except Exception as exc:
         logger.exception(exc)
         await fail()
@@ -469,21 +641,21 @@ async def BuildSourcePackage(build_id):
         await fail()
         return
 
-    with Session() as session:
-        build = session.query(Build).filter(Build.id == build_id).first()
+    with Session() as db:
+        build = db.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("BuildProcess: build {} not found".format(build_id))
             return
-        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        repo = db.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
         if not repo:
             logger.error("source repository %d not found", repo_id)
             return
 
         await build.set_needs_publish()
-        session.commit()
+        db.commit()
 
         repo.set_ready()
-        session.commit()
+        db.commit()
 
     await buildlog(parent_build_id, "I: publishing source package\n")
     await enqueue_aptly({"src_publish": [build_id]})
