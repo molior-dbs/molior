@@ -29,7 +29,7 @@ class BackendWorker:
             if not build:
                 logger.error("build_started: no build found for %d", build_id)
                 return
-            await build.parent.parent.log("I: started build %d\n" % build_id)
+            await build.parent.parent.log("I: started build for %s %s\n" % (build.projectversion.fullname, build.sourcename))
             await build.set_building()
             session.commit()
 
@@ -63,7 +63,7 @@ class BackendWorker:
                 await build.set_needs_publish()
                 await enqueue_aptly({"publish": [build_id]})
             else:        # build failed
-                await build.parent.parent.log("E: build %d failed\n" % build_id)
+                await build.parent.parent.log("I: build for %s %s failed\n" % (build.projectversion.fullname, build.sourcename))
                 await build.set_failed()
                 await buildlogdone(build.id)
                 session.commit()
