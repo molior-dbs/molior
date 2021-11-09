@@ -1,5 +1,4 @@
 import os
-import shlex
 import re
 
 from launchy import Launchy
@@ -163,7 +162,7 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     changes_file = "{}_{}_{}.changes".format(sourcename, v, architecture)
 
     cmd = "debsign -pgpg1 -k{} {}".format(key, changes_file)
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=str(out_path))
+    process = Launchy(cmd, outh, outh, cwd=str(out_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:

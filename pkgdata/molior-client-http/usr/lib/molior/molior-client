@@ -8,7 +8,6 @@ import platform
 import logging
 import json
 import os
-import shlex
 import subprocess
 from multiprocessing import cpu_count
 from psutil import virtual_memory, disk_usage
@@ -78,9 +77,8 @@ async def build(params, masterws):
                 await buildws.send_str(data)
 
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
-
             try:
-                process = Launchy(shlex.split(buildcmd), output, output, buffered=False, collect_time=0.1, env=env)
+                process = Launchy(buildcmd, output, output, buffered=False, collect_time=0.1, env=env)
                 await process.launch()
                 ret = await process.wait()
             except Exception as exc:

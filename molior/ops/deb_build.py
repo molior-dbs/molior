@@ -1,5 +1,4 @@
 import asyncio
-import shlex
 import uuid
 import os
 import re
@@ -55,7 +54,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
         dchcmd = "dch -v %s --distribution %s --force-distribution 'CI Build'" % (ci_version, distribution)
         version = ci_version
 
-        process = Launchy(shlex.split(dchcmd), outh, outh, cwd=str(repo_path), env=env)
+        process = Launchy(dchcmd, outh, outh, cwd=str(repo_path), env=env)
         await process.launch()
         ret = await process.wait()
         if ret != 0:
@@ -63,8 +62,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
             return False
 
         if (repo_path / ".git").exists():
-            process = Launchy(shlex.split(
-                              "git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email)),
+            process = Launchy("git -c user.name='{}' -c user.email='{}' commit -a -m 'ci build'".format(author, email),
                               outh, outh, cwd=str(repo_path))
             await process.launch()
             ret = await process.wait()
@@ -76,7 +74,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     await buildlog(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
 
     cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=str(repo_path))
+    process = Launchy(cmd, outh, outh, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
@@ -187,7 +185,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             nonlocal gittag
             gittag += line
 
-        process = Launchy(shlex.split("git describe --tags --abbrev=40"), outh, outh, cwd=str(src_path))
+        process = Launchy("git describe --tags --abbrev=40", outh, outh, cwd=str(src_path))
         await process.launch()
         ret = await process.wait()
         if ret != 0:
