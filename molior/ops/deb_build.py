@@ -344,8 +344,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                     ))
                 continue
 
-            projectversion_ids.append(projectversion.id)
-
             architectures = db2array(target.architectures)
             for architecture in architectures:
                 deb_build = session.query(Build).filter(
@@ -365,6 +363,11 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                     continue
 
                 found = True
+
+                # only add projectversions where a debian package will be built.
+                # this allows deleting a source republish without deleting the original source package
+                if projectversion.id not in projectversion_ids:
+                    projectversion_ids.append(projectversion.id)
 
                 await parent.log("I: creating build for projectversion '%s/%s'\n" % (
                         projectversion.project.name,
