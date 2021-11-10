@@ -1117,6 +1117,10 @@ class AptlyWorker:
                         if not projectversion:
                             logger.error("delete build: projectversion %d not found" % projectversion_id)
                             continue
+
+                        # FIXME: only delete srcpkg if no other same build (repo, version, projectversion) has
+                        # successful build in different arch
+
                         repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
                                                         projectversion.project.name, projectversion.name, dist)
                         publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
