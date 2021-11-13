@@ -5,7 +5,7 @@ from mock import MagicMock, mock, Mock
 sys.modules['aiofile'] = mock.MagicMock()
 
 from molior.model.build import Build            # noqa: E402
-from molior.model.maintainer import Maintainer  # noqa: F401
+from molior.model.maintainer import Maintainer  # noqa: F401, E402
 
 
 def logmock(build):
