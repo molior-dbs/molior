@@ -58,14 +58,16 @@ async def delete_build(request):
     if not topbuild:
         return ErrorResponse(400, "Build of type %s cannot be deleted" % build.buildtype)
 
-    if build.projectversion and build.projectversion.is_locked:
-        return ErrorResponse(400, "Build from locked projectversion cannot be deleted")
+    for srcbuild in topbuild.children:
+        for debbuild in srcbuild.children:
+            if debbuild.projectversion and debbuild.projectversion.is_locked:
+                return ErrorResponse(400, "Build from locked projectversion cannot be deleted")
 
-    if topbuild.buildstate == "scheduled" or \
-       topbuild.buildstate == "building" or \
-       topbuild.buildstate == "needs_publish" or \
-       topbuild.buildstate == "publishing":
-        return ErrorResponse(400, "Build in state %s cannot be deleted" % topbuild.buildstate)
+            if debbuild.buildstate == "scheduled" or \
+               debbuild.buildstate == "building" or \
+               debbuild.buildstate == "needs_publish" or \
+               debbuild.buildstate == "publishing":
+                return ErrorResponse(400, "Build in state %s cannot be deleted" % debbuild.buildstate)
 
     for b in builds:
         b.is_deleted = True
