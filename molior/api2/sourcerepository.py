@@ -350,7 +350,7 @@ async def add_repository(request):
                     SourceRepository.url.ilike("%{}%{}%/{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
         if query.count() > 1:
             repo = query.first()
-            logger.info("found %d similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
+            logger.info("found {} similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
                                                                                       repoinfo.owner, repoinfo.name))
         elif query.count() == 1:
             repo = query.first()
