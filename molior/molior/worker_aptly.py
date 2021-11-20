@@ -24,66 +24,6 @@ from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
 
-async def startup_migration():
-    """
-    Migrate old aptly repos
-    """
-    aptly = get_aptly_connection()
-
-    with Session() as session:
-        # get mirrors in updating state
-        query = session.query(ProjectVersion).join(Project, Project.id == ProjectVersion.project_id)
-        query = query.filter(Project.is_mirror.is_(False))
-
-        if not query.count():
-            return
-
-        aptly_repos = await aptly.repo_get()
-        aptly_snapshots = await aptly.snapshot_get()
-        projectversions = query.all()
-        for projectversion in projectversions:
-            repo_name = "%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
-                                         projectversion.project.name, projectversion.name)
-
-            for aptly_snapshot in aptly_snapshots:
-                aptly_snapshot_name = aptly_snapshot.get("Name")
-                publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
-                                                          projectversion.basemirror.name,
-                                                          projectversion.project.name,
-                                                          projectversion.name)
-                for dist in ["stable", "unstable"]:
-                    snapshot_name = "{}-{}-".format(publish_name, dist)
-                    if aptly_snapshot_name.startswith(snapshot_name):
-                        task_id = await aptly.snapshot_rename(aptly_snapshot_name, "{}-{}".format(publish_name, dist))
-                        await aptly.wait_task(task_id)
-
-            found = False
-            for a in aptly_repos:
-                if a.get("Name") == repo_name:
-                    found = True
-                    break
-            if not found:
-                continue
-
-            try:
-                await aptly.repo_rename(repo_name, repo_name + "-stable")
-            except Exception as exc:
-                logger.exception(exc)
-                # task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")
-                # await aptly.wait_task(task_id)
-                # FIXME: delete task
-
-            await asyncio.sleep(2)
-            try:
-                await aptly.repo_create(repo_name + "-unstable")
-                # task_id = await aptly.repo_create(repo_name + "-unstable")
-                # FIMXE await aptly.wait_task(task_id)
-                # FIXME: delete task
-            except Exception as exc:
-                logger.exception(exc)
-            await asyncio.sleep(2)
-
-
 async def startup_mirror():
     """
     Starts a finalize_mirror task in the asyncio event loop
@@ -1202,7 +1142,6 @@ class AptlyWorker:
 
         try:
             await startup_mirror()
-            await startup_migration()
         except Exception:
             pass
 
