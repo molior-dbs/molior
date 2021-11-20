@@ -99,15 +99,16 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
 
     # download Sources file
     Sources = ""
-    async with aiohttp.ClientSession() as http:
-        async with http.get(sources_url) as resp:
-            if not resp.status == 200:
-                await buildlog(build_id, "E: Error downloading {}\n".format(sources_url))
-                return False
-            Sources = await resp.text()
+    try:
+        async with aiohttp.ClientSession() as http:
+            async with http.get(sources_url) as resp:
+                if resp.status == 200:
+                    Sources = await resp.text()
+    except Exception:
+        pass
 
     if not Sources:
-        await buildlog(build_id, "E: Invalid Sources file: {}\n".format(sources_url))
+        await buildlog(build_id, "E: Error downloading {}\n".format(sources_url))
         return False
 
     # parse Soures file
