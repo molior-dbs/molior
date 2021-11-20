@@ -13,7 +13,7 @@ from ..aptly import get_aptly_connection
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
-from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone, enqueue_backend
 from ..molior.configuration import Configuration
 
 from ..model.database import Session
@@ -1144,6 +1144,36 @@ class AptlyWorker:
 
         logger.info("aptly worker: build %d deleted" % build_id)
 
+    async def _abort(self, args):
+        logger.debug("worker: got abort build task")
+        build_id = args[0]
+
+        with Session() as session:
+            topbuild = session.query(Build).filter(Build.id == build_id).first()
+            if not topbuild:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            if len(topbuild.children) != 1:
+                logger.error("aptly worker: no source build found for %d" % build_id)
+                return
+
+            await buildlog(build_id, "E: aborting build on user request\n")
+
+            for deb in topbuild.children[0].children:
+                # abort on build node
+                if deb.buildstate in ["building", "scheduled"]:
+                    await enqueue_backend({"abort": deb.id})
+
+                if deb.buildstate in ["new", "needs_build", "scheduled"]:
+                    await deb.set_failed()
+
+                if deb.buildtask:
+                    session.delete(deb.buildtask)
+
+            await topbuild.set_failed()
+            session.commit()
+
     async def run(self):
         """
         Run the worker task.
@@ -1227,6 +1257,13 @@ class AptlyWorker:
                         handled = True
                         await self._delete_build(args)
 
+                if not handled:
+                    args = task.get("abort")
+                    if args:
+                        handled = True
+                        await self._abort(args)
+
+                # must be last
                 if not handled:
                     args = task.get("cleanup")
                     # FIXME: check args is []
