@@ -69,11 +69,17 @@ class BackendWorker:
                 session.commit()
 
                 buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-                session.delete(buildtask)
-                session.commit()
+                if buildtask:
+                    session.delete(buildtask)
+                    session.commit()
 
                 if not build.is_ci:
                     send_mail_notification(build)
+
+    async def _abort(self, build_id):
+        b = Backend()
+        backend = b.get_backend()
+        await backend.abort(build_id)
 
     async def run(self):
         """
@@ -91,6 +97,10 @@ class BackendWorker:
                 if job:
                     handled = True
                     await self._schedule(job)
+                build_id = task.get("abort")
+                if build_id:
+                    handled = True
+                    await self._abort(build_id)
                 build_id = task.get("started")
                 if build_id:
                     handled = True

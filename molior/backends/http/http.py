@@ -207,6 +207,16 @@ class HTTPBackend:
                                              "task_id": task_id,
                                              "run_lintian": run_lintian})
 
+    async def abort(self, build_id):
+        logger.error(f"aborting build {build_id}")
+        for arch in running_nodes:
+            for node in running_nodes[arch]:
+                if node.molior_build_id == build_id:
+                    logger.error(f"aborting build {build_id} on node {node.molior_node_name}")
+                    await node.send_str(json.dumps({"abort": build_id}))
+                    return
+        logger.error(f"Error aborting build {build_id}: no node found")
+
     def get_nodes_info(self):
         # FIXME: lock both dicts on every access
         build_nodes = []
@@ -287,10 +297,7 @@ class HTTPBackend:
                 node.molior_sourcename = task.get("repository_name")
                 node.molior_sourceversion = task.get("version")
                 node.molior_sourcearch = task.get("architecture")
-                if asyncio.iscoroutinefunction(node.send_str):
-                    await node.send_str(json.dumps({"task": task}))
-                else:
-                    node.send_str(json.dumps({"task": task}))
+                await node.send_str(json.dumps({"task": task}))
 
             except Exception as exc:
                 logger.exception(exc)

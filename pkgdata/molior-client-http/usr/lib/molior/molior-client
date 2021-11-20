@@ -23,10 +23,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("molior-client")
 molior_server = os.environ.get("MOLIOR_SERVER", "172.16.0.254")
 interface_name = os.environ.get("INTERFACE_NAME", "eth0")
+build_process = None
 
 
 async def build(params, masterws):
-    ret = -1
+    global build_process
+    ret = None
     try:
         build_id = params.get("build_id")
         apt_urls = params.get("apt_urls")
@@ -61,30 +63,25 @@ async def build(params, masterws):
         session = aiohttp.ClientSession()
         async with session.ws_connect("ws://{}/internal/buildlog/{}".format(molior_server, token)) as buildws:
 
-            async def wslogger():
-                try:
-                    async for msg in buildws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            logger.info("got message: %s", msg.data)
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            break
-                except Exception as exc:
-                    logger.exception(exc)
-
             async def output(data):
                 await buildws.send_str(data)
 
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
             try:
-                process = Launchy(buildcmd, output, output, buffered=False, collect_time=0.1, env=env)
-                await process.launch()
-                ret = await process.wait()
+                build_process = Launchy(buildcmd, output, output, buffered=False, collect_time=0.1, env=env)
+                await build_process.launch()
+                ret = await build_process.wait()
+                build_process = None
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("build-script returned %d", ret)
+            if ret is None:
+                await buildws.send_str("Error running build script\n")
+                logger.error("Error running build-script")
+            if ret != 0:
+                await buildws.send_str(f"Error: build script returned {ret}\n")
+                logger.error("build-script returned %d", ret)
+
     except Exception as exc:
         logger.error("Error running build script")
         logger.exception(exc)
@@ -199,6 +196,9 @@ async def main():
 
                             await ws.send_str(json.dumps(response))
 
+                        elif "abort" in req:
+                            if build_process:
+                                build_process.terminate()
                         else:
                             logger.error("invalid request: %s", msg.data)
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
