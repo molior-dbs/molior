@@ -2,6 +2,7 @@ import asyncio
 import giturlparse
 
 from shutil import rmtree
+from pathlib import Path
 
 from ..app import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
@@ -243,11 +244,12 @@ class Worker:
                build.buildstate == "publish_failed":
                 ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
-                logger.info("removing %s", buildout)
-                try:
-                    rmtree(buildout)
-                except Exception as exc:
-                    logger.exception(exc)
+                if Path(buildout).exists():
+                    logger.info("removing %s", buildout)
+                    try:
+                        rmtree(buildout)
+                    except Exception as exc:
+                        logger.exception(exc)
 
                 await build.set_needs_build()
                 session.commit()
