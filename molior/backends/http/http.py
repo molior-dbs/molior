@@ -178,6 +178,7 @@ class HTTPBackend:
         self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
         self.task_scheduler_arm64 = asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
         self.task_notifier = asyncio.ensure_future(self.notifier(), loop=self.loop)
+        self.aborted_builds = []
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian=True):
@@ -215,7 +216,7 @@ class HTTPBackend:
                     logger.error(f"aborting build {build_id} on node {node.molior_node_name}")
                     await node.send_str(json.dumps({"abort": build_id}))
                     return
-        logger.error(f"Error aborting build {build_id}: no node found")
+        self.aborted_builds.append(build_id)
 
     def get_nodes_info(self):
         # FIXME: lock both dicts on every access
@@ -275,7 +276,8 @@ class HTTPBackend:
                 await deregister_node(node)
 
     async def scheduler(self, arch):
-        while True:
+        up = True
+        while up:
             try:
                 task = await dequeue_buildtask(arch)
                 if task is None:
@@ -283,16 +285,28 @@ class HTTPBackend:
 
                 build_id = task["build_id"]
 
-                while True:
+                while up:
                     try:
                         node = registry[arch].pop()
                     except IndexError:
                         # FIXME: put task to top of the queue / pending queue
-                        await asyncio.sleep(1)
+                        try:
+                            await asyncio.sleep(1)
+                        except CancelledError:
+                            up = False
+                            break
                         continue
                     break
-                running_nodes[arch].append(node)
+
+                # check if build was aborted
+                if build_id in self.aborted_builds:
+                    logger.info("build-%d: build aborted", build_id)
+                    self.aborted_builds.remove(build_id)
+                    registry[arch].append(node)
+                    continue
+
                 logger.info("build-%d: building for %s on %s ", build_id, arch, node.molior_node_name)
+                running_nodes[arch].append(node)
                 node.molior_build_id = build_id
                 node.molior_sourcename = task.get("repository_name")
                 node.molior_sourceversion = task.get("version")

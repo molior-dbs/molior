@@ -1212,10 +1212,15 @@ class AptlyWorker:
             await buildlog(build_id, "E: aborting build on user request\n")
 
             for deb in topbuild.children[0].children:
-                if deb.buildtask:
+                if deb.buildstate == "building":
                     await enqueue_backend({"abort": deb.id})
-                    if deb.buildtask:
-                        session.delete(deb.buildtask)
+                elif deb.buildstate == "new":
+                    await deb.set_failed()
+                elif deb.buildstate == "scheduled":
+                    await enqueue_backend({"abort": deb.id})
+                    await deb.set_failed()
+                if deb.buildtask:
+                    session.delete(deb.buildtask)
 
             await topbuild.set_failed()
             session.commit()
