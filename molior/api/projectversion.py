@@ -279,7 +279,8 @@ async def create_projectversions(request):
                 basemirror_version,
                 project_name,
                 project_version,
-                architectures]})
+                architectures,
+                []]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
@@ -424,17 +425,13 @@ async def do_overlay(request, projectversion_id, name):
 
     basemirror = overlay_projectversion.basemirror
 
-    await enqueue_aptly(
-        {
-            "init_repository": [
+    await enqueue_aptly({"init_repository": [
                 basemirror.project.name,
                 basemirror.name,
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
-                db2array(overlay_projectversion.mirror_architectures)
-            ]
-        }
-    )
+                db2array(overlay_projectversion.mirror_architectures),
+                []]})
 
     return OKResponse({"id": overlay_projectversion.id, "name": overlay_projectversion.name})
 

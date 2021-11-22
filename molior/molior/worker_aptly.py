@@ -838,7 +838,16 @@ class AptlyWorker:
         project_name = args[2]
         project_version = args[3]
         architectures = args[4]
+        trigger_builds = args[5]
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
+
+        if len(trigger_builds) > 0:
+            targets = [f"{project_name}/{project_version}"]
+            with Session() as session:
+                builds = session.query(Build).filter(Build.id.in_(trigger_builds)).all()
+                for build in builds:
+                    args = {"build": [build.id, build.sourcerepository_id, f"v{build.version}", "", targets, False]}
+                    await enqueue_task(args)
 
     async def _snapshot_repository(self, args):
         basemirror_name = args[0]
