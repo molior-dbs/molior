@@ -230,7 +230,8 @@ async def create_projectversion(request):
                 basemirror_version,
                 projectversion.project.name,
                 projectversion.name,
-                architectures]})
+                architectures,
+                []]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 

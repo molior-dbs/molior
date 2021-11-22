@@ -311,7 +311,7 @@ async def delete_projectversion_dependency(request):
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/copy")
 @req_role("owner")
-async def clone_projectversion(request):
+async def copy_projectversion(request):
     """
     Clone a project version.
 
@@ -339,6 +339,7 @@ async def clone_projectversion(request):
     basemirror = params.get("basemirror")
     architectures = params.get("architectures", [])
     cibuilds = params.get("cibuilds", False)
+    buildlatest = params.get("buildlatest", False)
 
     if not new_version:
         return ErrorResponse(400, "No valid name for the projectversion received")
@@ -362,17 +363,49 @@ async def clone_projectversion(request):
         return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
     projectversion.copy(db, new_version, description, dependency_policy, basemirror.id, architectures, cibuilds)
-    await enqueue_aptly(
-        {
-            "init_repository": [
+
+    trigger_builds = []
+    if buildlatest:
+        # find latest builds
+        latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
+                Build.projectversion_id == projectversion.id,
+                Build.is_ci.is_(False),
+                Build.sourcerepository_id.isnot(None),
+                Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
+
+        latest_builds = db.query(Build).join(latest_builds_subq, Build.id == latest_builds_subq.c.latest_id).order_by(
+                        Build.sourcename, Build.id.desc()).all()
+
+        for latest_build in latest_builds:
+            topbuild = latest_build.parent.parent
+            if topbuild.buildstate != "successful":
+                continue
+            if topbuild.sourcerepository is None:
+                continue
+            build = Build(
+                version=topbuild.version,
+                git_ref=topbuild.git_ref,
+                ci_branch=topbuild.ci_branch,
+                is_ci=False,
+                sourcename=topbuild.sourcename,
+                buildstate="new",
+                buildtype="build",
+                sourcerepository=topbuild.sourcerepository,
+                maintainer=None,
+            )
+
+            db.add(build)
+            db.commit()
+            await build.build_added()
+            trigger_builds.append(build.id)
+
+    await enqueue_aptly({"init_repository": [
                 basemirror.project.name,
                 basemirror.name,
                 projectversion.project.name,
                 new_version,
                 architectures,
-            ]
-        }
-    )
+                trigger_builds]})
     return OKResponse()
 
 
