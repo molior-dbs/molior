@@ -34,10 +34,6 @@ async def get_projects(request):
           in: query
           required: false
           type: string
-        - name: count_only
-          in: query
-          required: false
-          type: boolean
     produces:
         - text/json
     responses:
@@ -48,10 +44,6 @@ async def get_projects(request):
     """
     db = request.cirrina.db_session
     filter_name = request.GET.getone("q", "")
-    try:
-        count_only = request.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
 
     query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
 
@@ -63,11 +55,10 @@ async def get_projects(request):
     results = query.all()
 
     data = {"total_result_count": nb_results}
-    if not count_only:
-        data["results"] = [
-            {"id": item.id, "name": item.name, "description": item.description}
-            for item in results
-        ]
+    data["results"] = [
+        {"id": item.id, "name": item.name, "description": item.description}
+        for item in results
+    ]
 
     return web.json_response(data)
 
