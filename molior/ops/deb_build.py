@@ -226,6 +226,8 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
 
 async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
     await buildlogtitle(parent_build_id, "Molior Build")
+    info = None
+    source_exists = False
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
@@ -243,58 +245,81 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             return
         src_path = repo.src_path
 
-    await buildlog(parent_build_id, "I: git checkout {}\n".format(git_ref))
+        if parent.version:
+            existing_src_build = session.query(Build).filter(Build.buildtype == "source",
+                                                             Build.sourcerepository == repo,
+                                                             Build.version == parent.version,
+                                                             Build.buildstate == "successful",
+                                                             Build.is_deleted.is_(False)).first()
+            if existing_src_build:
+                source_exists = True
 
-    # Checkout
-    ret = await asyncio.ensure_future(GitCheckout(src_path, git_ref, parent_build_id))
+                # create fake info
+                class BuildInfo:
+                    pass
 
-    if not ret:
-        await buildlog(parent_build_id, "E: git checkout failed\n")
-        await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-        await buildlogdone(parent_build_id)
+                info = BuildInfo()
+                info.version = parent.version
+                info.plain_targets = []
+                info.firstname = existing_src_build.maintainer.firstname
+                info.lastname = existing_src_build.maintainer.surname
+                info.email = existing_src_build.maintainer.email
+                info.commit_hash = existing_src_build.git_ref
+                info.sourcename = existing_src_build.sourcename
 
-    with Session() as session:
-        parent = session.query(Build).filter(Build.id == parent_build_id).first()
-        if not parent:
-            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-            return
-        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
-        if not repo:
-            logger.error("source repository %d not found", repo_id)
-            return
+    if not source_exists:
+        await buildlog(parent_build_id, "I: git checkout {}\n".format(git_ref))
+
+        # Checkout
+        ret = await asyncio.ensure_future(GitCheckout(src_path, git_ref, parent_build_id))
 
         if not ret:
-            await parent.set_failed()
-            repo.set_ready()
-            session.commit()
-            return
+            await buildlog(parent_build_id, "E: git checkout failed\n")
+            await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            await buildlogdone(parent_build_id)
 
-    await buildlog(parent_build_id, "\nI: get build information\n")
+        with Session() as session:
+            parent = session.query(Build).filter(Build.id == parent_build_id).first()
+            if not parent:
+                logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
+                return
+            repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+            if not repo:
+                logger.error("source repository %d not found", repo_id)
+                return
 
-    info = None
-    try:
-        info = await GetBuildInfo(repo.src_path, git_ref)
-    except Exception as exc:
-        logger.exception(exc)
+            if not ret:
+                await parent.set_failed()
+                repo.set_ready()
+                session.commit()
+                return
 
-    if not info:
-        await buildlog(parent_build_id, "E: Error getting build information\n")
-        await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-        await buildlogdone(parent_build_id)
+        await buildlog(parent_build_id, "\nI: get build information\n")
+
+        try:
+            info = await GetBuildInfo(repo.src_path, git_ref)
+        except Exception as exc:
+            logger.exception(exc)
+
+        if not info:
+            await buildlog(parent_build_id, "E: Error getting build information\n")
+            await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
+            await buildlogdone(parent_build_id)
 
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
         if not parent:
             logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
             return
-        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
+        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id) .first()
         if not repo:
             logger.error("source repository %d not found", repo_id)
             return
 
         if not info:
             await parent.set_failed()
-            repo.set_ready()
+            if not source_exists:
+                repo.set_ready()
             session.commit()
             return
 
@@ -306,35 +331,37 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.log("   %s\n" % str(info.plain_targets))
             await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.logdone()
-            repo.set_ready()
+            if not source_exists:
+                repo.set_ready()
             await parent.set_nothing_done()
             session.commit()
             return
 
     is_ci = False
-    if force_ci:
-        is_ci = True
-    else:
-        # check if it is a CI build
-        # i.e. if gittag does not match version in debian/changelog
-        gittag = ""
-
-        async def outh(line):
-            nonlocal gittag
-            gittag += line
-
-        process = Launchy("git describe --tags --abbrev=40", outh, outh, cwd=str(src_path))
-        await process.launch()
-        ret = await process.wait()
-        if ret != 0:
-            logger.error("error running git describe: %s" % gittag.strip())
+    if not source_exists:
+        if force_ci:
+            is_ci = True
         else:
-            v = strip_epoch_version(info.version)
-            if not re.match("^v?{}$".format(v.replace("~", "-").replace("+", "\\+")), gittag) or "+git" in v:
-                is_ci = True
+            # check if it is a CI build
+            # i.e. if gittag does not match version in debian/changelog
+            gittag = ""
 
-    ci_cfg = Configuration().ci_builds
-    ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
+            async def outh(line):
+                nonlocal gittag
+                gittag += line
+
+            process = Launchy("git describe --tags --abbrev=40", outh, outh, cwd=str(src_path))
+            await process.launch()
+            ret = await process.wait()
+            if ret != 0:
+                logger.error("error running git describe: %s" % gittag.strip())
+            else:
+                v = strip_epoch_version(info.version)
+                if not re.match("^v?{}$".format(v.replace("~", "-").replace("+", "\\+")), gittag) or "+git" in v:
+                    is_ci = True
+
+        ci_cfg = Configuration().ci_builds
+        ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
 
     with Session() as session:
         parent = session.query(Build).filter(Build.id == parent_build_id).first()
@@ -383,12 +410,13 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 session.commit()
                 return
 
+        # Check if already built completely
         missing_builds = False
-        # Check if source build already exists
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
                                                          Build.sourcerepository == repo,
                                                          Build.version == info.version,
-                                                         Build.buildstate == "successful").first()
+                                                         Build.buildstate == "successful",
+                                                         Build.is_deleted.is_(False)).first()
         if existing_src_build:
             # check for missing successful deb builds
             for target in targets:

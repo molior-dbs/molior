@@ -131,7 +131,16 @@ class Worker:
             logger.error("build: repo %d not found", repo_id)
             return
 
-        if repo.state == "error":
+        source_exists = False
+        src_build = session.query(Build).filter(Build.sourcerepository_id == repo_id,
+                                                Build.version == build.version,
+                                                Build.buildtype == "source",
+                                                Build.buildstate == "successful",
+                                                Build.is_deleted.is_(False)).first()
+        if src_build:
+            source_exists = True
+
+        if not source_exists and repo.state == "error":
             await build.log("E: git repo is in error state\n")
             await build.set_failed()
             await build.logdone()
@@ -146,7 +155,9 @@ class Worker:
         if build.buildstate != "building":
             await build.set_building()
 
-        repo.set_busy()
+        if not source_exists:
+            repo.set_busy()
+
         session.commit()
 
         asyncio.ensure_future(BuildProcess(build_id, repo.id, git_ref, ci_branch, targets, force_ci))
