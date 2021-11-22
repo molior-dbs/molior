@@ -1,8 +1,10 @@
-from sqlalchemy import func
+import re
+
+from sqlalchemy.sql import func, or_
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db, escape_for_like
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
@@ -62,8 +64,10 @@ async def get_projectversions(request):
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     dependant_id = request.GET.getone("dependant_id", None)
+    search = request.GET.getone("q", "")
 
-    query = db.query(ProjectVersion).filter(ProjectVersion.is_deleted == False)  # noqa: E712
+    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted == False,
+                                                          Project.is_mirror == False)  # noqa: E712
 
     exclude_id = parse_int(exclude_id)
     if exclude_id:
@@ -75,6 +79,16 @@ async def get_projectversions(request):
 
     if project_name:
         query = query.filter(func.lower(Project.name) == project_name.lower())
+
+    if search:
+        terms = re.split("[/ ]", search)
+        for term in terms:
+            if not term:
+                continue
+            term = escape_for_like(term)
+            query = query.filter(or_(
+                 Project.name.ilike("%{}%".format(term)),
+                 ProjectVersion.name.ilike("%{}%".format(term))))
 
     if basemirror_id:
         query = query.filter(ProjectVersion.base_mirror_id == basemirror_id)
