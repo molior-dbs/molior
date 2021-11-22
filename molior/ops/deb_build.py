@@ -195,7 +195,7 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
             await process.launch()
             ret = await process.wait()
         elif sourcetype == "git":
-            cmd = "git clone -b v{} {} .".format(version, filepath)
+            cmd = "git clone -b v{} {}".format(version.replace("~", "-"), filepath)
             await buildlog(build_id, "$ {}\n".format(cmd))
             process = Launchy(cmd, outh, outh, cwd=tmpdir)
             await process.launch()
@@ -205,14 +205,14 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
         if ret == 0:
             cmd = "dpkg-genchanges -S"
             await buildlog(build_id, "$ {}\n".format(cmd))
-            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcename}")
             await process.launch()
             ret = await process.wait()
 
         if ret == 0:
             cmd = "dpkg-genbuildinfo --build=source"
             await buildlog(build_id, "$ {}\n".format(cmd))
-            process = Launchy(cmd, outh, outh, cwd=tmpdir)
+            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcename}")
             await process.launch()
             ret = await process.wait()
 
