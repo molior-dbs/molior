@@ -38,9 +38,14 @@ async def get_repository(request):
     """
     repository_id = request.match_info["repository_id"]
 
+    try:
+        repository_id = int(repository_id)
+    except Exception:
+        return ErrorResponse(404, "Repository with id {} not found".format(repository_id))
+
     repo = request.cirrina.db_session.query(SourceRepository).filter_by(id=repository_id).first()
     if not repo:
-        return ErrorResponse(404, "Repository with id {} could not be found!".format(repository_id))
+        return ErrorResponse(404, "Repository with id {} not found".format(repository_id))
 
     data = {
         "id": repo.id,
