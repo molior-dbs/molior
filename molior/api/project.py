@@ -6,7 +6,7 @@ from ..auth import req_role, req_admin
 from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion_deps, get_projectversion
-from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse
+from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse, escape_for_like
 
 
 @app.http_get("/api/projects")
@@ -48,7 +48,7 @@ async def get_projects(request):
     query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
 
     if filter_name:
-        query = query.filter(Project.name.ilike("%{}%".format(filter_name)))
+        query = query.filter(Project.name.ilike("%{}%".format(escape_for_like(filter_name))))
 
     nb_results = query.count()
     query = paginate(request, query)

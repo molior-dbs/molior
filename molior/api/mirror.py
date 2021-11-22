@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_admin
-from ..tools import OKResponse, ErrorResponse, paginate, db2array
+from ..tools import OKResponse, ErrorResponse, paginate, db2array, escape_for_like
 from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
@@ -211,6 +211,7 @@ async def get_mirrors(request):
         for term in terms:
             if not term:
                 continue
+            term = escape_for_like(term)
             query = query.filter(or_(
                  Project.name.ilike("%{}%".format(term)),
                  ProjectVersion.name.ilike("%{}%".format(term))))
