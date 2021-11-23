@@ -66,8 +66,8 @@ async def get_projectversions(request):
     dependant_id = request.GET.getone("dependant_id", None)
     search = request.GET.getone("q", "")
 
-    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted == False,
-                                                          Project.is_mirror == False)  # noqa: E712
+    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted.is_(False),
+                                                          Project.is_mirror.is_(False))
 
     exclude_id = parse_int(exclude_id)
     if exclude_id:
