@@ -2,6 +2,7 @@ config_version: '1'
 targets:
   molior:
   - "1.4"
+  - "1.4-bullseye"
 build_after:
   - "cirrina"
   - "launchy"
