@@ -90,7 +90,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     return True
 
 
-async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, projectversion):
+async def DownloadDebSrc(repo_id, sourcedir, sourcename, build_id, version, basemirror, projectversion):
     await buildlogtitle(build_id, "Source Package Republish")
     await buildlog(build_id, "I: downloading source package from {} ({})\n".format(projectversion, basemirror))
     cfg = Configuration()
@@ -151,8 +151,11 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
 
     await buildlog(build_id, "I: found directory: {}\n".format(directory))
     await buildlog(build_id, "I: downloading source files:\n")
-    sourcefile = None
+    sourcepath = None
     sourcetype = None
+    source_files = []
+    repopath = f"/var/lib/molior/repositories/{repo_id}"
+    tmpdir = mkdtemp(dir=repopath)
     for f in files:
         await buildlog(build_id, " - {}\n".format(f[2]))
 
@@ -162,25 +165,26 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
             async with http.get(file_url) as resp:
                 if not resp.status == 200:
                     await buildlog(build_id, "E: Error downloading {}\n".format(file_url))
-                    return False
+                    continue
                 body = await resp.read()
 
-        filepath = "/var/lib/molior/repositories/{}/{}".format(repo_id, f[2])
+        filepath = f"{tmpdir}/{f[2]}"
         async with AIOFile(filepath, "wb") as afp:
             writer = Writer(afp)
             await writer(body)
 
+        source_files.append(f[2])
+
         if filepath.endswith(".git"):
             sourcetype = "git"
-            sourcefile = filepath
+            sourcepath = filepath
         elif filepath.endswith(".tar.gz") or filepath.endswith(".tar.xz"):
             sourcetype = "tar"
-            sourcefile = filepath
+            sourcepath = filepath
 
     # extract source, if git, checkout version tag
     ret = None
     if sourcetype:
-        tmpdir = mkdtemp(dir="/var/lib/molior/repositories/{}/".format(repo_id))
         output = ""
 
         async def outh(line):
@@ -189,13 +193,13 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
             output += line
 
         if sourcetype == "tar":
-            cmd = "tar xf {}".format(sourcefile)
+            cmd = "tar xf {}".format(sourcepath)
             await buildlog(build_id, "$ {}\n".format(cmd))
             process = Launchy(cmd, outh, outh, cwd=tmpdir)
             await process.launch()
             ret = await process.wait()
         elif sourcetype == "git":
-            cmd = "git clone -b v{} {}".format(version.replace("~", "-"), filepath)
+            cmd = f"git clone -b v{version.replace('~', '-')} {filepath} {sourcedir}"
             await buildlog(build_id, "$ {}\n".format(cmd))
             process = Launchy(cmd, outh, outh, cwd=tmpdir)
             await process.launch()
@@ -205,21 +209,29 @@ async def DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, pro
         if ret == 0:
             cmd = "dpkg-genchanges -S"
             await buildlog(build_id, "$ {}\n".format(cmd))
-            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcename}")
+            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcedir}")
             await process.launch()
             ret = await process.wait()
 
         if ret == 0:
             cmd = "dpkg-genbuildinfo --build=source"
             await buildlog(build_id, "$ {}\n".format(cmd))
-            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcename}")
+            process = Launchy(cmd, outh, outh, cwd=f"{tmpdir}/{sourcedir}")
             await process.launch()
             ret = await process.wait()
 
+        source_files.append(f"{sourcename}_{version}_source.buildinfo")
+
+    for source_file in source_files:
         try:
-            rmtree(tmpdir)
-        except Exception:
-            pass
+            os.rename(f"{tmpdir}/{source_file}", f"{repopath}/{source_file}")
+        except Exception as exc:
+            logger.exception(exc)
+
+    try:
+        rmtree(tmpdir)
+    except Exception as exc:
+        logger.exception(exc)
 
     return ret == 0
 
@@ -620,6 +632,7 @@ async def BuildSourcePackage(build_id):
                 basemirror = projectversion.basemirror.fullname
                 projectversion = projectversion.fullname
                 sourcename = src_build.sourcename
+                sourcedir = src_build.parent.sourcename  # name of source directory is in top build
                 source_exists = True
 
         if source_exists:
@@ -660,7 +673,7 @@ async def BuildSourcePackage(build_id):
             ret = await BuildDebSrc(repo_id, src_path, build_id, version, is_ci,
                                     "{} {}".format(firstname, lastname), email)
         else:
-            ret = await DownloadDebSrc(repo_id, sourcename, build_id, version, basemirror, projectversion)
+            ret = await DownloadDebSrc(repo_id, sourcedir, sourcename, build_id, version, basemirror, projectversion)
     except Exception as exc:
         logger.exception(exc)
         await fail()
