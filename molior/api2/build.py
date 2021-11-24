@@ -133,7 +133,7 @@ async def abort_build(request):
 
     found = False
     for deb in srcbuild.children:
-        if deb.buildstate == "building":
+        if deb.buildstate == "building" or deb.buildstate == "needs_build":
             found = True
             break
 
