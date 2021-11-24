@@ -66,8 +66,7 @@ async def get_projectversions(request):
     dependant_id = request.GET.getone("dependant_id", None)
     search = request.GET.getone("q", "")
 
-    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted.is_(False),
-                                                          Project.is_mirror.is_(False))
+    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted.is_(False))
 
     exclude_id = parse_int(exclude_id)
     if exclude_id:
@@ -92,8 +91,11 @@ async def get_projectversions(request):
 
     if basemirror_id:
         query = query.filter(ProjectVersion.base_mirror_id == basemirror_id)
-    elif is_basemirror:
-        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
+    else:
+        if is_basemirror:
+            query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
+        else:
+            query = query.filter(Project.is_mirror.is_(False))
 
     if dependant_id:
         logger.info("dependant_id")
