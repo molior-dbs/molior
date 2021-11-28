@@ -338,7 +338,7 @@ async def copy_projectversion(request):
     dependency_policy = params.get("dependency_policy")
     basemirror = params.get("basemirror")
     baseproject = params.get("baseproject")
-    architectures = params.get("architectures", [])
+    architectures = params.get("architectures", None)
     cibuilds = params.get("cibuilds", False)
     buildlatest = params.get("buildlatest", False)
 
@@ -350,6 +350,10 @@ async def copy_projectversion(request):
         return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
     if baseproject and not ("/" in baseproject):
         return ErrorResponse(400, "No valid baseproject received (format: 'name/version')")
+    if not architectures:
+        return ErrorResponse(400, "No architecture received")
+    if len(architectures) == 0:
+        return ErrorResponse(400, "No architecture received")
 
     projectversion = get_projectversion(request)
     if not projectversion:

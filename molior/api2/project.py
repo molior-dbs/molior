@@ -170,21 +170,23 @@ async def create_projectversion(request):
     if dependency_policy not in DEPENDENCY_POLICIES:
         return ErrorResponse(400, "Wrong dependency policy2")
     cibuilds = params.get("cibuilds")
-    architectures = params.get("architectures", [])
+    architectures = params.get("architectures", None)
     basemirror = params.get("basemirror")
     baseproject = params.get("baseproject")
     project_id = request.match_info["project_id"]
 
     if not project_id:
-        return ErrorResponse(400, "No valid project id received")
+        return ErrorResponse(400, "No project id received")
     if not name:
-        return ErrorResponse(400, "No valid name for the projectversion recieived")
+        return ErrorResponse(400, "No name for the projectversion recieived")
     if basemirror and not ("/" in basemirror):
-        return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
+        return ErrorResponse(400, "No basemirror received (format: 'name/version')")
     if baseproject and not ("/" in baseproject):
-        return ErrorResponse(400, "No valid baseproject received (format: 'name/version')")
+        return ErrorResponse(400, "No baseproject received (format: 'name/version')")
     if not architectures:
-        return ErrorResponse(400, "No valid architecture received")
+        return ErrorResponse(400, "No architecture received")
+    if len(architectures) == 0:
+        return ErrorResponse(400, "No architecture received")
 
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name")
