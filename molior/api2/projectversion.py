@@ -337,6 +337,7 @@ async def copy_projectversion(request):
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
     basemirror = params.get("basemirror")
+    baseproject = params.get("baseproject")
     architectures = params.get("architectures", [])
     cibuilds = params.get("cibuilds", False)
     buildlatest = params.get("buildlatest", False)
@@ -345,6 +346,10 @@ async def copy_projectversion(request):
         return ErrorResponse(400, "No valid name for the projectversion received")
     if not is_name_valid(new_version):
         return ErrorResponse(400, "Invalid project name!")
+    if basemirror and not ("/" in basemirror):
+        return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
+    if baseproject and not ("/" in baseproject):
+        return ErrorResponse(400, "No valid baseproject received (format: 'name/version')")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -355,14 +360,35 @@ async def copy_projectversion(request):
                 Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
-    basemirror_name, basemirror_version = basemirror.split("/")
-    basemirror = db.query(ProjectVersion).join(Project).filter(
-            func.lower(Project.name) == basemirror_name.lower(),
-            func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
-    if not basemirror:
-        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+    bm = None
+    pv = None
+    if baseproject:
+        baseproject_name, baseproject_version = baseproject.split("/")
+        pv = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(False),
+                func.lower(Project.name) == baseproject_name.lower(),
+                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
+        if not pv:
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+        bm = pv.basemirror
+    else:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(True),
+                func.lower(Project.name) == basemirror_name.lower(),
+                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
+        if not bm:
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion.copy(db, new_version, description, dependency_policy, basemirror.id, architectures, cibuilds)
+    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds)
+
+    if baseproject:
+        pdep = ProjectVersionDependency(
+                projectversion_id=new_projectversion.id,
+                dependency_id=pv.id,
+                use_cibuilds=False)
+        db.add(pdep)
+        db.commit()
 
     trigger_builds = []
     if buildlatest:
@@ -400,8 +426,8 @@ async def copy_projectversion(request):
             trigger_builds.append(build.id)
 
     await enqueue_aptly({"init_repository": [
-                basemirror.project.name,
-                basemirror.name,
+                bm.project.name,
+                bm.name,
                 projectversion.project.name,
                 new_version,
                 architectures,
