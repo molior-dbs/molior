@@ -30,7 +30,7 @@ CREATE TABLE authtoken_project (
 );
 ALTER TABLE authtoken_project OWNER TO molior;
 
-ALTER TABLE authtoken ADD CONSTRAINT unique_authtoken_project UNIQUE (project_id, authtoken_id);
+ALTER TABLE authtoken_project ADD CONSTRAINT unique_authtoken_project UNIQUE (project_id, authtoken_id);
 
 ALTER TYPE role_enum ADD VALUE 'project_create';
 ALTER TYPE role_enum ADD VALUE 'mirror_create';
