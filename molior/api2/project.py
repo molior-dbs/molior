@@ -12,6 +12,7 @@ from ..model.authtoken_project import Authtoken_Project
 from ..model.projectversion import ProjectVersion, get_projectversion, DEPENDENCY_POLICIES
 from ..model.user import User
 from ..model.userrole import UserRole, USER_ROLES
+from ..model.projectversiondependency import ProjectVersionDependency
 
 
 @app.http_get("/api2/projectbase/{project_name}")
@@ -171,14 +172,17 @@ async def create_projectversion(request):
     cibuilds = params.get("cibuilds")
     architectures = params.get("architectures", [])
     basemirror = params.get("basemirror")
+    baseproject = params.get("baseproject")
     project_id = request.match_info["project_id"]
 
     if not project_id:
         return ErrorResponse(400, "No valid project id received")
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion recieived")
-    if not basemirror or not ("/" in basemirror):
+    if basemirror and not ("/" in basemirror):
         return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
+    if baseproject and not ("/" in baseproject):
+        return ErrorResponse(400, "No valid baseproject received (format: 'name/version')")
     if not architectures:
         return ErrorResponse(400, "No valid architecture received")
 
@@ -201,16 +205,28 @@ async def create_projectversion(request):
                                         name,
                                         ", and is marked as deleted" if projectversion.is_deleted else ""))
 
-    basemirror_name, basemirror_version = basemirror.split("/")
-    basemirror = db.query(ProjectVersion).join(Project).filter(
-                                    Project.id == ProjectVersion.project_id,
-                                    func.lower(Project.name) == basemirror_name.lower(),
-                                    func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
-    if not basemirror:
-        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+    bm = None
+    pv = None
+    if baseproject:
+        baseproject_name, baseproject_version = baseproject.split("/")
+        pv = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(False),
+                func.lower(Project.name) == baseproject_name.lower(),
+                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
+        if not pv:
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+        bm = pv.basemirror
+    else:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(True),
+                func.lower(Project.name) == basemirror_name.lower(),
+                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
+        if not bm:
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
     for arch in architectures:
-        if arch not in db2array(basemirror.mirror_architectures):
+        if arch not in db2array(bm.mirror_architectures):
             return ErrorResponse(400, "Architecture not found in basemirror: {}".format(arch))
 
     projectversion = ProjectVersion(
@@ -220,14 +236,22 @@ async def create_projectversion(request):
             dependency_policy=dependency_policy,
             ci_builds_enabled=cibuilds,
             mirror_architectures=array2db(architectures),
-            basemirror=basemirror,
+            basemirror=bm,
             mirror_state=None)
     db.add(projectversion)
     db.commit()
 
+    if baseproject:
+        pdep = ProjectVersionDependency(
+                projectversion_id=projectversion.id,
+                dependency_id=pv.id,
+                use_cibuilds=False)
+        db.add(pdep)
+        db.commit()
+
     await enqueue_aptly({"init_repository": [
-                basemirror_name,
-                basemirror_version,
+                bm.project.name,
+                bm.name,
                 projectversion.project.name,
                 projectversion.name,
                 architectures,

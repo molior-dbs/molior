@@ -210,6 +210,7 @@ class ProjectVersion(Base):
 
         db.add(new_projectversion)
         db.commit()
+        return new_projectversion
 
 
 def get_projectversion_deps(projectversion_id, session):
