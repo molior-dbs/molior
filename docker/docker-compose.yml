@@ -2,7 +2,7 @@ version: '3'
 services:
   molior:
     container_name: molior
-    image: neolynx/molior:1.4.1-rc28
+    image: neolynx/molior
     volumes:
       - molior_data:/var/lib/molior:rw
       - postgres_data:/var/lib/postgresql:rw
@@ -20,7 +20,7 @@ services:
       - "8000:80"
   aptly:
     container_name: aptly
-    image: neolynx/molior-aptly:1.4.1-rc28
+    image: neolynx/molior-aptly
     volumes:
       - aptly_data:/var/lib/aptly:rw
     environment:
