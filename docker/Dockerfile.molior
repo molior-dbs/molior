@@ -13,5 +13,6 @@ RUN sed -i 's/handlers=\[logging.handlers.SysLogHandler.*/)/' /usr/lib/python3/d
 RUN echo "daemon off;" >/etc/nginx/modules-enabled/no-daemon.conf
 COPY molior-supervisord.conf /etc/supervisor/conf.d/molior.conf
 COPY molior-start.sh /usr/local/bin/molior-start.sh
+COPY postgres-start.sh /usr/local/bin/postgres-start.sh
 COPY molior-nginx-start.sh /usr/local/bin/molior-nginx-start.sh
 CMD /usr/bin/supervisord
