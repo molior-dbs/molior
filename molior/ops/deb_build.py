@@ -703,7 +703,7 @@ async def BuildSourcePackage(build_id):
     await enqueue_aptly({"src_publish": [build_id]})
 
 
-def chroot_ready(build, session):
+async def chroot_ready(build, session):
     """
     Checks if the needed chroot
     for the given build is ready.
@@ -719,10 +719,10 @@ def chroot_ready(build, session):
     chroot = session.query(Chroot).filter(Chroot.basemirror_id == build.projectversion.basemirror_id,
                                           Chroot.architecture == target_arch).first()
     if not chroot:
-        build.log_state("chroot not found")
+        await build.log(f"E: build environment not found: {target_arch} {build.projectversion.basemirror.fullname}\n")
         return False
     if not chroot.ready:
-        build.log_state("chroot not ready")
+        await build.log(f"E: build environment not ready: {target_arch} {build.projectversion.basemirror.fullname}\n")
         return False
     return True
 
@@ -735,7 +735,7 @@ async def schedule_build(build, session):
     Args:
         build (molior.model.build.Build): Build to schedule.
     """
-    if not chroot_ready(build, session):
+    if not await chroot_ready(build, session):
         return False
 
     token = uuid.uuid4()
@@ -803,7 +803,7 @@ async def ScheduleBuilds():
 
         needed_builds = session.query(Build).filter(Build.buildstate == "needs_build", Build.buildtype == "deb").all()
         for build in needed_builds:
-            if not chroot_ready(build, session):
+            if not await chroot_ready(build, session):
                 continue
 
             projectversion = session.query(ProjectVersion).filter(
