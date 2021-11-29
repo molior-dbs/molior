@@ -108,7 +108,7 @@ async def GitCleanLocal(repo_path, build):
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        logger.error("error getting current commit")
+        logger.error("error getting default brach")
         return False
 
     async def outh_null(line):
