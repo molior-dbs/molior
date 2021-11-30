@@ -665,7 +665,7 @@ class AptlyApi:
             list: List of publish points
         """
         _, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, repo, version)
-        task = await self.DELETE(f"//publish/{publish_name}/{distribution}")
+        task = await self.DELETE(f"/publish/{publish_name}/{distribution}")
         return task["ID"]
 
     async def cleanup(self):
