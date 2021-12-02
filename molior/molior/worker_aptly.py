@@ -1058,7 +1058,7 @@ class AptlyWorker:
 
             projectversions = {}
             for src in srcpkgs:
-                if not src.projectversions:
+                if src.projectversions is None or len(src.projectversions) == 0:
                     continue
                 if src.buildstate == "successful":
                     continue

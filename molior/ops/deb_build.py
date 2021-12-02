@@ -604,44 +604,9 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
 
 async def BuildSourcePackage(build_id):
     source_exists = False
-    with Session() as db:
-        build = db.query(Build).filter(Build.id == build_id).first()
-        if not build:
-            logger.error("BuildProcess: build {} not found".format(build_id))
-            return
-        parent_build_id = build.parent_id
-        repo_id = build.sourcerepository_id
-        src_path = build.sourcerepository.src_path
-        version = build.version
-        is_ci = build.is_ci
-        firstname = build.maintainer.firstname
-        lastname = build.maintainer.surname
-        email = build.maintainer.email
-
-        await build.set_building()
-        db.commit()
-
-        src_build = db.query(Build).filter(Build.sourcerepository_id == repo_id,
-                                           Build.version == version,
-                                           Build.buildtype == "source",
-                                           Build.buildstate == "successful",
-                                           Build.is_deleted.is_(False)).first()
-        if src_build:
-            projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == src_build.projectversions[0]).first()
-            if projectversion:
-                basemirror = projectversion.basemirror.fullname
-                projectversion = projectversion.fullname
-                sourcename = src_build.sourcename
-                sourcedir = src_build.parent.sourcename  # name of source directory is in top build
-                source_exists = True
-
-        if source_exists:
-            await build.parent.log("I: downloading source package\n")
-        else:
-            await build.parent.log("I: building source package\n")
-            await build.logtitle("Source Build")
 
     async def fail():
+
         with Session() as db:
             build = db.query(Build).filter(Build.id == build_id).first()
             if not build:
@@ -667,6 +632,47 @@ async def BuildSourcePackage(build_id):
             await build.set_failed()
             db.commit()
             # FIXME: cancel deb builds, or only create deb builds after source build ok
+
+    with Session() as db:
+        build = db.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            logger.error("BuildProcess: build {} not found".format(build_id))
+            return
+        parent_build_id = build.parent_id
+        repo_id = build.sourcerepository_id
+        src_path = build.sourcerepository.src_path
+        version = build.version
+        is_ci = build.is_ci
+        firstname = build.maintainer.firstname
+        lastname = build.maintainer.surname
+        email = build.maintainer.email
+
+        await build.set_building()
+        db.commit()
+
+        src_build = db.query(Build).filter(Build.sourcerepository_id == repo_id,
+                                           Build.version == version,
+                                           Build.buildtype == "source",
+                                           Build.buildstate == "successful",
+                                           Build.is_deleted.is_(False)).first()
+        if src_build:
+            if src_build.projectversions is None or len(src_build.projectversions) == 0:
+                await build.log(f"E: no projectversion found for downloading source package in build {src_build.id}\n")
+                await fail()
+                return
+            projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == src_build.projectversions[0]).first()
+            if projectversion:
+                basemirror = projectversion.basemirror.fullname
+                projectversion = projectversion.fullname
+                sourcename = src_build.sourcename
+                sourcedir = src_build.parent.sourcename  # name of source directory is in top build
+                source_exists = True
+
+        if source_exists:
+            await build.parent.log("I: downloading source package\n")
+        else:
+            await build.parent.log("I: building source package\n")
+            await build.logtitle("Source Build")
 
     try:
         if not source_exists:
