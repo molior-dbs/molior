@@ -1,3 +1,15 @@
+molior (1.4.1~rc33) stretch; urgency=medium
+
+  * source republish: check for missing projectversions
+  * implement token authentication
+  * snapshot: ignore CI builds
+  * build log: use async with
+  * authenticate: trim username
+  * clone: fix response
+  * build delete: prevent removal builds from locked projectversion
+
+ -- André Roth <neolynx@gmail.com>  Sat, 04 Dec 2021 17:18:43 +0000
+
 molior (1.4.0) stretch; urgency=medium
 
   * projectvrsion/mirror: case insensitive search
