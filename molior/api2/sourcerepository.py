@@ -253,7 +253,7 @@ async def get_projectversion_repositories(request):
                 Build.is_ci.is_(False),
                 Build.sourcerepository_id == repository.id,
                 Build.buildtype == "deb",
-                Build.buildstate == "successful").group_by(Build.id).subquery()
+                Build.buildstate == "successful").subquery()
 
         return db.query(Build).join(latest_build_subq, Build.id == latest_build_subq.c.latest_id).first()
 
