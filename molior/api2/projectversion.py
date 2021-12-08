@@ -7,7 +7,7 @@ from aiofile import AIOFile, Writer
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db
+from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
 from ..api.projectversion import do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
@@ -111,6 +111,9 @@ async def get_projectversion_dependencies(request):
         cands_query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
                                                       ProjectVersion.id != projectversion.id,
                                                       ProjectVersion.id.notin_(dep_ids))
+        if filter_name:
+            cands_query = cands_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
+
         BaseMirror = aliased(ProjectVersion)
         dist_query = db.query(ProjectVersion).join(BaseMirror, BaseMirror.id == ProjectVersion.basemirror_id).filter(
                                                    ProjectVersion.dependency_policy == "distribution",
@@ -118,17 +121,31 @@ async def get_projectversion_dependencies(request):
                                                    BaseMirror.id != projectversion.basemirror_id,
                                                    ProjectVersion.id.notin_(dep_ids))
 
+        if filter_name:
+            dist_query = dist_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
+
         any_query = db.query(ProjectVersion).filter(
                                                    ProjectVersion.dependency_policy == "any",
                                                    ProjectVersion.id != projectversion.id,
                                                    ProjectVersion.id.notin_(dep_ids))
-        cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
-                                                                                func.lower(Project.name),
-                                                                                func.lower(ProjectVersion.name))
         if filter_name:
-            cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+            any_query = any_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
 
-        for cand in cands.all():
+        # cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
+        #                                                                         func.lower(Project.name),
+        #                                                                         func.lower(ProjectVersion.name))
+        # if filter_name:
+        #     cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+
+        # for cand in cands.all():
+
+        for cand in cands_query.all():
+            results.append(cand.data())
+
+        for cand in dist_query.all():
+            results.append(cand.data())
+
+        for cand in any_query.all():
             results.append(cand.data())
 
         data = {"total_result_count": len(results), "results": results}
