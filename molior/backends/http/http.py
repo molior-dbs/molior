@@ -11,6 +11,8 @@ from ...molior.notifier import Subject, Event, notify
 
 registry = {"amd64": [], "arm64": []}
 running_nodes = {"amd64": [], "arm64": []}
+# list: numbers of free nodes for each arch ready for building
+freeBuildNodes = {"amd64": [0], "arm64": [0], "armhf": [0]}
 
 cfg = Configuration()
 pt = cfg.backend_http.get("ping_timeout")
@@ -82,6 +84,7 @@ async def node_register(ws_client):
     ws_client.molior_uptime_seconds = 0
 
     registry[arch].insert(0, ws_client)
+    freeBuildNodes[arch][0] += 1
     logger.info("backend: %s node registered: %s", arch, node)
     ws_client.molior_watchdog = asyncio.ensure_future(watchdog(ws_client))
     await enqueue_backend({"node_registered": 1})
@@ -120,6 +123,7 @@ async def node_message(ws_client, msg):
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
+                freeBuildNodes[arch][0] += 1
             ws_client.molior_build_id = None
             ws_client.molior_sourcename = ""
             ws_client.molior_sourceversion = ""
@@ -131,6 +135,7 @@ async def node_message(ws_client, msg):
             if ws_client in running_nodes[arch]:
                 running_nodes[arch].remove(ws_client)
                 registry[arch].insert(0, ws_client)
+                freeBuildNodes[arch][0] += 1
             ws_client.molior_build_id = None
             ws_client.molior_sourcename = ""
             ws_client.molior_sourceversion = ""
@@ -154,10 +159,12 @@ async def deregister_node(ws_client):
 
     if ws_client in registry[arch]:
         registry[arch].remove(ws_client)
+        freeBuildNodes[arch][0] -= 1
         logger.warning("backend: node disconnected: %s/%s", arch, node)
 
     elif ws_client in running_nodes[arch]:
         running_nodes[arch].remove(ws_client)
+        freeBuildNodes[arch][0] -= 1
         build_id = ws_client.molior_build_id
         logger.error("backend: lost build_%d on %s/%s", build_id, arch, node)
         await enqueue_backend({"failed": build_id})
@@ -182,14 +189,31 @@ class HTTPBackend:
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian=True):
+        queue_arch = None
         task_id = "build_%d" % build_id
         if arch == "i386" or arch == "amd64":
             queue_arch = "amd64"
-        elif arch == "armhf" or arch == "arm64":
-            queue_arch = "arm64"
+        elif arch == "arm64" or arch == "armhf":
+            # determine which node can be used for arm-build
+            for arch2 in registry:
+                for node in registry[arch2]:
+                    if freeBuildNodes[arch][0] > 0:
+                        queue_arch = arch
+                        break
+                    elif freeBuildNodes[arch2][0] > 0:
+                        if arch2 == "arm64" or arch2 == "armhf":
+                            queue_arch = arch2
+                            break
+                if queue_arch is not None:
+                    break
+            # fall-back
+            if queue_arch is None:
+                queue_arch = "arm64"
         else:
             logger.error("backend: invalid build architecture '%s'", arch)
             return False
+
+        freeBuildNodes[queue_arch][0] -= 1
 
         await enqueue_buildtask(queue_arch, {"build_id": build_id,
                                              "token": token,
