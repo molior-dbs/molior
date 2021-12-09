@@ -170,7 +170,8 @@ class ProjectVersion(Base):
             "ci_builds_enabled": self.ci_builds_enabled,
             "dependency_policy": self.dependency_policy,
             "dependency_ids": dependency_ids,
-            "dependent_ids": dependent_ids
+            "dependent_ids": dependent_ids,
+            "projectversiontype": self.projectversiontype
         }
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})
