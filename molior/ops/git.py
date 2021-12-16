@@ -66,7 +66,7 @@ async def GitClone(build_id, repo_id, session):
             logger.info("clone task: removing git repo %s", str(repo.src_path))
             shutil.rmtree(str(repo.src_path))
 
-        if not await run_git("git clone --config http.sslVerify=false {}".format(repo.url), str(repo.path), build):
+        if not await run_git("git clone --config http.sslVerify=false {} {}".format(repo.url, str(repo.src_path)), str(repo.path), build):
             logger.error("error running git clone")
             repo.set_error()
             await build.set_failed()
