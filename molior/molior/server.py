@@ -3,6 +3,7 @@ import click
 import signal
 import functools
 
+from aiohttp.abc import AbstractAccessLogger
 from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
 from async_cron.job import CronJob
@@ -84,6 +85,21 @@ def destroy_cirrina_context(cirrina):
     cirrina.db_session.close()
 
 
+class MoliorAccessLogger(AbstractAccessLogger):
+
+    def _get_username(self, request):
+        try:
+            return request.cirrina.web_session.get('username')
+        except Exception:
+            return None
+
+    def log(self, request, response, time):
+        username = self._get_username(request)
+        self.logger.info(
+            '[%s] %s %s %s %s in %s secs',
+            username, request.remote, request.method, request.path, response.status, time)
+
+
 @click.command()
 @click.option(
     "--host", default="localhost", help="Hostname, examples: 'localhost' or '0.0.0.0'"
@@ -123,7 +139,7 @@ def mainloop(host, port, debug, coverage):
 
     asyncio.ensure_future(main())
     app.set_context_functions(create_cirrina_context, destroy_cirrina_context)
-    app.run(host, port, logger=logger, debug=debug)
+    app.run(host, port, logger=logger, debug=debug, access_log_class=MoliorAccessLogger)
     logger.info("terminated")
 
     if coverage:
