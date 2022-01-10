@@ -1,3 +1,5 @@
+import hashlib
+
 from sqlalchemy.sql import or_, func
 from secrets import token_hex
 
@@ -710,7 +712,11 @@ async def create_token(request):
 
     auth_token = token_hex(32)
 
-    token = Authtoken(description=description, token=auth_token)
+    # store hashed token
+    encoded = auth_token.encode()
+    hashed_token = hashlib.sha256(encoded)
+
+    token = Authtoken(description=description, token=hashed_token)
     db.add(token)
     db.commit()
     mapping = Authtoken_Project(project_id=project.id, authtoken_id=token.id, roles=array2db(['owner']))

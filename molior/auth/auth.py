@@ -1,11 +1,12 @@
 import importlib
+import hashlib
 
 from functools import wraps
 from aiohttp import web
 from sqlalchemy.sql import func
 
 from ..app import app, logger
-from ..tools import parse_int
+from ..tools import parse_int, db2array
 from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
@@ -127,6 +128,11 @@ async def authenticate_token(request, *kw):
     if not auth_token:
         return False
 
+    # only use hashed token from now on
+    encoded = auth_token.encode()
+    auth_token = hashlib.sha256(encoded)
+    request.headers["X-MoliorToken"] = auth_token
+
     token = None
     project_name = request.match_info.get("project_name")
     if project_name:
@@ -160,15 +166,24 @@ def load_user(user, db_session):
         db_session.commit()
 
 
-def check_admin(web_session, db_session):
+def check_admin(request):
     """
-    Helper to check current user is admin
+    Helper to check current user/token is admin
     """
-    if "username" in web_session:
-        res = db_session.query(User).filter_by(username=web_session["username"]).first()
-        if not res:
-            return False
-        return res.is_admin
+    if "username" in request.cirrina.web_session:
+        res = request.cirrina.db_session.query(User).filter_by(username=request.cirrina.web_session["username"]).first()
+        if res and res.is_admin:
+            return True
+
+    auth_token = request.headers.getone("X-MoliorToken", None)
+    if auth_token:
+        query = request.cirrina.db_session.query(Authtoken)
+        query = query.filter(Authtoken.token == auth_token)
+        for item in query.all():
+            # FIXME: check if owner/admin cap
+            if "project_create" in db2array(item.roles):
+                return True
+
     return False
 
 
@@ -187,7 +202,7 @@ def req_admin(function):
     @wraps(function)
     async def _wrapper(request):
         """Wrapper function for req_admin decorator."""
-        if check_admin(request.cirrina.web_session, request.cirrina.db_session):
+        if check_admin(request):
             return await function(request)
 
         return web.Response(status=403)
@@ -306,7 +321,7 @@ class req_role(object):
                     maintenance_mode = True
                 break
 
-            if check_admin(request.cirrina.web_session, request.cirrina.db_session):
+            if check_admin(request):
                 return await function(request)
 
             if maintenance_mode:
