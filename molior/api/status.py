@@ -132,6 +132,15 @@ async def set_maintenance(request):
 
 
 def get_server_info():
+
+    def get_machine_id():
+        try:
+            with open('/etc/machine-id') as machine_id_file:
+                machine_id = machine_id_file.readline().strip()
+        except IOError:
+            machine_id = None
+        return machine_id
+
     uptime_seconds = ""
     with open('/proc/uptime', 'r') as f:
         uptime_seconds = float(f.readline().split()[0])
@@ -147,7 +156,8 @@ def get_server_info():
                 "ram_used": ram_used,
                 "ram_total": ram_total,
                 "disk_used": disk_used,
-                "disk_total": disk_total
+                "disk_total": disk_total,
+                "id": get_machine_id()
                 }
     return server_info
 
