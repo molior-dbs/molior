@@ -22,7 +22,6 @@ override_dh_auto_test:
 
 override_dh_systemd_enable:
 	dh_systemd_enable -p molior-server molior-server.service
-	dh_systemd_enable -p molior-devel ssh-create-keys.service
 	dh_systemd_enable -p molior-vbox ssh-create-keys.service
 	dh_systemd_enable -p molior-node-amd64 ssh-create-keys.service
 	dh_systemd_enable -p molior-node-amd64-efi ssh-create-keys.service
@@ -31,7 +30,6 @@ override_dh_systemd_enable:
 
 override_dh_systemd_start:
 	dh_systemd_start -p molior-server molior-server.service
-	dh_systemd_start -p molior-devel ssh-create-keys.service
 	dh_systemd_enable -p molior-vbox ssh-create-keys.service
 	dh_systemd_start -p molior-node-amd64 ssh-create-keys.service
 	dh_systemd_start -p molior-node-amd64-efi ssh-create-keys.service
