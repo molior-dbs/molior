@@ -435,7 +435,7 @@ async def get_project_users2(request):
         query = query.filter(User.username != "admin")
         query = query.filter(or_(UserRole.project_id.is_(None), Project.id != project.id))
         if filter_name:
-            query = query.filter(User.username.ilike("%{}%").format(escape_for_like(filter_name)))
+            query = query.filter(User.username.ilike("%{}%".format(escape_for_like(filter_name))))
         query = query.order_by(User.username)
         query = paginate(request, query)
         users = query.all()
