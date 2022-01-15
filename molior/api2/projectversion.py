@@ -553,10 +553,26 @@ async def snapshot_projectversion(request):
     latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
             Build.projectversion_id == projectversion.id,
             Build.is_ci.is_(False),
-            Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
+            Build.sourcerepository_id.isnot(None),
+            Build.buildtype == "deb").group_by(Build.sourcerepository_id)  # .subquery()
 
-    latest_builds = db.query(Build).join(latest_builds_subq, Build.id == latest_builds_subq.c.latest_id).order_by(
-                    Build.sourcename, Build.id.desc()).all()
+    SourceBuild = aliased(Build)
+
+    latest_build_uploads_subq = db.query(func.max(Build.id).label("latest_id")).join(
+            SourceBuild, SourceBuild.id == Build.parent_id).filter(
+            Build.projectversion_id == projectversion.id,
+            Build.is_ci.is_(False),
+            Build.sourcerepository_id.is_(None),
+            Build.buildtype == "deb",
+            ).group_by(SourceBuild.sourcename)  # .subquery()
+
+    latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
+
+    latest_builds = db.query(Build).join(latest_union_builds_subq, Build.id == latest_union_builds_subq.c.latest_id).order_by(
+                    Build.sourcename, Build.id.desc())
+
+    logger.warning(latest_builds)
+    latest_builds = latest_builds.all()
 
     # get top level build for each latest build
     latest_debbuilds_ids = []
@@ -569,6 +585,9 @@ async def snapshot_projectversion(request):
             if not debbuild.debianpackages:
                 return ErrorResponse(400, "No debian packages found for %s/%s" % (debbuild.sourcename, debbuild.version))
             latest_debbuilds_ids.append(debbuild.id)
+
+    if len(latest_debbuilds_ids) == 0:
+        return ErrorResponse(400, "No snapshotable builds found")
 
     new_projectversion = ProjectVersion(
         name=name,
