@@ -899,7 +899,8 @@ class AptlyWorker:
                     startstamp=build.startstamp,
                     buildendstamp=build.buildendstamp,
                     endstamp=build.endstamp,
-                    snapshotbuild_id=build.id
+                    snapshotbuild_id=build.id,
+                    debianpackages=build.debianpackages
                 )
                 if copy.buildtype == "deb":
                     copy.projectversion_id = new_projectversion_id

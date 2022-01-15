@@ -117,7 +117,8 @@ class DebianRepository:
         task_id = await self.aptly.snapshot_create(repo_name, snapshot_name, package_refs)
         await self.aptly.wait_task(task_id)
 
-        archs = self.archs.extend(["source", "all"])
+        archs = self.archs
+        archs.extend(["source", "all"])
         task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, publish_name)
         await self.aptly.wait_task(task_id)
 

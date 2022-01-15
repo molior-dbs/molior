@@ -24,6 +24,30 @@ from ..model.postbuildhook import PostBuildHook
 from ..model.projectversiondependency import ProjectVersionDependency
 
 
+# find latest builds
+def latest_project_builds(db, projectversion_id):
+    latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
+            Build.projectversion_id == projectversion_id,
+            Build.is_ci.is_(False),
+            Build.sourcerepository_id.isnot(None),
+            Build.buildtype == "deb").group_by(Build.sourcerepository_id)
+
+    SourceBuild = aliased(Build)
+
+    latest_build_uploads_subq = db.query(func.max(Build.id).label("latest_id")).join(
+            SourceBuild, SourceBuild.id == Build.parent_id).filter(
+            Build.projectversion_id == projectversion_id,
+            Build.is_ci.is_(False),
+            Build.sourcerepository_id.is_(None),
+            Build.buildtype == "deb",
+            ).group_by(SourceBuild.sourcename)
+
+    latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
+
+    return db.query(Build).join(latest_union_builds_subq, Build.id == latest_union_builds_subq.c.latest_id).order_by(
+                    Build.sourcename, Build.id.desc()).all()
+
+
 @app.http_get("/api2/project/{project_name}/{project_version}")
 @app.authenticated
 async def get_projectversion2(request):
@@ -413,16 +437,7 @@ async def copy_projectversion(request):
 
     trigger_builds = []
     if buildlatest:
-        # find latest builds
-        latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
-                Build.projectversion_id == projectversion.id,
-                Build.is_ci.is_(False),
-                Build.sourcerepository_id.isnot(None),
-                Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
-
-        latest_builds = db.query(Build).join(latest_builds_subq, Build.id == latest_builds_subq.c.latest_id).order_by(
-                        Build.sourcename, Build.id.desc()).all()
-
+        latest_builds = latest_project_builds(db, projectversion.id)
         for latest_build in latest_builds:
             topbuild = latest_build.parent.parent
             if topbuild.buildstate != "successful":
@@ -549,32 +564,8 @@ async def snapshot_projectversion(request):
         if not dep.is_locked:
             return ErrorResponse(400, "Dependency '%s/%s' is not locked" % (dep.project.name, dep.name))
 
-    # find latest builds
-    latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
-            Build.projectversion_id == projectversion.id,
-            Build.is_ci.is_(False),
-            Build.sourcerepository_id.isnot(None),
-            Build.buildtype == "deb").group_by(Build.sourcerepository_id)  # .subquery()
-
-    SourceBuild = aliased(Build)
-
-    latest_build_uploads_subq = db.query(func.max(Build.id).label("latest_id")).join(
-            SourceBuild, SourceBuild.id == Build.parent_id).filter(
-            Build.projectversion_id == projectversion.id,
-            Build.is_ci.is_(False),
-            Build.sourcerepository_id.is_(None),
-            Build.buildtype == "deb",
-            ).group_by(SourceBuild.sourcename)  # .subquery()
-
-    latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
-
-    latest_builds = db.query(Build).join(latest_union_builds_subq, Build.id == latest_union_builds_subq.c.latest_id).order_by(
-                    Build.sourcename, Build.id.desc())
-
-    logger.warning(latest_builds)
-    latest_builds = latest_builds.all()
-
     # get top level build for each latest build
+    latest_builds = latest_project_builds(db, projectversion.id)
     latest_debbuilds_ids = []
     for latest_build in latest_builds:
         if latest_build.buildstate != "successful":
@@ -592,7 +583,7 @@ async def snapshot_projectversion(request):
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
-        dependencies=projectversion.dependencies,   # FIXME: use_cubilds not included via relationship
+        dependencies=projectversion.dependencies,   # FIXME: use_cibuilds not included via relationship
         mirror_architectures=projectversion.mirror_architectures,
         basemirror_id=projectversion.basemirror_id,
         sourcerepositories=projectversion.sourcerepositories,
