@@ -6,7 +6,7 @@ from aiohttp import web
 from sqlalchemy.sql import func
 
 from ..app import app, logger
-from ..tools import parse_int, db2array
+from ..tools import parse_int, db2array, ErrorResponse
 from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion
@@ -208,7 +208,7 @@ def req_admin(function):
         if check_admin(request):
             return await function(request)
 
-        return web.Response(status=403)
+        return ErrorResponse(403, "Admin privileges required")
 
     return _wrapper
 
@@ -355,9 +355,9 @@ class req_role(object):
                     if p:
                         project_id = p.id
                     else:
-                        return web.Response(status=403)
+                        return ErrorResponse(403, "Project privileges required")
             else:
-                return web.Response(status=403)
+                return ErrorResponse(403, "Project privileges required")
 
             if check_authtoken(request, project_id) or \
                check_user_role(request.cirrina.web_session,
@@ -367,6 +367,6 @@ class req_role(object):
                                self.allow_admin):
                 return await function(request)
 
-            return web.Response(status=403)
+            return ErrorResponse(403, "Project privileges required")
 
         return _wrapper
