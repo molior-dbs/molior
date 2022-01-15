@@ -214,6 +214,11 @@ class DebianRepository:
             ci_build (bool): Packages will be pushed to the unstable
                 publish point if set to True.
         """
+
+        if not files:
+            logger.error("add_packages: empty file list")
+            return False
+
         dist = "unstable" if ci_build else "stable"
         repo_name = self.name + "-%s" % dist
         task_id, upload_dir = await self.aptly.repo_add(repo_name, files)
@@ -227,4 +232,6 @@ class DebianRepository:
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
         await self.aptly.delete_directory(upload_dir)
-        await self.aptly.republish(dist, repo_name, self.publish_name)
+        if not await self.aptly.republish(dist, repo_name, self.publish_name):
+            return False
+        return True

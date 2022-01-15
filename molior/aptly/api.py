@@ -466,6 +466,9 @@ class AptlyApi:
             destination (str): Publish point destination name.
                 e.g. jessie_8.8_repos_test_1
         """
+        if not archs:
+            logger.error("snapshot_publish: emtpy architectures")
+
         data = {
             "SourceKind": "snapshot",
             "Sources": [{"Name": name, "Component": component}],
@@ -693,7 +696,8 @@ class AptlyApi:
         # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
 
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
-        await self.wait_task(task_id)
+        if not await self.wait_task(task_id):
+            return False
 
         logger.debug("switching published snapshot at '%s' dist '%s' with new created snapshot '%s'",
                      publish_name,
@@ -701,7 +705,8 @@ class AptlyApi:
                      snapshot_name_tmp)
 
         task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, publish_name)
-        await self.wait_task(task_id)
+        if not await self.wait_task(task_id):
+            return False
 
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         try:
@@ -711,7 +716,10 @@ class AptlyApi:
             pass
 
         task_id = await self.snapshot_rename(snapshot_name_tmp, snapshot_name)
-        await self.wait_task(task_id)
+        if not await self.wait_task(task_id):
+            return False
+
+        return True
 
     async def wait_task(self, task_id):
         """

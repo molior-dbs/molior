@@ -111,8 +111,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
-            await debian_repo.add_packages(publish_files, ci_build=is_ci)
-            ret = True
+            ret = await debian_repo.add_packages(publish_files, ci_build=is_ci)
         except Exception as exc:
             await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
@@ -192,8 +191,7 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
     ret = False
     try:
-        await debian_repo.add_packages(files2upload, ci_build=is_ci)
-        ret = True
+        ret = await debian_repo.add_packages(files2upload, ci_build=is_ci)
     except Exception as exc:
         await buildlog(build_id, "E: error uploading files to repository\n")
         logger.exception(exc)
