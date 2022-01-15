@@ -168,7 +168,7 @@ async def create_project(request):
     db.commit()
 
     username = request.cirrina.web_session.get('username')
-    auth_token = request.cirrina.web_session.auth_token
+    auth_token = request.cirrina.web_session.get("auth_token", None)
     if username:
         user = db.query(User).filter(User.username == username).first()
         if user:

@@ -134,7 +134,9 @@ def setup_token(request):
 @app.auth_handler
 async def authenticate_token(request, *kw):
     setup_token(request)
-    auth_token = request.cirrina.web_session.auth_token
+    auth_token = request.cirrina.web_session.get("auth_token", None)
+    if not auth_token:
+        return False
     token = None
     project_name = request.match_info.get("project_name")
     if project_name:
@@ -177,7 +179,7 @@ def check_admin(request):
         if res and res.is_admin:
             return True
 
-    auth_token = request.cirrina.web_session.auth_token
+    auth_token = request.cirrina.web_session.get("auth_token", None)
     if auth_token:
         query = request.cirrina.db_session.query(Authtoken)
         query = query.filter(Authtoken.token == auth_token)
