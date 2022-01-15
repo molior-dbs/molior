@@ -1104,41 +1104,46 @@ async def external_build_upload(request):
         version = None
         arch = None
         if filename.endswith(".deb"):
-            # FIXME: check number of _
-            pkgname, version, arch = filename[:-4].split("_", 3)
-            destbuild_id = debbuild.id
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
 
         elif filename.endswith(".changes"):
-            # FIXME: check number of _
-            pkgname, version, arch = filename[:-4].split("_", 3)
-            destbuild_id = debbuild.id
-            has_changes_file = True
-            if not sourcename:
-                sourcename = pkgname
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_changes_file = True
+                if not sourcename:
+                    sourcename = pkgname
 
         elif filename.endswith(".buildinfo"):
-            # FIXME: check number of _
-            pkgname, version, arch = filename[:-4].split("_", 3)
-            destbuild_id = debbuild.id
-            has_buildinfo_file = True
-            if not sourcename:
-                sourcename = pkgname
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_buildinfo_file = True
+                if not sourcename:
+                    sourcename = pkgname
 
         elif filename.endswith(".dsc"):
-            # FIXME: check number of _
-            pkgname, version = filename[:-4].split("_", 2)
-            destbuild_id = srcbuild.id
-            source_upload = True
-            if not sourcename:
-                sourcename = pkgname
+            s = filename[:-4].split("_", 2)
+            if len(s) == 2:
+                pkgname, version = s
+                destbuild_id = srcbuild.id
+                source_upload = True
+                if not sourcename:
+                    sourcename = pkgname
 
         elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
-            # FIXME: check number of _
-            pkgname, version = filename[:-7].split("_", 2)
-            destbuild_id = srcbuild.id
-            source_upload = True
-            if not sourcename:
-                sourcename = pkgname
+            s = filename[:-7].split("_", 2)
+            if len(s) == 2:
+                pkgname, version = s
+                destbuild_id = srcbuild.id
+                source_upload = True
+                if not sourcename:
+                    sourcename = pkgname
 
         else:
             await build.log("W: ignoring unknown file type: '%s'\n" % filename)
