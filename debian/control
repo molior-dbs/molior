@@ -39,23 +39,6 @@ Depends: ${misc:Depends}
 Description: Molior base OS configuration
  This will configure the Debian OS (locale, language, ...)
 
-Package: molior-devel
-Architecture: all
-Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
-  systemd-sysv, libpam-systemd,
-  net-tools, ifupdown, htop, isc-dhcp-client, iputils-ping, bash-completion,
-  openssh-server, rsyslog, acpi-support-base, acpid, sudo, locales,
-  dialog, bsdmainutils, less, gawk, bash-completion, haveged,
-# editor
-  vim-nox,
-# add some tools:
-  tree, bzip2, wget, telnet, man, psmisc,
-# molior:
-  molior-server, molior-client-http, molior-web, aptly (>= 1.3.0.adsy10.molior4)
-Description: molior ISO installer for testing
- Testing setup for molior
-
 Package: molior-vbox
 Architecture: all
 Pre-Depends: molior-os-config
@@ -70,8 +53,8 @@ Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
 # add some tools:
   htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xauth,
 # molior:
-  molior-server, molior-client-http, dma, molior-web, aptly (>= 1.3.0.adsy10.molior4),
-  molior-tools,
+  molior-server, molior-client-http, dma, molior-web, molior-tools,
+  aptly (>= 1.3.0.adsy10.molior4), apache2-utils, apg,
 # development:
   dh-python, debhelper, dh-exec, python3-all, nodejs (>= 8.1.3-1nodesource1~jessie1), npm (>= 5.8.0+ds6-2~bpo9+1)
 Description: molior development virtual machine
