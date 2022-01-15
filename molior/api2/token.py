@@ -1,3 +1,5 @@
+import hashlib
+
 from secrets import token_hex
 from sqlalchemy.sql import or_
 
@@ -48,7 +50,12 @@ async def create_token(request):
     # FIXME: check existing description
 
     auth_token = token_hex(32)
-    token = Authtoken(description=description, token=auth_token, roles=array2db(['project_create', 'mirror_create']))
+
+    # store hashed token
+    encoded = auth_token.encode()
+    hashed_token = hashlib.sha256(encoded).hexdigest()
+
+    token = Authtoken(description=description, token=hashed_token, roles=array2db(['project_create', 'mirror_create']))
     db.add(token)
     db.commit()
 

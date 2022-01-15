@@ -714,7 +714,7 @@ async def create_token(request):
 
     # store hashed token
     encoded = auth_token.encode()
-    hashed_token = hashlib.sha256(encoded)
+    hashed_token = hashlib.sha256(encoded).hexdigest()
 
     token = Authtoken(description=description, token=hashed_token)
     db.add(token)

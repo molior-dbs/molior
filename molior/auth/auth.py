@@ -122,17 +122,19 @@ async def authenticate(request, user, passwd):
     return Auth().login(user, passwd)
 
 
+def setup_token(request):
+    auth_token = request.headers.getone("X-MoliorToken", None)
+    if not hasattr(request.cirrina.web_session, "auth_token") and auth_token:
+        # use hashed token
+        encoded = auth_token.encode()
+        auth_token = hashlib.sha256(encoded).hexdigest()
+        request.cirrina.web_session.auth_token = auth_token
+
+
 @app.auth_handler
 async def authenticate_token(request, *kw):
-    auth_token = request.headers.getone("X-MoliorToken", None)
-    if not auth_token:
-        return False
-
-    # only use hashed token from now on
-    encoded = auth_token.encode()
-    auth_token = hashlib.sha256(encoded)
-    request.headers["X-MoliorToken"] = auth_token
-
+    setup_token(request)
+    auth_token = request.cirrina.web_session.auth_token
     token = None
     project_name = request.match_info.get("project_name")
     if project_name:
@@ -175,7 +177,7 @@ def check_admin(request):
         if res and res.is_admin:
             return True
 
-    auth_token = request.headers.getone("X-MoliorToken", None)
+    auth_token = request.cirrina.web_session.auth_token
     if auth_token:
         query = request.cirrina.db_session.query(Authtoken)
         query = query.filter(Authtoken.token == auth_token)
@@ -200,6 +202,7 @@ def req_admin(function):
     """
 
     @wraps(function)
+    @app.authenticated
     async def _wrapper(request):
         """Wrapper function for req_admin decorator."""
         if check_admin(request):
@@ -211,7 +214,7 @@ def req_admin(function):
 
 
 def check_authtoken(request, project_id):
-    auth_token = request.headers.getone("X-MoliorToken", None)
+    auth_token = request.cirrina.web_session.auth_token
     if not auth_token:
         return False
 
@@ -312,6 +315,7 @@ class req_role(object):
         """Wrapper function for req_admin decorator."""
 
         @wraps(function)
+        @app.authenticated
         async def _wrapper(request):
             maintenance_mode = False
             query = "SELECT value from metadata where name = :key"
