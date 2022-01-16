@@ -1,3 +1,19 @@
+molior (1.4.1) stretch; urgency=medium
+
+  * server info: get machine id
+  * status: get aptly version
+  * projectversion data: add projectversiontype
+  * fix: pass desired repository directory to the clone command
+  * source republish: check for missing projectversions
+  * implement token authentication
+  * snapshot: ignore CI builds
+  * build log: use async with
+  * authenticate: trim username
+  * clone: fix response
+  * build delete: prevent removal builds from locked projectversion
+
+ -- André Roth <neolynx@gmail.com>  Mon, 17 Jan 2022 00:03:30 +0100
+
 molior (1.4.0) stretch; urgency=medium
 
   * projectvrsion/mirror: case insensitive search
