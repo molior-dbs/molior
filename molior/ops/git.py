@@ -1,5 +1,4 @@
 import shutil
-import shlex
 import operator
 import os
 # import asyncio
@@ -27,7 +26,7 @@ async def run_git(cmd, cwd, build, write_output_log=True):
 
     env = os.environ.copy()
     env["GIT_SSL_NO_VERIFY"] = ""
-    process = Launchy(shlex.split(cmd), outh, errh, cwd=cwd, env=env)
+    process = Launchy(cmd, outh, errh, cwd=cwd, env=env)
     await process.launch()
     ret = await process.wait()
     return ret == 0
@@ -67,7 +66,8 @@ async def GitClone(build_id, repo_id, session):
             logger.info("clone task: removing git repo %s", str(repo.src_path))
             shutil.rmtree(str(repo.src_path))
 
-        if not await run_git("git clone --config http.sslVerify=false {}".format(repo.url), str(repo.path), build):
+        if not await run_git("git clone --config http.sslVerify=false {} {}".format(repo.url, str(repo.src_path)),
+                             str(repo.path), build):
             logger.error("error running git clone")
             repo.set_error()
             await build.set_failed()
@@ -105,11 +105,11 @@ async def GitCleanLocal(repo_path, build):
         default_branch = line.strip()
 
     # checkout remote default branch
-    process = Launchy(shlex.split("git symbolic-ref refs/remotes/origin/HEAD"), outh, outh, cwd=str(repo_path))
+    process = Launchy("git symbolic-ref refs/remotes/origin/HEAD", outh, outh, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        logger.error("error getting current commit")
+        logger.error("error getting default brach")
         return False
 
     async def outh_null(line):
@@ -117,7 +117,7 @@ async def GitCleanLocal(repo_path, build):
 
     default_branch = default_branch.replace("refs/remotes/", "")
 
-    process = Launchy(shlex.split("git checkout {}".format(default_branch)), outh_null, outh_null, cwd=str(repo_path))
+    process = Launchy("git checkout {}".format(default_branch), outh_null, outh_null, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
@@ -132,7 +132,7 @@ async def GitCleanLocal(repo_path, build):
         if "HEAD detached" not in line:
             branches.append(line.strip())
 
-    process = Launchy(shlex.split("git branch"), outh3, outh3, cwd=str(repo_path))
+    process = Launchy("git branch", outh3, outh3, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
@@ -146,7 +146,7 @@ async def GitCleanLocal(repo_path, build):
         nonlocal tags
         tags.append(line.strip())
 
-    process = Launchy(shlex.split("git tag"), outh4, outh4, cwd=str(repo_path))
+    process = Launchy("git tag", outh4, outh4, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
@@ -155,7 +155,7 @@ async def GitCleanLocal(repo_path, build):
 
     # delete all local branches and tags
     for branch in branches:
-        process = Launchy(shlex.split("git branch -D {}".format(branch)), outh_null, outh_null, cwd=str(repo_path))
+        process = Launchy("git branch -D {}".format(branch), outh_null, outh_null, cwd=str(repo_path))
         await process.launch()
         ret = await process.wait()
         if ret != 0:
@@ -163,7 +163,7 @@ async def GitCleanLocal(repo_path, build):
             return False
 
     for tag in tags:
-        process = Launchy(shlex.split("git tag -d {}".format(tag)), outh_null, outh_null, cwd=str(repo_path))
+        process = Launchy("git tag -d {}".format(tag), outh_null, outh_null, cwd=str(repo_path))
         await process.launch()
         ret = await process.wait()
         if ret != 0:
@@ -229,7 +229,7 @@ async def get_latest_tag(repo_path, build_id):
             nonlocal git_tags
             git_tags.append(line.strip())
 
-        process = Launchy(shlex.split("git tag"), outh, outh, cwd=str(repo_path))
+        process = Launchy("git tag", outh, outh, cwd=str(repo_path))
         await process.launch()
         await process.wait()
 
@@ -243,7 +243,7 @@ async def get_latest_tag(repo_path, build_id):
                 if line:
                     timestamp = line
 
-            process = Launchy(shlex.split("git log -1 --format=%ct {}".format(tag)), outh2, outh2, cwd=str(repo_path))
+            process = Launchy("git log -1 --format=%ct {}".format(tag), outh2, outh2, cwd=str(repo_path))
             await process.launch()
             await process.wait()
 
@@ -271,7 +271,7 @@ async def GetBuildInfo(repo_path, git_ref):
         nonlocal gitinfo
         gitinfo = line.strip()
 
-    process = Launchy(shlex.split("git show -s --format='%H %ae %an'"), outh, outh, cwd=str(repo_path))
+    process = Launchy("git show -s --format='%H %ae %an'", outh, outh, cwd=str(repo_path))
     await process.launch()
     await process.wait()
 
@@ -297,7 +297,8 @@ async def GetBuildInfo(repo_path, git_ref):
 
 
 async def GitChangeUrl(old_repo_path, name, url):
-    process = Launchy(shlex.split("git remote set-url origin {}".format(url)), None, None, cwd=str(old_repo_path))
+    process = Launchy("git remote set-url origin {}".format(url), None, None, cwd=str(old_repo_path))
     await process.launch()
     await process.wait()
-    os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)
+    if os.path.exists(old_repo_path):
+        os.rename(old_repo_path, os.path.dirname(old_repo_path) + "/" + name)

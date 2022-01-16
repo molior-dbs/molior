@@ -1,0 +1,37 @@
+version: '3'
+services:
+  molior:
+    container_name: molior
+    image: neolynx/molior
+    volumes:
+      - molior_data:/var/lib/molior:rw
+      - postgres_data:/var/lib/postgresql:rw
+    depends_on:
+      - aptly
+    environment:
+      - DEBSIGN_NAME=Molior
+      - DEBSIGN_EMAIL=debsign@docker
+      - REPOSIGN_EMAIL=reposign@docker
+      - MOLIOR_ADMIN_PASSWD=secret77
+      - APTLY_USER=molior
+      - APTLY_PASS=secret77
+      - APTLY_PUBLIC_URL=http://localhost:3142
+    ports:
+      - "8000:80"
+  aptly:
+    container_name: aptly
+    image: neolynx/molior-aptly
+    volumes:
+      - aptly_data:/var/lib/aptly:rw
+    environment:
+      - REPOSIGN_NAME=Molior
+      - REPOSIGN_EMAIL=reposign@docker
+      - APTLY_USER=molior
+      - APTLY_PASS=secret77
+    ports:
+      - "3142:3142"
+
+volumes:
+  aptly_data:
+  molior_data:
+  postgres_data:

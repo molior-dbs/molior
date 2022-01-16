@@ -1,0 +1,37 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE TABLE authtoken (
+    id integer NOT NULL,
+    token character varying,
+    description character varying,
+    roles role_enum[]
+);
+ALTER TABLE authtoken OWNER TO molior;
+
+ALTER TABLE ONLY authtoken ADD CONSTRAINT authtoken_pkey PRIMARY KEY (id);
+ALTER TABLE authtoken ADD CONSTRAINT unique_authtoken UNIQUE (description);
+
+CREATE SEQUENCE authtoken_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+ALTER TABLE authtoken_id_seq OWNER TO molior;
+ALTER SEQUENCE authtoken_id_seq OWNED BY authtoken.id;
+ALTER TABLE ONLY authtoken ALTER COLUMN id SET DEFAULT nextval('authtoken_id_seq'::regclass);
+
+CREATE TABLE authtoken_project (
+    project_id integer REFERENCES project(id),
+    authtoken_id integer REFERENCES authtoken(id),
+    roles role_enum[]
+);
+ALTER TABLE authtoken_project OWNER TO molior;
+
+ALTER TABLE authtoken_project ADD CONSTRAINT unique_authtoken_project UNIQUE (project_id, authtoken_id);
+
+ALTER TYPE role_enum ADD VALUE 'project_create';
+ALTER TYPE role_enum ADD VALUE 'mirror_create';
+EOF

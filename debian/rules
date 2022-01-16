@@ -10,7 +10,7 @@ export PYBUILD_DESTDIR_python3=debian/molior-server
 
 
 %:
-	dh $@ --with python3,systemd,sphinxdoc --buildsystem=pybuild
+	dh $@ --with python3,systemd --buildsystem=pybuild
 
 override_dh_auto_build:
 	echo 'MOLIOR_VERSION = "$(DEB_VERSION)"' > molior/version.py
@@ -22,7 +22,6 @@ override_dh_auto_test:
 
 override_dh_systemd_enable:
 	dh_systemd_enable -p molior-server molior-server.service
-	dh_systemd_enable -p molior-devel ssh-create-keys.service
 	dh_systemd_enable -p molior-vbox ssh-create-keys.service
 	dh_systemd_enable -p molior-node-amd64 ssh-create-keys.service
 	dh_systemd_enable -p molior-node-amd64-efi ssh-create-keys.service
@@ -31,16 +30,8 @@ override_dh_systemd_enable:
 
 override_dh_systemd_start:
 	dh_systemd_start -p molior-server molior-server.service
-	dh_systemd_start -p molior-devel ssh-create-keys.service
 	dh_systemd_enable -p molior-vbox ssh-create-keys.service
 	dh_systemd_start -p molior-node-amd64 ssh-create-keys.service
 	dh_systemd_start -p molior-node-amd64-efi ssh-create-keys.service
 	dh_systemd_start -p molior-node-arm64-efi ssh-create-keys.service
 	dh_systemd_start -p molior-client-http molior-client-http.service
-
-override_dh_auto_install:
-	dh_auto_install -O--buildsystem=pybuild
-
-	# build sphinx docs
-	PYTHONPATH=. sphinx-build -N -bhtml doc/ debian/molior-doc/usr/share/doc/molior/html
-	PYTHONPATH=. sphinx-build -N -bhtml userdoc/ debian/molior-doc/usr/share/doc/molior/userdocs

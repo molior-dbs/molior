@@ -213,7 +213,7 @@ def test_add_packages():
     """
     Test add packages
     """
-    files = []
+    files = ['file1', 'file2']
 
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(

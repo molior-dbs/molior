@@ -2,11 +2,12 @@
 
 import asyncio
 import aiohttp
+import aiofiles
+import concurrent
 import platform
 import logging
 import json
 import os
-import shlex
 import subprocess
 from multiprocessing import cpu_count
 from psutil import virtual_memory, disk_usage
@@ -22,10 +23,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("molior-client")
 molior_server = os.environ.get("MOLIOR_SERVER", "172.16.0.254")
 interface_name = os.environ.get("INTERFACE_NAME", "eth0")
+build_process = None
 
 
 async def build(params, masterws):
-    ret = -1
+    global build_process
+    ret = None
     try:
         build_id = params.get("build_id")
         apt_urls = params.get("apt_urls")
@@ -60,31 +63,25 @@ async def build(params, masterws):
         session = aiohttp.ClientSession()
         async with session.ws_connect("ws://{}/internal/buildlog/{}".format(molior_server, token)) as buildws:
 
-            async def wslogger():
-                try:
-                    async for msg in buildws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            logger.info("got message: %s", msg.data)
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            break
-                except Exception as exc:
-                    logger.exception(exc)
-
             async def output(data):
                 await buildws.send_str(data)
 
             buildcmd = "/usr/bin/unbuffer /usr/lib/molior/build-script"
-
             try:
-                process = Launchy(shlex.split(buildcmd), output, output, buffered=False, collect_time=0.1, env=env)
-                await process.launch()
-                ret = await process.wait()
+                build_process = Launchy(buildcmd, output, output, buffered=False, collect_time=0.1, env=env)
+                await build_process.launch()
+                ret = await build_process.wait()
+                build_process = None
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("build-script returned %d", ret)
+            if ret is None:
+                await buildws.send_str("Error running build script\n")
+                logger.error("Error running build-script")
+            if ret != 0:
+                await buildws.send_str(f"Error: build script returned {ret}\n")
+                logger.error("build-script returned %d", ret)
+
     except Exception as exc:
         logger.error("Error running build script")
         logger.exception(exc)
@@ -97,12 +94,36 @@ async def build(params, masterws):
         masterws.close()
 
 
+class SystemStats:
+    STATS_INTERVAL = 30
+
+    def __init__(self):
+        self.update()
+        self.loop = asyncio.get_event_loop()
+        self.executor = concurrent.futures.ThreadPoolExecutor()
+        self.task = asyncio.create_task(self.run_update())
+
+    def update(self):
+        self.load = os.getloadavg()
+        self.ram_used = virtual_memory().used
+        self.disk_used = disk_usage("/").used
+
+    def get(self):
+        return {"load": self.load, "ram_used": self.ram_used, "disk_used": self.disk_used}
+
+    async def run_update(self):
+        while True:
+            await asyncio.sleep(self.STATS_INTERVAL)
+            await self.loop.run_in_executor(self.executor, self.update)
+
+
 async def main():
 
-    def get_machine_id():
+    async def get_machine_id():
         try:
-            with open('/etc/machine-id') as machine_id_file:
-                machine_id = machine_id_file.readline().strip()
+            async with aiofiles.open('/etc/machine-id') as machine_id_file:
+                machine_id = await machine_id_file.readline()
+                machine_id = machine_id.strip()
         except IOError:
             machine_id = None
         return machine_id
@@ -124,7 +145,7 @@ async def main():
     cpu_cores = cpu_count()
     ram_total = virtual_memory().total
     disk_total = disk_usage("/").total
-    machine_id = get_machine_id()
+    machine_id = await get_machine_id()
     client_ver = str(subprocess.check_output(["dpkg-query", "--showformat=${Version}", "--show",
                      "molior-client-http"], stderr=subprocess.DEVNULL), "utf-8")
 
@@ -136,6 +157,7 @@ async def main():
         logger.error("invalid machine architecture: '%s'", machine)
         return
 
+    stats = SystemStats()
     logger.info("starting on %s/%s", arch, node)
 
     while(True):
@@ -162,16 +184,21 @@ async def main():
                         if "task" in req:
                             asyncio.create_task(build(req["task"], ws))
                         elif "ping" in req:
-                            uptime_seconds = ""
-                            with open('/proc/uptime', 'r') as f:
-                                uptime_seconds = float(f.readline().split()[0])
+                            uptime_seconds = 0.0
+                            async with aiofiles.open('/proc/uptime', mode='r') as f:
+                                line = await f.readline()
+                                uptime_seconds = float(line.split()[0])
 
-                            await ws.send_str(json.dumps({"pong": {
-                                              "seq": req["ping"],
-                                              "uptime_seconds": uptime_seconds,
-                                              "load": os.getloadavg(), "ram_used": virtual_memory().used,
-                                              "disk_used": disk_usage("/").used}}))
+                            response = {"pong": {
+                                            "seq": req["ping"],
+                                            "uptime_seconds": uptime_seconds}}
+                            response["pong"].update(stats.get())
 
+                            await ws.send_str(json.dumps(response))
+
+                        elif "abort" in req:
+                            if build_process:
+                                build_process.terminate()
                         else:
                             logger.error("invalid request: %s", msg.data)
                     elif msg.type == aiohttp.WSMsgType.CLOSED:

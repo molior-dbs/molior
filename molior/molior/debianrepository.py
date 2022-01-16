@@ -117,7 +117,8 @@ class DebianRepository:
         task_id = await self.aptly.snapshot_create(repo_name, snapshot_name, package_refs)
         await self.aptly.wait_task(task_id)
 
-        archs = self.archs.extend(["source", "all"])
+        archs = self.archs
+        archs.extend(["source", "all"])
         task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, publish_name)
         await self.aptly.wait_task(task_id)
 
@@ -213,6 +214,11 @@ class DebianRepository:
             ci_build (bool): Packages will be pushed to the unstable
                 publish point if set to True.
         """
+
+        if not files:
+            logger.error("add_packages: empty file list")
+            return False
+
         dist = "unstable" if ci_build else "stable"
         repo_name = self.name + "-%s" % dist
         task_id, upload_dir = await self.aptly.repo_add(repo_name, files)
@@ -226,4 +232,6 @@ class DebianRepository:
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
         await self.aptly.delete_directory(upload_dir)
-        await self.aptly.republish(dist, repo_name, self.publish_name)
+        if not await self.aptly.republish(dist, repo_name, self.publish_name):
+            return False
+        return True

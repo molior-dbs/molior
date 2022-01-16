@@ -1,8 +1,10 @@
-from sqlalchemy import func
+import re
+
+from sqlalchemy.sql import func, or_
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db, escape_for_like
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
@@ -62,8 +64,9 @@ async def get_projectversions(request):
     basemirror_id = request.GET.getone("basemirror_id", None)
     is_basemirror = request.GET.getone("isbasemirror", False)
     dependant_id = request.GET.getone("dependant_id", None)
+    search = request.GET.getone("q", "")
 
-    query = db.query(ProjectVersion).filter(ProjectVersion.is_deleted == False)  # noqa: E712
+    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.is_deleted.is_(False))
 
     exclude_id = parse_int(exclude_id)
     if exclude_id:
@@ -76,10 +79,23 @@ async def get_projectversions(request):
     if project_name:
         query = query.filter(func.lower(Project.name) == project_name.lower())
 
+    if search:
+        terms = re.split("[/ ]", search)
+        for term in terms:
+            if not term:
+                continue
+            term = escape_for_like(term)
+            query = query.filter(or_(
+                 Project.name.ilike("%{}%".format(term)),
+                 ProjectVersion.name.ilike("%{}%".format(term))))
+
     if basemirror_id:
         query = query.filter(ProjectVersion.base_mirror_id == basemirror_id)
-    elif is_basemirror:
-        query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
+    else:
+        if is_basemirror:
+            query = query.filter(Project.is_basemirror.is_(True), ProjectVersion.mirror_state == "ready")
+        else:
+            query = query.filter(Project.is_mirror.is_(False))
 
     if dependant_id:
         logger.info("dependant_id")
@@ -263,7 +279,8 @@ async def create_projectversions(request):
                 basemirror_version,
                 project_name,
                 project_version,
-                architectures]})
+                architectures,
+                []]})
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
@@ -408,17 +425,13 @@ async def do_overlay(request, projectversion_id, name):
 
     basemirror = overlay_projectversion.basemirror
 
-    await enqueue_aptly(
-        {
-            "init_repository": [
+    await enqueue_aptly({"init_repository": [
                 basemirror.project.name,
                 basemirror.name,
                 overlay_projectversion.project.name,
                 overlay_projectversion.name,
-                db2array(overlay_projectversion.mirror_architectures)
-            ]
-        }
-    )
+                db2array(overlay_projectversion.mirror_architectures),
+                []]})
 
     return OKResponse({"id": overlay_projectversion.id, "name": overlay_projectversion.name})
 

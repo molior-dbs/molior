@@ -29,7 +29,7 @@ class BackendWorker:
             if not build:
                 logger.error("build_started: no build found for %d", build_id)
                 return
-            await build.parent.parent.log("I: started build %d\n" % build_id)
+            await build.parent.parent.log("I: started build for %s %s\n" % (build.projectversion.fullname, build.sourcename))
             await build.set_building()
             session.commit()
 
@@ -63,17 +63,23 @@ class BackendWorker:
                 await build.set_needs_publish()
                 await enqueue_aptly({"publish": [build_id]})
             else:        # build failed
-                await build.parent.parent.log("E: build %d failed\n" % build_id)
+                await build.parent.parent.log("I: build for %s %s failed\n" % (build.projectversion.fullname, build.sourcename))
                 await build.set_failed()
                 await buildlogdone(build.id)
                 session.commit()
 
                 buildtask = session.query(BuildTask).filter(BuildTask.build == build).first()
-                session.delete(buildtask)
-                session.commit()
+                if buildtask:
+                    session.delete(buildtask)
+                    session.commit()
 
                 if not build.is_ci:
                     send_mail_notification(build)
+
+    async def _abort(self, build_id):
+        b = Backend()
+        backend = b.get_backend()
+        await backend.abort(build_id)
 
     async def run(self):
         """
@@ -83,10 +89,7 @@ class BackendWorker:
         while True:
             task = await dequeue_backend()
             if task is None:
-                logger.info("backend: got emtpy task, aborting...")
                 break
-
-                logger.debug("backend: got task {}".format(task))
 
             try:
                 handled = False
@@ -94,6 +97,10 @@ class BackendWorker:
                 if job:
                     handled = True
                     await self._schedule(job)
+                build_id = task.get("abort")
+                if build_id:
+                    handled = True
+                    await self._abort(build_id)
                 build_id = task.get("started")
                 if build_id:
                     handled = True
@@ -127,4 +134,4 @@ class BackendWorker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating backend task")
+        logger.info("backend task terminated")

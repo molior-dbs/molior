@@ -1,7 +1,7 @@
 import re
 import giturlparse
 
-from sqlalchemy.sql import or_
+from sqlalchemy.sql import func, or_
 
 from ..app import app, logger
 from ..auth import req_role, req_admin
@@ -38,9 +38,14 @@ async def get_repository(request):
     """
     repository_id = request.match_info["repository_id"]
 
+    try:
+        repository_id = int(repository_id)
+    except Exception:
+        return ErrorResponse(404, "Repository with id {} not found".format(repository_id))
+
     repo = request.cirrina.db_session.query(SourceRepository).filter_by(id=repository_id).first()
     if not repo:
-        return ErrorResponse(404, "Repository with id {} could not be found!".format(repository_id))
+        return ErrorResponse(404, "Repository with id {} not found".format(repository_id))
 
     data = {
         "id": repo.id,
@@ -242,6 +247,16 @@ async def get_projectversion_repositories(request):
     query = paginate(request, query)
     results = query.all()
 
+    def get_last_successful_build(db, projectversion, repository):
+        latest_build_subq = db.query(func.max(Build.id).label("latest_id")).filter(
+                Build.projectversion_id == projectversion.id,
+                Build.is_ci.is_(False),
+                Build.sourcerepository_id == repository.id,
+                Build.buildtype == "deb",
+                Build.buildstate == "successful").subquery()
+
+        return db.query(Build).join(latest_build_subq, Build.id == latest_build_subq.c.latest_id).first()
+
     data = {"total_result_count": count, "results": []}
     for repo, srpv in results:
         result = {
@@ -261,7 +276,18 @@ async def get_projectversion_repositories(request):
                     "buildstate": build.buildstate,
                     "sourcename": build.sourcename,
                 }
-            })
+                })
+            if build.buildstate != "successful":
+                build = get_last_successful_build(request.cirrina.db_session, projectversion, repo)
+                if build:
+                    result.update({
+                        "last_successful_build": {
+                            "id": build.id,
+                            "version": build.version,
+                            "buildstate": build.buildstate,
+                            "sourcename": build.sourcename,
+                        }
+                    })
         data["results"].append(result)
 
     return OKResponse(data)
@@ -350,7 +376,7 @@ async def add_repository(request):
                     SourceRepository.url.ilike("%{}%{}%/{}.git".format(repoinfo.resource, repoinfo.owner, repoinfo.name))))
         if query.count() > 1:
             repo = query.first()
-            logger.info("found %d similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
+            logger.info("found {} similar repos {} for {} {} {} - using first".format(query.count(), repo.url, repoinfo.resource,
                                                                                       repoinfo.owner, repoinfo.name))
         elif query.count() == 1:
             repo = query.first()
@@ -628,7 +654,7 @@ async def add_repository_hook(request):
             properties:
                 url:
                     type: string
-                skip_ssl:
+                skipssl:
                     type: boolean
                 body:
                     type: string
@@ -636,7 +662,7 @@ async def add_repository_hook(request):
                     type: string
                 method:
                     type: string
-                    example: "post" or "get"
+                    example: post/get/...
     produces:
         - text/json
     """
@@ -718,7 +744,7 @@ async def edit_repository_hook(request):
             properties:
                 url:
                     type: string
-                skip_ssl:
+                skipssl:
                     type: boolean
                 body:
                     type: string
@@ -726,7 +752,7 @@ async def edit_repository_hook(request):
                     type: string
                 method:
                     type: string
-                    example: "post" or "get"
+                    example: post/get/...
     produces:
         - text/json
     """

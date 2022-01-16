@@ -2,6 +2,7 @@ import asyncio
 import giturlparse
 
 from shutil import rmtree
+from pathlib import Path
 
 from ..app import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
@@ -118,7 +119,7 @@ class Worker:
         git_ref = args[2]
         ci_branch = args[3]
         targets = args[4]
-        force_ci = args[4]
+        force_ci = args[5]
 
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
@@ -130,7 +131,16 @@ class Worker:
             logger.error("build: repo %d not found", repo_id)
             return
 
-        if repo.state == "error":
+        source_exists = False
+        src_build = session.query(Build).filter(Build.sourcerepository_id == repo_id,
+                                                Build.version == build.version,
+                                                Build.buildtype == "source",
+                                                Build.buildstate == "successful",
+                                                Build.is_deleted.is_(False)).first()
+        if src_build:
+            source_exists = True
+
+        if not source_exists and repo.state == "error":
             await build.log("E: git repo is in error state\n")
             await build.set_failed()
             await build.logdone()
@@ -145,7 +155,9 @@ class Worker:
         if build.buildstate != "building":
             await build.set_building()
 
-        repo.set_busy()
+        if not source_exists:
+            repo.set_busy()
+
         session.commit()
 
         asyncio.ensure_future(BuildProcess(build_id, repo.id, git_ref, ci_branch, targets, force_ci))
@@ -243,11 +255,12 @@ class Worker:
                build.buildstate == "publish_failed":
                 ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
-                logger.info("removing %s", buildout)
-                try:
-                    rmtree(buildout)
-                except Exception as exc:
-                    logger.exception(exc)
+                if Path(buildout).exists():
+                    logger.info("removing %s", buildout)
+                    try:
+                        rmtree(buildout)
+                    except Exception as exc:
+                        logger.exception(exc)
 
                 await build.set_needs_build()
                 session.commit()
@@ -275,6 +288,7 @@ class Worker:
                     await asyncio.sleep(2)
                     return
                 await enqueue_task({"src_build": [build.id]})
+                ok = True
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed":
@@ -383,12 +397,13 @@ class Worker:
                 for p in phs:
                     p.sourcerepositoryprojectversion_id = t.id
                 # delete duplicate from projectversion
+                session.flush()
                 session.delete(sourepprover)
             else:
                 # replace duplicate with original
                 sourepprover.sourcerepository_id = original.id
 
-        session.commit() # workaround for sql alchemy
+        session.flush()
         session.delete(duplicate)
         original.set_ready()
         session.commit()
@@ -468,7 +483,6 @@ class Worker:
             try:
                 task = await dequeue_task()
                 if task is None:
-                    logger.info("worker: got emtpy task, aborting...")
                     break
 
                 logger.debug("worker: got task {}".format(task))
@@ -540,4 +554,4 @@ class Worker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating worker task")
+        logger.info("worker terminated")

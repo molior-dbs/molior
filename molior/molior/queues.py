@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime
 from aiofile import AIOFile, Writer
 from pathlib import Path
+from concurrent.futures._base import CancelledError
 
 from ..app import logger
 from ..tools import get_local_tz
@@ -26,8 +27,12 @@ async def enqueue(queue, item):
 
 
 async def dequeue(queue):
-    ret = await queue.get()
-    queue.task_done()
+    ret = None
+    try:
+        ret = await queue.get()
+        queue.task_done()
+    except (RuntimeError, CancelledError):
+        pass
     return ret
 
 
@@ -82,18 +87,17 @@ async def buildlog_writer(build_id):
         del buildlogs[build_id]
         return
     try:
-        afp = AIOFile(filename, 'a')
-        await afp.open()
-        writer = Writer(afp)
-        while True:
-            msg = await dequeue(buildlogs[build_id])
-            if msg is None:
-                await enqueue_backend({"logging_done": build_id})
-                continue
-            elif msg is False:
-                break
-            await writer(msg)
-            await afp.fsync()
+        async with AIOFile(filename, 'a') as afp:
+            writer = Writer(afp)
+            while True:
+                msg = await dequeue(buildlogs[build_id])
+                if msg is None:
+                    await enqueue_backend({"logging_done": build_id})
+                    continue
+                elif msg is False:
+                    break
+                await writer(msg)
+                await afp.fsync()
     except Exception as exc:
         logger.exception(exc)
 

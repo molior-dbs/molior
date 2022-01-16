@@ -40,6 +40,7 @@ class BuildLogger:
                build.buildstate == "publish_failed" or \
                build.buildstate == "successful" or \
                build.buildstate == "already_exists" or \
+               build.buildstate == "already_failed" or \
                build.buildstate == "nothing_done":
                 return True
         return False

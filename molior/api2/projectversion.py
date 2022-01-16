@@ -2,10 +2,12 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
 from shutil import rmtree
+from pathlib import Path
+from aiofile import AIOFile, Writer
 
 from ..app import app, logger
 from ..auth import req_role
-from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array
+from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
 from ..api.projectversion import do_lock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
@@ -20,6 +22,30 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.postbuildhook import PostBuildHook
 from ..model.projectversiondependency import ProjectVersionDependency
+
+
+# find latest builds
+def latest_project_builds(db, projectversion_id):
+    latest_builds_subq = db.query(func.max(Build.id).label("latest_id")).filter(
+            Build.projectversion_id == projectversion_id,
+            Build.is_ci.is_(False),
+            Build.sourcerepository_id.isnot(None),
+            Build.buildtype == "deb").group_by(Build.sourcerepository_id)
+
+    SourceBuild = aliased(Build)
+
+    latest_build_uploads_subq = db.query(func.max(Build.id).label("latest_id")).join(
+            SourceBuild, SourceBuild.id == Build.parent_id).filter(
+            Build.projectversion_id == projectversion_id,
+            Build.is_ci.is_(False),
+            Build.sourcerepository_id.is_(None),
+            Build.buildtype == "deb",
+            ).group_by(SourceBuild.sourcename)
+
+    latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
+
+    return db.query(Build).join(latest_union_builds_subq, Build.id == latest_union_builds_subq.c.latest_id).order_by(
+                    Build.sourcename, Build.id.desc()).all()
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
@@ -109,6 +135,9 @@ async def get_projectversion_dependencies(request):
         cands_query = db.query(ProjectVersion).filter(ProjectVersion.basemirror_id == projectversion.basemirror_id,
                                                       ProjectVersion.id != projectversion.id,
                                                       ProjectVersion.id.notin_(dep_ids))
+        if filter_name:
+            cands_query = cands_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
+
         BaseMirror = aliased(ProjectVersion)
         dist_query = db.query(ProjectVersion).join(BaseMirror, BaseMirror.id == ProjectVersion.basemirror_id).filter(
                                                    ProjectVersion.dependency_policy == "distribution",
@@ -116,17 +145,31 @@ async def get_projectversion_dependencies(request):
                                                    BaseMirror.id != projectversion.basemirror_id,
                                                    ProjectVersion.id.notin_(dep_ids))
 
+        if filter_name:
+            dist_query = dist_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
+
         any_query = db.query(ProjectVersion).filter(
                                                    ProjectVersion.dependency_policy == "any",
                                                    ProjectVersion.id != projectversion.id,
                                                    ProjectVersion.id.notin_(dep_ids))
-        cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
-                                                                                func.lower(Project.name),
-                                                                                func.lower(ProjectVersion.name))
         if filter_name:
-            cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+            any_query = any_query.filter(ProjectVersion.fullname.ilike("%{}%".format(escape_for_like(filter_name))))
 
-        for cand in cands.all():
+        # cands = cands_query.union(dist_query, any_query).join(Project).order_by(Project.is_mirror,
+        #                                                                         func.lower(Project.name),
+        #                                                                         func.lower(ProjectVersion.name))
+        # if filter_name:
+        #     cands = cands.filter(ProjectVersion.fullname.ilike("%{}%".format(filter_name)))
+
+        # for cand in cands.all():
+
+        for cand in cands_query.all():
+            results.append(cand.data())
+
+        for cand in dist_query.all():
+            results.append(cand.data())
+
+        for cand in any_query.all():
             results.append(cand.data())
 
         data = {"total_result_count": len(results), "results": results}
@@ -309,7 +352,7 @@ async def delete_projectversion_dependency(request):
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/copy")
 @req_role("owner")
-async def clone_projectversion(request):
+async def copy_projectversion(request):
     """
     Clone a project version.
 
@@ -335,13 +378,23 @@ async def clone_projectversion(request):
     description = params.get("description")
     dependency_policy = params.get("dependency_policy")
     basemirror = params.get("basemirror")
-    architectures = params.get("architectures", [])
+    baseproject = params.get("baseproject")
+    architectures = params.get("architectures", None)
     cibuilds = params.get("cibuilds", False)
+    buildlatest = params.get("buildlatest", False)
 
     if not new_version:
         return ErrorResponse(400, "No valid name for the projectversion received")
     if not is_name_valid(new_version):
         return ErrorResponse(400, "Invalid project name!")
+    if basemirror and not ("/" in basemirror):
+        return ErrorResponse(400, "No valid basemirror received (format: 'name/version')")
+    if baseproject and not ("/" in baseproject):
+        return ErrorResponse(400, "No valid baseproject received (format: 'name/version')")
+    if not architectures:
+        return ErrorResponse(400, "No architecture received")
+    if len(architectures) == 0:
+        return ErrorResponse(400, "No architecture received")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -352,25 +405,69 @@ async def clone_projectversion(request):
                 Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
-    basemirror_name, basemirror_version = basemirror.split("/")
-    basemirror = db.query(ProjectVersion).join(Project).filter(
-            func.lower(Project.name) == basemirror_name.lower(),
-            func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
-    if not basemirror:
-        return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+    bm = None
+    pv = None
+    if baseproject:
+        baseproject_name, baseproject_version = baseproject.split("/")
+        pv = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(False),
+                func.lower(Project.name) == baseproject_name.lower(),
+                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
+        if not pv:
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+        bm = pv.basemirror
+    else:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(True),
+                func.lower(Project.name) == basemirror_name.lower(),
+                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
+        if not bm:
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    projectversion.copy(db, new_version, description, dependency_policy, basemirror.id, architectures, cibuilds)
-    await enqueue_aptly(
-        {
-            "init_repository": [
-                basemirror.project.name,
-                basemirror.name,
+    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds)
+
+    if baseproject:
+        pdep = ProjectVersionDependency(
+                projectversion_id=new_projectversion.id,
+                dependency_id=pv.id,
+                use_cibuilds=False)
+        db.add(pdep)
+        db.commit()
+
+    trigger_builds = []
+    if buildlatest:
+        latest_builds = latest_project_builds(db, projectversion.id)
+        for latest_build in latest_builds:
+            topbuild = latest_build.parent.parent
+            if topbuild.buildstate != "successful":
+                continue
+            if topbuild.sourcerepository is None:
+                continue
+            build = Build(
+                version=topbuild.version,
+                git_ref=topbuild.git_ref,
+                ci_branch=topbuild.ci_branch,
+                is_ci=False,
+                sourcename=topbuild.sourcename,
+                buildstate="new",
+                buildtype="build",
+                sourcerepository=topbuild.sourcerepository,
+                maintainer=None,
+            )
+
+            db.add(build)
+            db.commit()
+            await build.build_added()
+            trigger_builds.append(build.id)
+
+    await enqueue_aptly({"init_repository": [
+                bm.project.name,
+                bm.name,
                 projectversion.project.name,
                 new_version,
                 architectures,
-            ]
-        }
-    )
+                trigger_builds]})
     return OKResponse()
 
 
@@ -467,30 +564,26 @@ async def snapshot_projectversion(request):
         if not dep.is_locked:
             return ErrorResponse(400, "Dependency '%s/%s' is not locked" % (dep.project.name, dep.name))
 
-    # find latest builds
-    latest_builds = db.query(func.max(Build.id).label("latest_id")).filter(
-            Build.projectversion_id == projectversion.id,
-            Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
+    # get top level build for each latest build
+    latest_builds = latest_project_builds(db, projectversion.id)
+    latest_debbuilds_ids = []
+    for latest_build in latest_builds:
+        if latest_build.buildstate != "successful":
+            return ErrorResponse(400, "Not all latest builds are successful: %d" % latest_build.id)
+        for debbuild in latest_build.parent.children:
+            if debbuild.projectversion_id != projectversion.id:
+                continue
+            if not debbuild.debianpackages:
+                return ErrorResponse(400, "No debian packages found for %s/%s" % (debbuild.sourcename, debbuild.version))
+            latest_debbuilds_ids.append(debbuild.id)
 
-    builds = db.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
-            Build.sourcename, Build.id.desc()).all()
-
-    build_source_names = []
-    for build in builds:
-        logger.info("snapshot: found latest build: %s/%s (%s)" % (build.sourcename, build.version, build.buildstate))
-        if build.buildstate != "successful":
-            return ErrorResponse(400, "Not all latest builds are successful")
-        if build.sourcename in build_source_names:
-            logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
-            continue
-        build_source_names.append(build.sourcename)
-        if not build.debianpackages:
-            return ErrorResponse(400, "No debian packages found for %s/%s" % (build.sourcename, build.version))
+    if len(latest_debbuilds_ids) == 0:
+        return ErrorResponse(400, "No snapshotable builds found")
 
     new_projectversion = ProjectVersion(
         name=name,
         project=projectversion.project,
-        dependencies=projectversion.dependencies,   # FIXME: use_cubilds not included via relationship
+        dependencies=projectversion.dependencies,   # FIXME: use_cibuilds not included via relationship
         mirror_architectures=projectversion.mirror_architectures,
         basemirror_id=projectversion.basemirror_id,
         sourcerepositories=projectversion.sourcerepositories,
@@ -521,8 +614,8 @@ async def snapshot_projectversion(request):
                 projectversion.name,
                 db2array(projectversion.mirror_architectures),
                 new_projectversion.name,
-                projectversion.id,
-                new_projectversion.id
+                new_projectversion.id,
+                latest_debbuilds_ids
             ]
         }
     )
@@ -882,3 +975,250 @@ async def get_projectversion_dependents(request):
     # FIXME paginate ??
     data = {"total_result_count": len(results), "results": results}
     return OKResponse(data)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/extbuild")
+# @req_role("owner")
+async def external_build_upload(request):
+    db = request.cirrina.db_session
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Cannot add dependencies to project which is a mirror")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Cannot add dependencies on a locked projectversion")
+
+    # TODO
+    # check extbuilds allowed
+
+    maintenance_mode = False
+    query = "SELECT value from metadata where name = :key"
+    result = db.execute(query, {"key": "maintenance_mode"})
+    for value in result:
+        if value[0] == "true":
+            maintenance_mode = True
+        break
+    if maintenance_mode:
+        return web.Response(status=503, text="Maintenance Mode")
+
+    # create builds
+    build = Build(
+        version=None,
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename="external build upload",
+        buildstate="new",
+        buildtype="build",
+        sourcerepository=None,
+        maintainer=None,
+        projectversion_id=projectversion.id,
+    )
+
+    db.add(build)
+    db.commit()
+    await build.logtitle("External Build Upload")
+    await build.build_added()
+
+    srcbuild = Build(
+        version="unknown",
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename="external build upload",
+        buildstate="new",
+        buildtype="source",
+        parent_id=build.id,
+        sourcerepository=None,
+        maintainer=None,
+        projectversion_id=projectversion.id,
+        projectversions=array2db([str(projectversion.id)])
+    )
+
+    db.add(srcbuild)
+    db.commit()
+    await srcbuild.build_added()
+
+    debbuild = Build(
+        version=None,
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename="external build upload",
+        buildstate="new",
+        buildtype="deb",
+        parent_id=srcbuild.id,
+        sourcerepository=None,
+        maintainer=None,
+        projectversion_id=projectversion.id,
+        architecture="amd64"
+    )
+
+    db.add(debbuild)
+    db.commit()
+    await debbuild.build_added()
+
+    await build.log("I: Receiving uploaded files\n")
+
+    buildout_path = Path(Configuration().working_dir) / "buildout"
+
+    async def write_part(build_id, part):
+        filename = part.filename.replace("/", "")  # no paths separators allowed
+        dir_path = buildout_path / str(build_id)
+        if not dir_path.is_dir():
+            dir_path.mkdir(parents=True)
+        async with AIOFile("%s/%s" % (dir_path, filename), "xb") as afp:
+            writer = Writer(afp)
+            while True:  # FIXME: timeout
+                # FIXME: might not return, timeout and cancel
+                chunk = await part.read_chunk()  # 8192 bytes by default.
+                if not chunk:
+                    break
+                await writer(chunk)
+
+    build_version = None
+    sourcename = None
+    source_upload = False
+    has_changes_file = False
+    has_buildinfo_file = False
+
+    reader = await request.multipart()
+    async for part in reader:
+        filename = part.filename.replace("/", "")  # no paths separators allowed
+        await build.log(" - %s\n" % filename)
+
+        destbuild_id = None
+
+        pkgname = None
+        version = None
+        arch = None
+        if filename.endswith(".deb"):
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+
+        elif filename.endswith(".changes"):
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_changes_file = True
+                if not sourcename:
+                    sourcename = pkgname
+
+        elif filename.endswith(".buildinfo"):
+            s = filename[:-4].split("_", 3)
+            if len(s) == 3:
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_buildinfo_file = True
+                if not sourcename:
+                    sourcename = pkgname
+
+        elif filename.endswith(".dsc"):
+            s = filename[:-4].split("_", 2)
+            if len(s) == 2:
+                pkgname, version = s
+                destbuild_id = srcbuild.id
+                source_upload = True
+                if not sourcename:
+                    sourcename = pkgname
+
+        elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
+            s = filename[:-7].split("_", 2)
+            if len(s) == 2:
+                pkgname, version = s
+                destbuild_id = srcbuild.id
+                source_upload = True
+                if not sourcename:
+                    sourcename = pkgname
+
+        else:
+            await build.log("W: ignoring unknown file type: '%s'\n" % filename)
+            continue
+
+        if not build_version:
+            build_version = version
+        elif version != build_version:
+            # FIXME: cleanup saved files
+            await build.log("E: version mismatch in uploaded files: '%s'\n" % version)
+            # FIXME: terminate build log
+            return ErrorResponse(400, "version mismatch in uploaded files")
+
+        # FIXME: check arch in projectversion
+        await write_part(destbuild_id, part)
+
+    await build.log("I: Verifying uploaded files...\n")
+
+    if not has_changes_file:
+        errmsg = "Missing *.changes file"
+        await build.log("E: %s\n" % errmsg)
+        await build.set_failed()
+        await srcbuild.set_failed()
+        await debbuild.set_failed()
+        db.commit()
+        return ErrorResponse(400, errmsg)
+
+    if not has_buildinfo_file:
+        errmsg = "Missing *.buildinfo file"
+        await build.log("E: %s\n" % errmsg)
+        await build.set_failed()
+        await srcbuild.set_failed()
+        await debbuild.set_failed()
+        db.commit()
+        return ErrorResponse(400, errmsg)
+
+    await build.log("I: Found external build: %s/%s\n" % (sourcename, build_version))
+
+    build.sourcename = sourcename
+    srcbuild.sourcename = sourcename
+    debbuild.sourcename = sourcename
+    build.version = build_version
+    srcbuild.version = build_version
+    debbuild.version = build_version
+    db.commit()
+
+    # check if version already exists
+    existing_build = db.query(Build).filter(Build.buildtype == "build",
+                                            Build.sourcerepository_id.is_(None),
+                                            Build.projectversion_id == projectversion.id,
+                                            Build.buildstate == "successful",
+                                            Build.is_deleted.is_(False),
+                                            Build.sourcename == sourcename,
+                                            Build.version == build_version).first()
+    if existing_build:
+        errmsg = "build for %s/%s already exists" % (sourcename, version)
+        await build.log("E: %s\n" % errmsg)
+        await build.set_failed()
+        await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+        await srcbuild.set_failed()
+        await debbuild.set_failed()
+        db.commit()
+        return ErrorResponse(400, errmsg)
+
+    await build.set_building()
+    db.commit()
+
+    # publish source package
+    await srcbuild.logtitle("External Source Upload")
+    if source_upload:
+        await srcbuild.set_needs_publish()
+        db.commit()
+        await srcbuild.log("I: verifying source package\n")
+        await enqueue_aptly({"src_publish": [srcbuild.id]})
+    else:
+        await srcbuild.log("W: no source package to publish\n")
+        await srcbuild.set_nothing_done()
+        db.commit()
+
+    # publish debian packages
+    await debbuild.logtitle("External Debian Package Upload")
+    await debbuild.set_needs_publish()
+    db.commit()
+    await debbuild.log("I: verifying debian packages\n")
+    await enqueue_aptly({"publish": [debbuild.id]})
+
+    return OKResponse()

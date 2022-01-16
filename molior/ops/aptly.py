@@ -1,5 +1,4 @@
 import os
-import shlex
 import re
 
 from launchy import Launchy
@@ -13,16 +12,19 @@ from ..molior.configuration import Configuration
 from ..molior.queues import buildlog, buildlogtitle
 
 from ..model.database import Session
-from ..model.build import build_logstate
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.projectversion import ProjectVersion
 from ..model.debianpackage import Debianpackage
 
 
-async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
+def get_debchanges_filename(sourcepath, sourcename, version, arch="source"):
     v = strip_epoch_version(version)
-    changes_file = "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
+    return "{}/{}_{}_{}.changes".format(sourcepath, sourcename, v, arch)
+
+
+async def debchanges_get_files(sourcepath, sourcename, version, arch="source"):
+    changes_file = get_debchanges_filename(sourcepath, sourcename, version, arch)
     files = []
     try:
         async with AIOFile(changes_file, "rb") as f:
@@ -59,27 +61,39 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
     await buildlog(build_id, "\n")
     await buildlogtitle(build_id, "Publishing")
-    sourcepath = Path(Configuration().working_dir) / "repositories" / str(repo_id)
-    srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
+
+    if repo_id:
+        sourcepath = Path(Configuration().working_dir) / "repositories" / str(repo_id)
+    else:
+        sourcepath = Path(Configuration().working_dir) / "buildout" / str(build_id)
+
+    srcfiles = []
+    if Path(get_debchanges_filename(sourcepath, sourcename, version, "source")).exists():
+        # check exists
+        srcfiles = await debchanges_get_files(sourcepath, sourcename, version)
+    else:  # source build without changes file, i.e. external build upload
+        for sourcefile in sourcepath.glob("*.*"):
+            filename = sourcefile.name
+            if filename != "build.log":
+                srcfiles.append(filename)
+
     if not srcfiles:
         logger.error("DebSrcPublish: no source files found")
         return False
 
-    add_files(build_id, buildtype, version, srcfiles)
-
+    await buildlog(build_id, "I: uploading files to aptly\n")
     publish_files = []
     for f in srcfiles:
-        logger.debug("publisher: adding %s", f)
+        await buildlog(build_id, " - %s\n" % f)
         publish_files.append("{}/{}".format(sourcepath, f))
 
-    build_logstate(build_id, buildtype, sourcename, version,
-                   "publishing {} for projectversion ids {}".format(sourcename, str(projectversions)))
+    add_files(build_id, buildtype, version, srcfiles)
 
     ret = False
     for projectversion_id in projectversions:
         fullname = None
         with Session() as session:
-            projectversion = session.query(ProjectVersion) .filter(ProjectVersion.id == projectversion_id) .first()
+            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id) .first()
             if projectversion:
                 fullname = projectversion.fullname
                 basemirror_name = projectversion.basemirror.project.name
@@ -93,23 +107,22 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
             await buildlog(build_id, "E: error finding projectversion {}\n".format(projectversion_id))
             continue
 
-        await buildlog(build_id, "I: publishing for %s\n" % fullname)
+        await buildlog(build_id, "I: publishing for project %s\n" % fullname)
 
         debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
         try:
-            await debian_repo.add_packages(publish_files, ci_build=is_ci)
-            ret = True
+            ret = await debian_repo.add_packages(publish_files, ci_build=is_ci)
         except Exception as exc:
-            await buildlog(build_id, "E: error adding files to projectversion {}\n".format(projectversion.fullname))
+            await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
 
     await buildlog(build_id, "\n")
 
     if ret:  # only delete if published, allow republish
         files2delete = publish_files
-        v = strip_epoch_version(version)
-        changes_file = "{}_{}_{}.changes".format(sourcename, v, "source")
-        files2delete.append("{}/{}".format(sourcepath, changes_file))
+        changes_file = get_debchanges_filename(sourcepath, sourcename, version, "source")
+        if Path(changes_file).exists():
+            files2delete.append(changes_file)
         for f in files2delete:
             logger.debug("publisher: removing %s", f)
             try:
@@ -120,7 +133,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
     return ret
 
 
-async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+async def publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                            basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
     """
     Publishes given packages to given
@@ -147,7 +160,6 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     if count_files == 0:
         logger.error("publisher: build %d: no files to upload", build_id)
         await buildlog(build_id, "E: no debian packages found to upload\n")
-        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
     # FIXME: check on startup
@@ -155,7 +167,6 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     if not key:
         logger.error("Signing key not defined in configuration")
         await buildlog(build_id, "E: no signinig key defined in configuration\n")
-        await buildlog(parent_parent_id, "E: build %d failed\n" % build_id)
         return False
 
     await buildlog(build_id, "Signing packages:\n")
@@ -168,7 +179,7 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     changes_file = "{}_{}_{}.changes".format(sourcename, v, architecture)
 
     cmd = "debsign -pgpg1 -k{} {}".format(key, changes_file)
-    process = Launchy(shlex.split(cmd), outh, outh, cwd=str(out_path))
+    process = Launchy(cmd, outh, outh, cwd=str(out_path))
     await process.launch()
     ret = await process.wait()
     if ret != 0:
@@ -180,8 +191,7 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
     ret = False
     try:
-        await debian_repo.add_packages(files2upload, ci_build=is_ci)
-        ret = True
+        ret = await debian_repo.add_packages(files2upload, ci_build=is_ci)
     except Exception as exc:
         await buildlog(build_id, "E: error uploading files to repository\n")
         logger.exception(exc)
@@ -195,7 +205,7 @@ async def publish_packages(build_id, parent_parent_id, buildtype, sourcename, ve
     return ret
 
 
-async def DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
                      basemirror_name, basemirror_version, project_name, project_version, archs):
     """
     Publishes given src_files/src package to given
@@ -210,11 +220,10 @@ async def DebPublish(build_id, parent_parent_id, buildtype, sourcename, version,
     """
 
     out_path = Path(Configuration().working_dir) / "buildout" / str(build_id)
-    await buildlog(parent_parent_id, "I: publishing build %d\n" % build_id)
     await buildlogtitle(build_id, "Publishing", no_header_newline=False)
 
     try:
-        if not await publish_packages(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+        if not await publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                                       basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
             logger.error("publisher: error publishing build %d" % build_id)
             return False
@@ -244,7 +253,7 @@ def add_files(build_id, buildtype, version, files):
 
         if buildtype == "deb":
             if len(p) != 3:
-                logger.error("build: unknown file: {}".format(f))
+                logger.error("build: unknown debian package file: {}".format(f))
                 continue
             name, version, suffix = p
             s = suffix.split(".", 2)
@@ -260,7 +269,7 @@ def add_files(build_id, buildtype, version, files):
             if len(p) == 3:  # $pkg_$ver_source.buildinfo
                 continue
             if len(p) != 2:
-                logger.error("build: unknown file: {}".format(f))
+                logger.error("build: unknown source package file: {}".format(f))
                 continue
 
             name, suffix = p

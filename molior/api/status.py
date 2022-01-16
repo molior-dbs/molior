@@ -1,11 +1,16 @@
 from aiohttp import web
 from os.path import expanduser
+from os import getloadavg
 
-from ..app import app
+from psutil import virtual_memory, disk_usage
+from multiprocessing import cpu_count
+
+from ..app import app  # , logger
 from ..auth import req_admin
 from ..version import MOLIOR_VERSION
 from ..molior.backend import Backend
 from ..molior.configuration import Configuration
+from ..aptly import get_aptly_connection
 
 
 @app.http_get("/api/status")
@@ -49,13 +54,16 @@ async def get_status(request):
     except Exception:
         pass
 
+    aptly = get_aptly_connection()
+    aptly_version = await aptly.version()
     cfg = Configuration()
     apt_url = cfg.aptly.get("apt_url_public")
     if not apt_url:
         apt_url = cfg.aptly.get("apt_url")
     gpgurl = apt_url + "/" + cfg.aptly.get("key")
     status = {
-        "version": MOLIOR_VERSION,
+        "version_molior_server": MOLIOR_VERSION,
+        "version_aptly": aptly_version,
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
         "sshkey": sshkey,
@@ -123,6 +131,37 @@ async def set_maintenance(request):
     return web.json_response(status)
 
 
+def get_server_info():
+
+    def get_machine_id():
+        try:
+            with open('/etc/machine-id') as machine_id_file:
+                machine_id = machine_id_file.readline().strip()
+        except IOError:
+            machine_id = None
+        return machine_id
+
+    uptime_seconds = ""
+    with open('/proc/uptime', 'r') as f:
+        uptime_seconds = float(f.readline().split()[0])
+    ram_total = virtual_memory().total
+    ram_used = virtual_memory().used
+    disk_total = disk_usage("/").total
+    disk_used = disk_usage("/").used
+    server_info = {
+                "name": "molior server",
+                "uptime_seconds": uptime_seconds,
+                "load": getloadavg(),
+                "cpu_cores": cpu_count(),
+                "ram_used": ram_used,
+                "ram_total": ram_total,
+                "disk_used": disk_used,
+                "disk_total": disk_total,
+                "id": get_machine_id()
+                }
+    return server_info
+
+
 @app.http_get("/api/nodes")
 async def get_nodes_info(request):
     """
@@ -149,6 +188,8 @@ async def get_nodes_info(request):
     build_nodes = backend.get_nodes_info()
 
     results = []
+    server = get_server_info()
+    results.append(server)
     for node in build_nodes:
         if search and search.lower() not in node["name"].lower():
             continue
@@ -157,8 +198,6 @@ async def get_nodes_info(request):
     def sortBy(node):
         return node["name"]
     results.sort(key=sortBy)
-
-    # FIXME: sort?
 
     # paginate
     result_page = results[page_size * (page - 1):page_size*page]

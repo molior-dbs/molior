@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TYPE buildstate_enum ADD VALUE 'already_failed';
+
+EOF

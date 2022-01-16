@@ -30,7 +30,6 @@ class NotificationWorker:
             try:
                 task = await dequeue_notification()
                 if task is None:
-                    logger.info("notification:: got emtpy task, aborting...")
                     break
 
                 notification = task.get("notify")
@@ -49,7 +48,7 @@ class NotificationWorker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating notification task")
+        logger.info("notification task terminated")
 
     async def do_hooks(self, build_id):
         hooks = []

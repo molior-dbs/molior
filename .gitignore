@@ -9,7 +9,6 @@ debian/files
 debian/tmp
 test
 debian/molior-server
-debian/molior-devel/
 debian/molior-os-config/
 debian/molior-doc/
 debian/molior-client-http/

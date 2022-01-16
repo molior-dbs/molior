@@ -13,7 +13,7 @@ from ..aptly import get_aptly_connection
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
-from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone, enqueue_backend
 from ..molior.configuration import Configuration
 
 from ..model.database import Session
@@ -22,66 +22,6 @@ from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion_byid
 from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
-
-
-async def startup_migration():
-    """
-    Migrate old aptly repos
-    """
-    aptly = get_aptly_connection()
-
-    with Session() as session:
-        # get mirrors in updating state
-        query = session.query(ProjectVersion).join(Project, Project.id == ProjectVersion.project_id)
-        query = query.filter(Project.is_mirror.is_(False))
-
-        if not query.count():
-            return
-
-        aptly_repos = await aptly.repo_get()
-        aptly_snapshots = await aptly.snapshot_get()
-        projectversions = query.all()
-        for projectversion in projectversions:
-            repo_name = "%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
-                                         projectversion.project.name, projectversion.name)
-
-            for aptly_snapshot in aptly_snapshots:
-                aptly_snapshot_name = aptly_snapshot.get("Name")
-                publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
-                                                          projectversion.basemirror.name,
-                                                          projectversion.project.name,
-                                                          projectversion.name)
-                for dist in ["stable", "unstable"]:
-                    snapshot_name = "{}-{}-".format(publish_name, dist)
-                    if aptly_snapshot_name.startswith(snapshot_name):
-                        task_id = await aptly.snapshot_rename(aptly_snapshot_name, "{}-{}".format(publish_name, dist))
-                        await aptly.wait_task(task_id)
-
-            found = False
-            for a in aptly_repos:
-                if a.get("Name") == repo_name:
-                    found = True
-                    break
-            if not found:
-                continue
-
-            try:
-                await aptly.repo_rename(repo_name, repo_name + "-stable")
-            except Exception as exc:
-                logger.exception(exc)
-                #task_id = await aptly.repo_rename(repo_name, repo_name + "-stable")                                                             
-                ########await aptly.wait_task(task_id)
-                # FIXME: delete task
-
-            await asyncio.sleep(2)
-            try:
-                await aptly.repo_create(repo_name + "-unstable")
-                # task_id = await aptly.repo_create(repo_name + "-unstable")
-                ####### FIMXE await aptly.wait_task(task_id)
-                # FIXME: delete task
-            except Exception as exc:
-                logger.exception(exc)
-            await asyncio.sleep(2)
 
 
 async def startup_mirror():
@@ -172,13 +112,14 @@ async def startup_mirror():
                     mirror.project.name,
                     mirror.name,
                     components,
+                    db2array(mirror.mirror_architectures),
                     # FIXME: add all running tasks
                     [m_task.get("ID")],
                 )
             )
 
 
-async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components):
+async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components, architectures):
     """
     Creates an update task in the asyncio event loop.
 
@@ -196,11 +137,11 @@ async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, vers
     logger.debug("start update progress: aptly tasks %s", str(task_ids))
     loop = asyncio.get_event_loop()
     loop.create_task(finalize_mirror(build_id, base_mirror, base_mirror_version,
-                                     mirror, version, components, task_ids))
+                                     mirror, version, components, architectures, task_ids))
 
 
 async def finalize_mirror(build_id, base_mirror, base_mirror_version,
-                          mirror_project, mirror_version, components, task_ids):
+                          mirror_project, mirror_version, components, architectures, task_ids):
     try:
         mirrorname = "{}-{}".format(mirror_project, mirror_version)
         logger.debug("finalizing mirror %s tasks %s, build_%d", mirrorname, str(task_ids), build_id)
@@ -361,7 +302,7 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                 logger.debug("publishing snapshot: %s", mirrorname)
                 try:
                     task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror_project, mirror_version,
-                                                         mirror.mirror_distribution, components)
+                                                         mirror.mirror_distribution, components, architectures)
                 except Exception as exc:
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
                     mirror.mirror_state = "error"
@@ -383,7 +324,8 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         await build.set_publish_failed()
                         session.commit()
 
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
+                                                           mirror_project, mirror_version, components)
                         return
 
                     # States:
@@ -395,7 +337,8 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         mirror.mirror_state = "error"
                         await build.set_publish_failed()
                         session.commit()
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version, mirror_project, mirror_version)
+                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
+                                                           mirror_project, mirror_version, components)
                         return
 
                     if upd_progress["TotalNumberOfPackages"] > 0:
@@ -492,7 +435,7 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, session)
 
 class AptlyWorker:
     """
-    Source Packaging worker thread
+    Aptly worker thread
 
     """
 
@@ -715,6 +658,7 @@ class AptlyWorker:
                         mirror.project.name,
                         mirror.name,
                         mirror.mirror_components.split(","),
+                        db2array(mirror.mirror_architectures)
                     )
                 except NotFoundError as exc:
                     await build.log("E: aptly seems to be not available: %s\n" % str(exc))
@@ -775,14 +719,11 @@ class AptlyWorker:
         except Exception as exc:
             logger.exception(exc)
 
-        if not ret:
-            await buildlog(parent_id, "E: publishing source package failed\n")
+        if not ret:  # src publish failed, no more logs for parent
             await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
             await buildlogdone(parent_id)
-        else:
-            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlog(parent_id, "I: scheduling deb package builds\n")
 
+        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
         await buildlogdone(build_id)
 
         found_childs = False
@@ -796,6 +737,7 @@ class AptlyWorker:
                 session.commit()
                 return False
 
+            # publish succeded
             await build.set_successful()
             session.commit()
 
@@ -814,7 +756,6 @@ class AptlyWorker:
         if not found_childs:
             await buildlog(parent_id, "E: no deb builds found\n")
             await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlogdone(build_id)
             await buildlogdone(parent_id)
             return False
 
@@ -847,9 +788,11 @@ class AptlyWorker:
             architecture = build.architecture
             is_ci = build.is_ci
 
+        await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
+
         ret = False
         try:
-            ret = await DebPublish(build_id, parent_parent_id, buildtype, sourcename, version, architecture, is_ci,
+            ret = await DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
                                    basemirror_name, basemirror_version, project_name, project_version, archs)
         except Exception as exc:
             logger.exception(exc)
@@ -857,9 +800,8 @@ class AptlyWorker:
         if not ret:
             await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
             await buildlog(build_id, "E: publishing build failed\n")
-        else:
-            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
 
+        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await buildlogdone(build_id)
 
         with Session() as session:
@@ -896,7 +838,16 @@ class AptlyWorker:
         project_name = args[2]
         project_version = args[3]
         architectures = args[4]
+        trigger_builds = args[5]
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
+
+        if len(trigger_builds) > 0:
+            targets = [f"{project_name}/{project_version}"]
+            with Session() as session:
+                builds = session.query(Build).filter(Build.id.in_(trigger_builds)).all()
+                for build in builds:
+                    args = {"build": [build.id, build.sourcerepository_id, f"v{build.version}", "", targets, False]}
+                    await enqueue_task(args)
 
     async def _snapshot_repository(self, args):
         basemirror_name = args[0]
@@ -905,33 +856,16 @@ class AptlyWorker:
         project_version = args[3]
         architectures = args[4]
         snapshot_name = args[5]
-        projectversion_id = args[6]
-        new_projectversion_id = args[7]
+        new_projectversion_id = args[6]
+        latest_debbuilds_ids = args[7]
         packages = []
         copybuilds = []
         buildlogs = []
         with Session() as session:
-            # find latest builds
-            latest_builds = session.query(func.max(Build.id).label("latest_id")).filter(
-                    Build.projectversion_id == projectversion_id,
-                    Build.buildtype == "deb").group_by(Build.sourcerepository_id).subquery()
-
-            builds = session.query(Build).join(latest_builds, Build.id == latest_builds.c.latest_id).order_by(
-                    Build.sourcename, Build.id.desc()).all()
+            builds = session.query(Build).filter(Build.id.in_(latest_debbuilds_ids)).all()
 
             pkgbuilds = []
-            build_source_names = []
             for build in builds:
-                if build.buildstate != "successful":
-                    logger.error("snapshot: Not all latest builds are successful")
-                    return
-                if build.sourcename in build_source_names:
-                    logger.warning("shapshot: ignoring duplicate build sourcename: %s/%s" % (build.sourcename, build.version))
-                    continue
-                build_source_names.append(build.sourcename)
-                if not build.debianpackages:
-                    logger.error("snapshot: No debian packages found for %s/%s" % (build.sourcename, build.version))
-                    return
                 copybuilds.append(build)
                 pkgbuilds.append(build)
                 if build.parent not in pkgbuilds:  # add source package
@@ -965,10 +899,13 @@ class AptlyWorker:
                     startstamp=build.startstamp,
                     buildendstamp=build.buildendstamp,
                     endstamp=build.endstamp,
-                    snapshotbuild_id=build.id
+                    snapshotbuild_id=build.id,
+                    debianpackages=build.debianpackages
                 )
                 if copy.buildtype == "deb":
                     copy.projectversion_id = new_projectversion_id
+                if copy.buildtype == "source":
+                    copy.projectversions = array2db([str(new_projectversion_id)])
                 session.add(copy)
                 session.commit()
                 return copy
@@ -1124,7 +1061,9 @@ class AptlyWorker:
 
             projectversions = {}
             for src in srcpkgs:
-                if not src.projectversions:
+                if src.projectversions is None or len(src.projectversions) == 0:
+                    continue
+                if src.buildstate == "successful":
                     continue
                 for f in src.debianpackages:
                     for projectversion_id in src.projectversions:
@@ -1132,6 +1071,10 @@ class AptlyWorker:
                         if not projectversion:
                             logger.error("delete build: projectversion %d not found" % projectversion_id)
                             continue
+
+                        # FIXME: only delete srcpkg if no other same build (repo, version, projectversion) has
+                        # successful build in different arch
+
                         repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
                                                         projectversion.project.name, projectversion.name, dist)
                         publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
@@ -1146,6 +1089,8 @@ class AptlyWorker:
                         to_delete[repo_name].append((f.name, src.version, "source"))
 
             for deb in debpkgs:
+                if deb.buildstate != "successful":  # only successful deb builds have packages to delete
+                    continue
                 for f in deb.debianpackages:
                     projectversion = deb.projectversion
                     repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
@@ -1202,6 +1147,36 @@ class AptlyWorker:
 
         logger.info("aptly worker: build %d deleted" % build_id)
 
+    async def _abort(self, args):
+        logger.debug("worker: got abort build task")
+        build_id = args[0]
+
+        with Session() as session:
+            topbuild = session.query(Build).filter(Build.id == build_id).first()
+            if not topbuild:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            if len(topbuild.children) != 1:
+                logger.error("aptly worker: no source build found for %d" % build_id)
+                return
+
+            await buildlog(build_id, "E: aborting build on user request\n")
+
+            for deb in topbuild.children[0].children:
+                # abort on build node
+                if deb.buildstate in ["building", "scheduled"]:
+                    await enqueue_backend({"abort": deb.id})
+
+                if deb.buildstate in ["new", "needs_build", "scheduled"]:
+                    await deb.set_failed()
+
+                if deb.buildtask:
+                    session.delete(deb.buildtask)
+
+            await topbuild.set_failed()
+            session.commit()
+
     async def run(self):
         """
         Run the worker task.
@@ -1209,15 +1184,13 @@ class AptlyWorker:
 
         try:
             await startup_mirror()
-            await startup_migration()
-        except:
+        except Exception:
             pass
 
         while True:
             try:
                 task = await dequeue_aptly()
                 if task is None:
-                    logger.error("aptly worker: got emtpy task, aborting...")
                     break
 
                 handled = False
@@ -1288,6 +1261,13 @@ class AptlyWorker:
                         await self._delete_build(args)
 
                 if not handled:
+                    args = task.get("abort")
+                    if args:
+                        handled = True
+                        await self._abort(args)
+
+                # must be last
+                if not handled:
                     args = task.get("cleanup")
                     # FIXME: check args is []
                     handled = True
@@ -1299,4 +1279,4 @@ class AptlyWorker:
             except Exception as exc:
                 logger.exception(exc)
 
-        logger.info("terminating aptly worker task")
+        logger.info("aptly task terminated")

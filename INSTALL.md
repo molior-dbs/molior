@@ -1,9 +1,8 @@
 # Installation
 
-Molior can be installed from APT sources, or with ISO installers.
+Molior can be installed on a Debian distribution (buster/bullseye) from APT sources, or a VM can be installed via ISO installers. Molior and aptly can also run as containers via docker-compose.
 
-Since molior is creating and using chroot environments (i.e. debootstrap, sbuild, schroot),
-operation in a unpriviledged container (i.e. docker, lxd) is currently not supported.
+Molior build nodes are using sbuild for building which cannot run in a container (i.e. docker, lxd) and need to run in a VM or on bare metal.
 
 <!-- vim-markdown-toc GFM -->
 
@@ -16,8 +15,9 @@ operation in a unpriviledged container (i.e. docker, lxd) is currently not suppo
     * [Install build node](#install-build-node)
     * [Install molior-tools](#install-molior-tools)
 * [ISO Installers / VMs](#iso-installers--vms)
-    * [Development Environemnt](#development-environemnt)
+    * [Development Environment](#development-environment)
     * [Build nodes](#build-nodes)
+* [Installation on docker](#installation-on-docker)
 * [Configuration](#configuration)
     * [Configure molior server](#configure-molior-server)
     * [Configure aptly server](#configure-aptly-server)
@@ -27,10 +27,12 @@ operation in a unpriviledged container (i.e. docker, lxd) is currently not suppo
 
 ## Prerequisites
 
-Debian stretch installations with stretch-backports, depending on the setup:
+Debian installation (VM, bare metal, docker) for:
 - molior server machine
 - aptly server machine (might be on the same installation as molior server)
-- build node(s) (amd64 or arm64)
+
+Debian installation (VM, bare metal) for:
+- one or more build nodes (amd64 or arm64)
 
 ## Installation via APT sources
 
@@ -94,23 +96,40 @@ Install molior/aptly server and build node on VMs or bare metal and follow the C
 
 User and Password for these installers is: admin/molior-dev (please change password after first login)
 
-### Development Environemnt
+### Development Environment
 
 For development on molior or aptly, the following VM can be used:
 
 Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.4_1.4.0_vbox-dev.ova
+- http://molior.info/installers/molior_1.4_1.4.1_vbox-dev.ova
 
 ### Build nodes
 
 Download amd64 build node installer:
-- http://molior.info/installers/molior_1.4_1.4.0_iso-installer-node-amd64.iso
+- http://molior.info/installers/molior_1.4_1.4.1_iso-installer-node-amd64.iso
 
 Download EFI installer for amd64 or arm64:
-- http://molior.info/installers/molior_1.4_1.4.0_efi-installer-node-amd64-UNATTENDED.iso
-- http://molior.info/installers/molior_1.4_1.4.0_efi-installer-node-arm64-UNATTENDED.iso
+- http://molior.info/installers/molior_1.4_1.4.1_efi-installer-node-amd64-UNATTENDED.iso
+- http://molior.info/installers/molior_1.4_1.4.1_efi-installer-node-arm64-UNATTENDED.iso
 
 Note: these are unattended installers, overwriting the disk without asking when booted
+
+## Installation on docker
+
+Molior server and aptly can be run in docker containers according to the following docker-compose example:
+
+[docker-compose.yml](docker/docker-compose.yml)
+
+Set the following variables:
+- DEBSIGN_NAME
+- DEBSIGN_EMAIL
+- REPOSIGN_NAME
+- REPOSIGN_EMAIL
+- MOLIOR_ADMIN_PASSWD
+- APTLY_USER
+- APTLY_PASS
+
+and run docker-compose up. Molior Web is exposed on port 8000.
 
 ## Configuration
 

@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from ..app import app, logger
 from ..auth import req_admin
-from ..tools import OKResponse, ErrorResponse, paginate, db2array
+from ..tools import OKResponse, ErrorResponse, paginate, db2array, escape_for_like
 from ..molior.queues import enqueue_aptly
 
 from ..model.project import Project
@@ -211,6 +211,7 @@ async def get_mirrors(request):
         for term in terms:
             if not term:
                 continue
+            term = escape_for_like(term)
             query = query.filter(or_(
                  Project.name.ilike("%{}%".format(term)),
                  ProjectVersion.name.ilike("%{}%".format(term))))
@@ -260,7 +261,7 @@ async def get_mirrors(request):
         if mirrorkey:
             mirrorkeyurl = mirrorkey.keyurl
             if mirrorkey.keyids:
-                mirrorkeyids = mirrorkey.keyids[1:-1]
+                mirrorkeyids = db2array(mirrorkey.keyids)
             mirrorkeyserver = mirrorkey.keyserver
         if not mirror.project.is_basemirror and mirror.basemirror:
             base_mirror_id = mirror.basemirror.id
@@ -287,7 +288,7 @@ async def get_mirrors(request):
                 "state": mirror.mirror_state,
                 "apt_url": apt_url,
                 "mirrorkeyurl": mirrorkeyurl,
-                "mirrorkeyids": mirrorkeyids,
+                "mirrorkeyids": " ".join(mirrorkeyids),
                 "mirrorkeyserver": mirrorkeyserver,
                 "external_repo": mirror.external_repo,
                 "dependency_policy": mirror.dependency_policy

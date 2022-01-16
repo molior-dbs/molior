@@ -6,7 +6,7 @@ from mock import patch, MagicMock
 
 from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
-from molior.tools import is_name_valid, validate_version_format
+from molior.tools import is_name_valid
 
 
 def test_get_projectversion_no_cfg():
@@ -210,67 +210,3 @@ def test_is_name_valid(test_input, expected):
     Tests the validity of a version/project name
     """
     assert is_name_valid(test_input) == expected
-
-
-@pytest.mark.parametrize(
-    "test_version_input,expected_validity",
-    [
-        ("", False),
-        ("v", False),
-        ("V", False),
-        ("va", False),
-        ("vx", False),
-        ("v-alpha1", False),
-        ("v+alpha1", False),
-        ("v0", True),
-        ("0", True),
-        ("v1", True),
-        ("v1.", False),
-        ("V1", False),
-        ("V1.", False),
-        ("v1.0", True),
-        ("V1.0", False),
-        ("v1.0.0", True),
-        ("v1.0.0.", False),
-        ("v1.0.0.0", True),
-        ("v1.0.0.0.", False),
-        ("v1.0.0.0.0", True),
-        ("1", True),
-        ("1.0", True),
-        ("1.0.0", True),
-        ("1.0.0.", False),
-        ("1.0.0.0", True),
-        ("1.0.0.0.", False),
-        ("1.0.0.0.0", True),
-        ("v1.", False),
-        ("v1..", False),
-        ("v1.0..", False),
-        ("1.", False),
-        ("1..", False),
-        ("1.0-alpha1", True),
-        ("1.0~alpha1", True),
-        ("1.0+alpha1", True),
-        ("1.0@alpha1", False),
-        ("1.0alpha1", True),
-        ("1.0-alpha11one", True),
-        ("v1.0-alpha1", True),
-        ("v1.0~alpha1", True),
-        ("v1.0+alpha1", True),
-        ("v1.0-alpha11one", True),
-        ("1.0-", False),
-        ("3.5+devel5", True),
-        ("this-Is-a.version", False),
-        ("1.0_alpha", False),
-        ("99.12.33.43~inv", True),
-        ("1 with space", False),
-        ("4.99/1", False),
-        ("version?", False),
-        (" ", False),
-        ("_", False),
-    ],
-)
-def test_version_format(test_version_input, expected_validity):
-    """
-    Tests the validity of a version/project name
-    """
-    assert validate_version_format(test_version_input) == expected_validity

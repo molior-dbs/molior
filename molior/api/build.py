@@ -49,10 +49,6 @@ async def get_builds(request):
           in: query
           required: false
           type: boolean
-        - name: count_only
-          in: query
-          required: false
-          type: boolean
         - name: project_version_id
           in: query
           required: false
@@ -148,11 +144,6 @@ async def get_builds(request):
         to_date = datetime.strptime(request.GET.getone("to"), "%Y-%m-%d %H:%M:%S")
     except (ValueError, KeyError):
         to_date = None
-
-    try:
-        count_only = request.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
 
     try:
         sourcerepository_id = int(request.GET.getone("sourcerepository_id"))
@@ -277,9 +268,8 @@ async def get_builds(request):
     builds = paginate(request, builds)
 
     data = {"total_result_count": nb_builds, "results": []}
-    if not count_only:
-        for build in builds:
-            data["results"].append(build.data())
+    for build in builds:
+        data["results"].append(build.data())
 
     return web.json_response(data)
 
@@ -499,13 +489,13 @@ async def trigger_build(request):
     if not repo:
         return web.Response(text="Repo not found", status=400)
 
-    repo.log_state("build triggered: %s(%s) force_ci=%s, targets=%s" % (git_ref, git_branch, force_ci, str(targets)))
+    repo.log_state("build triggered: %s, branch=%s, force_ci=%s, targets=%s" % (git_ref, git_branch, force_ci, str(targets)))
 
     build = Build(
         version=None,
         git_ref=git_ref,
         ci_branch=git_branch,
-        is_ci=None,
+        is_ci=False,
         sourcename=repo.name,
         buildstate="new",
         buildtype="build",

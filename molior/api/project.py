@@ -4,9 +4,14 @@ from sqlalchemy import func
 from ..app import app, logger
 from ..auth import req_role, req_admin
 from ..molior.configuration import Configuration
+from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse, escape_for_like, array2db
+
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion_deps, get_projectversion
-from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse
+from ..model.authtoken import Authtoken
+from ..model.authtoken_project import Authtoken_Project
+from ..model.user import User
+from ..model.userrole import UserRole
 
 
 @app.http_get("/api/projects")
@@ -34,10 +39,6 @@ async def get_projects(request):
           in: query
           required: false
           type: string
-        - name: count_only
-          in: query
-          required: false
-          type: boolean
     produces:
         - text/json
     responses:
@@ -48,26 +49,21 @@ async def get_projects(request):
     """
     db = request.cirrina.db_session
     filter_name = request.GET.getone("q", "")
-    try:
-        count_only = request.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
 
     query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
 
     if filter_name:
-        query = query.filter(Project.name.ilike("%{}%".format(filter_name)))
+        query = query.filter(Project.name.ilike("%{}%".format(escape_for_like(filter_name))))
 
     nb_results = query.count()
     query = paginate(request, query)
     results = query.all()
 
     data = {"total_result_count": nb_results}
-    if not count_only:
-        data["results"] = [
-            {"id": item.id, "name": item.name, "description": item.description}
-            for item in results
-        ]
+    data["results"] = [
+        {"id": item.id, "name": item.name, "description": item.description}
+        for item in results
+    ]
 
     return web.json_response(data)
 
@@ -171,7 +167,23 @@ async def create_project(request):
     db.add(project)
     db.commit()
 
-    return web.json_response({"id": project.id, "name": project.name})
+    username = request.cirrina.web_session.get('username')
+    auth_token = request.cirrina.web_session.get("auth_token", None)
+    if username:
+        user = db.query(User).filter(User.username == username).first()
+        if user:
+            userrole = UserRole(user_id=user.id, project_id=project.id, role="owner")
+            db.add(userrole)
+            db.commit()
+    elif auth_token:
+        token = db.query(Authtoken).filter(Authtoken.token == auth_token).first()
+        if token:
+            # FIXME: check already added
+            mapping = Authtoken_Project(project_id=project.id, authtoken_id=token.id, roles=array2db(['owner']))
+            db.add(mapping)
+            db.commit()
+
+    return OKResponse()
 
 
 @app.http_put("/api/projectbase/{project_id}")

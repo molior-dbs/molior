@@ -1,6 +1,6 @@
 <div align="center"><img src="doc/img/moliorlogo_large.png"/><p><strong>Debian Build System</strong></p></div>
 
-# About Molior 1.4.0
+# About Molior
 
 Molior is based on [aptly](https://www.aptly.info) for managing Debian package repositories and [sbuild](https://wiki.debian.org/sbuild) for building Debian packages for multiple distributions and architectures.
 

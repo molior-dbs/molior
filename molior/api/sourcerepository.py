@@ -4,7 +4,7 @@ import uuid
 from aiohttp import web
 
 from ..app import app, logger
-from ..tools import ErrorResponse, parse_int, get_hook_triggers, paginate, db2array
+from ..tools import ErrorResponse, OKResponse, parse_int, get_hook_triggers, paginate, db2array
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build
 from ..model.buildtask import BuildTask
@@ -104,10 +104,6 @@ async def get_repositories(request):
           in: query
           required: false
           type: integer
-        - name: count_only
-          in: query
-          required: false
-          type: boolean
     produces:
         - text/json
     responses:
@@ -132,11 +128,6 @@ async def get_repositories(request):
         project_version_id = int(custom_filter.GET.getone("project_version_id"))
     except (ValueError, KeyError):
         project_version_id = None
-
-    try:
-        count_only = custom_filter.GET.getone("count_only").lower() == "true"
-    except (ValueError, KeyError):
-        count_only = False
 
     repositories = request.cirrina.db_session.query(SourceRepository)
 
@@ -175,74 +166,41 @@ async def get_repositories(request):
     if project_version_id is not None:
         projectversion = request.cirrina.db_session.query(ProjectVersion).filter(ProjectVersion.id == project_version_id).first()
 
-    if not count_only:
-        data["results"] = []
-        for repository in repositories:
-            repoinfo = {
-                "id": repository.id,
-                "name": repository.name,
-                "url": repository.url,
-                "state": repository.state,
-                "dependencies": [
-                    {
-                        "id": dependency.id,
-                        "name": dependency.name,
-                        "url": dependency.url,
-                        "dependencies": get_dependencies_by_sourcerepository(request.cirrina.db_session, dependency.id),
+    data["results"] = []
+    for repository in repositories:
+        repoinfo = {
+            "id": repository.id,
+            "name": repository.name,
+            "url": repository.url,
+            "state": repository.state,
+            "dependencies": [
+                {
+                    "id": dependency.id,
+                    "name": dependency.name,
+                    "url": dependency.url,
+                    "dependencies": get_dependencies_by_sourcerepository(request.cirrina.db_session, dependency.id),
+                }
+                for dependency in repository.dependencies
+            ],
+        }
+        if projectversion:
+            build = get_last_build(request.cirrina.db_session, projectversion, repository)
+            repoinfo.update({
+                "projectversion": {
+                    "id": projectversion.id,
+                    "name": projectversion.project.name,
+                    "version": projectversion.name,
+                    "last_gitref": get_last_gitref(request.cirrina.db_session, repository),
+                    "architectures": get_architectures(request.cirrina.db_session, repository, projectversion),
+                    "last_build": {
+                        "id": build.id,
+                        "version": build.version,
+                        "buildstate": build.buildstate
                     }
-                    for dependency in repository.dependencies
-                ],
-            }
-            if projectversion:
-                build = get_last_build(request.cirrina.db_session, projectversion, repository)
-                repoinfo.update({
-                    "projectversion": {
-                        "id": projectversion.id,
-                        "name": projectversion.project.name,
-                        "version": projectversion.name,
-                        "last_gitref": get_last_gitref(request.cirrina.db_session, repository),
-                        "architectures": get_architectures(request.cirrina.db_session, repository, projectversion),
-                        "last_build": {
-                            "id": build.id,
-                            "version": build.version,
-                            "buildstate": build.buildstate
-                        }
-                    }
-                })
-            else:
-                repoinfo.update({"projectversions": [{
-                            "id": projectversion.id,
-                            "name": projectversion.project.name,
-                            "version": projectversion.name,
-                            # "last_gitref": get_last_gitref(
-                            #     request.cirrina.db_session, repository, projectversion
-                            # ),
-                        }
-                        for projectversion in repository.projectversions
-                    ]})
-            data["results"].append(repoinfo)
-        return web.json_response(data)
-
-        # FIXME: ????
-        data["results"] = [
-            {
-                "id": repository.id,
-                "name": repository.name,
-                "url": repository.url,
-                "state": repository.state,
-                "dependencies": [
-                    {
-                        "id": dependency.id,
-                        "name": dependency.name,
-                        "url": dependency.url,
-                        "dependencies": get_dependencies_by_sourcerepository(
-                            request.cirrina.db_session, dependency.id
-                        ),
-                    }
-                    for dependency in repository.dependencies
-                ],
-                "projectversions": [
-                    {
+                }
+            })
+        else:
+            repoinfo.update({"projectversions": [{
                         "id": projectversion.id,
                         "name": projectversion.project.name,
                         "version": projectversion.name,
@@ -251,11 +209,8 @@ async def get_repositories(request):
                         # ),
                     }
                     for projectversion in repository.projectversions
-                ],
-            }
-            for repository in repositories
-        ]
-
+                ]})
+        data["results"].append(repoinfo)
     return web.json_response(data)
 
 
@@ -517,7 +472,7 @@ async def trigger_clone(request):
 
     args = {"clone": [build.id, repository.id]}
     await enqueue_task(args)
-    return web.Response(status=200, text="Clone job started")
+    return OKResponse("Clone job started")
 
 
 @app.http_post("/api/repositories/{repository_id}/build")
