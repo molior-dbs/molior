@@ -905,7 +905,7 @@ class AptlyWorker:
                 if copy.buildtype == "deb":
                     copy.projectversion_id = new_projectversion_id
                 if copy.buildtype == "source":
-                    copy.projectversions = array2db([new_projectversion_id])
+                    copy.projectversions = array2db([str(new_projectversion_id)])
                 session.add(copy)
                 session.commit()
                 return copy
