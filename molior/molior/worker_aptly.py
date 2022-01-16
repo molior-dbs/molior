@@ -1063,7 +1063,7 @@ class AptlyWorker:
             for src in srcpkgs:
                 if src.projectversions is None or len(src.projectversions) == 0:
                     continue
-                if src.buildstate == "successful":
+                if src.buildstate != "successful":
                     continue
                 for f in src.debianpackages:
                     for projectversion_id in src.projectversions:
