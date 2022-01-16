@@ -978,7 +978,7 @@ async def get_projectversion_dependents(request):
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/extbuild")
-# @req_role("owner")
+@req_role("owner")
 async def external_build_upload(request):
     db = request.cirrina.db_session
 
@@ -1085,71 +1085,74 @@ async def external_build_upload(request):
     has_buildinfo_file = False
 
     reader = await request.multipart()
-    async for part in reader:
-        filename = part.filename.replace("/", "")  # no paths separators allowed
-        await build.log(" - %s\n" % filename)
+    try:
+        async for part in reader:
+            filename = part.filename.replace("/", "")  # no paths separators allowed
+            await build.log(" - %s\n" % filename)
 
-        destbuild_id = None
+            destbuild_id = None
 
-        pkgname = None
-        version = None
-        arch = None
-        if filename.endswith(".deb"):
-            s = filename[:-4].split("_", 3)
-            if len(s) == 3:
-                pkgname, version, arch = s
-                destbuild_id = debbuild.id
+            pkgname = None
+            version = None
+            arch = None
+            if filename.endswith(".deb"):
+                s = filename[:-4].split("_", 3)
+                if len(s) == 3:
+                    pkgname, version, arch = s
+                    destbuild_id = debbuild.id
 
-        elif filename.endswith(".changes"):
-            s = filename[:-4].split("_", 3)
-            if len(s) == 3:
-                pkgname, version, arch = s
-                destbuild_id = debbuild.id
-                has_changes_file = True
-                if not sourcename:
-                    sourcename = pkgname
+            elif filename.endswith(".changes"):
+                s = filename[:-4].split("_", 3)
+                if len(s) == 3:
+                    pkgname, version, arch = s
+                    destbuild_id = debbuild.id
+                    has_changes_file = True
+                    if not sourcename:
+                        sourcename = pkgname
 
-        elif filename.endswith(".buildinfo"):
-            s = filename[:-4].split("_", 3)
-            if len(s) == 3:
-                pkgname, version, arch = s
-                destbuild_id = debbuild.id
-                has_buildinfo_file = True
-                if not sourcename:
-                    sourcename = pkgname
+            elif filename.endswith(".buildinfo"):
+                s = filename[:-4].split("_", 3)
+                if len(s) == 3:
+                    pkgname, version, arch = s
+                    destbuild_id = debbuild.id
+                    has_buildinfo_file = True
+                    if not sourcename:
+                        sourcename = pkgname
 
-        elif filename.endswith(".dsc"):
-            s = filename[:-4].split("_", 2)
-            if len(s) == 2:
-                pkgname, version = s
-                destbuild_id = srcbuild.id
-                source_upload = True
-                if not sourcename:
-                    sourcename = pkgname
+            elif filename.endswith(".dsc"):
+                s = filename[:-4].split("_", 2)
+                if len(s) == 2:
+                    pkgname, version = s
+                    destbuild_id = srcbuild.id
+                    source_upload = True
+                    if not sourcename:
+                        sourcename = pkgname
 
-        elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
-            s = filename[:-7].split("_", 2)
-            if len(s) == 2:
-                pkgname, version = s
-                destbuild_id = srcbuild.id
-                source_upload = True
-                if not sourcename:
-                    sourcename = pkgname
+            elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
+                s = filename[:-7].split("_", 2)
+                if len(s) == 2:
+                    pkgname, version = s
+                    destbuild_id = srcbuild.id
+                    source_upload = True
+                    if not sourcename:
+                        sourcename = pkgname
 
-        else:
-            await build.log("W: ignoring unknown file type: '%s'\n" % filename)
-            continue
+            else:
+                await build.log("W: ignoring unknown file type: '%s'\n" % filename)
+                continue
 
-        if not build_version:
-            build_version = version
-        elif version != build_version:
-            # FIXME: cleanup saved files
-            await build.log("E: version mismatch in uploaded files: '%s'\n" % version)
-            # FIXME: terminate build log
-            return ErrorResponse(400, "version mismatch in uploaded files")
+            if not build_version:
+                build_version = version
+            elif version != build_version:
+                # FIXME: cleanup saved files
+                await build.log("E: version mismatch in uploaded files: '%s'\n" % version)
+                # FIXME: terminate build log
+                return ErrorResponse(400, "version mismatch in uploaded files")
 
-        # FIXME: check arch in projectversion
-        await write_part(destbuild_id, part)
+            # FIXME: check arch in projectversion
+            await write_part(destbuild_id, part)
+    except Exception as exc:
+        logger.exception(exc)
 
     await build.log("I: Verifying uploaded files...\n")
 

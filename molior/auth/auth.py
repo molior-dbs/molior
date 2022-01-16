@@ -134,7 +134,9 @@ def setup_token(request):
 @app.auth_handler
 async def authenticate_token(request, *kw):
     setup_token(request)
-    auth_token = request.cirrina.web_session.get("auth_token", None)
+    auth_token = None
+    if hasattr(request.cirrina.web_session, "auth_token"):
+        auth_token = request.cirrina.web_session.auth_token
     if not auth_token:
         return False
     token = None
@@ -179,7 +181,9 @@ def check_admin(request):
         if res and res.is_admin:
             return True
 
-    auth_token = request.cirrina.web_session.get("auth_token", None)
+    auth_token = None
+    if hasattr(request.cirrina.web_session, "auth_token"):
+        auth_token = request.cirrina.web_session.auth_token
     if auth_token:
         query = request.cirrina.db_session.query(Authtoken)
         query = query.filter(Authtoken.token == auth_token)
@@ -204,7 +208,6 @@ def req_admin(function):
     """
 
     @wraps(function)
-    @app.authenticated
     async def _wrapper(request):
         """Wrapper function for req_admin decorator."""
         if check_admin(request):
@@ -216,7 +219,9 @@ def req_admin(function):
 
 
 def check_authtoken(request, project_id):
-    auth_token = request.cirrina.web_session.auth_token
+    auth_token = None
+    if hasattr(request.cirrina.web_session, "auth_token"):
+        auth_token = request.cirrina.web_session.auth_token
     if not auth_token:
         return False
 
@@ -317,7 +322,6 @@ class req_role(object):
         """Wrapper function for req_admin decorator."""
 
         @wraps(function)
-        @app.authenticated
         async def _wrapper(request):
             maintenance_mode = False
             query = "SELECT value from metadata where name = :key"
@@ -327,6 +331,7 @@ class req_role(object):
                     maintenance_mode = True
                 break
 
+            setup_token(request)
             if check_admin(request):
                 return await function(request)
 
