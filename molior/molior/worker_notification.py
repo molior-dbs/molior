@@ -100,7 +100,6 @@ class NotificationWorker:
             }
 
             if not build.sourcerepository or not build.projectversion:
-                logger.warning("hook: no source repo and no projectversion")
                 return
 
             buildconfig = session.query(SouRepProVer).filter(SouRepProVer.sourcerepository_id == build.sourcerepository_id,

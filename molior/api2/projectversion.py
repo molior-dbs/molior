@@ -4,6 +4,7 @@ from aiohttp import web
 from shutil import rmtree
 from pathlib import Path
 from aiofile import AIOFile, Writer
+from launchy import Launchy
 
 from ..app import app, logger
 from ..auth import req_role
@@ -1080,14 +1081,23 @@ async def external_build_upload(request):
 
     build_version = None
     sourcename = None
+    source_pkg = None
+    dsc_file = None
     source_upload = False
     has_changes_file = False
     has_buildinfo_file = False
+    changes_file = None
 
-    reader = await request.multipart()
     try:
+        reader = await request.multipart()
         async for part in reader:
-            filename = part.filename.replace("/", "")  # no paths separators allowed
+            filename = part.filename.replace("/", "")  # sanitize
+            filename = filename.replace("$", "")
+            filename = filename.replace("`", "")
+            filename = filename.replace("'", "")
+            filename = filename.replace("\"", "")
+            filename = filename.replace("\\", "")
+
             await build.log(" - %s\n" % filename)
 
             destbuild_id = None
@@ -1097,38 +1107,51 @@ async def external_build_upload(request):
             arch = None
             if filename.endswith(".deb"):
                 s = filename[:-4].split("_", 3)
-                if len(s) == 3:
-                    pkgname, version, arch = s
-                    destbuild_id = debbuild.id
+                if len(s) != 3:
+                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    continue
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
 
             elif filename.endswith(".changes"):
                 s = filename[:-4].split("_", 3)
-                if len(s) == 3:
-                    pkgname, version, arch = s
-                    destbuild_id = debbuild.id
-                    has_changes_file = True
-                    if not sourcename:
-                        sourcename = pkgname
+                if len(s) != 3:
+                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    continue
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_changes_file = True
+                changes_file = buildout_path / str(destbuild_id) / filename
+                if not sourcename:
+                    sourcename = pkgname
 
             elif filename.endswith(".buildinfo"):
                 s = filename[:-4].split("_", 3)
-                if len(s) == 3:
-                    pkgname, version, arch = s
-                    destbuild_id = debbuild.id
-                    has_buildinfo_file = True
-                    if not sourcename:
-                        sourcename = pkgname
+                if len(s) != 3:
+                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    continue
+                pkgname, version, arch = s
+                destbuild_id = debbuild.id
+                has_buildinfo_file = True
+                if not sourcename:
+                    sourcename = pkgname
 
             elif filename.endswith(".dsc"):
                 s = filename[:-4].split("_", 2)
-                if len(s) == 2:
-                    pkgname, version = s
-                    destbuild_id = srcbuild.id
-                    source_upload = True
-                    if not sourcename:
-                        sourcename = pkgname
+                if len(s) != 2:
+                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    continue
+                dsc_file = filename
+                pkgname, version = s
+                destbuild_id = srcbuild.id
+                if not sourcename:
+                    sourcename = pkgname
 
             elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
+                if source_upload:
+                    await build.log("W: only one source package allowed: '%s'\n" % filename)
+                    continue
+                source_pkg = filename
                 s = filename[:-7].split("_", 2)
                 if len(s) == 2:
                     pkgname, version = s
@@ -1176,6 +1199,22 @@ async def external_build_upload(request):
 
     await build.log("I: Found external build: %s/%s\n" % (sourcename, build_version))
 
+    # Fix changes file for source uploads
+    if source_upload:
+        # remove dsc entry from changes file, as it is signed in the source upload
+        async def outh(line):
+            if len(line.strip()) != 0:
+                logger.info(line)
+
+        d = dsc_file.replace(".", "\\.")
+        s = source_pkg.replace(".", "\\.")
+        cmd = f"sed -i -e '/{d}$/d' -e '/{s}$/d' {changes_file}"
+        process = Launchy(cmd, outh, outh)
+        await process.launch()
+        ret = await process.wait()
+        if ret != 0:
+            logger.error("build upload: patching changes file failed")
+
     build.sourcename = sourcename
     srcbuild.sourcename = sourcename
     debbuild.sourcename = sourcename
@@ -1188,7 +1227,7 @@ async def external_build_upload(request):
     existing_build = db.query(Build).filter(Build.buildtype == "build",
                                             Build.sourcerepository_id.is_(None),
                                             Build.projectversion_id == projectversion.id,
-                                            Build.buildstate == "successful",
+                                            Build.buildstate == "successful",  # FIXME: or new, building, publishing
                                             Build.is_deleted.is_(False),
                                             Build.sourcename == sourcename,
                                             Build.version == build_version).first()
@@ -1224,4 +1263,4 @@ async def external_build_upload(request):
     await debbuild.log("I: verifying debian packages\n")
     await enqueue_aptly({"publish": [debbuild.id]})
 
-    return OKResponse()
+    return OKResponse({"build_id": build.id}, status=201)
