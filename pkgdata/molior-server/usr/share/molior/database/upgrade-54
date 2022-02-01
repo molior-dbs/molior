@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE projectversion ADD COLUMN mirror_filter character varying;
+ALTER TABLE projectversion ADD COLUMN mirror_filter_with_deps BOOLEAN;
+
+EOF
