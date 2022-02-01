@@ -94,7 +94,9 @@ async def get_mirror2(request):
         "mirrorkeyids": mirrorkeyids,
         "mirrorkeyserver": mirrorkeyserver,
         "external_repo": mirror.external_repo,
-        "dependency_policy": mirror.dependency_policy
+        "dependency_policy": mirror.dependency_policy,
+        "mirrorfilter": mirror.mirror_filter,
+        "mirrorfilterwithdeps": mirror.mirror_filter_with_deps
     }
     return web.json_response(result)
 
