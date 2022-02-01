@@ -51,6 +51,8 @@ class ProjectVersion(Base):
     mirror_with_sources = Column(Boolean, default=False)
     mirror_with_installer = Column(Boolean, default=False)
     mirror_keys = relationship("MirrorKey", back_populates="mirrors")
+    mirror_filter = Column(String)
+    mirror_filter_with_deps = Column(Boolean, default=False)
     is_locked = Column(Boolean, default=False)
     ci_builds_enabled = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)

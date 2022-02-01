@@ -221,7 +221,8 @@ class AptlyApi:
         return await self.POST("/gpg/key", data=data)
 
     async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
-                            components, architectures, download_sources=True, download_udebs=True, download_installer=True):
+                            components, architectures, mirror_filter, mirror_filter_with_deps=False, download_sources=True,
+                            download_udebs=True, download_installer=True):
         """
         Creates a debian archive mirror.
 
@@ -244,6 +245,8 @@ class AptlyApi:
                 "DownloadSources": download_sources,
                 "DownloadUdebs": download_udebs,
                 "DownloadInstaller": download_installer,
+                "Filter": mirror_filter,
+                "FilterWithDeps": mirror_filter_with_deps,
             }
 
             await self.POST("/mirrors", data=data)

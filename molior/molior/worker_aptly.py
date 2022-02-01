@@ -455,7 +455,9 @@ class AptlyWorker:
             download_sources,
             download_installer,
             external_repo,
-            dependency_policy
+            dependency_policy,
+            mirror_filter,
+            mirror_filter_with_deps
         ) = args
 
         mirror_id = None
@@ -495,7 +497,9 @@ class AptlyWorker:
                 mirror_state="new",
                 basemirror_id=basemirror_id,
                 external_repo=external_repo,
-                dependency_policy=dependency_policy
+                dependency_policy=dependency_policy,
+                mirror_filter=mirror_filter,
+                mirror_filter_with_deps=mirror_filter_with_deps
             )
 
             session.add(mirror)
@@ -595,6 +599,8 @@ class AptlyWorker:
                         mirror.mirror_distribution,
                         mirror.mirror_components.split(","),  # FIXME: should be array in db
                         db2array(mirror.mirror_architectures),
+                        mirror.mirror_filter,
+                        mirror_filter_with_deps=mirror.mirror_filter_with_deps,
                         download_sources=mirror.mirror_with_sources,
                         download_udebs=mirror.mirror_with_installer,
                         download_installer=mirror.mirror_with_installer,

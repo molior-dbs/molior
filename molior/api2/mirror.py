@@ -329,6 +329,8 @@ async def create_mirror2(request):
     mirrorkeyids      = params.get("mirrorkeyids")      # noqa: E221
     mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
     dependency_policy = params.get("dependencylevel")   # noqa: E221
+    mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
+    mirrorfilterwithdeps = params.get("mirrorfilterwithdeps")  # noqa: E221
 
     mirrorcomponents = re.split(r"[, ]", mirrorcomponents)
 
@@ -388,7 +390,9 @@ async def create_mirror2(request):
             mirrorsrc,
             mirrorinst,
             external_repo,
-            dependency_policy
+            dependency_policy,
+            mirrorfilter,
+            mirrorfilterwithdeps
         ]
     }
     await enqueue_aptly(args)
@@ -511,6 +515,8 @@ async def edit_mirror(request):
     mirrorkeyids      = params.get("mirrorkeyids")      # noqa: E221
     mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
     dependency_policy = params.get("dependencylevel")   # noqa: E221
+    mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
+    mirrorfilterwithdeps = params.get("mirrorfilterwithdeps")  # noqa: E221
 
     if basemirror:
         basemirror_name, basemirror_version = basemirror.split("/")
@@ -528,6 +534,8 @@ async def edit_mirror(request):
     mirror.mirror_with_sources = mirrorsrc
     mirror.mirror_with_installer = mirrorinst
     mirror.is_basemirror = mirrortype == "1"
+    mirror.mirror_filter = mirrorfilter
+    mirror.mirror_filter_with_deps = mirrorfilterwithdeps
 
     if mirrortype == "2":
         mirror.dependency_policy = dependency_policy
