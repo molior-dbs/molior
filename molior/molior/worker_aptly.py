@@ -589,6 +589,10 @@ class AptlyWorker:
                         return False
 
                 await build.log("I: creating mirror\n")
+                if mirror.mirror_filter:
+                    await build.log("I: using filter %s\n" % mirror.mirror_filter)
+                    if mirror.mirror_filter_with_deps:
+                        await build.log("I: using filter with deps\n")
                 try:
                     await aptly.mirror_create(
                         mirror.project.name,
