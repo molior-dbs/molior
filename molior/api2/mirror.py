@@ -311,6 +311,14 @@ async def create_mirror2(request):
                       required: false
                       type: string
                       description: Dependency policy, e.g. strict
+                  mirrorfilter:
+                      required: false
+                      type: string
+                      description: Filter packages to be mirrored
+                  mirrorfilterwithdeps:
+                      required: false
+                      type: boolean
+                      description: Mirror dependencies of the filtered packages
     produces:
         - text/json
     """
@@ -485,6 +493,14 @@ async def edit_mirror(request):
                       type: string
                       description: Dependency policy
                       example: strict
+                  mirrorfilter:
+                      required: false
+                      type: string
+                      description: Filter packages to be mirrored
+                  mirrorfilterwithdeps:
+                      required: false
+                      type: boolean
+                      description: Mirror dependencies of the filtered packages
     """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
