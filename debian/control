@@ -39,26 +39,43 @@ Depends: ${misc:Depends}
 Description: Molior base OS configuration
  This will configure the Debian OS (locale, language, ...)
 
-Package: molior-vbox
+Package: molior-vm
 Architecture: all
 Pre-Depends: molior-os-config
-Depends: ${misc:Depends}, linux-image-amd64, grub-pc, lvm2, busybox,
+Depends: ${misc:Depends}, linux-image-amd64, lvm2, busybox,
   systemd-sysv, libpam-systemd, bash-completion,
   net-tools, ifupdown, isc-dhcp-client, iputils-ping,
   openssh-server, acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, haveged,
+# add some tools:
+  htop, bzip2, wget, psmisc,
+# molior:
+  molior-server, dma, molior-web, molior-tools,
+  aptly (>= 1.3.0.adsy10.molior4), apache2-utils, apg
+Description: molior virtual machine
+ Virtual Machine meta package depending on molior and aptly services
+
+Package: molior-vbox
+Architecture: all
+Depends: ${misc:Depends}, molior-vm,
+  grub-pc,
+# molior node
+  molior-client-http,
 # vim:
   vim-nox, python3-flake8, flake8, cmake, python3-pytest, python3-pytest-cov,
   libpython3-dev, fonts-hack-ttf, build-essential, exuberant-ctags,
-# add some tools:
-  htop, tree, bzip2, wget, telnet, man, psmisc, gitk, git-gui, xauth,
-# molior:
-  molior-server, molior-client-http, dma, molior-web, molior-tools,
-  aptly (>= 1.3.0.adsy10.molior4), apache2-utils, apg,
 # development:
+  tree, telnet, man, gitk, git-gui, xauth,
   dh-python, debhelper, dh-exec, python3-all, nodejs (>= 8.1.3-1nodesource1~jessie1), npm (>= 5.8.0+ds6-2~bpo9+1)
 Description: molior development virtual machine
  Development environment for molior
+
+Package: molior-vsphere
+Architecture: all
+Depends: ${misc:Depends}, molior-vm,
+    vim, grub-efi-amd64, efibootmgr
+Description: molior virtual machine for vSphere
+ molior virtual machine template (OVF) meta package
 
 Package: molior-node-amd64
 Architecture: all
