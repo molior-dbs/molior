@@ -41,8 +41,9 @@ case "$1" in
         sed -i "s/^#force_color_prompt=yes/force_color_prompt=yes/" $SYSHOME/.bashrc
 
         cat > $SYSHOME/README.txt <<EOF
-Set molior service hostname or IP:
-sudo vi /etc/default/molior
+Set molior server hostname or IP:
+sudo vi /etc/default/molior-client
+sudo service molior-client-http restart
 EOF
         chown -R $SYSUSER:$SYSUSER $SYSHOME/
 
