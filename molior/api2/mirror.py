@@ -95,8 +95,7 @@ async def get_mirror2(request):
         "mirrorkeyserver": mirrorkeyserver,
         "external_repo": mirror.external_repo,
         "dependency_policy": mirror.dependency_policy,
-        "mirrorfilter": mirror.mirror_filter,
-        "mirrorfilterwithdeps": mirror.mirror_filter_with_deps
+        "mirrorfilter": mirror.mirror_filter
     }
     return web.json_response(result)
 
@@ -315,10 +314,6 @@ async def create_mirror2(request):
                       required: false
                       type: string
                       description: Filter packages to be mirrored
-                  mirrorfilterwithdeps:
-                      required: false
-                      type: boolean
-                      description: Mirror dependencies of the filtered packages
     produces:
         - text/json
     """
@@ -340,7 +335,6 @@ async def create_mirror2(request):
     mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
     dependency_policy = params.get("dependencylevel")   # noqa: E221
     mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
-    mirrorfilterwithdeps = params.get("mirrorfilterwithdeps")  # noqa: E221
 
     mirrorcomponents = re.split(r"[, ]", mirrorcomponents)
 
@@ -402,7 +396,6 @@ async def create_mirror2(request):
             external_repo,
             dependency_policy,
             mirrorfilter,
-            mirrorfilterwithdeps
         ]
     }
     await enqueue_aptly(args)
@@ -497,10 +490,6 @@ async def edit_mirror(request):
                       required: false
                       type: string
                       description: Filter packages to be mirrored
-                  mirrorfilterwithdeps:
-                      required: false
-                      type: boolean
-                      description: Mirror dependencies of the filtered packages
     """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
@@ -534,7 +523,6 @@ async def edit_mirror(request):
     mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
     dependency_policy = params.get("dependencylevel")   # noqa: E221
     mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
-    mirrorfilterwithdeps = params.get("mirrorfilterwithdeps")  # noqa: E221
 
     if basemirror:
         basemirror_name, basemirror_version = basemirror.split("/")
@@ -553,7 +541,6 @@ async def edit_mirror(request):
     mirror.mirror_with_installer = mirrorinst
     mirror.is_basemirror = mirrortype == "1"
     mirror.mirror_filter = mirrorfilter
-    mirror.mirror_filter_with_deps = mirrorfilterwithdeps
 
     if mirrortype == "2":
         mirror.dependency_policy = dependency_policy

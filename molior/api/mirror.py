@@ -152,8 +152,7 @@ async def create_mirror(request):
             download_installer,
             False,
             "strict",
-            "",
-            False
+            ""
         ]
     }
     await enqueue_aptly(args)
@@ -295,7 +294,6 @@ async def get_mirrors(request):
                 "external_repo": mirror.external_repo,
                 "dependency_policy": mirror.dependency_policy,
                 "mirrorfilter": mirror.mirror_filter,
-                "mirrorfilterwithdeps": mirror.mirror_filter_with_deps
             }
         )
     return web.json_response(data)

@@ -457,7 +457,6 @@ class AptlyWorker:
             external_repo,
             dependency_policy,
             mirror_filter,
-            mirror_filter_with_deps
         ) = args
 
         mirror_id = None
@@ -499,7 +498,6 @@ class AptlyWorker:
                 external_repo=external_repo,
                 dependency_policy=dependency_policy,
                 mirror_filter=mirror_filter,
-                mirror_filter_with_deps=mirror_filter_with_deps
             )
 
             session.add(mirror)
@@ -591,8 +589,6 @@ class AptlyWorker:
                 await build.log("I: creating mirror\n")
                 if mirror.mirror_filter:
                     await build.log("I: using filter %s\n" % mirror.mirror_filter)
-                    if mirror.mirror_filter_with_deps:
-                        await build.log("I: using filter with deps\n")
                 try:
                     await aptly.mirror_create(
                         mirror.project.name,
@@ -604,7 +600,6 @@ class AptlyWorker:
                         mirror.mirror_components.split(","),  # FIXME: should be array in db
                         db2array(mirror.mirror_architectures),
                         mirror.mirror_filter,
-                        mirror_filter_with_deps=mirror.mirror_filter_with_deps,
                         download_sources=mirror.mirror_with_sources,
                         download_udebs=mirror.mirror_with_installer,
                         download_installer=mirror.mirror_with_installer,
