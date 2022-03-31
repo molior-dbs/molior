@@ -11,6 +11,7 @@ from datetime import datetime
 from aiofile import AIOFile, Writer
 from tempfile import mkdtemp
 from shutil import rmtree
+from enum import Enum
 
 from ..app import logger
 from ..tools import get_changelog_attr, strip_epoch_version, db2array, array2db
@@ -236,77 +237,76 @@ async def DownloadDebSrc(repo_id, sourcedir, sourcename, build_id, version, base
     return ret == 0
 
 
-async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targets, force_ci=False):
-    await buildlogtitle(parent_build_id, "Molior Build")
+class BuildPreparationState(Enum):
+
+    OK = 0
+    RETRY = 1
+    ERROR = 2
+    ALREADY_DONE = 3
+
+
+async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_targets, force_ci=False):
+    await buildlogtitle(parent.id, "Molior Build")
+
     info = None
     source_exists = False
-    with Session() as session:
-        parent = session.query(Build).filter(Build.id == parent_build_id).first()
-        if not parent:
-            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-            return
+    existing_src_build = None
+    is_ci = False
 
-        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
-        if not repo:
-            logger.error("source repository %d not found", repo_id)
-            await parent.log("E: source repository {} not found\n".format(repo_id))
-            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await parent.logdone()
-            await parent.set_failed()
-            session.commit()
-            return
-        src_path = repo.src_path
-
-        if parent.version:
-            existing_src_build = session.query(Build).filter(Build.buildtype == "source",
-                                                             Build.sourcerepository == repo,
-                                                             Build.version == parent.version,
-                                                             Build.buildstate == "successful",
-                                                             Build.is_deleted.is_(False)).first()
-            if existing_src_build:
+    # check if there is build info from the parent build
+    if parent.version:
+        existing_src_build = session.query(Build).filter(Build.buildtype == "source",
+                                                         Build.sourcerepository == repo,
+                                                         Build.version == parent.version,
+                                                         Build.is_deleted.is_(False)).first()
+        if existing_src_build:
+            if existing_src_build.buildstate == "successful":
                 source_exists = True
+            elif existing_src_build.buildstate == "new" or existing_src_build.buildstate == "building" or \
+                    existing_src_build.buildstate == "needs_publish" or existing_src_build.buildstate == "publishing":
+                return BuildPreparationState.RETRY, info
+            elif existing_src_build.buildstate == "build_failed" or existing_src_build.buildstate == "publish_failed":
+                return BuildPreparationState.ERROR, info
 
-                # create fake info
-                class BuildInfo:
-                    pass
+            # create info object
+            class BuildInfo:
+                pass
 
-                info = BuildInfo()
-                info.version = parent.version
-                info.plain_targets = []
-                info.firstname = existing_src_build.maintainer.firstname
-                info.lastname = existing_src_build.maintainer.surname
-                info.email = existing_src_build.maintainer.email
-                info.commit_hash = existing_src_build.git_ref
-                info.sourcename = existing_src_build.sourcename
+            info = BuildInfo()
+            info.version = parent.version
+            info.firstname = existing_src_build.maintainer.firstname
+            info.lastname = existing_src_build.maintainer.surname
+            info.email = existing_src_build.maintainer.email
+            info.commit_hash = existing_src_build.git_ref
+            info.sourcename = existing_src_build.sourcename
+            is_ci = parent.is_ci
 
+            info.plain_targets = []
+            for p_id in parent.projectversions:
+                projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == p_id).first()
+                if projectversion:
+                    info.plain_targets.append((projectversion.project.name, projectversion.name))
+
+    # otherwise get info from git
     if not source_exists:
-        await buildlog(parent_build_id, "I: git checkout {}\n".format(git_ref))
+        await buildlog(parent.id, "I: git checkout {}\n".format(git_ref))
+
+        repo.set_busy()
+        session.commit()
 
         # Checkout
-        ret = await asyncio.ensure_future(GitCheckout(src_path, git_ref, parent_build_id))
-
+        ret = await asyncio.ensure_future(GitCheckout(repo.src_path, git_ref, parent.id))
         if not ret:
-            await buildlog(parent_build_id, "E: git checkout failed\n")
-            await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-            await buildlogdone(parent_build_id)
+            await buildlog(parent.id, "E: git checkout failed\n")
+            await buildlogtitle(parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+            await buildlogdone(parent.id)
 
-        with Session() as session:
-            parent = session.query(Build).filter(Build.id == parent_build_id).first()
-            if not parent:
-                logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-                return
-            repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
-            if not repo:
-                logger.error("source repository %d not found", repo_id)
-                return
+            await parent.set_failed()
+            repo.set_ready()
+            session.commit()
+            return BuildPreparationState.ERROR, info
 
-            if not ret:
-                await parent.set_failed()
-                repo.set_ready()
-                session.commit()
-                return
-
-        await buildlog(parent_build_id, "\nI: get build information\n")
+        await buildlog(parent.id, "\nI: get build information\n")
 
         try:
             info = await GetBuildInfo(repo.src_path, git_ref)
@@ -314,42 +314,18 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             logger.exception(exc)
 
         if not info:
-            await buildlog(parent_build_id, "E: Error getting build information\n")
-            await buildlogtitle(parent_build_id, "Done", no_footer_newline=True, no_header_newline=False)
-            await buildlogdone(parent_build_id)
+            await buildlog(parent.id, "E: Error getting build information\n")
+            await buildlogtitle(parent.id, "Done", no_footer_newline=True, no_header_newline=False)
+            await buildlogdone(parent.id)
 
-    with Session() as session:
-        parent = session.query(Build).filter(Build.id == parent_build_id).first()
-        if not parent:
-            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-            return
-        repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id) .first()
-        if not repo:
-            logger.error("source repository %d not found", repo_id)
-            return
+    # no build info found, abort
+    if not info:
+        await parent.set_failed()
+        if not source_exists:
+            repo.set_ready()
+        session.commit()
+        return BuildPreparationState.ERROR, info
 
-        if not info:
-            await parent.set_failed()
-            if not source_exists:
-                repo.set_ready()
-            session.commit()
-            return
-
-        targets = get_targets(info.plain_targets, repo, custom_targets, session)
-
-        if not targets:
-            repo.log_state("unknown target projectversions in debian/molior.yml")
-            await parent.log("E: the repository is not added to any projectversions from debian/molior.yml:\n")
-            await parent.log("   %s\n" % str(info.plain_targets))
-            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-            await parent.logdone()
-            if not source_exists:
-                repo.set_ready()
-            await parent.set_nothing_done()
-            session.commit()
-            return
-
-    is_ci = False
     if not source_exists:
         if force_ci:
             is_ci = True
@@ -362,7 +338,7 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
                 nonlocal gittag
                 gittag += line
 
-            process = Launchy("git describe --tags --abbrev=40", outh, outh, cwd=str(src_path))
+            process = Launchy("git describe --tags --abbrev=40", outh, outh, cwd=str(repo.src_path))
             await process.launch()
             ret = await process.wait()
             if ret != 0:
@@ -375,16 +351,6 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
         ci_cfg = Configuration().ci_builds
         ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
 
-    with Session() as session:
-        parent = session.query(Build).filter(Build.id == parent_build_id).first()
-        if not parent:
-            logger.error("BuildProcess: parent build {} not found".format(parent_build_id))
-            return
-        repo = session.query(SourceRepository) .filter(SourceRepository.id == repo_id) .first()
-        if not repo:
-            logger.error("source repository %d not found", repo_id)
-            return
-
         if is_ci and not ci_enabled:
             repo.log_state("CI builds are not enabled in configuration")
             await parent.log("E: CI builds are not enabled in configuration\n")
@@ -393,211 +359,268 @@ async def BuildProcess(parent_build_id, repo_id, git_ref, ci_branch, custom_targ
             await parent.set_successful()
             repo.set_ready()
             session.commit()
-            return
+            return BuildPreparationState.ERROR, info
 
-        parent.is_ci = is_ci
-        session.commit()
+    # set CI version
+    if is_ci:
+        # create CI version with git hash suffix
+        info.origversion = info.version
+        info.version += "+git{}.{}".format(datetime.now().strftime("%Y%m%d%H%M%S"), info.commit_hash[:6])
 
-        if is_ci:
-            # create CI version with git hash suffix
-            info.origversion = info.version
-            info.version += "+git{}.{}".format(datetime.now().strftime("%Y%m%d%H%M%S"), info.commit_hash[:6])
-
-            # check if CI builds enabled in any project version
-            found = False
-            for target in targets:
-                projectversion = session.query(ProjectVersion).filter(
-                        ProjectVersion.ci_builds_enabled.is_(True),
-                        ProjectVersion.id == target.projectversion_id).first()
-                if projectversion:
-                    found = True
-                    break
-            if not found:
-                repo.log_state("CI builds not enabled in specified projectversions, not building...")
-                await parent.log("E: CI builds not enabled in specified projectversions, not building...\n")
-                await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-                await parent.logdone()
-                await parent.set_nothing_done()
-                repo.set_ready()
-                session.commit()
-                return
-
-        # Check if already built completely
-        missing_builds = False
+    # check for existing source builds with real version
+    if not source_exists:
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
                                                          Build.sourcerepository == repo,
                                                          Build.version == info.version,
-                                                         Build.buildstate == "successful",
                                                          Build.is_deleted.is_(False)).first()
         if existing_src_build:
-            # check for missing successful deb builds
-            for target in targets:
-                for arch in db2array(target.architectures):
-                    # FIXME: check buildstates
-                    deb_build = session.query(Build).filter(Build.buildtype == "deb",
-                                                            Build.sourcerepository == repo,
-                                                            Build.version == info.version,
-                                                            Build.projectversion_id == target.projectversion_id,
-                                                            Build.architecture == arch).first()
-                    if not deb_build:
-                        missing_builds = True
-
-            if not missing_builds:
-                await parent.log("E: all debian builds already existing for version {}\n".format(info.version))
-                await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-                await parent.logdone()
-                repo.set_ready()
-                if existing_src_build.parent and existing_src_build.parent.buildstate == "successful":
-                    await parent.set_already_exists()
-                else:
-                    await parent.set_already_failed()
-                session.commit()
-                args = {"schedule": []}
-                await enqueue_task(args)
-                return
-
-        # Use commiter name as maintainer for CI builds
-        if is_ci:
-            t = info.author_name.split(" ", 2)
-            if len(t) == 2:
-                firstname = t[0]
-                lastname = t[1]
-            else:
-                firstname = t[0]
-                lastname = ""
-            email = info.author_email
-        else:
-            firstname = info.firstname
-            lastname = info.lastname
-            email = info.email
-
-        maintainer = session.query(Maintainer).filter(Maintainer.email == email).first()
-        if not maintainer:
-            maintainer = Maintainer(firstname=firstname, surname=lastname, email=email)
-            session.add(maintainer)
+            repo.set_ready()
             session.commit()
+            if existing_src_build.buildstate == "successful":
+                source_exists = True
+            elif existing_src_build.buildstate == "new" or existing_src_build.buildstate == "building" or \
+                    existing_src_build.buildstate == "needs_publish" or existing_src_build.buildstate == "publishing":
+                return BuildPreparationState.RETRY, info
+            elif existing_src_build.buildstate == "build_failed" or existing_src_build.buildstate == "publish_failed":
+                return BuildPreparationState.ERROR, info
 
-        # FIXME: assert version == git tag
+    # plain targets emtpy FIXME
+    targets = get_targets(info.plain_targets, repo, custom_targets, session)
 
-        build = Build(
-            version=info.version,
-            git_ref=info.commit_hash,
-            ci_branch=ci_branch,
-            is_ci=is_ci,
-            sourcename=info.sourcename,
-            buildstate="new",
-            buildtype="source",
-            parent_id=parent_build_id,
-            sourcerepository=repo,
-            maintainer=maintainer,
-        )
-
-        # update patent
-        parent.version = info.version
-        parent.sourcerepository = repo
-        parent.maintainer = maintainer
-        parent.git_ref = info.commit_hash
-
-        session.add(build)
+    if not targets:
+        repo.log_state("unknown target projectversions in debian/molior.yml")
+        await parent.log("E: the repository is not added to any projectversions from debian/molior.yml:\n")
+        await parent.log("   %s\n" % str(info.plain_targets))
+        await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+        await parent.logdone()
+        if not source_exists:
+            repo.set_ready()
+        await parent.set_nothing_done()
         session.commit()
-        await parent.build_changed()
-        await build.build_added()
+        return BuildPreparationState.ERROR, info
 
-        # add build order dependencies
-        build_after = get_buildorder(repo.src_path)
-        if build_after:
-            await build.parent.log("N: source needs to build after: %s\n" % ", ".join(build_after))
-            build.builddeps = "{" + ",".join(build_after) + "}"
-            session.commit()
+    # remember info for CreateBuilds
+    info.targets = targets  # FIXME: this stores db objects
+    info.source_exists = source_exists
 
-        projectversion_ids = []
+    if not parent.version:
+        parent.version = info.version
+        parent.is_ci = is_ci
+        projectversions = []
+        for target in info.targets:
+            projectversions.append(str(target.projectversion_id))
+        parent.projectversions = array2db(projectversions)
+        session.commit()
+
+    if is_ci:
+        # check if CI builds enabled in any project version
         found = False
         for target in targets:
-            projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == target.projectversion_id).first()
-            if projectversion.is_locked:
-                repo.log_state("build to locked projectversion '%s-%s' not permitted" % (
-                        projectversion.project.name,
-                        projectversion.name,
-                    ))
-                await parent.log("W: build to locked projectversion '%s-%s' not permitted\n" % (
-                        projectversion.project.name,
-                        projectversion.name,
-                    ))
-                continue
-
-            if is_ci and not projectversion.ci_builds_enabled:
-                repo.log_state("CI builds not enabled in projectversion '%s-%s'" % (
-                        projectversion.project.name,
-                        projectversion.name,
-                    ))
-                await parent.log("W: CI builds not enabled in projectversion '%s-%s'\n" % (
-                        projectversion.project.name,
-                        projectversion.name,
-                    ))
-                continue
-
-            architectures = db2array(target.architectures)
-            for architecture in architectures:
-                deb_build = session.query(Build).filter(
-                                Build.sourcerepository_id == repo.id,
-                                Build.projectversion == projectversion,
-                                Build.version == info.version,
-                                Build.buildtype == "deb",
-                                Build.architecture == architecture).first()
-                if deb_build:
-                    if deb_build.buildstate != "successful":
-                        deb_build.buildstate = "needs_build"
-                        session.commit()
-                        found = True  # FIXME: should this be here ?
-                        continue
-                    await parent.log("W: packages already built for {} {}\n".format(projectversion.fullname, architecture))
-                    continue
-
+            projectversion = session.query(ProjectVersion).filter(
+                    ProjectVersion.ci_builds_enabled.is_(True),
+                    ProjectVersion.id == target.projectversion_id).first()
+            if projectversion:
                 found = True
-
-                # only add projectversions where a debian package will be built.
-                # this allows deleting a source republish without deleting the original source package
-                if projectversion.id not in projectversion_ids:
-                    projectversion_ids.append(projectversion.id)
-
-                await parent.log("I: creating build for projectversion '%s/%s'\n" % (
-                        projectversion.project.name,
-                        projectversion.name,
-                    ))
-
-                deb_build = Build(
-                    version=info.version,
-                    git_ref=info.commit_hash,
-                    ci_branch=ci_branch,
-                    is_ci=is_ci,
-                    sourcename=info.sourcename,
-                    buildstate="new",
-                    buildtype="deb",
-                    parent_id=build.id,
-                    sourcerepository=repo,
-                    maintainer=maintainer,
-                    projectversion_id=projectversion.id,
-                    architecture=architecture
-                )
-
-                session.add(deb_build)
-                session.commit()
-
-                await deb_build.build_added()
-
+                break
         if not found:
-            await parent.log("E: no projectversion found to build for")
+            repo.log_state("CI builds not enabled in specified projectversions, not building...")
+            await parent.log("E: CI builds not enabled in specified projectversions, not building...\n")
             await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.logdone()
             await parent.set_nothing_done()
             repo.set_ready()
             session.commit()
-            return
+            return BuildPreparationState.ERROR, info
 
-        build.projectversions = array2db([str(p) for p in projectversion_ids])
+    # Check if already built completely
+    if source_exists:
+        # check for missing successful deb builds
+        missing_builds = False
+        for target in info.targets:
+            for arch in db2array(target.architectures):
+                # FIXME: check buildstates
+                deb_build = session.query(Build).filter(Build.buildtype == "deb",
+                                                        Build.sourcerepository == repo,
+                                                        Build.version == info.version,
+                                                        Build.projectversion_id == target.projectversion_id,
+                                                        Build.architecture == arch).first()
+                if not deb_build:
+                    missing_builds = True
+
+        if not missing_builds:
+            await parent.log("E: all debian builds already existing for version {}\n".format(info.version))
+            await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            await parent.logdone()
+
+            # FIXME: is this needed ?
+            repo.set_ready()
+
+            if existing_src_build.parent:
+                other_build = existing_src_build.parent
+                if other_build.buildstate == "successful":
+                    await parent.set_already_exists()
+                    session.commit()
+                    return BuildPreparationState.ALREADY_DONE, info
+                elif other_build.buildstate == "new" or other_build.buildstate == "building" or \
+                        other_build.buildstate == "needs_publish" or other_build.buildstate == "publishing":
+                    return BuildPreparationState.RETRY, info
+                elif other_build.buildstate == "build_failed" or other_build.buildstate == "publish_failed":
+                    await parent.set_already_failed()
+                    session.commit()
+                    return BuildPreparationState.ALREADY_DONE, info
+
+            # FIXME: needed ?
+            # args = {"schedule": []}
+            # await enqueue_task(args)
+            # return BuildPreparationState.OK, info
+
+    return BuildPreparationState.OK, info
+
+
+async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_targets, force_ci=False):
+
+    # Use commiter name as maintainer for CI builds
+    if parent.is_ci:
+        t = info.author_name.split(" ", 2)
+        if len(t) == 2:
+            firstname = t[0]
+            lastname = t[1]
+        else:
+            firstname = t[0]
+            lastname = ""
+        email = info.author_email
+    else:
+        firstname = info.firstname
+        lastname = info.lastname
+        email = info.email
+
+    maintainer = session.query(Maintainer).filter(Maintainer.email == email).first()
+    if not maintainer:
+        maintainer = Maintainer(firstname=firstname, surname=lastname, email=email)
+        session.add(maintainer)
         session.commit()
 
-        build_id = build.id
+    # FIXME: assert version == git tag
+
+    build = Build(
+        version=info.version,
+        git_ref=info.commit_hash,
+        ci_branch=ci_branch,
+        is_ci=parent.is_ci,
+        sourcename=info.sourcename,
+        buildstate="new",
+        buildtype="source",
+        parent_id=parent.id,
+        sourcerepository=repo,
+        maintainer=maintainer,
+    )
+
+    # update patent
+    parent.version = info.version
+    parent.sourcerepository = repo
+    parent.maintainer = maintainer
+    parent.git_ref = info.commit_hash
+
+    session.add(build)
+    session.commit()
+    await parent.build_changed()
+    await build.build_added()
+
+    # add build order dependencies
+    build_after = get_buildorder(repo.src_path)
+    if build_after:
+        await build.parent.log("N: source needs to build after: %s\n" % ", ".join(build_after))
+        build.builddeps = "{" + ",".join(build_after) + "}"
+        session.commit()
+
+    projectversion_ids = []
+    found = False
+    for target in info.targets:
+        projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == target.projectversion_id).first()
+        if projectversion.is_locked:
+            repo.log_state("build to locked projectversion '%s-%s' not permitted" % (
+                    projectversion.project.name,
+                    projectversion.name,
+                ))
+            await parent.log("W: build to locked projectversion '%s-%s' not permitted\n" % (
+                    projectversion.project.name,
+                    projectversion.name,
+                ))
+            continue
+
+        if parent.is_ci and not projectversion.ci_builds_enabled:
+            repo.log_state("CI builds not enabled in projectversion '%s-%s'" % (
+                    projectversion.project.name,
+                    projectversion.name,
+                ))
+            await parent.log("W: CI builds not enabled in projectversion '%s-%s'\n" % (
+                    projectversion.project.name,
+                    projectversion.name,
+                ))
+            continue
+
+        architectures = db2array(target.architectures)
+        for architecture in architectures:
+            deb_build = session.query(Build).filter(
+                            Build.sourcerepository_id == repo.id,
+                            Build.projectversion == projectversion,
+                            Build.version == info.version,
+                            Build.buildtype == "deb",
+                            Build.architecture == architecture).first()
+            if deb_build:
+                if deb_build.buildstate != "successful":
+                    deb_build.buildstate = "needs_build"
+                    session.commit()
+                    found = True  # FIXME: should this be here ?
+                    continue
+                await parent.log("W: packages already built for {} {}\n".format(projectversion.fullname, architecture))
+                continue
+
+            found = True
+
+            # only add projectversions where a debian package will be built.
+            # this allows deleting a source republish without deleting the original source package
+            if projectversion.id not in projectversion_ids:
+                projectversion_ids.append(projectversion.id)
+
+            await parent.log("I: creating build for projectversion '%s/%s'\n" % (
+                    projectversion.project.name,
+                    projectversion.name,
+                ))
+
+            deb_build = Build(
+                version=info.version,
+                git_ref=info.commit_hash,
+                ci_branch=ci_branch,
+                is_ci=parent.is_ci,
+                sourcename=info.sourcename,
+                buildstate="new",
+                buildtype="deb",
+                parent_id=build.id,
+                sourcerepository=repo,
+                maintainer=maintainer,
+                projectversion_id=projectversion.id,
+                architecture=architecture
+            )
+
+            session.add(deb_build)
+            session.commit()
+
+            await deb_build.build_added()
+
+    if not found:
+        await parent.log("E: no projectversion found to build for")
+        await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+        await parent.logdone()
+        await parent.set_nothing_done()
+        repo.set_ready()
+        session.commit()
+        return
+
+    build.projectversions = array2db([str(p) for p in projectversion_ids])
+    session.commit()
+
+    build_id = build.id
 
     await enqueue_task({"src_build": [build_id]})
 

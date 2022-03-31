@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..app import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
-from ..ops import BuildProcess, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
+from ..ops import PrepareBuilds, BuildPreparationState, CreateBuilds, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
 from ..molior.configuration import Configuration
 from ..molior.queues import enqueue_task, dequeue_task, enqueue_aptly
 
@@ -131,16 +131,7 @@ class Worker:
             logger.error("build: repo %d not found", repo_id)
             return
 
-        source_exists = False
-        src_build = session.query(Build).filter(Build.sourcerepository_id == repo_id,
-                                                Build.version == build.version,
-                                                Build.buildtype == "source",
-                                                Build.buildstate == "successful",
-                                                Build.is_deleted.is_(False)).first()
-        if src_build:
-            source_exists = True
-
-        if not source_exists and repo.state == "error":
+        if repo.state == "error":
             await build.log("E: git repo is in error state\n")
             await build.set_failed()
             await build.logdone()
@@ -155,12 +146,24 @@ class Worker:
         if build.buildstate != "building":
             await build.set_building()
 
-        if not source_exists:
-            repo.set_busy()
+        ret, info = await PrepareBuilds(session, build, repo, git_ref, ci_branch, targets, force_ci)
+        if ret == BuildPreparationState.RETRY:
+            logger.info("worker: build %d is depending on existing build, requeueing", build.id)
+            await enqueue_task({"build": args})
+            await asyncio.sleep(2)
+            return
+        if ret == BuildPreparationState.ERROR:
+            await build.log("E: error preparing build\n")
+            await build.set_failed()
+            await build.logdone()
+            return
+        if ret == BuildPreparationState.ALREADY_DONE:
+            await build.log("I: build done by different build\n")
+            await build.logdone()
+            return
 
-        session.commit()
-
-        asyncio.ensure_future(BuildProcess(build_id, repo.id, git_ref, ci_branch, targets, force_ci))
+        # FIXME: this was run as a future in bkg before
+        await CreateBuilds(session, build, repo, info, git_ref, ci_branch, targets, force_ci)
 
     async def _srcbuild(self, args, session):
         build_id = args[0]
