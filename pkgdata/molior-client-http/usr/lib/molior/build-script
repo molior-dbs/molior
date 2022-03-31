@@ -130,7 +130,7 @@ log " - $sources_url"
 # FIXME: use curl, remove wget
 pkgdir=`wget --timeout=30 -q -O- $sources_url | /usr/lib/molior/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
-  echo "Directory for source package $REPO_NAME $VERSION not found"
+  echo "E: Directory for source package $REPO_NAME $VERSION not found" >&2
   exit 1
 fi
 
@@ -141,7 +141,7 @@ dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/
 log " - $dsc_url"
 wget --timeout=30 -q $dsc_url
 if [ "$?" -ne 0 ]; then
-  echo "Error downloading source package $dsc_url"
+  echo "E: Error downloading source package $dsc_url" >&2
   exit 1
 fi
 
