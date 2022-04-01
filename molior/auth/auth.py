@@ -210,6 +210,7 @@ def req_admin(function):
     @wraps(function)
     async def _wrapper(request):
         """Wrapper function for req_admin decorator."""
+        setup_token(request)
         if check_admin(request):
             return await function(request)
 
