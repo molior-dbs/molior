@@ -282,10 +282,11 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
             is_ci = parent.is_ci
 
             info.plain_targets = []
-            for p_id in parent.projectversions:
-                projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == p_id).first()
-                if projectversion:
-                    info.plain_targets.append((projectversion.project.name, projectversion.name))
+            if parent.projectversions:
+                for p_id in parent.projectversions:
+                    projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == p_id).first()
+                    if projectversion:
+                        info.plain_targets.append((projectversion.project.name, projectversion.name))
 
     # otherwise get info from git
     if not source_exists:
