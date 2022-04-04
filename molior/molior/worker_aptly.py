@@ -24,6 +24,16 @@ from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 
 
+def mirror_architectures(mirror):
+    '''Return the mirror architectures to use on aptly for a given mirror.
+    Add "source" as architecture when updating mirror on aptly to trigger source downloading/snapshotting/publishing.
+    '''
+    mirror_architectures = db2array(mirror.mirror_architectures)
+    if mirror.mirror_with_sources:
+        mirror_architectures.append('source')
+    return mirror_architectures
+
+
 async def startup_mirror():
     """
     Starts a finalize_mirror task in the asyncio event loop
@@ -112,7 +122,7 @@ async def startup_mirror():
                     mirror.project.name,
                     mirror.name,
                     components,
-                    db2array(mirror.mirror_architectures),
+                    mirror_architectures(mirror),
                     # FIXME: add all running tasks
                     [m_task.get("ID")],
                 )
@@ -663,7 +673,7 @@ class AptlyWorker:
                         mirror.project.name,
                         mirror.name,
                         mirror.mirror_components.split(","),
-                        db2array(mirror.mirror_architectures)
+                        mirror_architectures(mirror)
                     )
                 except NotFoundError as exc:
                     await build.log("E: aptly seems to be not available: %s\n" % str(exc))
