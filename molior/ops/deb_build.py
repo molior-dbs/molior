@@ -254,7 +254,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
     is_ci = False
 
     # check if there is build info from the parent build
-    if parent.version:
+    if not force_ci and parent.version:
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
                                                          Build.sourcerepository == repo,
                                                          Build.version == parent.version,
@@ -327,10 +327,10 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
         session.commit()
         return BuildPreparationState.ERROR, info
 
-    if not source_exists:
-        if force_ci:
-            is_ci = True
-        else:
+    if force_ci:
+        is_ci = True
+    else:
+        if not source_exists:
             # check if it is a CI build
             # i.e. if gittag does not match version in debian/changelog
             gittag = ""
@@ -369,7 +369,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
         info.version += "+git{}.{}".format(datetime.now().strftime("%Y%m%d%H%M%S"), info.commit_hash[:6])
 
     # check for existing source builds with real version
-    if not source_exists:
+    if not force_ci and not source_exists:
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
                                                          Build.sourcerepository == repo,
                                                          Build.version == info.version,
