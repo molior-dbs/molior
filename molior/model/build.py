@@ -85,7 +85,7 @@ class Build(Base):
         await self.build_changed()
 
         if self.buildtype == "deb":
-            if self.parent.parent and not self.parent.parent.buildstate == "building":
+            if self.parent and self.parent.parent and not self.parent.parent.buildstate == "building":
                 self.parent.parent.endstamp = None
                 await self.parent.parent.set_building()
 
