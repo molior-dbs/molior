@@ -113,12 +113,6 @@ async def get_projectversions(request):
 
     for projectversion in projectversions:
         projectversion_dict = projectversion.data()
-        deps = get_projectversion_deps(projectversion.id, db)
-        projectversion_dict["dependencies"] = []
-        for d in deps:
-            dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
-            if dep:
-                projectversion_dict["dependencies"].append(dep.data())
         results.append(projectversion_dict)
 
     data = {"total_result_count": nb_projectversions, "results": results}
