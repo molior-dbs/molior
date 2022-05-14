@@ -535,6 +535,21 @@ def do_lock(request, projectversion_id):
     return OKResponse("Locked Project Version")
 
 
+def do_unlock(request, projectversion_id):
+    db = request.cirrina.db_session
+    projectversion = db.query(ProjectVersion).filter(ProjectVersion.id == projectversion_id).first()
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion#{projectversion_id} not found".format(
+                projectversion_id=projectversion_id))
+
+    projectversion.is_locked = False
+    projectversion.ci_builds_enabled = False
+    db.commit()
+
+    logger.info("ProjectVersion '%s/%s' unlocked", projectversion.project.name, projectversion.name)
+    return OKResponse("Unlocked Project Version")
+
+
 @app.http_put("/api/projectversions/{projectversion_id}/mark-delete")
 @req_role("owner")
 async def mark_delete_projectversion(request):

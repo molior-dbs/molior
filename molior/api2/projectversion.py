@@ -9,7 +9,7 @@ from launchy import Launchy
 from ..app import app, logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
-from ..api.projectversion import do_lock, do_overlay
+from ..api.projectversion import do_lock, do_unlock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
 
@@ -501,6 +501,37 @@ async def lock_projectversion(request):
         return ErrorResponse(400, "Projectversion is based on external mirror")
 
     return do_lock(request, projectversion.id)
+
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/unlock")
+@req_role("owner")
+async def unlock_projectversion(request):
+    """
+    Unlock a project version.
+
+    ---
+    description: Unlock a project version.
+    tags:
+        - Projects
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.basemirror.external_repo:
+        return ErrorResponse(400, "Projectversion is based on external mirror")
+
+    return do_unlock(request, projectversion.id)
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/overlay")
