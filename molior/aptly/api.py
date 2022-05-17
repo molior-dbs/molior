@@ -249,6 +249,8 @@ class AptlyApi:
                 "FilterWithDeps": False,
             }
 
+            if mirror_distribution == "./":
+                data.pop("Components", None)
             await self.POST("/mirrors", data=data)
 
     async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
