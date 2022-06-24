@@ -472,6 +472,51 @@ async def copy_projectversion(request):
     return OKResponse()
 
 
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/rebuild")
+@req_role("owner")
+async def rebuild_projectversion(request):
+    """
+    Rebuild a project version.
+
+    ---
+    description: Rebuild a project version.
+    tags:
+        - ProjectVersions
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    """
+    db = request.cirrina.db_session
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(404, "Projectversion not found")
+
+    # FIXME list of builds should be moved to worker
+    deb_builds_ids = []
+    latest_builds = latest_project_builds(db, projectversion.id)
+    for latest_build in latest_builds:
+        topbuild = latest_build.parent.parent
+        if topbuild.buildstate != "successful":
+            continue
+        if topbuild.sourcerepository is None:
+            continue
+        deb_builds_ids.append(latest_build.id)
+
+    for deb_build_id in deb_builds_ids:
+        await enqueue_aptly({"rebuild_deb_build": [
+                    deb_build_id]})
+    return OKResponse()
+
+
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
 @req_role("owner")
 async def lock_projectversion(request):

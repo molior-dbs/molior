@@ -1162,6 +1162,94 @@ class AptlyWorker:
 
         logger.info("aptly worker: build %d deleted" % build_id)
 
+    async def _rebuild_deb_build(self, args):
+        build_id = args[0]
+        logger.info("aptly worker: rebuilding deb build %d" % build_id)
+
+        to_delete = []
+        with Session() as session:
+            deb = session.query(Build).filter(Build.id == build_id,
+                                              Build.buildtype == "deb").first()
+            if not deb:
+                logger.error("aptly worker: deb build %d not found" % build_id)
+                return
+
+            if deb.buildstate != "successful":  # only successful deb builds have packages to delete
+                return
+
+            if deb.sourcerepository is None:
+                return
+
+            projectversion = deb.projectversion
+            dist = "stable"
+            repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
+                                            projectversion.project.name, projectversion.name, dist)
+
+            for f in deb.debianpackages:
+                to_delete.append((f.name, deb.version, f.suffix))
+
+        aptly = get_aptly_connection()
+        aptly_delete = []
+        for package in to_delete:
+            # logger.error("delete %s %s" % (repo_name, pkgname))
+            pkgs = await aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                package[1],   # version
+                                                                                package[2]))  # arch
+            aptly_delete.extend(pkgs)
+
+        task_id = await aptly.repo_packages_delete(repo_name, aptly_delete)
+        await aptly.wait_task(task_id)
+
+        # FIXME needed?
+        # await aptly.republish(dist, projectversions[pv][0], projectversions[pv][1])
+
+        buildout = "/var/lib/molior/buildout/%d" % build_id
+        try:
+            rmtree(buildout)
+        except Exception:
+            pass
+
+        with Session() as session:
+            deb = session.query(Build).filter(Build.id == build_id,
+                                              Build.buildtype == "deb").first()
+            if not deb:
+                logger.error("aptly worker: deb build %d not found" % build_id)
+                return
+
+            version = deb.version
+            git_ref = deb.git_ref
+            ci_branch = deb.ci_branch
+            sourcename = deb.sourcename
+            sourcerepository = deb.sourcerepository
+            project_name = deb.projectversion.project.name
+            project_version_name = deb.projectversion.name
+
+            deb.debianpackages = []
+            if deb.buildtask:
+                session.delete(deb.buildtask)
+            session.delete(deb)
+
+            logger.info("aptly worker: deb build %d deleted" % build_id)
+
+            build = Build(
+                version=version,
+                git_ref=git_ref,
+                ci_branch=ci_branch,
+                is_ci=False,
+                sourcename=sourcename,
+                buildstate="new",
+                buildtype="build",
+                sourcerepository=sourcerepository,
+                maintainer=None,
+            )
+
+            session.add(build)
+            session.commit()
+            await build.build_added()
+            targets = [f"{project_name}/{project_version_name}"]
+            args = {"build": [build.id, build.sourcerepository_id, f"v{build.version}", "", targets, False]}
+            await enqueue_task(args)
+
     async def _abort(self, args):
         logger.debug("worker: got abort build task")
         build_id = args[0]
@@ -1274,6 +1362,12 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._delete_build(args)
+
+                if not handled:
+                    args = task.get("rebuild_deb_build")
+                    if args:
+                        handled = True
+                        await self._rebuild_deb_build(args)
 
                 if not handled:
                     args = task.get("abort")
