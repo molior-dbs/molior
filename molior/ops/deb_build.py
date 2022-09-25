@@ -264,6 +264,8 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
     existing_src_build = None
     is_ci = False
 
+    logger.info(f"prepare build, {force_ci}")
+
     # check if there is build info from the parent build
     if not force_ci and parent.version:
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
@@ -275,8 +277,10 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                 source_exists = True
             elif existing_src_build.buildstate == "new" or existing_src_build.buildstate == "building" or \
                     existing_src_build.buildstate == "needs_publish" or existing_src_build.buildstate == "publishing":
+                logger.info(f"retry because of src build ({existing_src_build.id}) in new, building, needs_publish or publishing")
                 return BuildPreparationState.RETRY, info
             elif existing_src_build.buildstate == "build_failed" or existing_src_build.buildstate == "publish_failed":
+                logger.info(f"abort because of src build ({existing_src_build.id}) in state build_failed or publish_failed")
                 return BuildPreparationState.ERROR, info
 
             # create info object
@@ -336,6 +340,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
         if not source_exists:
             repo.set_ready()
         session.commit()
+        logger.info(f"abort because of no build info found")
         return BuildPreparationState.ERROR, info
 
     if force_ci:
@@ -358,6 +363,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
             else:
                 v = strip_epoch_version(info.version)
                 if not re.match("^v?{}$".format(v.replace("~", "-").replace("+", "\\+")), gittag) or "+git" in v:
+                    logger.info(f"setting ci because because version {v} does not match tag {gittag}")
                     is_ci = True
 
         ci_cfg = Configuration().ci_builds
@@ -373,6 +379,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
             session.commit()
             return BuildPreparationState.ERROR, info
 
+    logger.info(f"prepare build, is ci {is_ci}")
     # set CI version
     if is_ci:
         # create CI version with git hash suffix
@@ -392,8 +399,10 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                 source_exists = True
             elif existing_src_build.buildstate == "new" or existing_src_build.buildstate == "building" or \
                     existing_src_build.buildstate == "needs_publish" or existing_src_build.buildstate == "publishing":
+                logger.info(f"retry because of src build ({existing_src_build.id}) in new, building, needs_publish or publishing")
                 return BuildPreparationState.RETRY, info
             elif existing_src_build.buildstate == "build_failed" or existing_src_build.buildstate == "publish_failed":
+                logger.info(f"abort because of src build ({existing_src_build.id}) in state build_failed or publish_failed")
                 return BuildPreparationState.ERROR, info
 
     # plain targets emtpy FIXME
@@ -475,6 +484,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                     return BuildPreparationState.ALREADY_DONE, info
                 elif other_build.buildstate == "new" or other_build.buildstate == "building" or \
                         other_build.buildstate == "needs_publish" or other_build.buildstate == "publishing":
+                    logger.info(f"retry because of src build ({other_build.id}) in new, building, needs_publish or publishing")
                     return BuildPreparationState.RETRY, info
                 elif other_build.buildstate == "build_failed" or other_build.buildstate == "publish_failed":
                     await parent.set_already_failed()
