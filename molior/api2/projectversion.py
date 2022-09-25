@@ -601,7 +601,8 @@ async def snapshot_projectversion(request):
     latest_debbuilds_ids = []
     for latest_build in latest_builds:
         if latest_build.buildstate != "successful":
-            return ErrorResponse(400, "Not all latest builds are successful: %d" % latest_build.id)
+            return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,
+                                                                                         latest_build.sourcename))
         for debbuild in latest_build.parent.children:
             if debbuild.projectversion_id != projectversion.id:
                 continue
