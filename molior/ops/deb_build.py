@@ -116,6 +116,7 @@ async def DownloadDebSrc(repo_id, sourcedir, sourcename, build_id, version, base
     files = []
     directory = None
     found_package_entry = False
+    found_package_version = False
     found_directory_entry = False
     found_files_section = False
     for line in Sources.split('\n'):
@@ -125,7 +126,17 @@ async def DownloadDebSrc(repo_id, sourcedir, sourcename, build_id, version, base
             found_package_entry = True
             continue
         else:  # Package section
-            if not found_directory_entry:
+            if not found_package_version:
+                if line == "":
+                    break
+                if not line.startswith("Version: "):
+                    continue
+                pkgver = line.split(" ")[1]
+                if pkgver != version:
+                    found_package_entry = False
+                    continue
+                found_package_version = True
+            elif not found_directory_entry:
                 if line == "":
                     break
                 if not line.startswith("Directory: "):
