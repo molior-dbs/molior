@@ -582,9 +582,12 @@ class AptlyApi:
         # FIXME: use secret
         upload_dir = str(uuid.uuid4())
         for filename in files:
-            with open(filename, "rb") as _file:
-                post_files = {"file": _file}
-                await self.POST(f"/files/{upload_dir}", data=post_files)
+            try:
+                with open(filename, "rb") as _file:
+                    post_files = {"file": _file}
+                    await self.POST(f"/files/{upload_dir}", data=post_files)
+            except Exception as exc:
+                logger.exception(exc)
 
         task = await self.POST(f"/repos/{repo_name}/file/{upload_dir}")
         return task["ID"], upload_dir
