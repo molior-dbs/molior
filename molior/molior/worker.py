@@ -169,7 +169,7 @@ class Worker:
         build_id = args[0]
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("build: build %d not found", build_id)
+            logger.error("srcbuild: build %d not found", build_id)
             return
 
         if build.buildstate != "new" and build.buildstate != "build_failed":

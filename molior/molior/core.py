@@ -193,6 +193,8 @@ def get_target_arch(build, session):
                         SouRepProVer.projectversion_id == build.projectversion.id).first()
                 if arch not in db2array(sourepprover.architectures):
                     continue
+                if not sourepprover:
+                    continue
             return arch
     return None
 
