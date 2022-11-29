@@ -607,7 +607,11 @@ class AptlyWorker:
                         mirror.basemirror.name if mirror.basemirror else "",
                         mirror.mirror_url,
                         mirror.mirror_distribution,
-                        mirror.mirror_components.split(","),  # FIXME: should be array in db
+                        # FIXME: should be array in db
+                        # NOTE: return empty array when the components are empty, because
+                        # the default `.split()` algorythm returns `[""]` when
+                        # an empty string is given: https://stackoverflow.com/a/16645307/12356463
+                        mirror.mirror_components.split(",") if mirror.mirror_components else [],
                         db2array(mirror.mirror_architectures),
                         mirror.mirror_filter,
                         download_sources=mirror.mirror_with_sources,
