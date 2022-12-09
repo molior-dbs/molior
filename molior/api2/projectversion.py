@@ -1296,3 +1296,73 @@ async def external_build_upload(request):
     await enqueue_aptly({"publish": [debbuild.id]})
 
     return OKResponse({"build_id": build.id}, status=201)
+
+
+@app.http_delete("/api2/project/{project_id}/{projectversion_id}/build/{build_id}")
+@req_role("owner")
+async def delete_projectversion_build(request):
+    db = request.cirrina.db_session
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Cannot delete build on project which is a mirror")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Cannot delete build on a locked projectversion")
+
+    try:
+        build_id = int(request.match_info["build_id"])
+    except Exception:
+        return ErrorResponse(400, "No valid build_id received")
+
+    # copied from api2/build.py
+    build = db.query(Build).filter(Build.id == build_id).first()
+    if not build:
+        logger.error("build %d not found" % build_id)
+        return ErrorResponse(404, "Build not found")
+
+    topbuild = None
+    builds = []
+    if build.buildtype == "deb":
+        topbuild = build.parent.parent
+        builds.extend([build.parent, build.parent.parent])
+        for b in build.parent.children:
+            builds.append(b)
+    elif build.buildtype == "source":
+        topbuild = build.parent
+        builds.extend([build, build.parent])
+        for b in build.children:
+            builds.append(b)
+    elif build.buildtype == "build":
+        topbuild = build
+        builds.append(build)
+        for b in build.children:
+            builds.append(b)
+            for c in b.children:
+                builds.append(c)
+
+    if not topbuild:
+        return ErrorResponse(400, "Build of type %s cannot be deleted" % build.buildtype)
+
+    for srcbuild in topbuild.children:
+        for debbuild in srcbuild.children:
+            # FIXME: check if this project
+            if debbuild.projectversion.id != projectversion.id:
+                return ErrorResponse(400, "Builds for multiple projectversion cannot be deleted")
+
+            if debbuild.projectversion and debbuild.projectversion.is_locked:
+                return ErrorResponse(400, "Build from locked projectversion cannot be deleted")
+
+            if debbuild.buildstate == "scheduled" or \
+               debbuild.buildstate == "building" or \
+               debbuild.buildstate == "needs_publish" or \
+               debbuild.buildstate == "publishing":
+                return ErrorResponse(400, "Build in state %s cannot be deleted" % debbuild.buildstate)
+
+    for b in builds:
+        b.is_deleted = True
+    db.commit()
+
+    await enqueue_aptly({"delete_build": [topbuild.id]})
+    return OKResponse("Build is being deleted")
