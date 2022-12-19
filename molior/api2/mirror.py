@@ -15,7 +15,6 @@ from ..tools import paginate, array2db
 
 
 @app.http_get("/api2/mirror/{name}/{version}")
-@app.authenticated
 async def get_mirror2(request):
     """
     Returns all mirrors with given 'name' and 'version'.

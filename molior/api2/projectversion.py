@@ -50,7 +50,6 @@ def latest_project_builds(db, projectversion_id):
 
 
 @app.http_get("/api2/project/{project_name}/{project_version}")
-@app.authenticated
 async def get_projectversion2(request):
     """
     Returns a project with version information.
