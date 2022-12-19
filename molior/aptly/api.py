@@ -703,6 +703,23 @@ class AptlyApi:
         # package_refs = await self.__get_packages(ci_build)
         # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
 
+        try:
+            snapshots = await self.GET("/snapshots")
+            for snapshot in snapshots:
+                if snapshot["Name"] == snapshot_name_tmp:
+                    # delete leftover tmp snapshot
+                    logger.warning("deleting existing tmp snapshot")
+                    try:
+                        task_id = await self.snapshot_delete(snapshot_name_tmp)
+                        await self.wait_task(task_id)
+                    except Exception as exc:
+                        logger.error(f"Error deleting existing tmp snapshot: {snapshot_name_tmp}")
+                        logger.exception(exc)
+                    break
+        except Exception as exc:
+            logger.error("Error loading snapshots")
+            logger.exception(exc)
+
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
         if not await self.wait_task(task_id):
             return False
