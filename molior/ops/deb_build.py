@@ -83,7 +83,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     await process.launch()
     ret = await process.wait()
     if ret != 0:
-        await buildlog(build_id, "E: Error building source package\n")
+        await buildlog(build_id, f"E: Error building source package, dpkg-builpackage returned {ret}\n")
         logger.error("source packaging failed, dpkg-builpackage returned %d", ret)
         return False
 
@@ -264,8 +264,6 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
     existing_src_build = None
     is_ci = False
 
-    logger.info(f"prepare build, {force_ci}")
-
     # check if there is build info from the parent build
     if not force_ci and parent.version:
         existing_src_build = session.query(Build).filter(Build.buildtype == "source",
@@ -337,6 +335,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
     # no build info found, abort
     if not info:
         await parent.set_failed()
+        await buildlog(parent.id, "E: Error finding build information\n")
         if not source_exists:
             repo.set_ready()
         session.commit()
@@ -379,7 +378,6 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
             session.commit()
             return BuildPreparationState.ERROR, info
 
-    logger.info(f"prepare build, is ci {is_ci}")
     # set CI version
     if is_ci:
         # create CI version with git hash suffix
