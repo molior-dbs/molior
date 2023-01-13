@@ -698,6 +698,7 @@ class AptlyApi:
         return True
 
     async def republish(self, dist, repo_name, publish_name):
+        snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         snapshot_name_tmp = get_snapshot_name(publish_name, dist, temporary=True)
 
         # package_refs = await self.__get_packages(ci_build)
@@ -705,20 +706,33 @@ class AptlyApi:
 
         try:
             snapshots = await self.GET("/snapshots")
-            for snapshot in snapshots:
-                if snapshot["Name"] == snapshot_name_tmp:
-                    # delete leftover tmp snapshot
-                    logger.warning("deleting existing tmp snapshot")
-                    try:
-                        task_id = await self.snapshot_delete(snapshot_name_tmp)
-                        await self.wait_task(task_id)
-                    except Exception as exc:
-                        logger.error(f"Error deleting existing tmp snapshot: {snapshot_name_tmp}")
-                        logger.exception(exc)
-                    break
         except Exception as exc:
             logger.error("Error loading snapshots")
             logger.exception(exc)
+            return
+
+        for snapshot in snapshots:
+            if snapshot["Name"] == snapshot_name_tmp:
+                # delete leftover tmp snapshot
+                logger.warning("deleting existing tmp snapshot")
+                try:
+                    task_id = await self.snapshot_delete(snapshot_name_tmp)
+                except Exception:
+                    logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
+                if not await self.wait_task(task_id):
+                    logger.warning("republishing non-tmp snapshot")
+                    task_id = await self.snapshot_publish_update(snapshot_name, "main", dist, publish_name)
+                    if not await self.wait_task(task_id):
+                        logger.error(f"Error republishing non-tmp snapshot: {snapshot_name}")
+                    else:
+                        logger.warning("retrying to delete tmp snapshot")
+                        try:
+                            task_id = await self.snapshot_delete(snapshot_name_tmp)
+                        except Exception:
+                            logger.error(f"Error deleting existing tmp snapshot after republish: {snapshot_name_tmp}")
+                        if not await self.wait_task(task_id):
+                            return False
+                break
 
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
         if not await self.wait_task(task_id):
