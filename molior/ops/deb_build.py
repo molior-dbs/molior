@@ -339,7 +339,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
         if not source_exists:
             repo.set_ready()
         session.commit()
-        logger.info(f"abort because of no build info found")
+        logger.info("abort because of no build info found")
         return BuildPreparationState.ERROR, info
 
     if force_ci:
