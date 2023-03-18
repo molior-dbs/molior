@@ -1,3 +1,9 @@
+molior (1.5.0~alpha3) stretch; urgency=medium
+
+  * fix typo
+
+ -- André Roth <andre.roth@roche.com>  Sat, 18 Mar 2023 18:02:48 +0100
+
 molior (1.5.0~alpha2) stretch; urgency=medium
 
   * build for 1.5
