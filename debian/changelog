@@ -1,3 +1,28 @@
+molior (1.5.0~alpha1) stretch; urgency=medium
+
+  * publish: fix deleting leftover tmp snapshot
+  * cleanup logs
+  * Merge pull request #37 from molior-dbs/fix-empty-components
+  * publish: delete leftover tmp snapshots before creating
+  * allow unauthenticated access for projectversion and mirror
+  * projectversion: delete build
+  * Fix empty components string splitting
+  * improve logging, clenaup
+  * handle more exceptions
+  * prepare build: add logs
+  * rebuild: download correct source pkg version
+  * fix missing parent
+  * snapshot: report unsuccessful build name
+  * mirror: support flat repo
+  * fix ci builds with force ci
+  * fix none object reference
+  * add unlock projectversion
+  * exclude deps from projectversion to reduce load time
+  * build: fix getting plain targets from build
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Sat, 18 Mar 2023 15:55:37 +0100
+
 molior (1.4.1) stretch; urgency=medium
 
   * server info: get machine id
