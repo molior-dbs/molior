@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -12,6 +12,7 @@ fi
 
 MOLIOR_USER=molior
 HOME_DIR=/var/lib/molior
+
 GPG_BINARY=gpg1
 export GPG_TTY=`tty`
 
