@@ -1,3 +1,12 @@
+molior (1.5.0~alpha4) stretch; urgency=medium
+
+  * remove bashism
+  * add vsphere deployments
+  * fix db migration
+  * fix create-molior-keys
+
+ -- André Roth <andre.roth@roche.com>  Sun, 19 Mar 2023 14:25:29 +0100
+
 molior (1.5.0~alpha3) stretch; urgency=medium
 
   * fix typo
