@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
@@ -23,6 +25,7 @@ from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.postbuildhook import PostBuildHook
 from ..model.projectversiondependency import ProjectVersionDependency
+from ..model.database import Session
 
 
 # find latest builds
@@ -31,8 +34,7 @@ def latest_project_builds(db, projectversion_id):
             Build.projectversion_id == projectversion_id,
             Build.is_ci.is_(False),
             Build.sourcerepository_id.isnot(None),
-            Build.buildtype == "deb",
-            Build.buildstate == "successful").group_by(Build.sourcerepository_id)
+            Build.buildtype == "deb").group_by(Build.sourcerepository_id)
 
     SourceBuild = aliased(Build)
 
@@ -42,7 +44,6 @@ def latest_project_builds(db, projectversion_id):
             Build.is_ci.is_(False),
             Build.sourcerepository_id.is_(None),
             Build.buildtype == "deb",
-            Build.buildstate == "successful"
             ).group_by(SourceBuild.sourcename)
 
     latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
@@ -442,8 +443,8 @@ async def copy_projectversion(request):
         latest_builds = latest_project_builds(db, projectversion.id)
         for latest_build in latest_builds:
             topbuild = latest_build.parent.parent
-            # if topbuild.buildstate != "successful":
-            #     continue
+            if topbuild.buildstate != "successful":
+                continue
             if topbuild.sourcerepository is None:
                 continue
             build = Build(
@@ -463,14 +464,34 @@ async def copy_projectversion(request):
             await build.build_added()
             trigger_builds.append(build.id)
 
+    copy_build = Build(
+	version=new_version,
+	git_ref=None,
+	ci_branch=None,
+	is_ci=False,
+	sourcename=f"copy {projectversion.project.name}/{projectversion.name}",
+	buildstate="new",
+	buildtype="copy_projectversion",
+	sourcerepository=None,
+	maintainer=None,
+    )
+    db.add(copy_build)
+    db.commit()
+    await copy_build.build_added()
+    await copy_build.set_building()
+    db.commit()
+
     await enqueue_aptly({"init_repository": [
                 bm.project.name,
                 bm.name,
                 projectversion.project.name,
                 new_version,
                 architectures,
-                trigger_builds]})
-    return OKResponse()
+                trigger_builds,
+                copy_build.id]})
+
+    data = {"build_id": copy_build.id, "rebuild_ids": trigger_builds}
+    return OKResponse(data)
 
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
@@ -601,9 +622,9 @@ async def snapshot_projectversion(request):
     latest_builds = latest_project_builds(db, projectversion.id)
     latest_debbuilds_ids = []
     for latest_build in latest_builds:
-        # if latest_build.buildstate != "successful":
-        #     return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,
-        #                                                                                  latest_build.sourcename))
+        if latest_build.buildstate != "successful":
+            return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,
+                                                                                         latest_build.sourcename))
         for debbuild in latest_build.parent.children:
             if debbuild.projectversion_id != projectversion.id:
                 continue
@@ -624,7 +645,8 @@ async def snapshot_projectversion(request):
         ci_builds_enabled=False,
         is_locked=True,
         projectversiontype="snapshot",
-        baseprojectversion_id=projectversion.id
+        baseprojectversion_id=projectversion.id,
+        dependency_policy=projectversion.dependency_policy
     )
 
     for repo in new_projectversion.sourcerepositories:
@@ -1094,9 +1116,23 @@ async def external_build_upload(request):
     db.commit()
     await debbuild.build_added()
 
-    await build.log("I: Receiving uploaded files\n")
+    # loop = asyncio.get_event_loop()
+    # loop.create_task(
+    await finalize_extbuild(build.id, projectversion.id, srcbuild.id, debbuild.id, request.multipart)
+    # )
+    return OKResponse({"build_id": build.id}, status=201)
 
+
+async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_id, multipart):
     buildout_path = Path(Configuration().working_dir) / "buildout"
+    build_version = None
+    sourcename = None
+    source_pkg = None
+    dsc_file = None
+    source_upload = False
+    has_changes_file = False
+    has_buildinfo_file = False
+    changes_file = None
 
     async def write_part(build_id, part):
         filename = part.filename.replace("/", "")  # no paths separators allowed
@@ -1112,17 +1148,17 @@ async def external_build_upload(request):
                     break
                 await writer(chunk)
 
-    build_version = None
-    sourcename = None
-    source_pkg = None
-    dsc_file = None
-    source_upload = False
-    has_changes_file = False
-    has_buildinfo_file = False
-    changes_file = None
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            await build.log("E: build not found: '%d'\n" % build_id)
+            return False
 
+        await build.log("I: Receiving uploaded files\n")
+
+    logs = []
     try:
-        reader = await request.multipart()
+        reader = await multipart()
         async for part in reader:
             filename = part.filename.replace("/", "")  # sanitize
             filename = filename.replace("$", "")
@@ -1141,18 +1177,18 @@ async def external_build_upload(request):
             if filename.endswith(".deb"):
                 s = filename[:-4].split("_", 3)
                 if len(s) != 3:
-                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild.id
+                destbuild_id = debbuild_id
 
             elif filename.endswith(".changes"):
                 s = filename[:-4].split("_", 3)
                 if len(s) != 3:
-                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild.id
+                destbuild_id = debbuild_id
                 has_changes_file = True
                 changes_file = buildout_path / str(destbuild_id) / filename
                 if not sourcename:
@@ -1161,10 +1197,10 @@ async def external_build_upload(request):
             elif filename.endswith(".buildinfo"):
                 s = filename[:-4].split("_", 3)
                 if len(s) != 3:
-                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild.id
+                destbuild_id = debbuild_id
                 has_buildinfo_file = True
                 if not sourcename:
                     sourcename = pkgname
@@ -1172,131 +1208,151 @@ async def external_build_upload(request):
             elif filename.endswith(".dsc"):
                 s = filename[:-4].split("_", 2)
                 if len(s) != 2:
-                    await build.log("W: invalid filename: '%s'\n" % filename)
+                    logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 dsc_file = filename
                 pkgname, version = s
-                destbuild_id = srcbuild.id
+                destbuild_id = srcbuild_id
                 if not sourcename:
                     sourcename = pkgname
 
             elif filename.endswith(".tar.gz") or filename.endswith(".tar.xz"):
                 if source_upload:
-                    await build.log("W: only one source package allowed: '%s'\n" % filename)
+                    logs.append("W: only one source package allowed: '%s'\n" % filename)
                     continue
                 source_pkg = filename
                 s = filename[:-7].split("_", 2)
                 if len(s) == 2:
                     pkgname, version = s
-                    destbuild_id = srcbuild.id
+                    destbuild_id = srcbuild_id
                     source_upload = True
                     if not sourcename:
                         sourcename = pkgname
 
             else:
-                await build.log("W: ignoring unknown file type: '%s'\n" % filename)
+                logs.append("W: ignoring unknown file type: '%s'\n" % filename)
                 continue
 
             if not build_version:
                 build_version = version
             elif version != build_version:
                 # FIXME: cleanup saved files
-                await build.log("E: version mismatch in uploaded files: '%s'\n" % version)
-                # FIXME: terminate build log
-                return ErrorResponse(400, "version mismatch in uploaded files")
+                logs.append("E: version mismatch in uploaded files: '%s'\n" % version)
+                return False
 
             # FIXME: check arch in projectversion
             await write_part(destbuild_id, part)
     except Exception as exc:
+        logs.append("E: error uploading file")
         logger.exception(exc)
+        return False
 
-    await build.log("I: Verifying uploaded files...\n")
+    with Session() as session:
+        build = session.query(Build).filter(Build.id == build_id).first()
+        if not build:
+            await build.log("E: build not found: '%d'\n" % build_id)
+            return False
 
-    if not has_changes_file:
-        errmsg = "Missing *.changes file"
-        await build.log("E: %s\n" % errmsg)
-        await build.set_failed()
-        await srcbuild.set_failed()
-        await debbuild.set_failed()
-        db.commit()
-        return ErrorResponse(400, errmsg)
+        srcbuild = session.query(Build).filter(Build.id == srcbuild_id).first()
+        if not srcbuild:
+            await build.log("E: build not found: '%d'\n" % srcbuild_id)
+            return False
 
-    if not has_buildinfo_file:
-        errmsg = "Missing *.buildinfo file"
-        await build.log("E: %s\n" % errmsg)
-        await build.set_failed()
-        await srcbuild.set_failed()
-        await debbuild.set_failed()
-        db.commit()
-        return ErrorResponse(400, errmsg)
+        debbuild = session.query(Build).filter(Build.id == debbuild_id).first()
+        if not debbuild:
+            await build.log("E: build not found: '%d'\n" % debbuild_id)
+            return False
 
-    await build.log("I: Found external build: %s/%s\n" % (sourcename, build_version))
+        for log in logs:
+            await build.log(log)
 
-    # Fix changes file for source uploads
-    if source_upload:
-        # remove dsc entry from changes file, as it is signed in the source upload
-        async def outh(line):
-            if len(line.strip()) != 0:
-                logger.info(line)
+        await build.log("I: Verifying uploaded files...\n")
 
-        d = dsc_file.replace(".", "\\.")
-        s = source_pkg.replace(".", "\\.")
-        cmd = f"sed -i -e '/{d}$/d' -e '/{s}$/d' {changes_file}"
-        process = Launchy(cmd, outh, outh)
-        await process.launch()
-        ret = await process.wait()
-        if ret != 0:
-            logger.error("build upload: patching changes file failed")
+        if not has_changes_file:
+            errmsg = "Missing *.changes file"
+            await build.log("E: %s\n" % errmsg)
+            await build.set_failed()
+            await srcbuild.set_failed()
+            await debbuild.set_failed()
+            session.commit()
+            return False
 
-    build.sourcename = sourcename
-    srcbuild.sourcename = sourcename
-    debbuild.sourcename = sourcename
-    build.version = build_version
-    srcbuild.version = build_version
-    debbuild.version = build_version
-    db.commit()
+        if not has_buildinfo_file:
+            errmsg = "Missing *.buildinfo file"
+            await build.log("E: %s\n" % errmsg)
+            await build.set_failed()
+            await srcbuild.set_failed()
+            await debbuild.set_failed()
+            session.commit()
+            return False
 
-    # check if version already exists
-    existing_build = db.query(Build).filter(Build.buildtype == "build",
-                                            Build.sourcerepository_id.is_(None),
-                                            Build.projectversion_id == projectversion.id,
-                                            Build.buildstate == "successful",  # FIXME: or new, building, publishing
-                                            Build.is_deleted.is_(False),
-                                            Build.sourcename == sourcename,
-                                            Build.version == build_version).first()
-    if existing_build:
-        errmsg = "build for %s/%s already exists" % (sourcename, version)
-        await build.log("E: %s\n" % errmsg)
-        await build.set_failed()
-        await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
-        await srcbuild.set_failed()
-        await debbuild.set_failed()
-        db.commit()
-        return ErrorResponse(400, errmsg)
+        await build.log("I: Found external build: %s/%s\n" % (sourcename, build_version))
 
-    await build.set_building()
-    db.commit()
+        # Fix changes file for source uploads
+        if source_upload:
+            # remove dsc entry from changes file, as it is signed in the source upload
+            async def outh(line):
+                if len(line.strip()) != 0:
+                    logger.info(line)
 
-    # publish source package
-    await srcbuild.logtitle("External Source Upload")
-    if source_upload:
-        await srcbuild.set_needs_publish()
-        db.commit()
-        await srcbuild.log("I: verifying source package\n")
-        await enqueue_aptly({"src_publish": [srcbuild.id]})
-    else:
-        await srcbuild.log("W: no source package to publish\n")
-        await srcbuild.set_nothing_done()
-        db.commit()
+            d = dsc_file.replace(".", "\\.")
+            s = source_pkg.replace(".", "\\.")
+            cmd = f"sed -i -e '/{d}$/d' -e '/{s}$/d' {changes_file}"
+            process = Launchy(cmd, outh, outh)
+            await process.launch()
+            ret = await process.wait()
+            if ret != 0:
+                logger.error("build upload: patching changes file failed")
 
-    # publish debian packages
-    await debbuild.logtitle("External Debian Package Upload")
-    await debbuild.set_needs_publish()
-    db.commit()
-    await debbuild.log("I: verifying debian packages\n")
-    await enqueue_aptly({"publish": [debbuild.id]})
+        build.sourcename = sourcename
+        srcbuild.sourcename = sourcename
+        debbuild.sourcename = sourcename
+        build.version = build_version
+        srcbuild.version = build_version
+        debbuild.version = build_version
+        session.commit()
 
-    return OKResponse({"build_id": build.id}, status=201)
+        # check if version already exists
+        existing_build = session.query(Build).filter(Build.buildtype == "build",
+                                                     Build.sourcerepository_id.is_(None),
+                                                     Build.projectversion_id == projectversion_id,
+                                                     Build.buildstate == "successful",  # FIXME: or new, building, publishing
+                                                     Build.is_deleted.is_(False),
+                                                     Build.sourcename == sourcename,
+                                                     Build.version == build_version).first()
+        if existing_build:
+            errmsg = "build for %s/%s already exists" % (sourcename, version)
+            await build.log("E: %s\n" % errmsg)
+            await build.set_failed()
+            await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            await srcbuild.set_failed()
+            await debbuild.set_failed()
+            session.commit()
+            return False
+
+        await build.set_building()
+        session.commit()
+
+        # publish source package
+        await srcbuild.logtitle("External Source Upload")
+        if source_upload:
+            await srcbuild.set_needs_publish()
+            session.commit()
+            await srcbuild.log("I: verifying source package\n")
+            await enqueue_aptly({"src_publish": [srcbuild.id]})
+        else:
+            await srcbuild.log("W: no source package to publish\n")
+            await srcbuild.set_nothing_done()
+            session.commit()
+
+        # publish debian packages
+        await debbuild.logtitle("External Debian Package Upload")
+        await debbuild.set_needs_publish()
+        session.commit()
+        await debbuild.log("I: verifying debian packages\n")
+        await enqueue_aptly({"publish": [debbuild.id]})
+
+    return True
 
 
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}/build/{build_id}")
