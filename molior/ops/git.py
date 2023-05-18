@@ -49,7 +49,7 @@ async def GitClone(build_id, repo_id, session):
 
         repo = session.query(SourceRepository).filter(SourceRepository.id == repo_id).first()
         if not repo:
-            logger.error("buildlatest: repo %d not found", repo_id)
+            logger.error("git clone: repo %d not found", repo_id)
             return
 
         repo.set_busy()
