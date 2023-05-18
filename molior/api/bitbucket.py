@@ -83,7 +83,6 @@ async def bitbucket_trigger(request):
 
     try:
         data = await request.json()
-        logger.info(data)
         url = data["repository"]["links"]["self"][0]["href"]
         git_ref = data["push"]["changes"][0]["new"]["target"]["hash"]
         branch = data["push"]["changes"][0]["new"]["name"]
