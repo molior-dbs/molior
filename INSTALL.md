@@ -224,6 +224,6 @@ From the molior server, execute the following for each build machine IP in order
 DEBSIGN_KEY=debsign@molior.info
 for molior_node in NODE_IPS
 do
-  sudo -u molior gpg1 --armor --export $DEBSIGN_KEY | sudo -u molior ssh -o StrictHostKeyChecking=no $molior_node "gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg"
+  sudo -u molior gpg --armor --export $DEBSIGN_KEY | sudo -u molior ssh -o StrictHostKeyChecking=no $molior_node "gpg --import --no-default-keyring --keyring=trustedkeys.gpg"
 done
 ```
