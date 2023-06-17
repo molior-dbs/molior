@@ -26,7 +26,7 @@ Architecture: all
 Section: misc
 Depends: ${misc:Depends}, ${perl:Depends}, dpkg-dev, lsb-base (>= 3.0-6), adduser, lsb-release, fakeroot,
   haveged, gcc, debhelper, tcl, expect, dh-systemd | debhelper (>= 9.20160709), sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
-  schroot, gnupg1, devscripts, pxz | xz-utils (>= 5.2.4-1),
+  schroot, gnupg, devscripts, pxz | xz-utils (>= 5.2.4-1),
   python3, python3-launchy, python3-yaml, python3-aiohttp, python3-aiofiles, python3-psutil, python3-netifaces
 Tag: devel::buildtools
 Description: Molior build node client

@@ -78,7 +78,7 @@ async def BuildDebSrc(repo_id, repo_path, build_id, ci_version, is_ci, author, e
     logger.debug("%s: creating source package", src_package_name)
     await buildlog(build_id, "I: creating source package: %s (%s)\n" % (src_package_name, version))
 
-    cmd = "dpkg-buildpackage -S -d -nc -I.git -pgpg1 -k{}".format(key)
+    cmd = "dpkg-buildpackage -S -d -nc -I.git -k{}".format(key)
     process = Launchy(cmd, outh, outh, cwd=str(repo_path))
     await process.launch()
     ret = await process.wait()
