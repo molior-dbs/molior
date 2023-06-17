@@ -1,6 +1,6 @@
 FROM debian:buster-slim
 RUN apt-get update \
-    && apt-get install -y supervisor wget gnupg1 nginx-light \
+    && apt-get install -y supervisor wget gnupg nginx-light \
     && rm -rf /var/lib/apt/lists/*
 RUN wget http://molior.info/archive-keyring.asc -q -O- | apt-key add -
 COPY apt.sources /etc/apt/sources.list.d/molior.list
