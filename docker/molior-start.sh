@@ -9,7 +9,7 @@ if [ -z "$DEBSIGN_NAME" ]; then
 fi
 
 create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL
-su molior -c "gpg1 --armor --export $DEBSIGN_EMAIL | gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg"
+su molior -c "gpg --armor --export $DEBSIGN_EMAIL | gpg --import --no-default-keyring --keyring=trustedkeys.gpg"
 
 sed -i 's/127.0.0.1/molior/' /etc/molior/molior.yml
 sed -i "s/\( \+apt_url: \).*/\1'http:\/\/aptly:3142'/" /etc/molior/molior.yml

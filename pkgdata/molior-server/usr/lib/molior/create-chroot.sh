@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo $0 $@
+
+set -x
+
 usage()
 {
   echo "Usage: $0 build|publish|remove <distrelease> <name> <version> <architecture> components <mirror url> keys" 1>&2
@@ -48,7 +52,7 @@ build_chroot()
   if [ -n "$COMPONENTS" ]; then
       COMPONENTS="--components main,$COMPONENTS"
   fi
-  INCLUDE="--include=gnupg1"
+  # INCLUDE="--include=gnupg"
 
   keydir=`mktemp -d /tmp/molior-chrootkeys.XXXXXX`
   i=1
@@ -58,13 +62,13 @@ build_chroot()
           keyserver=`echo $KEY | cut -d# -f1`
           keyids=`echo $KEY | cut -d# -f2 | tr ',' ' '`
           echo I: Downloading gpg public key: $keyserver $keyids
-          flock /root/.gnupg.molior gpg1 --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
-          gpg1 --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids > "$keydir/$i.asc"
+          flock /root/.gnupg.molior gpg --no-default-keyring --keyring=trustedkeys.gpg --keyserver $keyserver --recv-keys $keyids
+          gpg --no-default-keyring --keyring=trustedkeys.gpg --export --armor $keyids > "$keydir/$i.asc"
       else
           echo I: Downloading gpg public key: $KEY
           keyfile="$keydir/$i.asc"
           wget -q $KEY -O $keyfile
-          cat $keyfile | flock /root/.gnupg.molior gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+          cat $keyfile | flock /root/.gnupg.molior gpg --import --no-default-keyring --keyring=trustedkeys.gpg
       fi
       i=$((i + 1))
   done
@@ -115,9 +119,19 @@ EOM
   echo I: Adding gpg public keys to chroot
   for keyfile in $keydir/*
   do
-    cat $keyfile | chroot $target apt-key add - >/dev/null
+    name=`basename $keyfile .asc`
+    mv $keyfile $keydir/$name
+    gpg --dearmour $keydir/$name
+    mv $keydir/$name.gpg $target//etc/apt/trusted.gpg.d/
   done
   rm -rf $keydir
+
+#  echo I: Adding gpg public keys to chroot
+#  for keyfile in $keydir/*
+#  do
+#    cat $keyfile | chroot $target apt-key add - >/dev/null || true
+#  done
+#  rm -rf $keydir
 
   # Add Molior Source signing key
   # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
