@@ -1,8 +1,6 @@
 #!/bin/bash
 
-echo $0 $@
-
-set -x
+# echo $0 $@
 
 usage()
 {
