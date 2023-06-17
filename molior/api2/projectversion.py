@@ -1,5 +1,3 @@
-import asyncio
-
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
@@ -465,15 +463,15 @@ async def copy_projectversion(request):
             trigger_builds.append(build.id)
 
     copy_build = Build(
-	version=new_version,
-	git_ref=None,
-	ci_branch=None,
-	is_ci=False,
-	sourcename=f"copy {projectversion.project.name}/{projectversion.name}",
-	buildstate="new",
-	buildtype="copy_projectversion",
-	sourcerepository=None,
-	maintainer=None,
+        version=new_version,
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename=f"copy {projectversion.project.name}/{projectversion.name}",
+        buildstate="new",
+        buildtype="copy_projectversion",
+        sourcerepository=None,
+        maintainer=None,
     )
     db.add(copy_build)
     db.commit()
