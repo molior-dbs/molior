@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TYPE buildtype ADD VALUE 'copy_projectversion';
+ALTER TYPE buildtype ADD VALUE 'delete_projectversion';
+
+EOF
