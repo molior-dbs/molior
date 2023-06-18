@@ -1,3 +1,9 @@
+molior (1.5.0~alpha11) stretch; urgency=medium
+
+  * debian: fix build for bookworm
+
+ -- André Roth <neolynx@gmail.com>  Sun, 18 Jun 2023 13:28:26 +0200
+
 molior (1.5.0~alpha10) stretch; urgency=medium
 
   * fix buildtype enum
