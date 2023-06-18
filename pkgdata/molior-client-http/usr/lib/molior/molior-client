@@ -160,8 +160,7 @@ async def main():
     stats = SystemStats()
     logger.info("starting on %s/%s", arch, node)
 
-    up = True
-    while(up is True):
+    while (True):
         await asyncio.sleep(1)
         try:
             async with session.ws_connect("ws://{}/internal/registry/{}/{}".format(
