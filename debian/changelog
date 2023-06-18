@@ -1,3 +1,9 @@
+molior (1.5.0~alpha10) stretch; urgency=medium
+
+  * fix buildtype enum
+
+ -- André Roth <neolynx@gmail.com>  Sun, 18 Jun 2023 12:55:19 +0200
+
 molior (1.5.0~alpha9) stretch; urgency=medium
 
   * add buildtypes for copy and delete projectversions
