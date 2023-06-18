@@ -1,3 +1,9 @@
+molior (1.5.0~alpha13) stretch; urgency=medium
+
+  * disable tests, need python upgrade
+
+ -- André Roth <andre.roth@roche.com>  Sun, 18 Jun 2023 14:09:25 +0200
+
 molior (1.5.0~alpha12) stretch; urgency=medium
 
   * fix flake8
