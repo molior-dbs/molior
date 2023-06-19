@@ -11,6 +11,7 @@ from ..molior.configuration import Configuration
 from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_mirror
 from ..model.mirrorkey import MirrorKey
+from ..model.build import Build
 from ..tools import paginate, array2db
 
 
@@ -377,28 +378,68 @@ async def create_mirror2(request):
         mirrorkeyids = []
         mirrorkeyserver = ""
 
-    args = {
-        "create_mirror": [
-            mirrorname,
-            mirrorurl,
-            mirrordist,
-            mirrorcomponents,
-            mirrorkeyids,
-            mirrorkeyserver,
-            is_basemirror,
-            architectures,
-            mirrorversion,
-            mirrorkeyurl,
-            basemirror_id,
-            mirrorsrc,
-            mirrorinst,
-            external_repo,
-            dependency_policy,
-            mirrorfilter,
-        ]
-    }
+    mirror_project = db.query(Project).filter(func.lower(Project.name) == mirrorname.lower(),
+                                              Project.is_mirror.is_(True)).first()
+    if not mirror_project:
+        mirror_project = Project(name=mirrorname, is_mirror=True, is_basemirror=is_basemirror)
+        db.add(mirror_project)
+
+    project_version = db.query(ProjectVersion).join(Project).filter(
+            func.lower(Project.name) == mirrorname.lower(), Project.is_mirror.is_(True),
+            func.lower(ProjectVersion.name) == mirrorversion.lower()).first()
+    if project_version:
+        return ErrorResponse(400, f"mirror with name {mirrorname} and version {mirrorversion} already exists")
+
+    # FIXME: check basemirror exists
+    # FIXME: until here, should be in api
+
+    mirror = ProjectVersion(
+        name=mirrorversion,
+        project=mirror_project,
+        mirror_url=mirrorurl,
+        mirror_distribution=mirrordist,
+        mirror_components=",".join(mirrorcomponents),
+        mirror_architectures=array2db(architectures),
+        mirror_with_sources=mirrorsrc,
+        mirror_with_installer=mirrorinst,
+        mirror_state="new",
+        basemirror_id=basemirror_id,
+        external_repo=external_repo,
+        dependency_policy=dependency_policy,
+        mirror_filter=mirrorfilter)
+
+    db.add(mirror)
+    db.commit()
+
+    mirrorkey = MirrorKey(
+            projectversion_id=mirror.id,
+            keyurl=mirrorkeyurl,
+            keyids=array2db(mirrorkeyids),
+            keyserver=mirrorkeyserver)
+
+    db.add(mirrorkey)
+
+    build = Build(
+        version=mirrorversion,
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename=mirrorname,
+        buildstate="new",
+        buildtype="mirror",
+        sourcerepository=None,
+        maintainer=None,
+        projectversion_id=mirror.id
+    )
+
+    db.add(build)
+    db.commit()
+    build.log_state("created")
+    await build.build_added()
+
+    args = {"init_mirror": [mirror.id]}
     await enqueue_aptly(args)
-    return OKResponse("Mirror creation started")
+    return web.json_response({"build_id": build.id})
 
 
 @app.http_put("/api2/mirror/{name}/{version}")

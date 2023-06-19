@@ -449,104 +449,6 @@ class AptlyWorker:
 
     """
 
-    async def _create_mirror(self, args):
-        (
-            mirror_name,
-            url,
-            mirror_distribution,
-            components,
-            keys,
-            keyserver,
-            is_basemirror,
-            architectures,
-            mirror_version,
-            key_url,
-            basemirror_id,
-            download_sources,
-            download_installer,
-            external_repo,
-            dependency_policy,
-            mirror_filter,
-        ) = args
-
-        mirror_id = None
-
-        with Session() as session:
-            # FIXME: the following db checking should happen in api
-            mirror_project = session.query(Project).filter(func.lower(Project.name) == mirror_name.lower(),
-                                                           Project.is_mirror.is_(True)).first()
-            if not mirror_project:
-                mirror_project = Project(name=mirror_name, is_mirror=True, is_basemirror=is_basemirror)
-                session.add(mirror_project)
-
-            project_version = (
-                session.query(ProjectVersion)
-                .join(Project)
-                .filter(func.lower(Project.name) == mirror_name.lower(), Project.is_mirror.is_(True))
-                .filter(func.lower(ProjectVersion.name) == mirror_version.lower())
-                .first()
-            )
-
-            if project_version:
-                logger.error("mirror with name '%s' and version '%s' already exists", mirror_name, mirror_version)
-                return False
-
-            # FIXME: check basemirror exists
-            # FIXME: until here, should be in api
-
-            mirror = ProjectVersion(
-                name=mirror_version,
-                project=mirror_project,
-                mirror_url=url,
-                mirror_distribution=mirror_distribution,
-                mirror_components=",".join(components),
-                mirror_architectures=array2db(architectures),
-                mirror_with_sources=download_sources,
-                mirror_with_installer=download_installer,
-                mirror_state="new",
-                basemirror_id=basemirror_id,
-                external_repo=external_repo,
-                dependency_policy=dependency_policy,
-                mirror_filter=mirror_filter,
-            )
-
-            session.add(mirror)
-            session.commit()
-
-            mirrorkey = MirrorKey(
-                    projectversion_id=mirror.id,
-                    keyurl=key_url,
-                    keyids=array2db(keys),
-                    keyserver=keyserver)
-
-            session.add(mirrorkey)
-
-            build = Build(
-                version=mirror_version,
-                git_ref=None,
-                ci_branch=None,
-                is_ci=False,
-                sourcename=mirror_name,
-                buildstate="new",
-                buildtype="mirror",
-                sourcerepository=None,
-                maintainer=None,
-                projectversion_id=mirror.id
-            )
-
-            session.add(build)
-            session.commit()
-            build.log_state("created")
-            await build.build_added()
-            mirror_id = mirror.id
-
-        if not mirror_id:
-            return False
-
-        args = {"init_mirror": [mirror_id]}
-        await enqueue_aptly(args)
-        return True
-
     async def _init_mirror(self, args):
         mirror_id = args[0]
 
@@ -1235,12 +1137,6 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._publish(args)
-
-                if not handled:
-                    args = task.get("create_mirror")
-                    if args:
-                        handled = True
-                        await self._create_mirror(args)
 
                 if not handled:
                     args = task.get("init_mirror")
