@@ -858,7 +858,18 @@ class AptlyWorker:
         project_version = args[3]
         architectures = args[4]
         trigger_builds = args[5]
+        build_id = None
+        if len(args) > 6:
+            build_id = args[6]  # build id for copying projectversions
+
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
+
+        if build_id:
+            with Session() as session:
+                build = session.query(Build).filter(Build.id == build_id).first()
+                if build:
+                    await build.set_successful()
+                    session.commit()
 
         if len(trigger_builds) > 0:
             targets = [f"{project_name}/{project_version}"]
