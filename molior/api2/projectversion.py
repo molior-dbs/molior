@@ -1,7 +1,6 @@
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
-from shutil import rmtree
 from pathlib import Path
 from aiofile import AIOFile, Writer
 from launchy import Launchy
@@ -20,8 +19,6 @@ from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
-from ..model.buildtask import BuildTask
-from ..model.postbuildhook import PostBuildHook
 from ..model.projectversiondependency import ProjectVersionDependency
 from ..model.database import Session
 
@@ -711,95 +708,13 @@ async def delete_projectversion(request):
         if debbuilds:
             return ErrorResponse(400, "Builds are still depending on this version, cannot delete it")
 
-    # remember configuration
-    basemirror_name = projectversion.basemirror.project.name
-    basemirror_version = projectversion.basemirror.name
-    project_name = projectversion.project.name
-    project_version = projectversion.name
-    architectures = db2array(projectversion.mirror_architectures)
-
     # mark as deleted
     projectversion.is_deleted = True
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
-    projectversion.name = projectversion.name + "-deleted"
     db.commit()
 
-    # delete deb builds and parents if needed
-    todelete = []
-    debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion.id, Build.buildtype == "deb").all()
-    for debbuild in debbuilds:
-        todelete.append(debbuild)
-
-    for debbuild in debbuilds:
-        sourcebuild = None
-        if debbuild.parent:
-            sourcebuild = debbuild.parent
-            for child in debbuild.parent.children:
-                if child.projectversion_id == projectversion.id:
-                    continue
-                sourcebuild = None  # source build has childs belonging to a different projectversion
-        if sourcebuild and sourcebuild not in todelete:
-            todelete.append(sourcebuild)
-
-    def deletebuild(build):
-        buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
-        for buildtask in buildtasks:
-            db.delete(buildtask)
-        db.delete(build)
-        buildout = "/var/lib/molior/buildout/%d" % build.id
-        try:
-            rmtree(buildout)
-        except Exception:
-            pass
-
-    for build in todelete:
-        if build.buildtype == "source":
-            topbuild = build.parent
-            deletebuild(build)
-            deletebuild(topbuild)
-        else:
-            deletebuild(build)
-
-    # delete hooks
-    todelete = []
-    sourcerepositoryprojectversions = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion.id).all()
-    for sourcerepositoryprojectversion in sourcerepositoryprojectversions:
-        hooks = db.query(PostBuildHook).filter(PostBuildHook.sourcerepositoryprojectversion_id ==
-                                               sourcerepositoryprojectversion.id).all()
-
-        for hook in hooks:
-            db.delete(hook)
-
-        todelete.append(sourcerepositoryprojectversion)
-
-    db.commit()
-
-    for d in todelete:
-        db.delete(d)
-
-    # delete references from copies and snapshots
-    relatives = db.query(ProjectVersion).filter(ProjectVersion.baseprojectversion_id == projectversion.id).all()
-    for relative in relatives:
-        relative.baseprojectversion_id = None
-
-    db.commit()
-
-    # delete projectversion
-    db.delete(projectversion)
-    db.commit()
-
-    await enqueue_aptly(
-        {
-            "delete_repository": [
-                basemirror_name,
-                basemirror_version,
-                project_name,
-                project_version,
-                architectures
-            ]
-        }
-    )
+    await enqueue_aptly({"delete_repository": [projectversion.id]})
     return OKResponse("Deleted Project Version")
 
 

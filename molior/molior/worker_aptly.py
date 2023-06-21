@@ -22,6 +22,9 @@ from ..model.project import Project
 from ..model.projectversion import ProjectVersion, get_projectversion_byid
 from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
+from ..model.buildtask import BuildTask
+from ..model.postbuildhook import PostBuildHook
+from ..model.sourepprover import SouRepProVer
 
 
 def mirror_architectures(mirror):
@@ -870,11 +873,93 @@ class AptlyWorker:
                 logger.exception(exc)
 
     async def _delete_repository(self, args):
-        basemirror_name = args[0]
-        basemirror_version = args[1]
-        project_name = args[2]
-        project_version = args[3]
-        architectures = args[4]
+        projectversion_id = args[0]
+        basemirror_name = None
+        basemirror_version = None
+        project_name = None
+        project_version = None
+        architectures = None
+
+        build_ids = []
+        with Session() as db:
+            # remember configuration
+            projectversion = get_projectversion_byid(projectversion_id, db)
+            if not projectversion:
+                logger.error("delete projectversion: projectversion %d not found" % projectversion_id)
+                return
+
+            basemirror_name = projectversion.basemirror.project.name
+            basemirror_version = projectversion.basemirror.name
+            project_name = projectversion.project.name
+            project_version = projectversion.name
+            architectures = db2array(projectversion.mirror_architectures)
+
+            # delete deb builds and parents if needed
+            todelete = []
+            debbuilds = db.query(Build).filter(Build.projectversion_id == projectversion_id, Build.buildtype == "deb").all()
+            for debbuild in debbuilds:
+                todelete.append(debbuild)
+
+            for debbuild in debbuilds:
+                sourcebuild = None
+                if debbuild.parent:
+                    sourcebuild = debbuild.parent
+                    for child in debbuild.parent.children:
+                        if child.projectversion_id == projectversion_id:
+                            continue
+                        sourcebuild = None  # source build has childs belonging to a different projectversion
+                if sourcebuild and sourcebuild not in todelete:
+                    todelete.append(sourcebuild)
+
+            def deletebuild(build):
+                buildtasks = db.query(BuildTask).filter(BuildTask.build == build).all()
+                for buildtask in buildtasks:
+                    db.delete(buildtask)
+                build_ids.append(build.id)
+                db.delete(build)
+
+            for build in todelete:
+                if build.buildtype == "source":
+                    topbuild = build.parent
+                    deletebuild(build)
+                    deletebuild(topbuild)
+                else:
+                    deletebuild(build)
+
+            # delete hooks
+            todelete = []
+            sourepovers = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion_id).all()
+            for sourcerepositoryprojectversion in sourepovers:
+                hooks = db.query(PostBuildHook).filter(PostBuildHook.sourcerepositoryprojectversion_id ==
+                                                       sourcerepositoryprojectversion.id).all()
+
+                for hook in hooks:
+                    db.delete(hook)
+
+                todelete.append(sourcerepositoryprojectversion)
+
+            db.commit()
+
+            for d in todelete:
+                db.delete(d)
+
+            # delete references from copies and snapshots
+            relatives = db.query(ProjectVersion).filter(ProjectVersion.baseprojectversion_id == projectversion_id).all()
+            for relative in relatives:
+                relative.baseprojectversion_id = None
+
+            db.commit()
+
+            # delete projectversion
+            db.delete(projectversion)
+            db.commit()
+
+        for build_id in build_ids:
+            buildout = "/var/lib/molior/buildout/%d" % build_id
+            try:
+                rmtree(buildout)
+            except Exception:
+                pass
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).delete()
 
     async def _cleanup(self, args):

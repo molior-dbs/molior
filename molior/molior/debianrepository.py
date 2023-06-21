@@ -129,11 +129,11 @@ class DebianRepository:
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
             try:
-                # FIXME: should this aptly task run in background?
-                await self.aptly.publish_drop(self.basemirror_name,
-                                              self.basemirror_version,
-                                              self.project_name,
-                                              self.project_version, dist)
+                task_id = await self.aptly.publish_drop(self.basemirror_name,
+                                                        self.basemirror_version,
+                                                        self.project_name,
+                                                        self.project_version, dist)
+                await self.aptly.wait_task(task_id)
             except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
             await asyncio.sleep(2)
