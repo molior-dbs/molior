@@ -3,8 +3,9 @@ import operator
 
 from os import mkdir
 from shutil import rmtree
-from sqlalchemy import func, or_
 from shutil import copy2
+from concurrent.futures import ThreadPoolExecutor
+from sqlalchemy import func, or_
 
 from ..app import logger
 from ..tools import db2array, array2db
@@ -451,6 +452,9 @@ class AptlyWorker:
 
     """
 
+    def __init__(self):
+        self.threadexc = ThreadPoolExecutor(max_workers=5)
+
     async def _init_mirror(self, args):
         mirror_id = args[0]
 
@@ -862,14 +866,18 @@ class AptlyWorker:
         await DebianRepository(basemirror_name, basemirror_version, project_name,
                                project_version, architectures).snapshot(snapshot_name, packages)
 
-        # copy build logs
-        buildout_path = Configuration().working_dir + "/buildout"
-        for old, new in buildlogs:
-            try:
-                mkdir(buildout_path + "/%d" % new)
-                copy2(buildout_path + "/%d/build.log" % old, buildout_path + "/%d/build.log" % new)
-            except Exception as exc:
-                logger.exception(exc)
+        def copy_buildout():
+            # copy build logs
+            buildout_path = Configuration().working_dir + "/buildout"
+            for old, new in buildlogs:
+                try:
+                    mkdir(buildout_path + "/%d" % new)
+                    copy2(buildout_path + "/%d/build.log" % old, buildout_path + "/%d/build.log" % new)
+                except Exception as exc:
+                    logger.exception(exc)
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self.threadexc, copy_buildout)
 
     async def _delete_repository(self, args):
         projectversion_id = args[0]
@@ -953,12 +961,15 @@ class AptlyWorker:
             db.delete(projectversion)
             db.commit()
 
-        for build_id in build_ids:
-            buildout = "/var/lib/molior/buildout/%d" % build_id
-            try:
-                rmtree(buildout)
-            except Exception:
-                pass
+        def remove_buildout():
+            for build_id in build_ids:
+                buildout = "/var/lib/molior/buildout/%d" % build_id
+                try:
+                    rmtree(buildout)
+                except Exception:
+                    pass
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self.threadexc, remove_buildout)
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).delete()
 
     async def _cleanup(self, args):
@@ -1134,12 +1145,15 @@ class AptlyWorker:
         for pv in projectversions:
             await aptly.republish(dist, projectversions[pv][0], projectversions[pv][1])
 
-        for bid in build_ids:
-            buildout = "/var/lib/molior/buildout/%d" % bid
-            try:
-                rmtree(buildout)
-            except Exception:
-                pass
+        def remove_buildout():
+            for build_id in build_ids:
+                buildout = "/var/lib/molior/buildout/%d" % build_id
+                try:
+                    rmtree(buildout)
+                except Exception:
+                    pass
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self.threadexc, remove_buildout)
 
         with Session() as session:
             top = session.query(Build).filter(Build.id == build_id).first()
