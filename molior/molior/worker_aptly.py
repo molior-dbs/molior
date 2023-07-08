@@ -881,6 +881,7 @@ class AptlyWorker:
 
     async def _delete_repository(self, args):
         projectversion_id = args[0]
+        delete_build_id = args[1]
         basemirror_name = None
         basemirror_version = None
         project_name = None
@@ -929,7 +930,8 @@ class AptlyWorker:
                 if build.buildtype == "source":
                     topbuild = build.parent
                     deletebuild(build)
-                    deletebuild(topbuild)
+                    if topbuild:
+                        deletebuild(topbuild)
                 else:
                     deletebuild(build)
 
@@ -970,7 +972,16 @@ class AptlyWorker:
                     pass
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(self.threadexc, remove_buildout)
+
         await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).delete()
+
+        with Session() as db:
+            build = db.query(Build).filter(Build.id == delete_build_id).first()
+            if not build:
+                logger.error("delete projectversion: build %d not found" % delete_build_id)
+                return
+            await build.set_successful()
+            db.commit()
 
     async def _cleanup(self, args):
         logger.info("aptly worker: running cleanup")
