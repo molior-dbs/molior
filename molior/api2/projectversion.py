@@ -712,10 +712,28 @@ async def delete_projectversion(request):
     projectversion.is_deleted = True
     projectversion.is_locked = True
     projectversion.ci_builds_enabled = False
+
+    delete_build = Build(
+        version=projectversion.name,
+        git_ref=None,
+        ci_branch=None,
+        is_ci=False,
+        sourcename=f"delete {projectversion.project.name}/{projectversion.name}",
+        buildstate="new",
+        buildtype="delete_projectversion",
+        sourcerepository=None,
+        maintainer=None,
+    )
+    db.add(delete_build)
+
+    await delete_build.build_added()
+    await delete_build.set_building()
     db.commit()
 
-    await enqueue_aptly({"delete_repository": [projectversion.id]})
-    return OKResponse("Deleted Project Version")
+    await enqueue_aptly({"delete_repository": [projectversion.id, delete_build.id]})
+
+    data = {"build_id": delete_build.id}
+    return OKResponse(data)
 
 
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}/repository/{sourcerepository_id}")
