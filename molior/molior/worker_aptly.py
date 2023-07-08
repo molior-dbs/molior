@@ -380,12 +380,11 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
 
             if mirror.project.is_basemirror:
                 await create_chroots(mirror, build, mirror_project, mirror_version, session)
+            else:
+                await build.set_successful()
 
             mirror.is_locked = True
             mirror.mirror_state = "ready"
-            session.commit()
-
-            await build.set_successful()
             session.commit()
 
             await build.log("\n")

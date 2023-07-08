@@ -30,6 +30,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         await build.logtitle("Chroot Environment")
 
         await build.set_building()
+        await build.parent.set_building()
         session.commit()
 
         logger.info("creating build environments for %s-%s-%s", dist, version, arch)
@@ -59,6 +60,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         session.commit()
 
         await build.set_publishing()
+        await build.parent.set_publishing()
         session.commit()
 
         process = Launchy(["sudo", "run-parts", "-a", "publish", "-a", dist, "-a", name, "-a", version, "-a", arch,
@@ -78,6 +80,21 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         await build.log("\n")
         await build.logtitle("Done", no_footer_newline=True)
         await build.set_successful()
+
+        done = True
+        successful = True
+        for sibling in build.parent.children:
+            if sibling.buildstate == "building" or sibling.buildstate == "publishing":
+                done = False
+                break
+            if sibling.buildstate != "successful":
+                successful = False
+        if done:
+            if successful:
+                await build.parent.set_successful()
+            else:
+                await build.parent.set_failed()
+
         session.commit()
 
         chroot = session.query(Chroot).filter(Chroot.id == chroot_id).first()
