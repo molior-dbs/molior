@@ -1,3 +1,16 @@
+molior (1.5.0~alpha15) stretch; urgency=medium
+
+  * db upgrade: add missing indexes
+  * projectversion: add delete build
+  * use thread executor for removing files
+  * projectversion: add mirror build
+  * git: improve checkout
+  * builtask: add index
+  * projects: sort case insensitive
+  * projectversion: delete in worker
+
+ -- André Roth <neolynx@gmail.com>  Sat, 08 Jul 2023 18:30:40 +0200
+
 molior (1.5.0~alpha14) stretch; urgency=medium
 
   * create mirror: return build id
