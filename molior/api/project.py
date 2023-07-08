@@ -50,7 +50,7 @@ async def get_projects(request):
     db = request.cirrina.db_session
     filter_name = request.GET.getone("q", "")
 
-    query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(Project.name)
+    query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(func.lower(Project.name))
 
     if filter_name:
         query = query.filter(Project.name.ilike("%{}%".format(escape_for_like(filter_name))))
