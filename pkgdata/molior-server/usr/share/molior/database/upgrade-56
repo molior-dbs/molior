@@ -1,0 +1,10 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+CREATE INDEX ix_buildtask_build_id           ON buildtask           USING btree (build_id);
+CREATE INDEX ix_chroot_build_id              ON build               USING btree (build_id);
+CREATE INDEX ix_chroot_build_id              ON chroot              USING btree (build_id);
+CREATE INDEX ix_build_debianpackage_build_id ON build_debianpackage USING btree (build_id);
+
+EOF
