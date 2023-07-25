@@ -226,7 +226,10 @@ class DebianRepository:
         logger.debug("repo add returned aptly task id '%s' and upload dir '%s'", task_id, upload_dir)
         logger.debug("waiting for repo add task with id '%s' to finish", task_id)
 
-        await self.aptly.wait_task(task_id)
+        ret = await self.aptly.wait_task(task_id)
+        if not ret:
+            logger.error("add_packages: error uploading packages")
+            return False
 
         logger.debug("repo add task with id '%s' has finished", task_id)
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
