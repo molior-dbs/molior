@@ -180,12 +180,13 @@ async def GitCheckout(repo_path, git_ref, build_id):
             logger.error("checkout: build %d not found", build_id)
             return False
 
-        # if not await GitCleanLocal(repo_path, build):
-        #     return False
+        # cleanup local changes
         if not await run_git("git reset --hard origin", repo_path, build, write_output_log=False):
             return False
-        if not await run_git("git fetch --tags --prune --prune-tags --force", repo_path, build, write_output_log=False):
+        # delete old tag, update moved tags, fetch new tags
+        if not await run_git("git fetch --prune origin +refs/tags/*:refs/tags/*", repo_path, build, write_output_log=False):
             return False
+        # checkout
         if not await run_git("git checkout --force {}".format(git_ref), repo_path, build, write_output_log=False):
             return False
 
