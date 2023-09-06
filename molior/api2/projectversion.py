@@ -1028,33 +1028,14 @@ async def external_build_upload(request):
     db.commit()
     await srcbuild.build_added()
 
-    debbuild = Build(
-        version=None,
-        git_ref=None,
-        ci_branch=None,
-        is_ci=False,
-        sourcename="external build upload",
-        buildstate="new",
-        buildtype="deb",
-        parent_id=srcbuild.id,
-        sourcerepository=None,
-        maintainer=None,
-        projectversion_id=projectversion.id,
-        architecture="amd64"
-    )
-
-    db.add(debbuild)
-    db.commit()
-    await debbuild.build_added()
-
     # loop = asyncio.get_event_loop()
     # loop.create_task(
-    await finalize_extbuild(build.id, projectversion.id, srcbuild.id, debbuild.id, request.multipart)
+    await finalize_extbuild(build.id, projectversion.id, srcbuild.id, request.multipart)
     # )
     return OKResponse({"build_id": build.id}, status=201)
 
 
-async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_id, multipart):
+async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, multipart):
     buildout_path = Path(Configuration().working_dir) / "buildout"
     build_version = None
     sourcename = None
@@ -1079,6 +1060,38 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
                     break
                 await writer(chunk)
 
+    async def get_debbuild(arch, version, srcbuild_id, projectversion_id):
+        # create deb builds per arch
+        if arch == "all":
+            arch = "amd64"  # FIXME: should be arch from project
+        with Session() as db:
+            debbuild = session.query(Build).filter(Build.version == version,
+                                                   Build.buildstate == "new",
+                                                   Build.buildtype == "deb",
+                                                   Build.parent_id == srcbuild_id,
+                                                   Build.projectversion_id == projectversion_id,
+                                                   Build.architecture == arch).first()
+            if not debbuild:
+                debbuild = Build(
+                    version=version,
+                    git_ref=None,
+                    ci_branch=None,
+                    is_ci=False,
+                    sourcename="external build upload",
+                    buildstate="new",
+                    buildtype="deb",
+                    parent_id=srcbuild_id,
+                    sourcerepository=None,
+                    maintainer=None,
+                    projectversion_id=projectversion_id,
+                    architecture=arch
+                )
+
+                db.add(debbuild)
+                db.commit()
+                await debbuild.build_added()
+            return debbuild.id
+
     with Session() as session:
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
@@ -1102,16 +1115,16 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
 
             destbuild_id = None
 
+            arch = None
             pkgname = None
             version = None
-            arch = None
             if filename.endswith(".deb"):
                 s = filename[:-4].split("_", 3)
                 if len(s) != 3:
                     logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild_id
+                destbuild_id = await get_debbuild(arch, version, srcbuild_id, projectversion_id)
 
             elif filename.endswith(".changes"):
                 s = filename[:-4].split("_", 3)
@@ -1119,11 +1132,12 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
                     logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild_id
+                arch = arch.split(".")[0]
                 has_changes_file = True
-                changes_file = buildout_path / str(destbuild_id) / filename
                 if not sourcename:
                     sourcename = pkgname
+                destbuild_id = await get_debbuild(arch, version, srcbuild_id, projectversion_id)
+                changes_file = buildout_path / str(destbuild_id) / filename
 
             elif filename.endswith(".buildinfo"):
                 s = filename[:-4].split("_", 3)
@@ -1131,10 +1145,11 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
                     logs.append("W: invalid filename: '%s'\n" % filename)
                     continue
                 pkgname, version, arch = s
-                destbuild_id = debbuild_id
+                arch = arch.split(".")[0]
                 has_buildinfo_file = True
                 if not sourcename:
                     sourcename = pkgname
+                destbuild_id = await get_debbuild(arch, version, srcbuild_id, projectversion_id)
 
             elif filename.endswith(".dsc"):
                 s = filename[:-4].split("_", 2)
@@ -1189,9 +1204,9 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
             await build.log("E: build not found: '%d'\n" % srcbuild_id)
             return False
 
-        debbuild = session.query(Build).filter(Build.id == debbuild_id).first()
-        if not debbuild:
-            await build.log("E: build not found: '%d'\n" % debbuild_id)
+        debbuilds = session.query(Build).filter(Build.parent_id == srcbuild_id).all()
+        if not debbuilds:
+            await build.log("E: no deb builds found for source build: '%d'\n" % srcbuild_id)
             return False
 
         for log in logs:
@@ -1204,7 +1219,8 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
             await build.log("E: %s\n" % errmsg)
             await build.set_failed()
             await srcbuild.set_failed()
-            await debbuild.set_failed()
+            for debbuild in debbuilds:
+                await debbuild.set_failed()
             session.commit()
             return False
 
@@ -1213,7 +1229,8 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
             await build.log("E: %s\n" % errmsg)
             await build.set_failed()
             await srcbuild.set_failed()
-            await debbuild.set_failed()
+            for debbuild in debbuilds:
+                await debbuild.set_failed()
             session.commit()
             return False
 
@@ -1237,10 +1254,10 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
 
         build.sourcename = sourcename
         srcbuild.sourcename = sourcename
-        debbuild.sourcename = sourcename
+        for debbuild in debbuilds:
+            debbuild.sourcename = sourcename
         build.version = build_version
         srcbuild.version = build_version
-        debbuild.version = build_version
         session.commit()
 
         # check if version already exists
@@ -1257,7 +1274,8 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
             await build.set_failed()
             await build.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await srcbuild.set_failed()
-            await debbuild.set_failed()
+            for debbuild in debbuilds:
+                await debbuild.set_failed()
             session.commit()
             return False
 
@@ -1277,11 +1295,12 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, debbuild_i
             session.commit()
 
         # publish debian packages
-        await debbuild.logtitle("External Debian Package Upload")
-        await debbuild.set_needs_publish()
-        session.commit()
-        await debbuild.log("I: verifying debian packages\n")
-        await enqueue_aptly({"publish": [debbuild.id]})
+        for debbuild in debbuilds:
+            await debbuild.logtitle("External Debian Package Upload")
+            await debbuild.set_needs_publish()
+            session.commit()
+            await debbuild.log("I: verifying debian packages\n")
+            await enqueue_aptly({"publish": [debbuild.id]})
 
     return True
 
