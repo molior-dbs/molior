@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
@@ -29,7 +31,8 @@ def latest_project_builds(db, projectversion_id):
             Build.projectversion_id == projectversion_id,
             Build.is_ci.is_(False),
             Build.sourcerepository_id.isnot(None),
-            Build.buildtype == "deb").group_by(Build.sourcerepository_id)
+            Build.buildtype == "deb",
+            Build.buildstate == "successful").group_by(Build.sourcerepository_id)
 
     SourceBuild = aliased(Build)
 
@@ -39,7 +42,7 @@ def latest_project_builds(db, projectversion_id):
             Build.is_ci.is_(False),
             Build.sourcerepository_id.is_(None),
             Build.buildtype == "deb",
-            ).group_by(SourceBuild.sourcename)
+            Build.buildstate == "successful").group_by(SourceBuild.sourcename)
 
     latest_union_builds_subq = latest_builds_subq.union_all(latest_build_uploads_subq).subquery()
 
@@ -438,8 +441,8 @@ async def copy_projectversion(request):
         latest_builds = latest_project_builds(db, projectversion.id)
         for latest_build in latest_builds:
             topbuild = latest_build.parent.parent
-            if topbuild.buildstate != "successful":
-                continue
+            # if topbuild.buildstate != "successful":
+            #     continue
             if topbuild.sourcerepository is None:
                 continue
             build = Build(
@@ -617,9 +620,9 @@ async def snapshot_projectversion(request):
     latest_builds = latest_project_builds(db, projectversion.id)
     latest_debbuilds_ids = []
     for latest_build in latest_builds:
-        if latest_build.buildstate != "successful":
-            return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,
-                                                                                         latest_build.sourcename))
+        # if latest_build.buildstate != "successful":
+        #     return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,         
+        #                                                                                  latest_build.sourcename))
         for debbuild in latest_build.parent.children:
             if debbuild.projectversion_id != projectversion.id:
                 continue
