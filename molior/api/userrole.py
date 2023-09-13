@@ -13,7 +13,7 @@ async def get_userroles(*_):
     - Project UserRole
     produces:
     - application/json
-    responsses:
+    responses:
         "200":
             description: Return an array with results
     """

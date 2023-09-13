@@ -47,6 +47,8 @@ async def create_mirror(request):
           in: query
           required: false
           type: array
+          items:
+            type: string
           description: components to be mirrored
           default: main
         - name: keys
@@ -74,6 +76,8 @@ async def create_mirror(request):
           in: query
           required: false
           type: array
+          items:
+            type: string
           description: i386,amd64,arm64,armhf,...
         - name: version
           in: query
@@ -458,11 +462,11 @@ async def put_update_mirror(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: name
+        - name: id
           in: path
           required: true
           type: integer
-          description: name of the mirror
+          description: id of the mirror
     produces:
         - text/json
     responses:
