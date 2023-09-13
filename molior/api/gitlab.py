@@ -24,42 +24,32 @@ async def gitlab_event(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: object_kind
-          in: body
-          required: true
-          type: string
-        - name: event_name
-          in: body
-          required: true
-          type: string
-        - name: ref
-          in: body
-          required: false
-          type: string
-        - name: checkout_sha
-          in: body
-          required: false
-          type: string
-        - name: user_id
-          in: body
-          required: false
-          type: integer
-        - name: user_username
-          in: body
-          required: false
-          type: string
-        - name: user_name
-          in: body
-          required: false
-          type: string
-        - name: user_email
-          in: body
-          required: false
-          type: string
-        - name: project_id
-          in: body
-          required: false
-          type: integer
+        - in: body
+          name: events
+          schema:
+            type: object
+            required:
+              - object_kind
+              - event_name
+            properties:
+              object_kind:
+                type: string
+              event_name:
+                type: string
+              ref:
+                type: string
+              checkout_sha:
+                type: string
+              user_id:
+                type: integer
+              user_username:
+                type: string
+              user_name:
+                type: string
+              user_email:
+                type: string
+              project_id:
+                type: integer
     produces:
         - text/json
     responses:

@@ -39,6 +39,11 @@ async def get_mirror2(request):
           description: Search for mirrors with this version
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "404":
+            description: Mirror not found
     """
     mirror_name = request.match_info["name"]
     mirror_version = request.match_info["version"]
@@ -142,6 +147,11 @@ async def get_projectversion_dependents(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Mirror not found
     """
     db = request.cirrina.db_session
     filter_name = request.GET.getone("q", None)
@@ -194,6 +204,11 @@ async def get_apt_sources2(request):
           description: Mirror version
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "404":
+            description: Mirror not found
     """
     name = request.match_info["name"]
     version = request.match_info["version"]
@@ -275,6 +290,8 @@ async def create_mirror2(request):
                   mirrorcomponents:
                       required: true
                       type: array
+                      items:
+                        type: string
                       description: Components to be mirrored
                       default: main
                   architectures:
@@ -304,7 +321,7 @@ async def create_mirror2(request):
                       required: false
                       type: array
                       items:
-                          type: string
+                        type: string
                       description: IDs of the mirror keys
                   dependencylevel:
                       required: false
@@ -316,6 +333,11 @@ async def create_mirror2(request):
                       description: Filter packages to be mirrored
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Mirror already exists
     """
     params = await request.json()
 

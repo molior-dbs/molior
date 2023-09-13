@@ -36,7 +36,7 @@ async def get_projectversions(request):
         - name: is_basemirror
           in: query
           required: false
-          type: bool
+          type: boolean
         - name: project_id
           in: query
           required: false

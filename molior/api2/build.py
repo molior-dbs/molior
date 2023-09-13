@@ -22,6 +22,11 @@ async def delete_build(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Incorrect value for build_id
     """
     build_id = request.match_info["build_id"]
     try:

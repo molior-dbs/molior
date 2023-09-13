@@ -459,13 +459,18 @@ async def get_projectversion_repository(request):
           in: path
           required: true
           type: integer
-        - name: repository_id
+        - name: sourcerepository_id
           in: path
           required: true
           type: integer
           description: id of the repository to get
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: SourceRepository not found in project
     """
     db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
@@ -508,7 +513,7 @@ async def edit_repository(request):
           in: path
           required: true
           type: integer
-        - name: repository_id
+        - name: sourcerepository_id
           in: path
           required: true
           type: integer
@@ -528,6 +533,11 @@ async def edit_repository(request):
                     example: ["amd64", "armhf"]
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     params = await request.json()
     sourcerepository_id = request.match_info["sourcerepository_id"]
@@ -575,13 +585,18 @@ async def get_repository_hooks(request):
           in: path
           required: true
           type: integer
-        - name: repository_id
+        - name: sourcerepository_id
           in: path
           required: true
           type: integer
           description: id of the repository to get
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     db = request.cirrina.db_session
     sourcerepository_id = request.match_info["sourcerepository_id"]
@@ -665,6 +680,11 @@ async def add_repository_hook(request):
                     example: post/get/...
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     params = await request.json()
@@ -755,6 +775,11 @@ async def edit_repository_hook(request):
                     example: post/get/...
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: No URL received
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     hook_id = request.match_info["hook_id"]
@@ -836,6 +861,11 @@ async def delete_repository_hook(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     sourcerepository_id = request.match_info["sourcerepository_id"]
     hook_id = request.match_info["hook_id"]
@@ -886,6 +916,11 @@ async def merge_repository(request):
                 duplicate:
                     type: integer
                     description: duplicate repository id
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid parameter received
     """
     repository_id = request.match_info["repository_id"]
     try:

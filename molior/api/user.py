@@ -266,6 +266,7 @@ async def get_user_roles(request):
     parameters:
       - name: user_id
         description: id of the user
+        in: path
         required: true
         type: integer
     responses:

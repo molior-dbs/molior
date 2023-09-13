@@ -40,11 +40,13 @@ async def get_builds(request):
         - name: from
           in: query
           required: false
-          type: datetime
+          type: string
+          format: date-time
         - name: to
           in: query
           required: false
-          type: datetime
+          type: string
+          format: date-time
         - name: currently_failing
           in: query
           required: false
@@ -85,6 +87,8 @@ async def get_builds(request):
           in: query
           required: false
           type: array
+          items:
+            type: string
         - name: startstamp
           in: query
           required: false
@@ -103,6 +107,11 @@ async def get_builds(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found    
     """
     search = request.GET.getone("search", None)
     search_project = request.GET.getone("search_project", None)
@@ -443,25 +452,26 @@ async def trigger_build(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
-        - name: repository
-          in: body
-          required: true
-          type: string
-        - name: git_ref
-          in: body
-          required: false
-          type: string
-        - name: git_branch
-          in: body
-          required: false
-          type: string
+        - in: body
+          name: build
+          schema:
+            type: string
+            required:
+              - repository
+            properties:
+              repository:
+                type: string
+              git_ref:
+                type: string
+              git_branch:
+                type: string
     produces:
         - text/json
     responses:
         "200":
             description: successful
-        "500":
-            description: internal server error
+        "400":
+            description: Repo not found
     """
     data = await request.json()
 

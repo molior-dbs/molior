@@ -236,6 +236,8 @@ async def post_repositories(request):
           in: query
           required: false
           type: array
+          items:
+            type: integer
     produces:
         - text/json
     responses:
@@ -301,7 +303,7 @@ async def get_repository(request):
     parameters:
         - name: repository_id
           in: path
-          required: false
+          required: true
           type: integer
         - name: project_version_id
           in: query
@@ -313,7 +315,7 @@ async def get_repository(request):
         "200":
             description: successful
         "400":
-            Incorrect value for repository_id
+            description: Incorrect value for repository_id
         "500":
             description: internal server error
     """
