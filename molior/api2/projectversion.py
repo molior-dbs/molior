@@ -50,7 +50,7 @@ def latest_project_builds(db, projectversion_id):
                     Build.sourcename, Build.id.desc()).all()
 
 
-@app.http_get("/api2/project/{project_name}/{project_version}/info")
+@app.http_get("/api2/project/{project_name}/{project_version}")
 async def get_projectversion2(request):
     """
     Returns a project with version information.
@@ -72,7 +72,7 @@ async def get_projectversion2(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
@@ -122,7 +122,7 @@ async def get_projectversion_dependencies(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
@@ -392,7 +392,7 @@ async def copy_projectversion(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: No valid name for the projectversion received
     """
@@ -538,7 +538,7 @@ async def lock_projectversion(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
@@ -574,7 +574,7 @@ async def unlock_projectversion(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
@@ -806,7 +806,7 @@ async def remove_repository2(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
