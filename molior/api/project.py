@@ -88,7 +88,7 @@ async def get_project(request):
         - name: show_deleted
           in: query
           required: false
-          type: bool
+          type: boolean
     produces:
         - text/json
     responses:
@@ -149,6 +149,11 @@ async def create_project(request):
                 type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid project name
     """
     db = request.cirrina.db_session
     params = await request.json()
@@ -292,11 +297,11 @@ async def get_apt_sources(request):
         - name: project_name
           in: path
           required: true
-          type: str
+          type: string
         - name: project_version
           in: path
           required: true
-          type: str
+          type: string
     produces:
         - text/json
     responses:

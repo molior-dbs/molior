@@ -73,7 +73,7 @@ async def get_projectversions2(request):
         - name: is_basemirror
           in: query
           required: false
-          type: bool
+          type: boolean
         - name: page
           in: query
           required: false
@@ -88,6 +88,11 @@ async def get_projectversions2(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Incorrect value
     """
     db = request.cirrina.db_session
     project_id = request.match_info["project_name"]
@@ -163,6 +168,11 @@ async def create_projectversion(request):
                     example: strict
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid project name
     """
     params = await request.json()
 
@@ -299,6 +309,11 @@ async def edit_projectversion(request):
                     example: strict
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Projectversion not found
     """
     params = await request.json()
     description = params.get("description")
@@ -313,7 +328,7 @@ async def edit_projectversion(request):
     for dep in projectversion.dependents:
         if dependency_policy == "strict" and dep.basemirror_id != projectversion.basemirror_id:
             return ErrorResponse(400, "Cannot change dependency policy because strict policy demands \
-                                       to use the same basemirror as all dependents")
+                                       to use the same basemirror  as all dependents")
         elif dependency_policy == "distribution" and dep.basemirror.project_id != projectversion.basemirror.project_id:
             return ErrorResponse(400, "Cannot change dependency policy because the same distribution \
                                        is required as for all dependents")
