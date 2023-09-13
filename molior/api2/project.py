@@ -34,6 +34,11 @@ async def get_project_byname(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "404":
+            description: Project not found
     """
 
     project_name = request.match_info["project_name"]
@@ -125,7 +130,7 @@ async def get_projectversions2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/projectbase/{project_id}/versions")
+@app.http_post("/api2/projectbase/{project_id}/createversions")
 @req_role("owner")
 async def create_projectversion(request):
     """
@@ -145,6 +150,10 @@ async def create_projectversion(request):
           required: true
           schema:
             type: object
+            required:
+              - name
+              - basemirror
+              - architectures
             properties:
                 name:
                     type: string
@@ -160,9 +169,8 @@ async def create_projectversion(request):
                     items:
                         type: string
                     example: ["amd64", "armhf"]
-                    FIXME: only accept existing archs on mirror!
+                    # FIXME: only accept existing archs on mirror!
                 dependency_policy:
-                    required: false
                     type: string
                     description: Dependency policy
                     example: strict
@@ -303,7 +311,6 @@ async def edit_projectversion(request):
                     type: string
                     example: "This version does this and that"
                 dependency_policy:
-                    required: false
                     type: string
                     description: Dependency policy
                     example: strict
@@ -328,7 +335,7 @@ async def edit_projectversion(request):
     for dep in projectversion.dependents:
         if dependency_policy == "strict" and dep.basemirror_id != projectversion.basemirror_id:
             return ErrorResponse(400, "Cannot change dependency policy because strict policy demands \
-                                       to use the same basemirror  as all dependents")
+                                       to use the same basemirror as all dependents")
         elif dependency_policy == "distribution" and dep.basemirror.project_id != projectversion.basemirror.project_id:
             return ErrorResponse(400, "Cannot change dependency policy because the same distribution \
                                        is required as for all dependents")
@@ -342,7 +349,7 @@ async def edit_projectversion(request):
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
 
-@app.http_delete("/api2/projectbase/{project_id}")
+@app.http_delete("/api2/projectbase/{project_id}/delete")
 @req_role("owner")
 async def delete_project2(request):
     """
@@ -359,6 +366,11 @@ async def delete_project2(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     db = request.cirrina.db_session
     project_name = request.match_info["project_id"]
@@ -404,7 +416,7 @@ async def get_project_users2(request):
         - name: candidates
           in: query
           required: false
-          type: bool
+          type: boolean
         - name: q
           in: query
           required: false
@@ -429,6 +441,11 @@ async def get_project_users2(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Project not found
     """
     db = request.cirrina.db_session
     project_name = request.match_info["project_name"]
@@ -508,19 +525,25 @@ async def add_project_users2(request):
           required: true
           schema:
             type: object
+            required:
+              - username
+              - role
             properties:
                 username:
                     type: string
-                    required: true
                     description: Username
                     example: "username"
                 role:
                     type: string
-                    required: true
                     description: User role, e.g. member, manager, owner, ...
                     example: "member"
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid role
     """
     project_name = request.match_info["project_name"]
     params = await request.json()
@@ -578,17 +601,23 @@ async def edit_project_users2(request):
           required: true
           schema:
             type: object
+            required:
+              - username
+              - role
             properties:
                 username:
                     type: string
-                    required: true
                     description: Username
                     example: "username"
                 role:
                     type: string
-                    required: true
                     description: User role, e.g. member, manager, owner, ...
                     example: "member"
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid role
     """
     project_name = request.match_info["project_name"]
     params = await request.json()
@@ -642,12 +671,18 @@ async def delete_project_users2(request):
           required: true
           schema:
             type: object
+            required:
+              - username
             properties:
                 username:
                     type: string
-                    required: true
                     description: Username
                     example: "username"
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: User not allowed
     """
     project_name = request.match_info["project_name"]
     params = await request.json()
@@ -682,6 +717,7 @@ async def delete_project_users2(request):
 @app.http_get("/api2/projectbase/{project_name}/tokens")
 @app.authenticated
 async def get_tokens(request):
+
     project_name = request.match_info["project_name"]
     description = request.GET.getone("description", "")
 
@@ -711,6 +747,25 @@ async def create_token(request):
     """
     Create project auth token
     ---
+    description: Create project auth token
+    tags:
+        - CreateToken
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - in: path
+          name: project_name
+          type: string
+          required: true
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Cannot create auth token for mirrors
+        "404":
+            description: Project not found
     """
     project_name = request.match_info["project_name"]
     params = await request.json()
@@ -747,6 +802,25 @@ async def add_token(request):
     """
     Add existing auth token to project
     ---
+    description: Add existing auth token to project
+    tags:
+        - AddToken
+    consumes:
+        - application/x-www-form-urlencoded
+    parameters:
+        - in: path
+          name: project_name
+          type: string
+          required: true
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Cannot create auth token for mirrors
+        "404":
+            description: Project not found
     """
     project_name = request.match_info["project_name"]
     params = await request.json()
@@ -776,6 +850,22 @@ async def add_token(request):
 async def delete_project_token(request):
     """
     Delete project auth token
+    ---
+    description: Delete existing auth token from project
+    tags:
+        - DeleteToken
+    parameters:
+        - name: project_name
+          in: path
+          type: string
+          required: true
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "404":
+            description: Token not found
     """
     project_name = request.match_info["project_name"]
     params = await request.json()

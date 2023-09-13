@@ -317,10 +317,14 @@ async def get_mirror(request):
         - application/x-www-form-urlencoded
     parameters:
         - name: name
-          in: query
-          required: false
+          in: path
+          required: true
           type: string
           description: filter criteria
+        - name: version
+          in: path
+          required: true
+          type: string
     produces:
         - text/json
     responses:

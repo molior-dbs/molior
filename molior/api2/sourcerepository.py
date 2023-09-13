@@ -35,6 +35,11 @@ async def get_repository(request):
           description: id of the repository to get
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Repository with id not found
     """
     repository_id = request.match_info["repository_id"]
 
@@ -97,6 +102,11 @@ async def get_sourcerepository_dependents(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Repository with id could not be found!
     """
     repository_id = request.match_info["repository_id"]
     filter_name = request.GET.getone("q", "")
@@ -148,6 +158,11 @@ async def get_repositories2(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Repo not found
     """
     db = request.cirrina.db_session
     url = request.GET.getone("filter_url", "")
@@ -227,6 +242,11 @@ async def get_projectversion_repositories(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Projectversion not found
     """
     db = request.cirrina.db_session
     filter_url = request.GET.getone("filter_url", "")
@@ -305,11 +325,11 @@ async def add_repository(request):
     tags:
         - SourceRepositories
     parameters:
-        - name: projectversion_id
+        - name: project_id
           in: path
           required: true
           type: integer
-        - name: sourcerepository_id
+        - name: projectversion_id
           in: path
           required: true
           type: integer
@@ -318,14 +338,17 @@ async def add_repository(request):
           required: true
           schema:
             type: object
+            required:
+              - architectures
             properties:
                 url:
                     type: string
                 buildvariants:
                     type: array
+                    items:
+                      type: integer
                     example: [1, 2]
                 architectures:
-                    required: true
                     type: array
                     items:
                         type: string
@@ -523,9 +546,10 @@ async def edit_repository(request):
           required: true
           schema:
             type: object
+            required: 
+              - architectures
             properties:
                 architectures:
-                    required: true
                     type: array
                     items:
                         type: string
@@ -648,6 +672,10 @@ async def add_repository_hook(request):
     tags:
         - SourceRepositories
     parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
         - name: projectversion_id
           in: path
           required: true
@@ -656,11 +684,6 @@ async def add_repository_hook(request):
           in: path
           required: true
           type: integer
-        - name: repository_id
-          in: path
-          required: true
-          type: integer
-          description: id of the repository to get
         - name: body
           in: body
           required: true
@@ -960,6 +983,11 @@ async def delete_repository(request):
           in: path
           required: true
           type: integer
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Repository not found
     """
     repository_id = request.match_info["repository_id"]
     try:
@@ -1007,6 +1035,13 @@ async def edit_repository2(request):
             properties:
                 url:
                     type: string
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid parameter received
+        "404":
+            description: Repository not found
     """
     repository_id = request.match_info["repository_id"]
     try:

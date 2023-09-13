@@ -92,6 +92,8 @@ async def get_repositories(request):
           in: query
           required: false
           type: array
+          items:
+            type: string
         - name: project_version_id
           in: query
           required: false
