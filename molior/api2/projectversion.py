@@ -50,7 +50,7 @@ def latest_project_builds(db, projectversion_id):
                     Build.sourcename, Build.id.desc()).all()
 
 
-@app.http_get("/api2/project/{project_name}/{project_version}")
+@app.http_get("/api2/project/{project_name}/{project_version}/info")
 async def get_projectversion2(request):
     """
     Returns a project with version information.
@@ -70,6 +70,11 @@ async def get_projectversion2(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -107,7 +112,7 @@ async def get_projectversion_dependencies(request):
         - name: candidates
           in: query
           required: false
-          type: bool
+          type: boolean
         - name: q
           in: query
           required: false
@@ -115,6 +120,11 @@ async def get_projectversion_dependencies(request):
           description: Filter query
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     db = request.cirrina.db_session
     candidates = request.GET.getone("candidates", None)
@@ -224,15 +234,18 @@ async def add_projectversion_dependency(request):
               type: object
               properties:
                   dependency:
-                      required: false
                       type: string
                       description: Name of the dependency
                   use_cibuilds:
-                      required: false
-                      type: bool
+                      type: boolean
                       description: Use CI builds?
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     params = await request.json()
     dependency_name = params.get("dependency")
@@ -314,16 +327,21 @@ async def delete_projectversion_dependency(request):
           in: path
           required: true
           type: string
-        - name: dependecy_name
+        - name: dependency_name
           in: path
           required: true
           type: string
-        - name: dependecy_version
+        - name: dependency_version
           in: path
           required: true
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     db = request.cirrina.db_session
     dependency_name = request.match_info["dependency_name"]
@@ -372,6 +390,11 @@ async def copy_projectversion(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: No valid name for the projectversion received
     """
     db = request.cirrina.db_session
     params = await request.json()
@@ -513,6 +536,11 @@ async def lock_projectversion(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -544,6 +572,11 @@ async def unlock_projectversion(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -575,6 +608,11 @@ async def overlay_projectversion(request):
           type: string
     produces:
         - text/json
+    responses:
+        "200":
+            description: Projectversion not found
+        "400":
+            description: Invalid project name
     """
     params = await request.json()
 
@@ -752,6 +790,10 @@ async def remove_repository2(request):
     consumes:
         - application/json
     parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: string
         - name: projectversion_id
           in: path
           required: true
@@ -762,6 +804,11 @@ async def remove_repository2(request):
           type: integer
     produces:
         - text/json
+    responses:
+        "200":
+            description: successfulinternal server error
+        "400":
+            description: Projectversion not found
     """
     db = request.cirrina.db_session
     projectversion = get_projectversion(request)
@@ -806,11 +853,11 @@ async def get_apt_sources2(request):
         - name: project_name
           in: path
           required: true
-          type: str
+          type: string
         - name: project_version
           in: path
           required: true
-          type: str
+          type: string
     produces:
         - text/json
     responses:
@@ -874,6 +921,10 @@ async def get_projectversion_dependents(request):
     consumes:
         - application/x-www-form-urlencoded
     parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
         - name: basemirror_id
           in: query
           required: false
@@ -881,10 +932,10 @@ async def get_projectversion_dependents(request):
         - name: is_basemirror
           in: query
           required: false
-          type: bool
+          type: boolean
         - name: project_id
-          in: query
-          required: false
+          in: path
+          required: true
           type: integer
         - name: project_name
           in: query

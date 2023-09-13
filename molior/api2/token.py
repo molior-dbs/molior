@@ -41,6 +41,14 @@ async def create_token(request):
     """
     Create auth token
     ---
+    description: Create auth token
+    tags:
+        - CreateToken
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Cannot create auth token
     """
     params = await request.json()
     description = params.get("description")
@@ -66,7 +74,16 @@ async def create_token(request):
 @req_role("owner")
 async def delete_token(request):
     """
-    Delete authtoken
+    Delete auth token
+    ---
+    description: Delete auth token
+    tags:
+        - DeleteToken
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Cannot delete auth token
     """
     params = await request.json()
     token_id = params.get("id")

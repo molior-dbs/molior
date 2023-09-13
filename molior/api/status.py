@@ -90,7 +90,6 @@ async def set_maintenance(request):
           required: false
           type: boolean
           description: enable/disable maintenance mode
-          examples: ["true", "false"]
         - name: maintenance_message
           in: query
           required: false
@@ -215,13 +214,18 @@ async def get_node(request):
     description: Returns info about the build nodes
     tags:
         - Status
+    parameters:
+        - name: machineID
+          in: path
+          required: true
+          type: string
     produces:
         - text/json
     responses:
         "200":
             description: successful
-        "500":
-            description: internal server error
+        "404":
+            description: Node not found
     """
     machine_id = request.match_info["machineID"]
     b = Backend()

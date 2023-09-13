@@ -455,7 +455,7 @@ async def trigger_build(request):
         - in: body
           name: build
           schema:
-            type: string
+            type: object
             required:
               - repository
             properties:
@@ -539,7 +539,7 @@ async def get_build_info(request):
         - application/x-www-form-urlencoded
     parameters:
         - name: build_id
-          in: query
+          in: path
           required: true
           type: string
     produces:

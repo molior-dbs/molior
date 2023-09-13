@@ -97,7 +97,9 @@ async def create_webhook(request):
                     type: string
                     example: "http://localhost"
                 triggers:
-                    type: arrays
+                    type: array
+                    items:
+                      type: string
                     example: ["src", "deb", "overall"]
     produces:
         - text/json
@@ -201,7 +203,9 @@ async def update_hook(request):
                     type: string
                     example: "http://localhost"
                 triggers:
-                    type: arrays
+                    type: array
+                    items:
+                      type: string
                     example: ["src", "deb"]
     produces:
         - text/json

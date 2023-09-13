@@ -184,10 +184,10 @@ async def create_projectversions(request):
     consumes:
         - application/json
     parameters:
-        - name: project
+        - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: body
           in: body
           required: true
@@ -202,8 +202,10 @@ async def create_projectversions(request):
                     example: "stretch/9.6"
                 architectures:
                     type: array
+                    items:
+                      type: string
                     example: ["amd64", "armhf"]
-                    FIXME: only accept existing archs on mirror!
+                    # FIXME: only accept existing archs on mirror!
     produces:
         - text/json
     responses:
