@@ -130,7 +130,7 @@ async def get_projectversions2(request):
     return OKResponse(data)
 
 
-@app.http_post("/api2/projectbase/{project_id}/createversions")
+@app.http_post("/api2/projectbase/{project_id}/versions")
 @req_role("owner")
 async def create_projectversion(request):
     """
@@ -349,7 +349,7 @@ async def edit_projectversion(request):
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
 
 
-@app.http_delete("/api2/projectbase/{project_id}/delete")
+@app.http_delete("/api2/projectbase/{project_id}")
 @req_role("owner")
 async def delete_project2(request):
     """
