@@ -258,77 +258,65 @@ async def create_mirror2(request):
           required: true
           schema:
               type: object
+              required:
+                - mirrorname
+                - mirrorversion
+                - mirrorcomponents
               properties:
                   mirrorname:
-                      required: true
                       type: string
                       description: Mirror name
                   mirrorversion:
-                      required: true
                       type: string
                       description: Mirror version
                   mirrortype:
-                      required: false
                       type: string
                       description: Mirror type
                   basemirror:
-                      required: false
                       type: string
                       description: Base mirror name, e.g. project/version
                   external:
-                      required: false
                       type: boolean
                       description: Is it an external repository?
                   mirrorurl:
-                      required: false
                       type: string
                       description: Mirror URL
                   mirrordist:
-                      required: false
                       type: string
                       description: Mirror distribution
                   mirrorcomponents:
-                      required: true
                       type: array
                       items:
                         type: string
                       description: Components to be mirrored
                       default: main
                   architectures:
-                      required: false
                       type: array
                       items:
                           type: string
                       description: E.g. i386, amd64, arm64, armhf, ...
                       example: ["amd64", "armhf"]
                   mirrorsrc:
-                      required: false
                       type: boolean
                       description: Is a mirror with sources?
                   mirrorinst:
-                      required: false
                       type: boolean
                       description: Is a mirror with installer?
                   mirrorkeyserver:
-                      required: false
                       type: string
                       description: Host name where the keys are
                   mirrorkeyurl:
-                      required: false
                       type: string
                       description: URL of the mirror key
                   mirrorkeyids:
-                      required: false
                       type: array
                       items:
                         type: string
                       description: IDs of the mirror keys
                   dependencylevel:
-                      required: false
                       type: string
                       description: Dependency policy, e.g. strict
                   mirrorfilter:
-                      required: false
                       type: string
                       description: Filter packages to be mirrored
     produces:
@@ -492,66 +480,67 @@ async def edit_mirror(request):
           required: true
           schema:
               type: object
+              required:
+                - mirrortype
+                - mirrorurl
+                - mirrordist
+                - mirrorcomponents
+                - architectures
               properties:
                   mirrortype:
-                      required: true
                       type: string
                       description: Mirror type
                   basemirror:
-                      required: false
                       type: string
                       description: Base mirror name, e.g. project/version
                   mirrorurl:
-                      required: true
                       type: string
                       description: Mirror URL
                   mirrordist:
-                      required: true
                       type: string
                       description: Mirror distribution
                   mirrorcomponents:
-                      required: true
                       type: array
+                      items:
+                        type: string
                       description: Components to be mirrored
                       default: main
                   architectures:
-                      required: true
                       type: array
                       items:
                           type: string
                       description: E.g. i386, amd64, arm64, armhf, ...
                       example: ["amd64", "armhf"]
                   mirrorsrc:
-                      required: false
                       type: boolean
                       description: Is a mirror with sources?
                   mirrorinst:
-                      required: false
                       type: boolean
                       description: Is a mirror with installer?
                   mirrorkeyserver:
-                      required: false
                       type: string
                       description: Host name where the keys are
                   mirrorkeyurl:
-                      required: false
                       type: string
                       description: URL of the mirror key
                   mirrorkeyids:
-                      required: false
                       type: array
                       items:
                           type: string
                       description: IDs of the mirror keys
                   dependencylevel:
-                      required: false
                       type: string
                       description: Dependency policy
                       example: strict
                   mirrorfilter:
-                      required: false
                       type: string
                       description: Filter packages to be mirrored
+
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Mirror not found
     """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]
@@ -656,6 +645,11 @@ async def delete_mirror2(request):
           description: Mirror version
     produces:
         - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Mirror not found
     """
     db = request.cirrina.db_session
     mirror_name = request.match_info["name"]

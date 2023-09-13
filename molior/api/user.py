@@ -336,21 +336,24 @@ async def create_user(request):
     consumes:
       - application/json
     parameters:
-      - name: username
-        description: login name
-        in: path
-        required: true
-        type: string
-      - name: password
-        description: login password
-        in: path
-        required: true
-        type: password
-      - name: email
-        description: contact email
-        in: path
-        required: true
-        type: string
+      - in: body
+        name: user
+        schema:
+          type: object
+          required:
+            - username
+            - password
+            - email
+          properties:
+            username:
+              type: string
+              description: login name
+            password:
+              type: string
+              description: login password
+            email:
+              type: string
+              description: contact email
       - name: is_admin
         description: set admin or not
         in: query
