@@ -940,7 +940,7 @@ async def remove_repository2(request):
         - text/json
     responses:
         "200":
-            description: Sourcerepository removed from projectversion
+            description: successful
         "400":
             description: Projectversion not found
     """
