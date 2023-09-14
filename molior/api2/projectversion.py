@@ -50,7 +50,7 @@ def latest_project_builds(db, projectversion_id):
                     Build.sourcename, Build.id.desc()).all()
 
 
-@app.http_get("/api2/project/{project_name}/{project_version}/info")
+@app.http_get("/api2/project/{project_name}/{project_version}")
 async def get_projectversion2(request):
     """
     Returns a project with version information.

@@ -204,8 +204,7 @@ async def create_projectversions(request):
                     type: array
                     items:
                       type: string
-                    example: ["amd64", "armhf"]
-                    # FIXME: only accept existing archs on mirror!
+                    example: ["amd64", "armhf"]               
     produces:
         - text/json
     responses:
@@ -238,6 +237,7 @@ async def create_projectversions(request):
     if not is_name_valid(name):
         return ErrorResponse(400, "Invalid project name!")
 
+    # FIXME: only accept existing archs on mirror!
     basemirror_name, basemirror_version = basemirror.split("/")
 
     # FIXME: verify valid architectures
