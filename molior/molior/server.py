@@ -88,6 +88,18 @@ class MoliorServer(cirrina.Server):
         self.task_aptly_worker = None
         self.task_notification_worker = None
         self.task_cron = None
+    
+    def list_active_tasks(self, debug_pos):
+        self.logger.info(debug_pos)
+        tasks = asyncio.all_tasks()
+        self.logger.info(f"There are {len(tasks)} active tasks")
+        task_ids = [id(task) for task in tasks]  # Get the IDs of all tasks
+        self.logger.info("Active Task IDs: %s", task_ids)
+        self.logger.info("Start of tasks listed: ")
+        for task in tasks:
+            self.logger.info(task.get_name())
+            self.logger.info(task.get_coro())
+        self.logger.info("End of tasks listed: ")
 
         self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
         self.on_startup.append(run_molior)
@@ -170,8 +182,10 @@ class MoliorServer(cirrina.Server):
 
     async def terminate(self):
 
-        logger.info("terminating tasks")
+        self.list_active_tasks(debug_pos="At the beginning of the terminate function:")
 
+        logger.info("terminating tasks")
+        
         self.task_worker.cancel()
         self.task_backend_worker.cancel()
         self.task_aptly_worker.cancel()
@@ -198,6 +212,8 @@ class MoliorServer(cirrina.Server):
             await Launchy.stop()
         except asyncio.CancelledError:
             logger.info("launchy tasks were completed")
+
+        self.list_active_tasks(debug_pos="At the end of the terminate function:")
 
         logger.info("terminating app")
         app.stop()
