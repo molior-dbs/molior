@@ -231,7 +231,7 @@ class Build(Base):
             "maintainer_email": (self.maintainer.email if self.maintainer else ""),
             "git_ref": self.git_ref,
             "branch": self.ci_branch,
-            "architecture": self.architecture
+            "architecture": self.architecture,
         }
 
         if self.projectversion:

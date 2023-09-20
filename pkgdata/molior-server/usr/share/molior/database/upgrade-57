@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE sourcerepositoryprojectversion ADD COLUMN run_lintian BOOLEAN DEFAULT FALSE;
+
+EOF
