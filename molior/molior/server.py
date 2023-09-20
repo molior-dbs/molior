@@ -112,21 +112,36 @@ class MoliorServer:
         app.run(self.host, self.port, logger=self.logger, debug=self.debug)
 
     async def terminate(self):
+
         logger.info("terminating tasks")
+
         self.task_worker.cancel()
-        await self.task_worker
         self.task_backend_worker.cancel()
-        await self.task_backend_worker
         self.task_aptly_worker.cancel()
-        await self.task_aptly_worker
         self.task_notification_worker.cancel()
-        await self.task_notification_worker
 
-        logger.info("terminating backend")
-        await self.backend.stop()
+        try:
+            await self.task_worker
+            await self.task_backend_worker
+            await self.task_aptly_worker
+            await self.task_notification_worker
+        except asyncio.CancelledError:
+            logger.info("tasks were canceled")
+        else:
+            logger.info("tasks were completed")
 
-        logger.info("terminating launchy")
-        await Launchy.stop()
+        try:
+            logger.info("terminating backend")
+            await self.backend.stop()
+        except asyncio.CancelledError:
+            logger.info("backend tasks were completed")
+
+        try:
+            logger.info("terminating launchy")
+            await Launchy.stop()
+        except asyncio.CancelledError:
+            logger.info("launchy tasks were completed")
+
         logger.info("terminating app")
         app.stop()
 
