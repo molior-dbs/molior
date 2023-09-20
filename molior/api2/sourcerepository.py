@@ -2,6 +2,7 @@ import re
 import giturlparse
 
 from sqlalchemy.sql import func, or_
+import logging
 
 from ..app import app, logger
 from ..auth import req_role, req_admin
@@ -286,6 +287,7 @@ async def get_projectversion_repositories(request):
             "state": repo.state,
             "last_gitref": get_last_gitref(repo, db),
             "architectures": db2array(srpv.architectures),
+            "run_lintian": srpv.run_lintian,
         }
         build = get_last_build(request.cirrina.db_session, projectversion, repo)
         if build:
@@ -356,6 +358,8 @@ async def add_repository(request):
                     example: ["amd64", "armhf"]
                 startbuild:
                     type: boolean
+                run_lintian:
+                    type: boolean
     produces:
         - text/json
     responses:
@@ -364,10 +368,13 @@ async def add_repository(request):
         "400":
             description: Invalid data received.
     """
+    logging.basicConfig()
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
     startbuild = params.get("startbuild", "true")
+    run_lintian = params.get("run_lintian", "false")
     startbuild = startbuild == "true"
 
     if not url:
@@ -415,8 +422,8 @@ async def add_repository(request):
     sourepprover = db.query(SouRepProVer).filter(
                           SouRepProVer.sourcerepository_id == repo.id,
                           SouRepProVer.projectversion_id == projectversion.id).first()
-
     sourepprover.architectures = array2db(architectures)
+    sourepprover.run_lintian = run_lintian
     db.commit()
 
     if repo.state == "new":
@@ -429,7 +436,7 @@ async def add_repository(request):
             buildstate="new",
             buildtype="build",
             sourcerepository=repo,
-            maintainer=None
+            maintainer=None,
         )
 
         db.add(build)
@@ -512,7 +519,8 @@ async def get_projectversion_repository(request):
         "name": repository.name,
         "url": repository.url,
         "state": repository.state,
-        "architectures": db2array(buildconfig.architectures)
+        "architectures": db2array(buildconfig.architectures),
+        "run_lintian": buildconfig.run_lintian,
     }
     return OKResponse(data)
 
@@ -546,8 +554,9 @@ async def edit_repository(request):
           required: true
           schema:
             type: object
-            required: 
+            required:
               - architectures
+              - run_lintian
             properties:
                 architectures:
                     type: array
@@ -555,6 +564,9 @@ async def edit_repository(request):
                         type: string
                     description: E.g. i386, amd64, arm64, armhf, ...
                     example: ["amd64", "armhf"]
+                run_lintian:
+                    type: boolean
+                    description: Whether to run Lintian.
     produces:
         - text/json
     responses:
@@ -568,6 +580,7 @@ async def edit_repository(request):
     architectures = params.get("architectures", [])
     if not architectures:
         return ErrorResponse(400, "No architectures received")
+    run_lintian = params.get("run_lintian", "false")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -586,6 +599,7 @@ async def edit_repository(request):
         return ErrorResponse(404, "SourceRepository not found in project")
 
     buildconfig.architectures = array2db(architectures)
+    buildconfig.run_lintian = run_lintian
     db.commit()
     return OKResponse("SourceRepository changed")
 

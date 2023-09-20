@@ -111,7 +111,7 @@ async def get_builds(request):
         "200":
             description: successful
         "400":
-            description: Project not found    
+            description: Project not found
     """
     search = request.GET.getone("search", None)
     search_project = request.GET.getone("search_project", None)

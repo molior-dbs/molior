@@ -204,7 +204,7 @@ async def create_projectversions(request):
                     type: array
                     items:
                       type: string
-                    example: ["amd64", "armhf"]               
+                    example: ["amd64", "armhf"]
     produces:
         - text/json
     responses:
