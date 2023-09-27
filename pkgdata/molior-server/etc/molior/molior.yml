@@ -32,9 +32,8 @@ max_parallel_chroots: 2
 
 # Aptly settings
 aptly:
-    # apt_url_public: 'http://molior:8000'
-    apt_url: 'http://127.0.0.1:8000'
-    api_url: 'http://127.0.0.1:8080/api'
+    apt_url: 'http://127.0.0.1:8080'
+    api_url: 'http://127.0.0.1:3143/api'
     gpg_key: 'reposign@molior.info'
     user: 'molior'
     pass: 'molior-dev'
