@@ -19,6 +19,7 @@ export GPG_TTY=`tty`
 if ! su - $MOLIOR_USER -c "$GPG_BINARY -K | grep -q $GPG_EMAIL"; then
   echo 'Generating GPG keys ...'
   su - $MOLIOR_USER -c "$GPG_BINARY --no-tty --batch --gen-key" <<EOF
+%no-protection
 Key-Type: RSA
 Key-Length: 2048
 Key-Usage: encrypt, sign
@@ -29,8 +30,6 @@ Name-Real: $GPG_REALNAME
 Name-Comment: none
 Name-Email: $GPG_EMAIL
 Expire-Date: 0
-%pubring $HOME_DIR/.gnupg/pubring.gpg
-%secring $HOME_DIR/.gnupg/secring.gpg
 %commit
 EOF
 else
@@ -39,8 +38,8 @@ fi
 
 # create ssh key
 if [ ! -e "$HOME_DIR/.ssh/id_rsa.pub" ]; then
-  echo 'Generating SSH keys ...'
-  su molior -c 'ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa'
+ echo 'Generating SSH keys ...'
+ su molior -c 'ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa'
 else
-  echo 'ssh key for molior already exists'
+ echo 'ssh key for molior already exists'
 fi
