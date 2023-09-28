@@ -16,7 +16,7 @@ override_dh_auto_build:
 	echo 'MOLIOR_VERSION = "$(DEB_VERSION)"' > molior/version.py
 	dh_auto_build
 
-# override_dh_auto_test:
+override_dh_auto_test:
 # 	flake8 molior tests pkgdata/molior-client-http/usr/lib/molior/molior-client
 # 	# python3 -m pytest --cov=molior tests/unit
 
