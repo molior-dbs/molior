@@ -374,8 +374,10 @@ async def add_repository(request):
     url = params.get("url", "")
     architectures = params.get("architectures", [])
     startbuild = params.get("startbuild", "true")
-    run_lintian = params.get("run_lintian", "false")
     startbuild = startbuild == "true"
+    run_lintian = params.get("run_lintian", "false")
+    run_lintian = run_lintian == "true"
+
 
     if not url:
         return ErrorResponse(400, "No URL received")
