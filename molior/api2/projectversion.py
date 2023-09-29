@@ -418,10 +418,13 @@ async def copy_projectversion(request):
                   buildlatest:
                       type: boolean
                       description: build latest
+<<<<<<< HEAD
                   retention_successful_builds:
                       type: integer
                   retention_failed_builds:
                     type: integer
+=======
+>>>>>>> swagger: fix API documentation
     produces:
         - text/json
     responses:
@@ -940,7 +943,7 @@ async def remove_repository2(request):
         - text/json
     responses:
         "200":
-            description: successful
+            description: Sourcerepository removed from projectversion
         "400":
             description: Projectversion not found
     """
