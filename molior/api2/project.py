@@ -174,6 +174,10 @@ async def create_projectversion(request):
                     type: string
                     description: Dependency policy
                     example: strict
+                cibuilds:
+                    type: boolean
+                baseproject:
+                    type: string
     produces:
         - text/json
     responses:
