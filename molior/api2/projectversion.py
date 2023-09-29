@@ -104,10 +104,6 @@ async def get_projectversion_dependencies(request):
         - name: projectversion_id
           in: path
           required: true
-          type: string
-        - name: basemirror_id
-          in: query
-          required: false
           type: integer
         - name: candidates
           in: query
@@ -225,7 +221,7 @@ async def add_projectversion_dependency(request):
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: body
           in: body
           description: Dependency data
@@ -243,7 +239,7 @@ async def add_projectversion_dependency(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: successful
         "400":
             description: Projectversion not found
     """
@@ -322,11 +318,11 @@ async def delete_projectversion_dependency(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: dependency_name
           in: path
           required: true
@@ -339,7 +335,7 @@ async def delete_projectversion_dependency(request):
         - text/json
     responses:
         "200":
-            description: successfulinternal server error
+            description: Dependency deleted
         "400":
             description: Projectversion not found
     """
@@ -383,11 +379,44 @@ async def copy_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
+        - name: body
+          in: body
+          description: Project version data
+          required: true
+          schema:
+              type: object
+              properties:
+                  name:
+                      type: string
+                      description: Name of the new projectversion
+                  description:
+                      type: string
+                      description: description of the projectversion
+                  dependency_policy:
+                      type: string
+                      description: Dependency policy
+                  basemirror:
+                      type: string
+                      description: Basemirror
+                  baseproject:
+                      type: string
+                      description: Baseproject
+                  architectures:
+                      type: array
+                      items:
+                        type: string
+                      description: E.g. i386, amd64, arm64, armhf, ...
+                  cibuilds:
+                      type: boolean
+                      description: cibuilds
+                  buildlatest:
+                      type: boolean
+                      description: build latest
     produces:
         - text/json
     responses:
@@ -529,11 +558,11 @@ async def lock_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
     produces:
         - text/json
     responses:
@@ -565,11 +594,11 @@ async def unlock_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
     produces:
         - text/json
     responses:
@@ -601,16 +630,25 @@ async def overlay_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
-          type: string
+          type: integer
+        - name: name
+          in: body
+          description: Name of project version
+          required: true
+          schema:
+              type: object
+              properties:
+                  name:
+                      type: string
     produces:
         - text/json
     responses:
         "200":
-            description: Projectversion not found
+            description: successful
         "400":
             description: Invalid project name
     """
@@ -627,6 +665,39 @@ async def overlay_projectversion(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/snapshot")
 @req_role("owner")
 async def snapshot_projectversion(request):
+    """
+    Create a snapshot of a project version
+
+    ---
+    description: Create a snapshot of a project version.
+    tags:
+        - Projects
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: name
+          in: body
+          description: Name of project version snapshot
+          required: true
+          schema:
+              type: object
+              properties:
+                  name:
+                      type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid project name
+    """
     params = await request.json()
 
     name = params.get("name")
@@ -718,6 +789,36 @@ async def snapshot_projectversion(request):
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}")
 @req_role("owner")
 async def delete_projectversion(request):
+    """
+    Delete Project Version
+
+    ---
+    description: Deletes a project version, including associated builds, repositories and dependencies.
+    tags:
+        - Projects
+    consumes:
+        - application/json
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: forceremoval
+          in: query
+          required: false
+          type: boolan
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: Projectversion deleted successfully.
+        "400":
+            description: Projectversion not found
+    """
     force = request.GET.getone("forceremoval", None)
     force = force == "true"
     projectversion = get_projectversion(request)
@@ -793,7 +894,7 @@ async def remove_repository2(request):
         - name: project_id
           in: path
           required: true
-          type: string
+          type: integer
         - name: projectversion_id
           in: path
           required: true
@@ -806,7 +907,7 @@ async def remove_repository2(request):
         - text/json
     responses:
         "200":
-            description: successful
+            description: Sourcerepository removed from projectversion
         "400":
             description: Projectversion not found
     """
@@ -858,13 +959,23 @@ async def get_apt_sources2(request):
           in: path
           required: true
           type: string
+        - name: unstable
+          in: query
+          required: false
+          type: boolean
+          description: Include unstable APT sources. Default is false.
+        - name: internal
+          in: query
+          required: false
+          type: boolean
+          description: Include internal APT sources. Default is false. 
     produces:
         - text/json
     responses:
         "200":
             description: successful
         "400":
-            description: Parameter missing
+            description: Projectversion not found
     """
     db = request.cirrina.db_session
     unstable = request.GET.getone("unstable", False)
@@ -924,31 +1035,20 @@ async def get_projectversion_dependents(request):
         - name: projectversion_id
           in: path
           required: true
-          type: string
-        - name: basemirror_id
-          in: query
-          required: false
           type: integer
-        - name: is_basemirror
-          in: query
-          required: false
-          type: boolean
         - name: project_id
           in: path
           required: true
           type: integer
-        - name: project_name
+        - name: candidates
+          in: query
+          required: false
+          type: boolean
+        - name: q
           in: query
           required: false
           type: string
-        - name: page
-          in: query
-          required: false
-          type: integer
-        - name: page_size
-          in: query
-          required: false
-          type: integer
+          description: Filter query
     produces:
         - text/json
     responses:
@@ -1021,6 +1121,32 @@ async def get_projectversion_dependents(request):
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/extbuild")
 @req_role("owner")
 async def external_build_upload(request):
+    """
+    Initiates an external build upload process.
+
+    ---
+    description: Initiates an external build upload process.
+    tags:
+        - Projects
+    consumes:
+        - application/json
+        parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "201":
+            description: External build upload initiated successfully.
+        "500":
+            description: Projectversion not found
+    """
     db = request.cirrina.db_session
 
     projectversion = get_projectversion(request)
@@ -1314,7 +1440,7 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, multipart)
         srcbuild.version = build_version
         session.commit()
 
-        # check if version already exists
+        # check if version already existsrun
         existing_build = session.query(Build).filter(Build.buildtype == "build",
                                                      Build.sourcerepository_id.is_(None),
                                                      Build.projectversion_id == projectversion_id,
@@ -1362,6 +1488,36 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, multipart)
 @app.http_delete("/api2/project/{project_id}/{projectversion_id}/build/{build_id}")
 @req_role("owner")
 async def delete_projectversion_build(request):
+    """
+    Delete Project Version Build
+
+    ---
+    description: Deletes a specific build associated with a project version.
+    tags:
+        - Projects
+    consumes:
+        - application/json
+    parameters:
+        - name: project_id
+          in: path
+          required: true
+          type: integer
+        - name: projectversion_id
+          in: path
+          required: true
+          type: integer
+        - name: build_id
+          in: path
+          required: true
+          type: integer
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: Build is being deleted
+        "400":
+            description: Projectversion not found
+    """
     db = request.cirrina.db_session
 
     projectversion = get_projectversion(request)
