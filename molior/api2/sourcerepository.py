@@ -368,8 +368,6 @@ async def add_repository(request):
         "400":
             description: Invalid data received.
     """
-    logging.basicConfig()
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     params = await request.json()
     url = params.get("url", "")
     architectures = params.get("architectures", [])
