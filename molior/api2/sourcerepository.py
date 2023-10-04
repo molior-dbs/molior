@@ -2,7 +2,6 @@ import re
 import giturlparse
 
 from sqlalchemy.sql import func, or_
-import logging
 
 from ..app import app, logger
 from ..auth import req_role, req_admin
@@ -376,7 +375,6 @@ async def add_repository(request):
     run_lintian = params.get("run_lintian", "false")
     run_lintian = run_lintian == "true"
 
-
     if not url:
         return ErrorResponse(400, "No URL received")
     if not architectures:
@@ -581,6 +579,7 @@ async def edit_repository(request):
     if not architectures:
         return ErrorResponse(400, "No architectures received")
     run_lintian = params.get("run_lintian", "false")
+    run_lintian = run_lintian == "true"
 
     projectversion = get_projectversion(request)
     if not projectversion:
