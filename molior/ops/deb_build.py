@@ -19,6 +19,7 @@ from .git import GitCheckout, GetBuildInfo
 
 from ..model.database import Session
 from ..model.sourcerepository import SourceRepository
+from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.maintainer import Maintainer
@@ -807,7 +808,10 @@ async def schedule_build(build, session):
 
     token = buildtask.task_id
 
-    run_lintian = True
+    query = session.query(SouRepProVer.run_lintian).filter(SouRepProVer.sourcerepository_id == build.sourcerepository_id,
+                                                                SouRepProVer.projectversion_id == build.projectversion_id).first()
+    if query is not None:
+        run_lintian = query.run_lintian
     if build.is_ci:
         run_lintian = False
 

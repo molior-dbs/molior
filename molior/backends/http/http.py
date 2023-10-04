@@ -181,7 +181,7 @@ class HTTPBackend:
         self.aborted_builds = []
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
-                    project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian=True):
+                    project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
         task_id = "build_%d" % build_id
         if arch == "i386" or arch == "amd64":
             queue_arch = "amd64"
