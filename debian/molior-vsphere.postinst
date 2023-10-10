@@ -23,7 +23,7 @@ set -e
 PROJECT=Molior
 SYSUSER=admin
 SYSHOME=/home/admin
-PASSWORD=molior-admin
+PASSWORD=molior-dev
 
 case "$1" in
     configure)
