@@ -417,6 +417,8 @@ async def copy_projectversion(request):
                   buildlatest:
                       type: boolean
                       description: build latest
+                  retention_successful_builds:
+                      type: integer
     produces:
         - text/json
     responses:
@@ -435,6 +437,7 @@ async def copy_projectversion(request):
     architectures = params.get("architectures", None)
     cibuilds = params.get("cibuilds", False)
     buildlatest = params.get("buildlatest", False)
+    retention_successful_builds = params.get("retention_successful_builds", None)
 
     if not new_version:
         return ErrorResponse(400, "No valid name for the projectversion received")
@@ -478,7 +481,7 @@ async def copy_projectversion(request):
         if not bm:
             return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
 
-    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds)
+    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds, retention_successful_builds)
 
     if baseproject:
         pdep = ProjectVersionDependency(
