@@ -178,6 +178,8 @@ async def create_projectversion(request):
                     type: boolean
                 baseproject:
                     type: string
+                retention_successful_builds:
+                    type: integer
     produces:
         - text/json
     responses:
@@ -197,6 +199,7 @@ async def create_projectversion(request):
     architectures = params.get("architectures", None)
     basemirror = params.get("basemirror")
     baseproject = params.get("baseproject")
+    retention_successful_builds = params.get("retention_successful_builds")
     project_id = request.match_info["project_id"]
 
     if not project_id:
@@ -263,7 +266,8 @@ async def create_projectversion(request):
             ci_builds_enabled=cibuilds,
             mirror_architectures=array2db(architectures),
             basemirror=bm,
-            mirror_state=None)
+            mirror_state=None,
+            retention_successful_builds=retention_successful_builds,)
     db.add(projectversion)
     db.commit()
 
@@ -318,6 +322,8 @@ async def edit_projectversion(request):
                     type: string
                     description: Dependency policy
                     example: strict
+                retention_successful_builds:
+                    type: integer
     produces:
         - text/json
     responses:
@@ -332,6 +338,7 @@ async def edit_projectversion(request):
     if dependency_policy not in DEPENDENCY_POLICIES:
         return ErrorResponse(400, "Wrong dependency policy1")
     cibuilds = params.get("cibuilds")
+    retention_successful_builds = params.get("retention_successful_builds")
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -348,6 +355,7 @@ async def edit_projectversion(request):
     projectversion.description = description
     projectversion.dependency_policy = dependency_policy
     projectversion.ci_builds_enabled = cibuilds
+    projectversion.retention_successful_builds = retention_successful_builds
     db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
