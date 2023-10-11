@@ -109,14 +109,35 @@ class MoliorServer:
         self.task_notification_worker = asyncio.ensure_future(notification_worker.run())
 
         cfg = Configuration()
-        daily_cleanup = cfg.aptly.get("daily_cleanup")
-        if daily_cleanup is False or daily_cleanup == "off" or daily_cleanup == "disabled":
-            return
+        cleanup_active = cfg.aptly.get("cleanup_active")
+        cleanup_weekday = cfg.aptly.get("cleanup_weekday")
+        cleanup_time = cfg.aptly.get("cleanup_time")
 
-        if not daily_cleanup:
-            daily_cleanup = "04:00"
+        def get_weekday_number(weekday_name):
+            weekday_mapping = {
+                'Monday': 0,
+                'Tuesday': 1,
+                'Wednesday': 2,
+                'Thursday': 3,
+                'Friday': 4,
+                'Saturday': 5,
+                'Sunday': 6
+            } 
+            return weekday_mapping.get(weekday_name)
+
+        if not cleanup_time:
+            cleanup_time = "04:00"
+        if not cleanup_weekday:
+            cleanup_weekday = 'Sunday'
+        
+        if cleanup_active is False or cleanup_active == "off" or cleanup_active == "disabled":
+            self.logger.info("cleanup job disabled")
+            return
+        else:
+            self.logger.info(f"cleanup job enabled for every {cleanup_weekday} at {cleanup_time}")
+
         cleanup_sched = Scheduler(locale="en_US")
-        cleanup_job = CronJob(name='cleanup').every().day.at(daily_cleanup).go(self.cleanup_task)
+        cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
         cleanup_sched.add_job(cleanup_job)
         self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
