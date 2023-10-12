@@ -109,9 +109,9 @@ class MoliorServer:
         self.task_notification_worker = asyncio.ensure_future(notification_worker.run())
 
         cfg = Configuration()
-        cleanup_active = cfg.aptly.get("cleanup_active")
-        cleanup_weekday = cfg.aptly.get("cleanup_weekday")
-        cleanup_time = cfg.aptly.get("cleanup_time")
+        cleanup_active = cfg.cleanup.get("cleanup_active")
+        cleanup_weekday = cfg.cleanup.get("cleanup_weekday")
+        cleanup_time = cfg.cleanup.get("cleanup_time")
 
         def get_weekday_number(weekday_name):
             weekday_mapping = {
