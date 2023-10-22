@@ -19,7 +19,7 @@ from .worker_aptly import AptlyWorker
 from .worker_backend import BackendWorker
 from .worker_notification import NotificationWorker
 from .backend import Backend
-from .queues import enqueue_aptly
+from .queues import enqueue_task
 
 # import api handlers
 import molior.api.build              # noqa: F401
@@ -85,7 +85,7 @@ class MoliorServer:
         cirrina.db_session.close()
 
     async def cleanup_task(self):
-        await enqueue_aptly({"cleanup": []})
+        await enqueue_task({"weekly_cleanup": []})
 
     def run(self):
         self.backend = Backend().init()
@@ -112,6 +112,7 @@ class MoliorServer:
         cleanup_active = cfg.cleanup.get("cleanup_active")
         cleanup_weekday = cfg.cleanup.get("cleanup_weekday")
         cleanup_time = cfg.cleanup.get("cleanup_time")
+        cleanup_load = cfg.cleanup.get("cleanup_load")
 
         def get_weekday_number(weekday_name):
             weekday_mapping = {
