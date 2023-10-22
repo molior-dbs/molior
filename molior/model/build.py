@@ -29,7 +29,7 @@ BUILD_STATES = [
     "nothing_done",
 ]
 
-BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror", "copy_projectversion", "delete_projectversion"]
+BUILD_TYPES = ["build", "source", "deb", "chroot", "mirror", "copy_projectversion", "delete_projectversion", "cleanup"]
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
