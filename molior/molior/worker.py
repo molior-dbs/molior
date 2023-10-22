@@ -4,6 +4,8 @@ import giturlparse
 from shutil import rmtree
 from pathlib import Path
 
+from molior.model.projectversion import ProjectVersion
+
 from ..app import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
 from ..ops import PrepareBuilds, BuildPreparationState, CreateBuilds, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
@@ -164,6 +166,83 @@ class Worker:
 
         # FIXME: this was run as a future in bkg before
         await CreateBuilds(session, build, repo, info, git_ref, ci_branch, targets, force_ci)
+        await enqueue_task({"retention_cleanup": [build_id]})
+
+    async def _retention_cleanup(self, args, session):
+
+        build_id = args[0]       
+        build = session.query(Build).filter(Build.id == build_id).first()
+
+        if build is not None:
+            for column in build.__table__.columns:
+                column_name = column.name
+                column_value = getattr(build, column_name)
+                logger.info(f"{column_name}: {column_value}")
+
+        projectversions = build.projectversions
+  
+        for projectversion in projectversions:
+            retention_successful_builds = session.query(ProjectVersion.retention_successful_builds).filter(ProjectVersion.id == projectversion).first()
+            successful_builds = session.query(Build).filter(Build.projectversion_id == projectversion, Build.buildstate == 'successful').count()
+            logger.info("There are %s too many successful builds", successful_builds - retention_successful_builds)
+
+            logger.info("type of retention_successful_builds: %s", type(retention_successful_builds))
+            logger.info("builds_to_retain: %s", retention_successful_builds[0])
+
+        logger.info("retention_successful_builds: %s", retention_successful_builds)
+
+
+        logger.info("successful builds: %s", successful_builds)
+
+
+
+
+      
+        # args.append(projectversions)
+
+        # logger.info("args lengths = %s", len(args))
+        # logger.info("args[6] should be build.projectversions: %s", projectversions)
+
+        return
+
+    async def _weekly_cleanup(self, args, session):
+
+        build_id = args[0]
+        
+        build = session.query(Build).filter(Build.id == build_id).first()
+
+        if build is not None:
+            for column in build.__table__.columns:
+                column_name = column.name
+                column_value = getattr(build, column_name)
+                logger.info(f"{column_name}: {column_value}")
+
+        projectversions = []
+        projectversions_str = build.projectversions.strip('{}')
+        numbers = projectversions_str.split(',')
+
+        for num in numbers:
+            projectversions.append(int(num))   
+        
+        projectversions = build.projectversions
+
+        logger.info("type of projectversions: %s", type(projectversions))
+
+        args.append(projectversions)
+
+        logger.info("args lengths = %s", len(args))
+        logger.info("args[6] should be build.projectversions: %s", projectversions)
+
+        await enqueue_aptly({"cleanup": []})
+
+        return
+
+        ## when a new build is created, delete ONE successful build that is too much.
+        ## when we delete builds in the context of the cleanup_job, we delete a fixed amount of 'too much builds'
+        ## check build_retention
+        ## delete 1 (maybe more?) db entries, that exceed the build_retention
+
+
 
     async def _srcbuild(self, args, session):
         build_id = args[0]
@@ -550,6 +629,18 @@ class Worker:
                         if args:
                             handled = True
                             await self._repo_change_url(args, session)
+
+                    if not handled:
+                        args = task.get("weekly_cleanup")
+                        if args:
+                            handled = True
+                            await self._weekly_cleanup(args, session)
+
+                    if not handled:
+                        args = task.get("retention_cleanup")
+                        if args:
+                            handled = True
+                            await self._retention_cleanup(args, session)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))
