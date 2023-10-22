@@ -1301,12 +1301,11 @@ class AptlyWorker:
                         handled = True
                         await self._abort(args)
 
-                # must be last
                 if not handled:
                     args = task.get("cleanup")
-                    # FIXME: check args is []
-                    handled = True
-                    await self._cleanup(args)
+                    if args == []:
+                        handled = True
+                        await self._cleanup(args)
 
                 if not handled:
                     logger.error("aptly worker got unknown task %s", str(task))
