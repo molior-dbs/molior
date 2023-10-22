@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TYPE buildtype_enum ADD VALUE 'cleanup';
+
+EOF
