@@ -88,7 +88,7 @@ class MoliorServer(cirrina.Server):
         self.task_aptly_worker = None
         self.task_notification_worker = None
         self.task_cron = None
-    
+
     def list_active_tasks(self, debug_pos):
         self.logger.info(debug_pos)
         tasks = asyncio.all_tasks()
@@ -174,18 +174,14 @@ class MoliorServer(cirrina.Server):
 
                     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
-    async def terminate(self):
-
-        self.list_active_tasks(debug_pos="At the beginning of the terminate function:")
-
-        self.logger.info("terminating tasks")
+        await enqueue_task({"weekly_cleanup": []})
 
     async def terminate(self):
 
         self.list_active_tasks(debug_pos="At the beginning of the terminate function:")
 
         logger.info("terminating tasks")
-        
+
         self.task_worker.cancel()
         self.task_backend_worker.cancel()
         self.task_aptly_worker.cancel()
@@ -259,32 +255,3 @@ def main(host, port, debug, coverage):
         cov.html_report(directory='/var/lib/molior/buildout/coverage')
 
     logger.info("terminated")
-
->>>>>>> server restart: encapsuled stop/cancel commands in try-except blocks
-
-        try:
-            await self.task_worker
-            await self.task_backend_worker
-            await self.task_aptly_worker
-            await self.task_notification_worker
-        except asyncio.CancelledError:
-            self.logger.info("tasks were canceled")
-        else:
-            self.logger.info("tasks were completed")
-
-        try:
-            self.logger.info("terminating backend")
-            await self.backend.stop()
-        except asyncio.CancelledError:
-            self.logger.info("backend tasks were completed")
-
-        try:
-            self.logger.info("terminating launchy")
-            await Launchy.stop()
-        except asyncio.CancelledError:
-            self.logger.info("launchy tasks were completed")
-
-        self.list_active_tasks(debug_pos="At the end of the terminate function:")
-
-        self.logger.info("terminating app")
-        self.stop()

@@ -40,6 +40,12 @@ aptly:
     gpg_key: 'reposign@molior.info'
     key: 'archive-keyring.asc'
 
+cleanup:
+    cleanup_active: 'on'
+    cleanup_time: '04:00'
+    cleanup_weekday: 'Saturday'
+    cleanup_load: 100
+
 # Gitlab-API settings
 #gitlab:
 #    auth_token: '<top_secret_token>'
