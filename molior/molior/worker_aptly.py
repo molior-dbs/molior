@@ -1188,6 +1188,92 @@ class AptlyWorker:
 
         logger.info("aptly worker: build %d deleted" % build_id)
 
+    async def _delete_deb_build(self, args):
+        build_id = args[0]
+        logger.info("aptly worker: deleting Debian packages for build %d" % build_id)
+
+        build_ids = [build_id]
+        to_delete = {}
+        with Session() as session:
+            topbuild = session.query(Build).filter(Build.id == build_id).first()
+            if not topbuild:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            dist = "stable"
+            if topbuild.is_ci:
+                dist = "unstable"
+
+            debpkgs = []
+            for src in topbuild.children:
+                for deb in src.children:
+                    build_ids.append(deb.id)
+                    debpkgs.append(deb)
+
+            projectversions = {}
+            for deb in debpkgs:
+                if deb.buildstate != "successful":  # only successful deb builds have packages to delete
+                    continue
+                for f in deb.debianpackages:
+                    projectversion = deb.projectversion
+                    repo_name = "%s-%s-%s-%s-%s" % (projectversion.basemirror.project.name, projectversion.basemirror.name,
+                                                    projectversion.project.name, projectversion.name, dist)
+                    if repo_name not in to_delete:
+                        to_delete[repo_name] = []
+                    to_delete[repo_name].append((f.name, deb.version, f.suffix))
+
+        aptly = get_aptly_connection()
+        aptly_delete = {}
+        for repo_name in to_delete:
+            for package in to_delete[repo_name]:
+                # logger.error("delete %s %s" % (repo_name, pkgname))
+                pkgs = await aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                    package[1],   # version
+                                                                                    package[2]))  # arch
+                if repo_name not in aptly_delete:
+                    aptly_delete[repo_name] = []
+                aptly_delete[repo_name].extend(pkgs)
+
+        for repo_name in aptly_delete:
+            task_id = await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
+            await aptly.wait_task(task_id)
+
+        for pv in projectversions:
+            await aptly.republish(dist, projectversions[pv][0], projectversions[pv][1])
+
+        def remove_buildout():
+            for build_id in build_ids:
+                buildout = "/var/lib/molior/buildout/%d" % build_id
+                try:
+                    rmtree(buildout)
+                except Exception:
+                    pass
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self.threadexc, remove_buildout)
+
+        with Session() as session:
+            top = session.query(Build).filter(Build.id == build_id).first()
+            if not top:
+                logger.error("aptly worker: build %d not found" % build_id)
+                return
+
+            to_delete = []
+            for src in top.children:
+                for deb in src.children:
+                    to_delete.append(deb)
+                to_delete.append(src)
+            to_delete.append(top)
+
+            for build in to_delete:
+                build.debianpackages = []
+                if build.buildtask:
+                    session.delete(build.buildtask)
+                session.delete(build)
+            session.commit()
+
+        logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
+
+
     async def _abort(self, args):
         logger.debug("worker: got abort build task")
         build_id = args[0]
@@ -1294,6 +1380,12 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._delete_build(args)
+
+                if not handled:
+                    args = task.get("delete_deb_build")
+                    if args:
+                        handled = True
+                        await self._delete_deb_build(args)
 
                 if not handled:
                     args = task.get("abort")

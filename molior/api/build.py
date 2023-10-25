@@ -399,7 +399,7 @@ async def rebuild_build(request):
     Rebuild a failed build
 
     ---
-    description: Delete a build from database.
+    description: Rebuild a failed build
     tags:
         - Builds
     consumes:
