@@ -536,7 +536,7 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
         maintainer=maintainer,
     )
 
-    # update patent
+    # update parent
     parent.version = info.version
     parent.sourcerepository = repo
     parent.maintainer = maintainer
@@ -839,6 +839,7 @@ async def schedule_build(build, session):
             ]
         }
     )
+    await enqueue_task({"retention_cleanup": [build.id]})
     return True
 
 
