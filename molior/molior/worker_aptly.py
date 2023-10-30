@@ -1271,7 +1271,24 @@ class AptlyWorker:
                 session.delete(build)
             session.commit()
 
+            logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
+
+            src_build = top.children[0]
+            other_deb_packages = session.query(Build).filter(
+                Build.buildstate == "successful",
+                Build.buildtype == "deb",
+                Build.parent == src_build,
+            ).all()
+            if len(other_deb_packages) == 0:
+                session.delete(src_build)
+                session.delete(top)
+            session.commit()
+
+            logger.info("aptly worker: Source packages and Top Build for build %d deleted" % build_id)
+            
+
         logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
+
 
 
     async def _abort(self, args):
