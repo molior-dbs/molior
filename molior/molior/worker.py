@@ -1,6 +1,5 @@
 import asyncio
 import giturlparse
-from sqlalchemy import asc
 
 from shutil import rmtree
 from pathlib import Path
@@ -599,8 +598,6 @@ class Worker:
                         if args:
                             handled = True
                             await self._weekly_cleanup(args, session)
-
-
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))

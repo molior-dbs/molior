@@ -85,6 +85,8 @@ class BackendWorker:
         backend = b.get_backend()
         await backend.abort(build_id)
 
+    
+
 
     async def _retention_cleanup(self, build_id):
 
@@ -194,7 +196,7 @@ class BackendWorker:
 
                 else:
                     logger.info(f"Build is in the state ({build_state}), waiting for 5 seconds and checking again")
-                    #await asyncio.sleep(10)
+                    await asyncio.sleep(5)
                     
 
 
@@ -246,10 +248,6 @@ class BackendWorker:
                     args = {"schedule": []}
                     await enqueue_task(args)
                     handled = True
-                build_id = task.get("retention_cleanup")
-                if build_id:
-                    handled = True
-                    await self._retention_cleanup(build_id)
                 if not handled:
                     logger.error("backend: got unknown task %s", str(task))
 

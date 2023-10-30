@@ -5,7 +5,7 @@ from os import mkdir
 from shutil import rmtree
 from shutil import copy2
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, asc
 
 from ..app import logger
 from ..tools import db2array, array2db
@@ -727,7 +727,79 @@ class AptlyWorker:
         if not ret:
             await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
             await buildlog(build_id, "E: publishing build failed\n")
+        else:
+            logger.info(build_id)
+                #cleanup job for particular projectversion
+                #check the buildstate
+                #check how many successful builds
+            project_version_id = build.projectversion_id
+            build_state = build.buildstate            
+            logger.info(f"Build is {build_state}, performing retention cleanup")
+            logger.info(f"Projectversion ID: {project_version_id}")
+            #the number of successful builds to retain per sourcerepository
+            retention_successful_builds = build.projectversion.retention_successful_builds
+            logger.info(f"Number of retention_successful_builds: {retention_successful_builds}")
+            #how many successful builds are for the sourcerepository
+            successful_builds = session.query(Build).filter(
+                Build.buildstate == "successful",
+                Build.buildtype == "deb",
+                Build.sourcename == build.sourcename,
+                Build.projectversion_id == project_version_id).all()
+            for successful_build in successful_builds:
+                sourcename = successful_build.sourcename
+                build_state = successful_build.buildstate
+                build_id = successful_build.id
+                logger.info(f"Sourcename: {sourcename}, Build State: {build_state}, Build Id: {build_id}")
+            #count how many successful builds there are for the projectversion
+            successful_builds_number = len(successful_builds)
+            logger.info(f"Number of Successful Builds: {successful_builds_number}")
+            #how many builds should be deleted
+            builds_to_delete = successful_builds_number - retention_successful_builds
+            if builds_to_delete > 0:
+                logger.info(f"Number of builds to delete: {builds_to_delete}")
+                #if there are more than the retention successful builds, give the list of the oldest build
+                oldest_builds_to_delete = session.query(Build).filter(
+                    Build.buildstate == "successful",
+                    Build.buildtype == "deb",
+                    Build.sourcename == build.sourcename,
+                    Build.projectversion_id == project_version_id
+                    ).order_by(asc(Build.startstamp)).limit(builds_to_delete).all()
+                for oldest_build in oldest_builds_to_delete:
+                    sourcename = oldest_build.sourcename
+                    start_stamp = oldest_build.startstamp
+                    logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}")
 
+                # for example: if there are 3 successful builds, but retention_successful builds is 1, the oldest build needs to be deleted
+                #delete the oldest build
+                #take the oldest build
+
+                oldest_build_to_delete = session.query(Build).filter(
+                Build.buildstate == "successful",
+                Build.buildtype == "deb",
+                Build.sourcename == build.sourcename,
+                Build.projectversion_id == project_version_id
+                ).order_by(asc(Build.startstamp)).first()
+
+                if oldest_build_to_delete:
+                    sourcename = oldest_build_to_delete.sourcename
+                    start_stamp = oldest_build_to_delete.startstamp
+                    build_id = oldest_build_to_delete.id
+                    logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {build_id}")
+                else:
+                    logger.info("No oldest build found")
+
+                #check how many successful builds are now and if the correct build got deleted
+                #create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
+
+                await enqueue_aptly({"delete_deb_build": [build_id]})
+                #await enqueue_aptly({"delete_build": [build_id]})
+            else:
+                logger.info("No successful builds to delete") 
+            """
+            search for build to delete
+            log build delete
+            delete the build -> call aptly api here like deb publish
+            """
         await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await buildlogdone(build_id)
 
@@ -1273,6 +1345,7 @@ class AptlyWorker:
 
             logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
 
+            """
             src_build = top.children[0]
             other_deb_packages = session.query(Build).filter(
                 Build.buildstate == "successful",
@@ -1285,7 +1358,7 @@ class AptlyWorker:
             session.commit()
 
             logger.info("aptly worker: Source packages and Top Build for build %d deleted" % build_id)
-            
+            """
 
         logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
 
