@@ -746,10 +746,10 @@ class AptlyWorker:
                 Build.sourcename == build.sourcename,
                 Build.projectversion_id == project_version_id).all()
             for successful_build in successful_builds:
-                sourcename = successful_build.sourcename
-                build_state = successful_build.buildstate
-                build_id = successful_build.id
-                logger.info(f"Sourcename: {sourcename}, Build State: {build_state}, Build Id: {build_id}")
+                oldest_sourcename = successful_build.sourcename
+                oldest_build_state = successful_build.buildstate
+                oldest_build_id = successful_build.id
+                logger.info(f"Sourcename: {oldest_sourcename}, Build State: {oldest_build_state}, Build Id: {oldest_build_id}")
             #count how many successful builds there are for the projectversion
             successful_builds_number = len(successful_builds)
             logger.info(f"Number of Successful Builds: {successful_builds_number}")
@@ -781,17 +781,17 @@ class AptlyWorker:
                 ).order_by(asc(Build.startstamp)).first()
 
                 if oldest_build_to_delete:
-                    sourcename = oldest_build_to_delete.sourcename
+                    oldest_sourcename = oldest_build_to_delete.sourcename
                     start_stamp = oldest_build_to_delete.startstamp
-                    build_id = oldest_build_to_delete.id
-                    logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {build_id}")
+                    oldest_build_id = oldest_build_to_delete.id
+                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
                 else:
                     logger.info("No oldest build found")
 
                 #check how many successful builds are now and if the correct build got deleted
                 #create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
 
-                await enqueue_aptly({"delete_deb_build": [build_id]})
+                await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
                 #await enqueue_aptly({"delete_build": [build_id]})
             else:
                 logger.info("No successful builds to delete") 
@@ -800,6 +800,7 @@ class AptlyWorker:
             log build delete
             delete the build -> call aptly api here like deb publish
             """
+
         await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await buildlogdone(build_id)
 
