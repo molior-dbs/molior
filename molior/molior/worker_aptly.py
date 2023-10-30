@@ -778,20 +778,34 @@ class AptlyWorker:
                 Build.buildtype == "deb",
                 Build.sourcename == build.sourcename,
                 Build.projectversion_id == project_version_id
-                ).order_by(asc(Build.startstamp)).first()
+                ).order_by(asc(Build.startstamp)).first()   
 
-                if oldest_build_to_delete:
-                    oldest_sourcename = oldest_build_to_delete.sourcename
-                    start_stamp = oldest_build_to_delete.startstamp
-                    oldest_build_id = oldest_build_to_delete.id
-                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
+                projectversions = oldest_build_to_delete.parent.parent.projectversions 
+
+                if not len(projectversions) > 1:
+                    if oldest_build_to_delete:
+                        oldest_sourcename = oldest_build_to_delete.parent.parent.sourcename
+                        start_stamp = oldest_build_to_delete.parent.parent.startstamp
+                        oldest_topbuild_id = oldest_build_to_delete.parent.parent.id
+                        logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_topbuild_id}")
+                        await enqueue_aptly({"delete_build": [oldest_topbuild_id]}) 
+                    else:
+                        logger.info("No oldest build found")
                 else:
-                    logger.info("No oldest build found")
+                    if oldest_build_to_delete:
+                        oldest_sourcename = oldest_build_to_delete.sourcename
+                        start_stamp = oldest_build_to_delete.startstamp
+                        oldest_build_id = oldest_build_to_delete.id
+                        logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
+                        await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
+                    else:
+                        logger.info("No oldest build found")
+                                
 
                 #check how many successful builds are now and if the correct build got deleted
                 #create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
 
-                await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
+
                 #await enqueue_aptly({"delete_build": [build_id]})
             else:
                 logger.info("No successful builds to delete") 
