@@ -839,10 +839,6 @@ async def schedule_build(build, session):
             ]
         }
     )
-    #loop to check if the build with the build id 
-    await enqueue_backend({"retention_cleanup": build.id})
-    return True
-
 
 def get_dependencies_recursive(dependencies, array):
     for dep in dependencies:
