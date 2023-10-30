@@ -169,82 +169,6 @@ class Worker:
         await CreateBuilds(session, build, repo, info, git_ref, ci_branch, targets, force_ci)
         #await enqueue_task({"retention_cleanup": [build_id]})
 
-    async def _retention_cleanup(self, args, session):
-
-        build_id = args[0]       
-        build = session.query(Build).filter(Build.id == build_id).first()
-
-        if build is not None:
-            for column in build.__table__.columns:
-                column_name = column.name
-                column_value = getattr(build, column_name)
-                logger.info(f"{column_name}: {column_value}")
-
-        #cleanup job for particular projectversion
-        #check the buildstate
-        #check how many successful builds
-        project_version_id = build.projectversion_id
-        logger.info(f"Projectversion ID: {project_version_id}")
-        #the number of successful builds to retain per sourcerepository
-        retention_successful_builds = build.projectversion.retention_successful_builds
-        logger.info(f"Number of retention_successful_builds: {retention_successful_builds}")
-        #how many successful builds are for the sourcerepository
-        successful_builds = session.query(Build).filter(
-                            Build.buildstate == "successful",
-                            Build.buildtype == "deb",
-                            Build.sourcename == build.sourcename,
-                            Build.projectversion_id == project_version_id).all()
-        for successful_build in successful_builds:
-            sourcename = successful_build.sourcename
-            build_state = successful_build.buildstate
-            build_id = successful_build.id
-            logger.info(f"Sourcename: {sourcename}, Build State: {build_state}, Build Id: {build_id}")
-        #count how many successful builds there are for the projectversion
-        successful_builds_number = len(successful_builds)
-        logger.info(f"Number of Successful Builds: {successful_builds_number}")
-      
-        #how many builds should be deleted
-        builds_to_delete = successful_builds_number - retention_successful_builds
-        logger.info(f"Number of builds to delete: {builds_to_delete}")
-        #if there are more than the retention successful builds, give the list of the oldest build
-        oldest_builds_to_delete = session.query(Build).filter(
-                            Build.buildstate == "successful",
-                            Build.buildtype == "deb",
-                            Build.sourcename == build.sourcename,
-                            Build.projectversion_id == project_version_id
-                        ).order_by(asc(Build.startstamp)).limit(builds_to_delete).all()
-        for oldest_build in oldest_builds_to_delete:
-            sourcename = oldest_build.sourcename
-            start_stamp = oldest_build.startstamp
-            logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}")
-
-        # for example: if there are 3 successful builds, but retention_successful builds is 1, the oldest build needs to be deleted
-        #delete the oldest build
-        #take the oldest build
-
-        oldest_build_to_delete = session.query(Build).filter(
-            Build.buildstate == "successful",
-            Build.buildtype == "deb",
-            Build.sourcename == build.sourcename,
-            Build.projectversion_id == project_version_id
-        ).order_by(asc(Build.startstamp)).first()
-
-        if oldest_build_to_delete:
-            sourcename = oldest_build_to_delete.sourcename
-            start_stamp = oldest_build_to_delete.startstamp
-            build_id = oldest_build_to_delete.id
-            logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {build_id}")
-        else:
-            logger.info("No oldest build found")
-
-        #check how many successful builds are now and if the correct build got deleted
-        #create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
-
-        await enqueue_aptly({"delete_deb_build": [build_id]})
-        #await enqueue_aptly({"delete_build": [build_id]})
-
-        return
-
     async def _weekly_cleanup(self, args, session):
 
         build_id = args[0]
@@ -676,11 +600,7 @@ class Worker:
                             handled = True
                             await self._weekly_cleanup(args, session)
 
-                    if not handled:
-                        args = task.get("retention_cleanup")
-                        if args:
-                            handled = True
-                            await self._retention_cleanup(args, session)
+
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))

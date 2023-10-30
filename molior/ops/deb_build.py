@@ -839,7 +839,8 @@ async def schedule_build(build, session):
             ]
         }
     )
-    await enqueue_task({"retention_cleanup": [build.id]})
+    #loop to check if the build with the build id 
+    await enqueue_backend({"retention_cleanup": build.id})
     return True
 
 
