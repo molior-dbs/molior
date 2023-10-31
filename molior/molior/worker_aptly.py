@@ -763,7 +763,7 @@ class AptlyWorker:
                     Build.buildtype == "deb",
                     Build.sourcename == build.sourcename,
                     Build.projectversion_id == project_version_id
-                    ).order_by(asc(Build.startstamp)).limit(builds_to_delete).all()
+                    ).order_by(asc(Build.id)).limit(builds_to_delete).all()
                 for oldest_build in oldest_builds_to_delete:
                     sourcename = oldest_build.sourcename
                     start_stamp = oldest_build.startstamp
@@ -778,11 +778,16 @@ class AptlyWorker:
                 Build.buildtype == "deb",
                 Build.sourcename == build.sourcename,
                 Build.projectversion_id == project_version_id
-                ).order_by(asc(Build.startstamp)).first()   
+                ).order_by(asc(Build.id)).first()   
 
-                projectversions = oldest_build_to_delete.parent.parent.projectversions 
+                # projectversions = oldest_build_to_delete.parent.parent.projectversions 
+                children = oldest_build_to_delete.parent.children
 
-                if not len(projectversions) > 1:
+                # logger.info("oldest_build_to_delete.id = %s", oldest_build_to_delete)
+                # logger.info("children = %s", children)
+                # logger.info("oldest_topbuild.id = %s", oldest_build_to_delete.parent.parent.id)
+
+                if len(children) == 1:
                     if oldest_build_to_delete:
                         oldest_sourcename = oldest_build_to_delete.parent.parent.sourcename
                         start_stamp = oldest_build_to_delete.parent.parent.startstamp
@@ -1071,6 +1076,34 @@ class AptlyWorker:
             db.commit()
 
     async def _cleanup(self, args):
+        logger.info("checking for obsolete builds")
+        with Session() as session:
+            projectversions = session.query(ProjectVersion).join(Project).filter(
+                Project.is_mirror.is_(False),
+                ProjectVersion.is_locked.is_(False)
+            ).all()
+            
+            builds_to_delete = []
+            for projectversion in projectversions:
+                builds = session.query(Build).filter(
+                    Build.projectversion_id == projectversion.id,
+                    Build.buildtype == "deb",
+                    Build.buildstate == "successful"
+                ).all()
+                delete_candidates = {}
+                for build in builds:
+                    if build.sourcename not in delete_candidates:
+                        delete_candidates[build.sourcename] = []
+                    delete_candidates[build.sourcename].append(build)
+                for sourcename in delete_candidates:
+                    pass
+                    # check if builds for sourcename exceeds limit of retention
+                    # if yes, sort build ids, append them to builds_to_delete
+                    # check if builds to delete exceeds 'delete limit' (from cfg file)
+                    # check if it's an 'only child', see retention_cleanup logic
+                
+            
+
         logger.info("aptly worker: running cleanup")
         with Session() as session:
             mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
