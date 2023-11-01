@@ -730,8 +730,8 @@ class AptlyWorker:
         else:
             logger.info(build_id)
             project_version_id = build.projectversion_id
-            build_state = build.buildstate 
-         
+            build_state = build.buildstate
+
             #the number of successful builds to retain per sourcerepository
             retention_successful_builds = build.projectversion.retention_successful_builds
 
@@ -747,7 +747,7 @@ class AptlyWorker:
             builds_to_delete = successful_builds_number - retention_successful_builds
             await buildlog(parent_parent_id, "I: there is a total of %d builds that exceed the amount of retention \n" % builds_to_delete)
             if builds_to_delete > 0:
-                oldest_build_to_delete = successful_builds[-1] 
+                oldest_build_to_delete = successful_builds[-1]
 
                 siblings = 0
                 if oldest_build_to_delete.parent:
@@ -759,7 +759,7 @@ class AptlyWorker:
                     oldest_topbuild_id = oldest_build_to_delete.parent.parent.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_topbuild_id}")
                     await buildlog(parent_parent_id, "I: deleting debian, source and topbuild for %s\n" % oldest_topbuild_id)
-                    await enqueue_aptly({"delete_build": [oldest_topbuild_id]}) 
+                    await enqueue_aptly({"delete_build": [oldest_topbuild_id]})
                 else:
                     oldest_sourcename = oldest_build_to_delete.sourcename
                     start_stamp = oldest_build_to_delete.startstamp
@@ -769,7 +769,7 @@ class AptlyWorker:
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
             else:
                 await buildlog(build.parent.parent_id, "I: No successful builds to delete\n")
-                logger.info("No successful builds to delete") 
+                logger.info("No successful builds to delete")
             """
             search for build to delete
             log build delete
@@ -1054,14 +1054,14 @@ class AptlyWorker:
                 for build in builds:
                     if build.sourcename not in delete_candidates:
                         delete_candidates[build.sourcename] = []
-                    delete_candidates[build.sourcename].append(build)  
-                
+                    delete_candidates[build.sourcename].append(build)
+
 
                 complete = False
                 for sourcename in delete_candidates:
                     if complete:
                         break
-                    successful_builds = len(delete_candidates[sourcename])                    
+                    successful_builds = len(delete_candidates[sourcename])
                     retention_successful_builds = projectversion.retention_successful_builds
                     amount_exceeded =  successful_builds - retention_successful_builds
                     if amount_exceeded > 0:
@@ -1076,7 +1076,7 @@ class AptlyWorker:
                 i = i + 1
 
                 logger.info(f"deleting build {i} of {cleanup_max}")
-                
+
                 siblings = 0
                 if build.parent:
                     siblings =  len(build.parent.children)
@@ -1086,14 +1086,14 @@ class AptlyWorker:
                     start_stamp = build.parent.parent.startstamp
                     topbuild_id = build.parent.parent.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {topbuild_id}")
-                    await enqueue_aptly({"delete_build": [topbuild_id]}) 
+                    await enqueue_aptly({"delete_build": [topbuild_id]})
                 else:
                     oldest_sourcename = build.sourcename
                     start_stamp = build.startstamp
                     oldest_build_id = build.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
-                    await enqueue_aptly({"delete_deb_build": [oldest_build_id]})         
-            
+                    await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
+
         logger.info("aptly worker: running cleanup")
         with Session() as session:
             mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
@@ -1380,23 +1380,6 @@ class AptlyWorker:
                     session.delete(build.buildtask)
                 session.delete(build)
             session.commit()
-
-            logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
-
-            """
-            src_build = top.children[0]
-            other_deb_packages = session.query(Build).filter(
-                Build.buildstate == "successful",
-                Build.buildtype == "deb",
-                Build.parent == src_build,
-            ).all()
-            if len(other_deb_packages) == 0:
-                session.delete(src_build)
-                session.delete(top)
-            session.commit()
-
-            logger.info("aptly worker: Source packages and Top Build for build %d deleted" % build_id)
-            """
 
         logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
 
