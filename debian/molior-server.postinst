@@ -50,7 +50,8 @@ Host *
 EOF
         fi
 
-        chown $MOLIOR_USER $MOLIOR_HOME $MOLIOR_HOME/buildout $MOLIOR_HOME/repositories $MOLIOR_HOME/upload
+        chown $MOLIOR_USER $MOLIOR_HOME $MOLIOR_HOME/buildout $MOLIOR_HOME/repositories $MOLIOR_HOME/upload $MOLIOR_HOME/web-sessions
+        chmod 700 $MOLIOR_HOME/web-sessions
     ;;
     abort-upgrade|abort-remove|abort-deconfigure) exit 0;;
 esac
