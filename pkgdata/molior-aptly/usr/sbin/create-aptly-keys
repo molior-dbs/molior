@@ -1,0 +1,63 @@
+#!/bin/sh
+
+set -e
+
+GPG_REALNAME=$1
+GPG_EMAIL=$2
+PUBKEY_FILE=$3
+
+if [ -z "$PUBKEY_FILE" ]; then
+    PUBKEY_FILE=archive-keyring.asc
+fi
+
+if [ -z "$GPG_REALNAME" -o -z "$GPG_EMAIL" ]; then
+  echo "Usage: $0 GPG_REALNAME GPG_EMAIL [PUBKEY_FILE]"
+  exit 1
+fi
+
+APTLY_USER=aptly
+HOME_DIR=/var/lib/aptly
+PUBLIC_DIR=${HOME_DIR}/.aptly/public
+
+GPG_TEMP_DIR=`mktemp -d /tmp/aptly-XXXXXX`
+GPG_PASSPHRASE=`apg -q -n 1 -E \' -E \"`
+
+GPG_BINARY=gpg
+export GPG_TTY=`tty`
+
+if su - $APTLY_USER -c "$GPG_BINARY -K --no-default-keyring --keyring=trustedkeys.gpg | grep -q $GPG_EMAIL"; then
+  echo 'gpg: key for aptly already exists'
+  exit 1
+fi
+
+chown $APTLY_USER $GPG_TEMP_DIR
+su - $APTLY_USER -c "mkdir -p $PUBLIC_DIR"
+
+echo 'Generating GPG keys ...'
+su $APTLY_USER -c "$GPG_BINARY --no-tty --no-default-keyring --keyring=trustedkeys.gpg --no-permission-warning --batch --gen-key" <<EOF
+Key-Type: RSA
+Key-Length: 2048
+Key-Usage: encrypt, sign
+Subkey-Type: RSA
+Subkey-Length: 2048
+Subkey-Usage: encrypt, sign
+Name-Real: $GPG_REALNAME
+Name-Comment: none
+Name-Email: $GPG_EMAIL
+Expire-Date: 0
+Passphrase: $GPG_PASSPHRASE
+%commit
+EOF
+
+echo 'Exporting public key ...'
+su - $APTLY_USER -c "$GPG_BINARY --no-default-keyring --keyring=trustedkeys.gpg --export -a $GPG_EMAIL > $PUBLIC_DIR/$PUBKEY_FILE"
+
+cat > ${HOME_DIR}/gpg-pass<<EOF
+$GPG_PASSPHRASE
+EOF
+chown aptly ${HOME_DIR}/gpg-pass
+chmod 600 ${HOME_DIR}/gpg-pass
+
+su - $APTLY_USER -c "$GPG_BINARY --allow-secret-key-import --import $PUBLIC_DIR/$PUBKEY_FILE"
+rm -rf $GPG_TEMP_DIR
+
