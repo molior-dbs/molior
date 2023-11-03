@@ -24,7 +24,6 @@ if [ -f ${HOME_DIR}/gpg-pass ]; then
     exit 0
 fi
 
-
 GPG_TEMP_DIR=`mktemp -d /tmp/aptly-XXXXXX`
 GPG_PASSPHRASE=`apg -q -n 1 -E \' -E \"`
 
