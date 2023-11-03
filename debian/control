@@ -32,6 +32,13 @@ Tag: devel::buildtools
 Description: Molior build node client
  Build node client for molior-server nodes (amd64 or arm64)
 
+Package: molior-aptly
+Section: misc
+Architecture: all
+Depends: ${misc:Depends}, aptly (>> 1.5.0)
+Description: aptly configuration for molior
+ Aptly configuraiton and scripts for integraiton with molior
+
 Package: molior-os-config
 Section: misc
 Architecture: all
