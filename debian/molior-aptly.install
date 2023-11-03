@@ -1,0 +1,4 @@
+#! /usr/bin/dh-exec
+
+pkgdata/molior-aptly/* .
+
