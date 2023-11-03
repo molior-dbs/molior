@@ -3,3 +3,4 @@ var/lib/molior/repositories
 var/lib/molior/upload
 var/lib/molior/debootstrap
 etc/molior/mirror-hooks.d
+var/lib/molior/web-sessions
