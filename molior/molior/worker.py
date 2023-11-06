@@ -594,10 +594,10 @@ class Worker:
                             await self._repo_change_url(args, session)
 
                     if not handled:
-                        args = task.get("weekly_cleanup")
-                        if args:
+                        args = task.get("cleanup")
+                        if args == []:
                             handled = True
-                            await self._weekly_cleanup(args, session)
+                            await self._cleanup(args, session)
 
                     if not handled:
                         logger.error("worker got unknown task %s", str(task))
