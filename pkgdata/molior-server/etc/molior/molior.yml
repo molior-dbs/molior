@@ -41,9 +41,10 @@ aptly:
     
 cleanup:
     cleanup_active: 'on'
-    cleanup_time: '04:00'
-    cleanup_weekday: 'Saturday'
-    cleanup_load: 100
+    cleanup_time: '11:44'
+    cleanup_weekday: 'Friday'
+    cleanup_max: 100
+    failed_builds_retention: 7
 
 # Gitlab-API settings
 #gitlab:
