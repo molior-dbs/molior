@@ -730,12 +730,11 @@ class AptlyWorker:
         else:
             logger.info(build_id)
             project_version_id = build.projectversion_id
-            build_state = build.buildstate            
-            logger.info(f"Build is {build_state}, performing retention cleanup")
-            logger.info(f"Projectversion ID: {project_version_id}")
+            build_state = build.buildstate 
+         
             #the number of successful builds to retain per sourcerepository
             retention_successful_builds = build.projectversion.retention_successful_builds
-            logger.info(f"Number of retention_successful_builds: {retention_successful_builds}")
+
             #how many successful builds are for the sourcerepository
             successful_builds = session.query(Build).filter(
                 Build.buildstate == "successful",
@@ -744,8 +743,9 @@ class AptlyWorker:
                 Build.projectversion_id == project_version_id).order_by(desc(Build.id)).all()
             successful_builds_number = len(successful_builds)
             logger.info(f"Number of Successful Builds: {successful_builds_number}")
-            #how many builds should be deleted
+            # how many builds should be deleted
             builds_to_delete = successful_builds_number - retention_successful_builds
+            await buildlog(parent_parent_id, "I: there is a total of %d builds that exceed the amount of retention \n" % builds_to_delete)
             if builds_to_delete > 0:
                 oldest_build_to_delete = successful_builds[-1] 
 
@@ -758,14 +758,17 @@ class AptlyWorker:
                     start_stamp = oldest_build_to_delete.parent.parent.startstamp
                     oldest_topbuild_id = oldest_build_to_delete.parent.parent.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_topbuild_id}")
+                    await buildlog(parent_parent_id, "I: deleting debian, source and topbuild for %s\n" % oldest_topbuild_id)
                     await enqueue_aptly({"delete_build": [oldest_topbuild_id]}) 
                 else:
                     oldest_sourcename = oldest_build_to_delete.sourcename
                     start_stamp = oldest_build_to_delete.startstamp
                     oldest_build_id = oldest_build_to_delete.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
+                    await buildlog(parent_parent_id, "I: deleting debian packages %d\n" % oldest_build_id)
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
             else:
+                await buildlog(build.parent.parent_id, "I: No successful builds to delete\n")
                 logger.info("No successful builds to delete") 
             """
             search for build to delete
