@@ -55,7 +55,7 @@ async def get_status(request):
         pass
 
     aptly = get_aptly_connection()
-    # aptly_version = await aptly.version()
+    aptly_version = await aptly.version()
     cfg = Configuration()
     apt_url = cfg.aptly.get("apt_url_public")
     if not apt_url:
@@ -63,7 +63,7 @@ async def get_status(request):
     gpgurl = apt_url + "/" + cfg.aptly.get("key")
     status = {
         "version_molior_server": MOLIOR_VERSION,
-        # "version_aptly": aptly_version,
+        "version_aptly": aptly_version,
         "maintenance_message": maintenance_message,
         "maintenance_mode": maintenance_mode,
         "sshkey": sshkey,
