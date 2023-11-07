@@ -180,6 +180,8 @@ async def create_projectversion(request):
                     type: string
                 retention_successful_builds:
                     type: integer
+                retention_failed_builds:
+                    type: integer
     produces:
         - text/json
     responses:
@@ -200,6 +202,7 @@ async def create_projectversion(request):
     basemirror = params.get("basemirror")
     baseproject = params.get("baseproject")
     retention_successful_builds = params.get("retention_successful_builds")
+    retention_failed_builds = params.get("retention_failed_builds")
     project_id = request.match_info["project_id"]
 
     if not project_id:
@@ -267,7 +270,8 @@ async def create_projectversion(request):
             mirror_architectures=array2db(architectures),
             basemirror=bm,
             mirror_state=None,
-            retention_successful_builds=retention_successful_builds,)
+            retention_successful_builds=retention_successful_builds,
+            retention_failed_builds=retention_failed_builds,)
     db.add(projectversion)
     db.commit()
 
@@ -324,6 +328,8 @@ async def edit_projectversion(request):
                     example: strict
                 retention_successful_builds:
                     type: integer
+                retention_failed_builds:
+                    type: integer
     produces:
         - text/json
     responses:
@@ -339,6 +345,7 @@ async def edit_projectversion(request):
         return ErrorResponse(400, "Wrong dependency policy1")
     cibuilds = params.get("cibuilds")
     retention_successful_builds = params.get("retention_successful_builds")
+    retention_failed_builds = params.get("retention_failed_builds")
     projectversion = get_projectversion(request)
     if not projectversion:
         return ErrorResponse(400, "Projectversion not found")
@@ -356,6 +363,7 @@ async def edit_projectversion(request):
     projectversion.dependency_policy = dependency_policy
     projectversion.ci_builds_enabled = cibuilds
     projectversion.retention_successful_builds = retention_successful_builds
+    projectversion.retention_failed_builds = retention_failed_builds
     db.commit()
 
     return OKResponse({"id": projectversion.id, "name": projectversion.name})
