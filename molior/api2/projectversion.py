@@ -442,6 +442,32 @@ async def copy_projectversion(request):
     retention_successful_builds = params.get("retention_successful_builds", None)
     retention_failed_builds = params.get("retention_failed_builds", None)
 
+    min_successful_builds = 1
+    max_successful_builds = 5
+    min_failed_builds = 7
+
+    if (
+        retention_successful_builds is not None
+        and (
+            not isinstance(retention_successful_builds, int)
+            or retention_successful_builds <min_successful_builds
+            or retention_successful_builds > max_successful_builds
+        )
+    ):
+        return ErrorResponse(
+            400, f"Invalid retention_successful_builds. It should be an integer between {min_successful_builds} and {max_successful_builds}.",
+        )
+    if (
+        retention_failed_builds is not None
+        and (
+            not isinstance(retention_failed_builds, int)
+            or retention_failed_builds < min_failed_builds
+        )
+    ):
+        return ErrorResponse(
+            400, f"Invalid retention_failed_builds. It should be an integer greater than or equal to {min_failed_builds}."
+        )
+
     if not new_version:
         return ErrorResponse(400, "No valid name for the projectversion received")
     if not is_name_valid(new_version):
