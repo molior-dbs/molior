@@ -59,6 +59,7 @@ class ProjectVersion(Base):
     projectversiontype = Column(Enum(*PROJECTVERSION_TYPES, name="projectversion_enum"), default="regular")
     baseprojectversion_id = Column(ForeignKey("projectversion.id"))
     retention_successful_builds = Column(Integer, default=1)
+    retention_failed_builds = Column(Integer, default=7)
 
     @hybrid_property
     def fullname(self):
@@ -174,14 +175,15 @@ class ProjectVersion(Base):
             "dependency_ids": dependency_ids,
             "dependent_ids": dependent_ids,
             "projectversiontype": self.projectversiontype,
-            "retention_successful_builds": self.retention_successful_builds
+            "retention_successful_builds": self.retention_successful_builds,
+            "retention_failed_builds": self.retention_failed_builds,
         }
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})
 
         return data
 
-    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds, retention_successful_builds):
+    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds, retention_successful_builds, retention_failed_builds):
         new_projectversion = ProjectVersion(
             name=version,
             project=self.project,
@@ -192,6 +194,7 @@ class ProjectVersion(Base):
             sourcerepositories=self.sourcerepositories,
             ci_builds_enabled=cibuilds,
             retention_successful_builds=retention_successful_builds,
+            retention_failed_builds=retention_failed_builds,
         )
 
         for dependency in self.dependencies:
