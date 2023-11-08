@@ -1,0 +1,7 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE projectversion ADD COLUMN retention_failed_builds INTEGER DEFAULT 7;
+
+EOF
