@@ -745,8 +745,8 @@ class AptlyWorker:
             logger.info(f"Number of Successful Builds: {successful_builds_number}")
             # how many builds should be deleted
             builds_to_delete = successful_builds_number - retention_successful_builds
-            await buildlog(parent_parent_id, "I: there is a total of %d builds that exceed the amount of retention \n" % builds_to_delete)
             if builds_to_delete > 0:
+                await buildlog(parent_parent_id, "I: there is a total of %d build(s) that exceed the amount of retention \n" % builds_to_delete)
                 oldest_build_to_delete = successful_builds[-1]
 
                 siblings = 0
@@ -758,18 +758,17 @@ class AptlyWorker:
                     start_stamp = oldest_build_to_delete.parent.parent.startstamp
                     oldest_topbuild_id = oldest_build_to_delete.parent.parent.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_topbuild_id}")
-                    await buildlog(parent_parent_id, "I: deleting debian, source and topbuild for %s\n" % oldest_topbuild_id)
+                    await buildlog(parent_parent_id, "I: deleting debian, source and topbuild of %s-%s\n" % (oldest_sourcename, oldest_build_to_delete.projectversion))
                     await enqueue_aptly({"delete_build": [oldest_topbuild_id]})
                 else:
                     oldest_sourcename = oldest_build_to_delete.sourcename
                     start_stamp = oldest_build_to_delete.startstamp
                     oldest_build_id = oldest_build_to_delete.id
                     logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
-                    await buildlog(parent_parent_id, "I: deleting debian packages %d\n" % oldest_build_id)
+                    await buildlog(parent_parent_id, "I: deleting debian package %s-%s\n" % (oldest_sourcename, oldest_build_to_delete.projectversion))
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
             else:
-                await buildlog(build.parent.parent_id, "I: No successful builds to delete\n")
-                logger.info("No successful builds to delete")
+                await buildlog(build.parent.parent_id, "I: no successful builds to delete\n")
             """
             search for build to delete
             log build delete
@@ -1033,47 +1032,119 @@ class AptlyWorker:
 
     async def _cleanup(self, args):
         logger.info("checking for obsolete builds")
+
+        # check what blocks do need the session and which doesn't
+        # close & open sessions
+
         with Session() as session:
             projectversions = session.query(ProjectVersion).join(Project).filter(
                 Project.is_mirror.is_(False),
                 ProjectVersion.is_locked.is_(False)
             ).order_by(ProjectVersion.id.desc()).all()
 
-            cleanup_max = Configuration().cleanup.get("cleanup_max")
-            builds_to_delete = []
 
+            # create cleanup build
+            cleanup_build = Build(
+                version=None,
+                git_ref=None,
+                ci_branch=None,
+                is_ci=False,
+                sourcename="Cleanup",
+                buildstate="scheduled",
+                buildtype="cleanup",
+                sourcerepository=None,
+                maintainer=None,
+            )
+
+            session.add(cleanup_build)
+            await cleanup_build.logtitle("Cleanup")
+            await cleanup_build.build_added()
+
+            await cleanup_build.set_building()
+            session.commit()
+
+            cleanup_max = Configuration().cleanup.get("cleanup_max")
+
+            builds_to_delete = []
+            successful_builds_to_delete = []
+            failed_builds_to_delete = []
+
+            complete = False
             for projectversion in projectversions:
-                builds = session.query(Build).filter(
+                if complete:
+                    break
+                successful_builds = session.query(Build).filter(
                     Build.projectversion_id == projectversion.id,
                     Build.buildtype == "deb",
                     Build.buildstate == "successful"
                 ).order_by(Build.id.desc()).all()
 
-                delete_candidates = {}
+                failed_builds = session.query(Build).filter(
+                    Build.projectversion_id == projectversion.id,
+                    Build.buildtype == "deb",
+                    # retention days >= now - createdstamp OR SO
+                    or_(Build.buildstate == "build_failed",
+                        Build.buildstate == "publish_failed",
+                        )
+                ).order_by(Build.id.desc()).all()
 
-                for build in builds:
-                    if build.sourcename not in delete_candidates:
-                        delete_candidates[build.sourcename] = []
-                    delete_candidates[build.sourcename].append(build)
+                # get 100 of successful and failed. divide by 2, if one has 'too less', 'fill' with the other
+                # either add the failed_builds to successful_builds and sort it again by ID
+                # handle it separately from the successful_builds and use a 2nd value in the config (later database) to limit the deletion of failed_builds
+
+                successful_delete_candidates = {}
+
+                for build in successful_builds:
+                    if build.sourcename not in successful_delete_candidates:
+                        successful_delete_candidates[build.sourcename] = []
+                    successful_delete_candidates[build.sourcename].append(build)
+
+                b = True
+                for build in failed_builds:
+                    if b:
+                        failed_builds_to_delete.append(build)
 
 
-                complete = False
-                for sourcename in delete_candidates:
+
+                for sourcename in successful_builds:
                     if complete:
                         break
-                    successful_builds = len(delete_candidates[sourcename])
+                    amount_successful_builds = len(successful_builds[sourcename])
                     retention_successful_builds = projectversion.retention_successful_builds
-                    amount_exceeded =  successful_builds - retention_successful_builds
+                    amount_exceeded =  amount_successful_builds - retention_successful_builds
+
                     if amount_exceeded > 0:
-                        for build in delete_candidates[sourcename][:-amount_exceeded]:
+                        for build in successful_builds[sourcename][:-amount_exceeded]:
+                            successful_builds_to_delete.append(build)
+                            logger.info("length of successful builds_to_delete: %s", len(builds_to_delete))
+                            if len(successful_builds_to_delete) == cleanup_max:
+                                complete = True
+                                break
+
+                for sourcename in failed_builds:
+                    if complete:
+                        break
+                    amount_successful_builds = len(successful_builds[sourcename])
+                    retention_successful_builds = projectversion.retention_successful_builds
+                    date_exceeded =  amount_successful_builds - retention_successful_builds
+
+                    if date_exceeded > 0:
+                        for build in successful_builds[sourcename][:-amount_exceeded]:
                             builds_to_delete.append(build)
+                            logger.info("length of successful builds_to_delete: %s", len(builds_to_delete))
                             if len(builds_to_delete) == cleanup_max:
                                 complete = True
                                 break
 
+            cleanup_build_id = cleanup_build.id
+
+            logger.info("cleanup_build_id: %s", cleanup_build_id)
+
             i=0
             for build in builds_to_delete:
                 i = i + 1
+
+                await buildlog(cleanup_build_id, "I: deleting build %s of %s\n" % (i, cleanup_max))
 
                 logger.info(f"deleting build {i} of {cleanup_max}")
 
@@ -1085,25 +1156,35 @@ class AptlyWorker:
                     sourcename = build.parent.parent.sourcename
                     start_stamp = build.parent.parent.startstamp
                     topbuild_id = build.parent.parent.id
-                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {topbuild_id}")
+                    logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {topbuild_id}")
+                    await buildlog(cleanup_build_id, "I: deleting debian, source and topbuild of %s-%s\n" % (sourcename, build.version))
                     await enqueue_aptly({"delete_build": [topbuild_id]})
                 else:
-                    oldest_sourcename = build.sourcename
+                    sourcename = build.sourcename
                     start_stamp = build.startstamp
                     oldest_build_id = build.id
-                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
+                    logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
+                    await buildlog(cleanup_build_id, "I: deleting debian package %s-%s\n" % (sourcename, build.version))
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
 
         logger.info("aptly worker: running cleanup")
         with Session() as session:
+
+            # goes to the top
             mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
             for mirror in mirrors:
                 if mirror.mirror_state in ["updating", "publishing"]:
                     # FIXME: postpone if mirroring is active
                     logger.error("aptly cleanup: cannot start, mirroring is active for mirror with id %d", mirror.id)
                     return
+
         aptly = get_aptly_connection()
         await aptly.cleanup()
+
+        with Session() as session:
+            await cleanup_build.set_successful()
+            session.commit()
+
 
     async def _delete_mirror(self, args):
         mirror_id = args[0]
