@@ -8,9 +8,11 @@ from launchy import Launchy
 from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
 
+from molior.model.metadata import MetaData
+
 from ..app import app, logger
 from ..version import MOLIOR_VERSION
-from ..model.database import database
+from ..model.database import Session, database
 from ..auth import Auth
 from .configuration import Configuration
 
@@ -108,11 +110,27 @@ class MoliorServer:
         notification_worker = NotificationWorker()
         self.task_notification_worker = asyncio.ensure_future(notification_worker.run())
 
+        # not needed after database change
         cfg = Configuration()
         cleanup_active = cfg.cleanup.get("cleanup_active")
         cleanup_weekday = cfg.cleanup.get("cleanup_weekday")
         cleanup_time = cfg.cleanup.get("cleanup_time")
 
+        # needed after change to database config
+        # with Session() as session:
+        #     cleanup_active = session.query(MetaData).filter_by(
+        #         name="cleanup_active".first()
+        #     )
+        #     cleanup_weekdays = session.query(MetaData).filter_by(
+        #         name="cleanup_weekday".first()
+        #     )
+        #     cleanup_time = session.query(MetaData).filter_by(
+        #         name="cleanup_time".first()
+        #     )
+
+        #     cleanup_weekdays = cleanup_weekdays.split(', ')
+
+        # not needed after database change
         def get_weekday_number(weekday_name):
             weekday_mapping = {
                 'Monday': 0,
@@ -138,6 +156,11 @@ class MoliorServer:
 
         cleanup_sched = Scheduler(locale="en_US")
         cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
+
+        # for weekday in cleanup_weekdays:
+        #     cleanup_job = CronJob(name=f'cleanup_{weekday}')
+        #     cleanup_job.every().weekday(weekday).at(cleanup_time).go(self.cleanup_task)
+
         cleanup_sched.add_job(cleanup_job)
         self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
