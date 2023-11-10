@@ -151,6 +151,10 @@ class Build(Base):
         self.endstamp = now
         await self.build_changed()
 
+        if self.buildtype == "cleanup":
+            await self.logtitle("Done", no_footer_newline=True, no_header_newline=False)
+            await self.logdone()
+
         if self.buildtype == "deb":
             # update (grand) parent build
             all_ok = True
