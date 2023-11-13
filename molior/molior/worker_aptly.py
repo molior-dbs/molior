@@ -1,12 +1,16 @@
 import asyncio
 import operator
+<<<<<<< HEAD
 from datetime import datetime
+=======
+from datetime import datetime, timezone
+>>>>>>> cleanup: added failed build retention
 
 from os import mkdir
 from shutil import rmtree
 from shutil import copy2
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import func, or_, desc
+from sqlalchemy import func, text, or_, desc
 
 from ..logger import logger
 from ..tools import db2array, array2db
@@ -1093,7 +1097,6 @@ class AptlyWorker:
     async def _cleanup(self, args):
         logger.info("checking for obsolete builds")
 
-<<<<<<< HEAD
         with Session() as session:
             mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
             for mirror in mirrors:
@@ -1101,10 +1104,8 @@ class AptlyWorker:
                     # FIXME: postpone if mirroring is active
                     logger.error("aptly cleanup: cannot start, mirroring is active for mirror with id %d", mirror.id)
                     return
-=======
         # check what blocks do need the session and which doesn't
         # close & open sessions
->>>>>>> current cleanup status
 
         with Session() as session:
             projectversions = session.query(ProjectVersion).join(Project).filter(
@@ -1112,10 +1113,6 @@ class AptlyWorker:
                 ProjectVersion.is_locked.is_(False)
             ).order_by(ProjectVersion.id.desc()).all()
 
-<<<<<<< HEAD
-=======
-
->>>>>>> current cleanup status
             # create cleanup build
             cleanup_build = Build(
                 version=None,
@@ -1143,9 +1140,10 @@ class AptlyWorker:
             successful_builds_to_delete = []
             failed_builds_to_delete = []
 
-            complete = False
+            successful_complete = False
+            failed_complete = False
             for projectversion in projectversions:
-                if complete:
+                if successful_complete and failed_complete:
                     break
                 successful_builds = session.query(Build).filter(
                     Build.projectversion_id == projectversion.id,
@@ -1210,6 +1208,73 @@ class AptlyWorker:
                                 complete = True
                                 break
 
+                if not failed_complete:
+                    failed_builds = session.query(Build).filter(
+                        Build.projectversion_id == projectversion.id,
+                        Build.buildtype == "deb",
+                        ProjectVersion.retention_failed_builds <= func.extract('epoch', datetime.now() - Build.endstamp) / 86400,
+                        or_(Build.buildstate == "build_failed",
+                            Build.buildstate == "publish_failed",
+                            )
+                    ).order_by(Build.id.desc()).all()
+
+                    logger.info("lenght of failed_builds: %d", len(failed_builds))
+
+                    for build in failed_builds:
+                        failed_builds_to_delete.append(build)
+                        if len(failed_builds_to_delete) == cleanup_max:
+                            failed_complete = True
+                            break
+
+                if not successful_complete:
+                    successful_builds = session.query(Build).filter(
+                        Build.projectversion_id == projectversion.id,
+                        Build.buildtype == "deb",
+                        Build.buildstate == "successful"
+                    ).order_by(Build.id.desc()).all()
+
+                    successful_delete_candidates = {}
+
+                    for build in successful_builds:
+                        if build.sourcename not in successful_delete_candidates:
+                            successful_delete_candidates[build.sourcename] = []
+                        successful_delete_candidates[build.sourcename].append(build)
+
+                    # FIXME logic could be part of the sqlalchemy query
+                    for sourcename in successful_delete_candidates:
+                        if successful_complete:
+                            break
+                        amount_successful_builds = len(successful_delete_candidates[sourcename])
+                        retention_successful_builds = projectversion.retention_successful_builds
+                        amount_exceeded =  amount_successful_builds - retention_successful_builds
+
+                        if amount_exceeded > 0:
+                            for build in successful_delete_candidates[sourcename][:-amount_exceeded]:
+                                successful_builds_to_delete.append(build)
+                                if len(successful_builds_to_delete) == cleanup_max:
+                                    successful_complete = True
+                                    break
+            logger.info("length of failed builds: %d", len(failed_builds_to_delete))
+            logger.info("length of succ builds: %d", len(successful_builds_to_delete))
+
+
+            # FIXME what happens when either or both equals 0
+            if len(failed_builds_to_delete) < cleanup_max:
+                builds_to_delete = failed_builds_to_delete + successful_builds_to_delete[:-(cleanup_max-len(failed_builds_to_delete))]
+            elif len(successful_builds_to_delete) < cleanup_max:
+                builds_to_delete = successful_builds_to_delete + failed_builds_to_delete[:-(cleanup_max-len(successful_builds_to_delete))]
+            else:
+                builds_to_delete = failed_builds_to_delete[:-int(len(failed_builds_to_delete)*0.5)] + successful_builds_to_delete[:-int(len(successful_builds_to_delete)*0.5)]
+
+            i = 0
+            logger.info("length of builds_to_delete: %d", len(builds_to_delete))
+            for build in builds_to_delete:
+                i = i +1
+                logger.info(f"deleting build {i} of {len(builds_to_delete)}")
+                logger.info("build id: %d", build.id)
+                logger.info("buildstate: %s", build.buildstate)
+
+>>>>>>> cleanup: added failed build retention
             cleanup_build_id = cleanup_build.id
 
             logger.info("cleanup_build_id: %s", cleanup_build_id)
@@ -1241,23 +1306,16 @@ class AptlyWorker:
                     await buildlog(cleanup_build_id, "I: deleting debian package %s-%s\n" % (sourcename, build.version))
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
 
-        logger.info("aptly worker: running cleanup")
-        with Session() as session:
+            logger.info("aptly worker: running cleanup")
 
-            # goes to the top
-            mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
-            for mirror in mirrors:
-                if mirror.mirror_state in ["updating", "publishing"]:
-                    # FIXME: postpone if mirroring is active
-                    logger.error("aptly cleanup: cannot start, mirroring is active for mirror with id %d", mirror.id)
-                    return
 
-        aptly = get_aptly_connection()
-        await aptly.cleanup()
+            aptly = get_aptly_connection()
+            await aptly.cleanup()
 
-        with Session() as session:
             await cleanup_build.set_successful()
             session.commit()
+
+        logger.info("end of cleanup function")
 
     async def _delete_mirror(self, args):
         mirror_id = args[0]
