@@ -39,13 +39,6 @@ aptly:
     pass: 'molior-dev'
     key: 'archive-keyring.asc'
     
-cleanup:
-    cleanup_active: 'on'
-    cleanup_time: '11:44'
-    cleanup_weekday: 'Friday'
-    cleanup_max: 100
-    failed_builds_retention: 7
-
 # Gitlab-API settings
 #gitlab:
 #    auth_token: '<top_secret_token>'
