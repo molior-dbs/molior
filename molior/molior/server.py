@@ -120,18 +120,15 @@ class MoliorServer:
         cleanup_weekdays_list = []
         with Session() as session:
             cleanup_active = session.query(MetaData).filter_by(
-                name="cleanup_active".first()
-            )
+                name="cleanup_active").first()
             cleanup_weekdays = session.query(MetaData).filter_by(
-                name="cleanup_weekday".first()
-            )
+                name="cleanup_weekday").first()
             cleanup_time = session.query(MetaData).filter_by(
-                name="cleanup_time".first()
-            )
+                name="cleanup_time").first()
 
             cleanup_weekdays_list = cleanup_weekdays.split(', ')
   
-        if cleanup_active is False:
+        if cleanup_active.value is False:
             self.logger.info("cleanup job disabled")
             return
         else:
