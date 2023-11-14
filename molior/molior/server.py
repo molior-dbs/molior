@@ -116,6 +116,10 @@ class MoliorServer:
         app.run(self.host, self.port, logger=self.logger, debug=self.debug)
 
     def weekly_cleanup(self):
+        if hasattr(self, 'task_cron') and self.task_cron:
+            # If a scheduler already exists, cancel the existing tasks
+            self.task_cron.cancel()
+        
         # extract values from db
         cleanup_weekdays_list = []
         with Session() as session:
