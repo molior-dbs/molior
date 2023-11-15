@@ -1,0 +1,9 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+INSERT INTO metadata (key, value) values ('cleanup_active', 'true'); 
+INSERT INTO metadata (key, value) values ('cleanup_weekdays', 'Saturday');
+INSERT INTO metadata (key, value) values ('cleanup_time', '04:00');
+
+EOF
