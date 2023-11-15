@@ -49,6 +49,7 @@ import molior.api2.user              # noqa: F401
 import molior.api2.mirror            # noqa: F401
 import molior.api2.build             # noqa: F401
 import molior.api2.token             # noqa: F401
+import molior.api2.admin             # noqa: F401
 
 
 class MoliorServer:
@@ -120,7 +121,7 @@ class MoliorServer:
             # If a scheduler already exists, cancel the existing tasks
             self.task_cron.cancel()
         
-        # extract values from db
+        # extract values from db or write default values a new molior-server instance
         cleanup_weekdays_list = []
         with Session() as session:
             cleanup_active = session.query(MetaData).filter_by(
@@ -129,8 +130,11 @@ class MoliorServer:
                 name="cleanup_weekday").first()
             cleanup_time = session.query(MetaData).filter_by(
                 name="cleanup_time").first()
+            if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
+                logger.error("Cleanup not set")
 
-            cleanup_weekdays_list = cleanup_weekdays.split(', ')
+            cleanup_weekdays_list = cleanup_weekdays.value.split(', ')
+
   
         if cleanup_active.value is False:
             self.logger.info("cleanup job disabled")
