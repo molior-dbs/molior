@@ -132,8 +132,8 @@ class MoliorServer:
                 name="cleanup_time").first()
             if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
                 logger.error("Cleanup not set")
-
-            cleanup_weekdays_list = cleanup_weekdays.value.split(', ')
+            else:
+                cleanup_weekdays_list = cleanup_weekdays.value.split(', ')
 
   
         if cleanup_active.value is False:
