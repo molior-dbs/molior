@@ -1,3 +1,4 @@
+from molior.model.metadata import MetaData
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web

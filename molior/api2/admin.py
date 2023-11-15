@@ -1,3 +1,4 @@
+from ..auth import req_role
 from molior.model.metadata import MetaData
 from molior.tools import OKResponse
 from ..app import app
