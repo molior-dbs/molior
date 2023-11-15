@@ -1,5 +1,3 @@
-import asyncio
-
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
@@ -762,7 +760,7 @@ async def snapshot_projectversion(request):
     latest_debbuilds_ids = []
     for latest_build in latest_builds:
         # if latest_build.buildstate != "successful":
-        #     return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,         
+        #     return ErrorResponse(400, "Not all latest builds are successful: %d (%s)" % (latest_build.id,
         #                                                                                  latest_build.sourcename))
         for debbuild in latest_build.parent.children:
             if debbuild.projectversion_id != projectversion.id:
@@ -1000,7 +998,7 @@ async def get_apt_sources2(request):
           in: query
           required: false
           type: boolean
-          description: Include internal APT sources. Default is false. 
+          description: Include internal APT sources. Default is false.
     produces:
         - text/json
     responses:
@@ -1615,3 +1613,5 @@ async def delete_projectversion_build(request):
 
     await enqueue_aptly({"delete_build": [topbuild.id]})
     return OKResponse("Build is being deleted")
+
+
