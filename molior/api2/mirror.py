@@ -346,6 +346,9 @@ async def create_mirror2(request):
     dependency_policy = params.get("dependencylevel")   # noqa: E221
     mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
 
+    if mirrorcomponents is None:
+        mirrorcomponents = "main"
+
     mirrorcomponents = re.split(r"[, ]", mirrorcomponents)
 
     db = request.cirrina.db_session
