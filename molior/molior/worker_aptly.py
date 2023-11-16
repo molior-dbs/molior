@@ -27,6 +27,7 @@ from ..model.mirrorkey import MirrorKey
 from ..model.buildtask import BuildTask
 from ..model.postbuildhook import PostBuildHook
 from ..model.sourepprover import SouRepProVer
+from ..model.metadata import MetaData
 
 
 def mirror_architectures(mirror):
@@ -1070,7 +1071,8 @@ class AptlyWorker:
             await cleanup_build.set_building()
             session.commit()
 
-            cleanup_max = Configuration().cleanup.get("cleanup_max")
+            cleanup_max = int(session.query(MetaData).filter_by(
+                name="cleanup_max").first().value)
 
             builds_to_delete = []
             successful_builds_to_delete = []
@@ -1130,14 +1132,23 @@ class AptlyWorker:
             logger.info("length of failed builds: %d", len(failed_builds_to_delete))
             logger.info("length of succ builds: %d", len(successful_builds_to_delete))
 
-
-            # FIXME what happens when either or both equals 0
             if len(failed_builds_to_delete) < cleanup_max:
-                builds_to_delete = failed_builds_to_delete + successful_builds_to_delete[:-(cleanup_max-len(failed_builds_to_delete))]
+                if len(successful_builds_to_delete) > 0:
+                    builds_to_delete = failed_builds_to_delete + successful_builds_to_delete[:-(cleanup_max-len(failed_builds_to_delete))]
+                else:
+                    builds_to_delete = failed_builds_to_delete
             elif len(successful_builds_to_delete) < cleanup_max:
-                builds_to_delete = successful_builds_to_delete + failed_builds_to_delete[:-(cleanup_max-len(successful_builds_to_delete))]
+                if len(failed_builds_to_delete) > 0:
+                    builds_to_delete = successful_builds_to_delete + failed_builds_to_delete[:-(cleanup_max-len(successful_builds_to_delete))]
+                else:
+                    builds_to_delete = successful_builds_to_delete
             else:
-                builds_to_delete = failed_builds_to_delete[:-int(len(failed_builds_to_delete)*0.5)] + successful_builds_to_delete[:-int(len(successful_builds_to_delete)*0.5)]
+                if len(failed_builds_to_delete) > 0 and len(successful_builds_to_delete) > 0:
+                    builds_to_delete = failed_builds_to_delete[:-int(len(failed_builds_to_delete)*0.5)] + successful_builds_to_delete[:-int(len(successful_builds_to_delete)*0.5)]
+                elif len(failed_builds_to_delete) > 0:
+                    builds_to_delete = failed_builds_to_delete
+                else:
+                    builds_to_delete = successful_builds_to_delete
 
             i = 0
             logger.info("length of builds_to_delete: %d", len(builds_to_delete))
