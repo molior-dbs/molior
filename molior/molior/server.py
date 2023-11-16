@@ -134,23 +134,21 @@ class MoliorServer:
                 logger.error("Cleanup not set")
             else:
                 cleanup_weekdays_list = cleanup_weekdays.value.split(', ')
+                if cleanup_active.value is False:
+                    self.logger.info("cleanup job disabled")
+                    return
+                else:
+                    self.logger.info(f"cleanup job enabled for every {str(cleanup_weekdays_list)} at {cleanup_time}")
+    
+                cleanup_sched = Scheduler(locale="en_US")
 
-  
-        if cleanup_active.value is False:
-            self.logger.info("cleanup job disabled")
-            return
-        else:
-            self.logger.info(f"cleanup job enabled for every {str(cleanup_weekdays_list)} at {cleanup_time}")
-
-        cleanup_sched = Scheduler(locale="en_US")
-
-        # create single cleanup_job for every weekday
-        for weekday in cleanup_weekdays_list:
-            cleanup_job = CronJob(name=f'cleanup_{weekday}')
-            cleanup_job.every().weekday(weekday).at(cleanup_time).go(self.cleanup_task)
-            cleanup_sched.add_job(cleanup_job)
- 
-        self.task_cron = asyncio.ensure_future(cleanup_sched.start())
+                # create single cleanup_job for every weekday
+                for weekday in cleanup_weekdays_list:
+                    cleanup_job = CronJob(name=f'cleanup_{weekday}')
+                    cleanup_job.every().weekday(weekday).at(cleanup_time).go(self.cleanup_task)
+                    cleanup_sched.add_job(cleanup_job)
+        
+                self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
     async def terminate(self):
 
