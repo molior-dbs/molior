@@ -1615,4 +1615,67 @@ async def delete_projectversion_build(request):
     await enqueue_aptly({"delete_build": [topbuild.id]})
     return OKResponse("Build is being deleted")
 
+@app.http_get("/api2/cleanup")
+async def get_cleanup(request):
+
+    db = request.cirrina.db_session
+    
+    cleanup_active_metadata = db.query(MetaData).filter_by(name='cleanup_active').first()
+    cleanup_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
+    cleanup_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
+
+    logger.info(cleanup_active_metadata)
+    logger.info(cleanup_time_metadata)
+    logger.info(cleanup_weekdays_metadata)
+
+    cleanup_active = cleanup_active_metadata.value if cleanup_active_metadata else None
+    cleanup_time = cleanup_time_metadata.value if cleanup_time_metadata else None
+    cleanup_weekdays = cleanup_weekdays_metadata.value.split(',') if cleanup_weekdays_metadata else None
+
+    logger.info(cleanup_active)
+    logger.info(cleanup_time)
+    logger.info(cleanup_weekdays)
+
+    data = {
+    'cleanup_active': cleanup_active,
+    'cleanup_time': cleanup_time,
+    'cleanup_weekdays': cleanup_weekdays
+    }
+
+    logger.info(data)
+    db.close()
+
+    return OKResponse(data)
+
+@app.http_put("/api2/cleanup")
+async def edit_cleanup(request):
+
+    params = await request.json()
+    cleanup_active = params.get("cleanup_active")
+    cleanup_weekdays = params.get("cleanup_weekdays")
+    cleanup_time = params.get("cleanup_time")
+
+    db = request.cirrina.db_session
+
+    existing_active_metadata = db.query(MetaData).filter_by(name='cleanup_active').first()
+    if existing_active_metadata:
+        existing_active_metadata.value = str(cleanup_active)
+    else:
+        db.add(MetaData(name='cleanup_active', value=str(cleanup_active)))
+
+    existing_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
+    if existing_weekdays_metadata:
+        existing_weekdays_metadata.value = cleanup_weekdays
+    else:
+        db.add(MetaData(name='cleanup_weekdays', value=cleanup_weekdays))
+
+    existing_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
+    if existing_time_metadata:
+        existing_time_metadata.value = cleanup_time
+    else:
+        db.add(MetaData(name='cleanup_time', value=cleanup_time))
+
+    db.commit()
+
+    return OKResponse("Cleanup job is being configured")
 
