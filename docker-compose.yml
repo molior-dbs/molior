@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  web:
+    container_name: web
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "8000:4200"
+    volumes:
+      - ../molior-web2:/app
+
+  api:
+    container_name: api
+    profiles: ["serve"]
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./:/app
+      - postgres:/var/run/postgresql/
+
+  postgres:
+    container_name: postgres
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
+    volumes:
+      - postgres:/var/run/postgresql/
+
+  aptly:
+    container_name: aptly
+    profiles: ["serve"]
+    build:
+      context: .
+      dockerfile: docker/aptly.Dockerfile
+    ports:
+      - "3142:3142"
+
+  nginx:
+    container_name: nginx
+    profiles: ["serve"]
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+    ports:
+      - "3143:3143"
+    volumes:
+      - ../aptly:/app
+
+volumes:
+     postgres:

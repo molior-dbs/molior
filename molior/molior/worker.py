@@ -4,9 +4,8 @@ import giturlparse
 from shutil import rmtree
 from pathlib import Path
 
-from molior.model.projectversion import ProjectVersion
 
-from ..app import logger
+from ..logger import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
 from ..ops import PrepareBuilds, BuildPreparationState, CreateBuilds, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
 from ..molior.configuration import Configuration
@@ -166,7 +165,7 @@ class Worker:
 
         # FIXME: this was run as a future in bkg before
         await CreateBuilds(session, build, repo, info, git_ref, ci_branch, targets, force_ci)
-        #await enqueue_task({"retention_cleanup": [build_id]})
+        # await enqueue_task({"retention_cleanup": [build_id]})
 
     async def _srcbuild(self, args, session):
         build_id = args[0]

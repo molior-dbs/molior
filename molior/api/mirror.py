@@ -4,7 +4,8 @@ from aiohttp import web
 from sqlalchemy.sql import or_
 from sqlalchemy import func
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..auth import req_admin
 from ..tools import OKResponse, ErrorResponse, paginate, db2array, escape_for_like
 from ..molior.queues import enqueue_aptly

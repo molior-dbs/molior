@@ -3,7 +3,8 @@ import giturlparse
 
 from sqlalchemy.sql import func, or_
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, paginate, array2db, db2array
 from ..api.sourcerepository import get_last_gitref, get_last_build

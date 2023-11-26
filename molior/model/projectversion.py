@@ -2,7 +2,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func,
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from ..app import logger
+from ..logger import logger
 from ..molior.configuration import Configuration
 from ..tools import db2array, array2db
 

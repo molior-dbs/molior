@@ -5,7 +5,8 @@ from aiohttp import web
 from sqlalchemy.sql import func, or_
 from sqlalchemy.orm import aliased
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..model.build import Build, BUILD_STATES, DATETIME_FORMAT
 from ..model.sourcerepository import SourceRepository
 from ..model.project import Project

@@ -1,6 +1,6 @@
 from launchy import Launchy
 
-from ..app import logger
+from ..logger import logger
 from ..model.database import Session
 from ..model.build import Build
 from ..model.chroot import Chroot

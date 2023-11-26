@@ -1,4 +1,5 @@
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..model.build import Build
 from ..molior.queues import enqueue_aptly
 from ..tools import OKResponse, ErrorResponse

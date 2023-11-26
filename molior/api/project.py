@@ -1,7 +1,8 @@
 from aiohttp import web
 from sqlalchemy import func
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..auth import req_role, req_admin
 from ..molior.configuration import Configuration
 from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse, escape_for_like, array2db

@@ -5,7 +5,7 @@ import os
 
 from launchy import Launchy
 
-from ..app import logger
+from ..logger import logger
 from ..tools import get_changelog_attr, validate_version_format
 from ..model.database import Session
 from ..model.sourcerepository import SourceRepository

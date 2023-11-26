@@ -3,7 +3,8 @@ import uuid
 
 from aiohttp import web
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..tools import ErrorResponse, OKResponse, parse_int, get_hook_triggers, paginate, db2array
 from ..model.sourcerepository import SourceRepository
 from ..model.build import Build

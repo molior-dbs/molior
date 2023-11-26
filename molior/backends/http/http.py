@@ -3,7 +3,8 @@ import json
 
 from concurrent.futures._base import CancelledError
 
-from ...app import app, logger
+from ...app import app
+from ...logger import logger
 from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_backend, enqueue_buildtask, dequeue_buildtask
 from ...molior.notifier import Subject, Event, notify

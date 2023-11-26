@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from aiofile import AIOFile, Reader
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..molior.notifier import Subject, Event, Action
 from ..model.database import Session
 from ..model.build import Build

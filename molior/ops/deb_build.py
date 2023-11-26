@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from shutil import rmtree
 from enum import Enum
 
-from ..app import logger
+from ..logger import logger
 from ..tools import get_changelog_attr, strip_epoch_version, db2array, array2db
 from .git import GitCheckout, GetBuildInfo
 

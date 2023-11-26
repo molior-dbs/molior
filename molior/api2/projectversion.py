@@ -5,7 +5,8 @@ from pathlib import Path
 from aiofile import AIOFile, Writer
 from launchy import Launchy
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..auth import req_role
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
 from ..api.projectversion import do_lock, do_unlock, do_overlay

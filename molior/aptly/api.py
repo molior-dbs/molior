@@ -3,7 +3,7 @@ import json
 import asyncio
 import aiohttp
 
-from ..app import logger
+from ..logger import logger
 from ..molior.configuration import Configuration
 
 from .taskstate import TaskState

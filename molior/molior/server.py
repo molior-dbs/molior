@@ -2,6 +2,7 @@ import asyncio
 import click
 import signal
 import functools
+import cirrina
 
 from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
@@ -10,62 +11,29 @@ from async_cron.schedule import Scheduler
 
 from molior.model.metadata import MetaData
 
-from ..app import app, logger
-from ..version import MOLIOR_VERSION
-from ..model.database import Session, database
-from ..auth import Auth
-from .configuration import Configuration
+from ..logger import logger
+# from ..version import MOLIOR_VERSION
+from ..model.database import database, Session
 
 from .worker import Worker
 from .worker_aptly import AptlyWorker
 from .worker_backend import BackendWorker
 from .worker_notification import NotificationWorker
 from .backend import Backend
-from .queues import enqueue_aptly
-
-# import api handlers
-import molior.api.build              # noqa: F401
-import molior.api.gitlab             # noqa: F401
-import molior.api.bitbucket          # noqa: F401
-import molior.api.project            # noqa: F401
-import molior.api.buildstate         # noqa: F401
-import molior.api.mirror             # noqa: F401
-import molior.api.websocket          # noqa: F401
-import molior.api.auth               # noqa: F401
-import molior.api.user               # noqa: F401
-import molior.api.userrole           # noqa: F401
-import molior.api.sourcerepository   # noqa: F401
-import molior.api.projectuserrole    # noqa: F401
-import molior.api.projectversion     # noqa: F401
-import molior.api.info               # noqa: F401
-import molior.api.status             # noqa: F401
-import molior.api.hook               # noqa: F401
-import molior.api.upload             # noqa: F401
-
-import molior.api2.project           # noqa: F401
-import molior.api2.projectversion    # noqa: F401
-import molior.api2.sourcerepository  # noqa: F401
-import molior.api2.user              # noqa: F401
-import molior.api2.mirror            # noqa: F401
-import molior.api2.build             # noqa: F401
-import molior.api2.token             # noqa: F401
-import molior.api2.admin             # noqa: F401
 
 
-class MoliorServer:
+class MoliorServer(cirrina.Server):
 
-    def __init__(self, loop, host, port, logger, debug):
-        self.loop = loop
-        self.host = host
-        self.port = port
-        self.logger = logger
-        self.debug = debug
+    def __init__(self, session_type=None, session_dir=None):
+        super().__init__(session_type=session_type, session_dir=session_dir)
         self.task_worker = None
         self.task_backend_worker = None
         self.task_aptly_worker = None
         self.task_notification_worker = None
         self.task_cron = None
-    
+
+        self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
+
     def list_active_tasks(self, debug_pos):
         logger.info(debug_pos)
         tasks = asyncio.all_tasks()
@@ -87,7 +55,7 @@ class MoliorServer:
             'Friday': 4,
             'Saturday': 5,
             'Sunday': 6
-        } 
+        }
         return weekday_mapping.get(weekday_name)
 
     @staticmethod
@@ -102,7 +70,11 @@ class MoliorServer:
     async def cleanup_task(self):
         await self.enqueue_aptly({"cleanup": []})
 
-    def run(self):
+    def run(self, host, port, logger, debug):
+        self.host = host
+        self.port = port
+        self.logger = logger
+        self.debug = debug
         self.backend = Backend().init()
         if not self.backend:
             return
@@ -125,14 +97,14 @@ class MoliorServer:
 
         self.weekly_cleanup()
 
-        app.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
-        app.run(self.host, self.port, logger=self.logger, debug=self.debug)
+        self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
+        self.run(self.host, self.port, logger=self.logger, debug=self.debug)
 
     def weekly_cleanup(self):
         if hasattr(self, 'task_cron') and self.task_cron:
             # If a scheduler already exists, cancel the existing tasks
             self.task_cron.cancel()
-        
+
         # extract values from db or write default values a new molior-server instance
         cleanup_weekdays_list = []
         with Session() as session:
@@ -142,14 +114,14 @@ class MoliorServer:
                 name="cleanup_weekdays").first()
             cleanup_time = session.query(MetaData).filter_by(
                 name="cleanup_time").first()
-                        
+
             if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
                 logger.error("cleanup job not set")
             else:
                 if cleanup_active.value.lower() == "false":
                     logger.info("cleanup job disabled")
                     return
-                else: 
+                else:
                     cleanup_sched = Scheduler(locale="en_US")
                     cleanup_weekdays_list = cleanup_weekdays.value.split(',')
 
@@ -159,15 +131,15 @@ class MoliorServer:
                         cleanup_job = CronJob(name=f'cleanup_{weekday}')
                         cleanup_job.every().weekday(self.get_weekday_number(weekday)).at(cleanup_time.value).go(self.cleanup_task)
                         cleanup_sched.add_job(cleanup_job)
-            
+
                     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
     async def terminate(self):
 
         self.list_active_tasks(debug_pos="At the beginning of the terminate function:")
 
-        logger.info("terminating tasks")
-        
+        self.logger.info("terminating tasks")
+
         self.task_worker.cancel()
         self.task_backend_worker.cancel()
         self.task_aptly_worker.cancel()
@@ -179,26 +151,26 @@ class MoliorServer:
             await self.task_aptly_worker
             await self.task_notification_worker
         except asyncio.CancelledError:
-            logger.info("tasks were canceled")
+            self.logger.info("tasks were canceled")
         else:
-            logger.info("tasks were completed")
+            self.logger.info("tasks were completed")
 
         try:
-            logger.info("terminating backend")
+            self.logger.info("terminating backend")
             await self.backend.stop()
         except asyncio.CancelledError:
-            logger.info("backend tasks were completed")
+            self.logger.info("backend tasks were completed")
 
         try:
-            logger.info("terminating launchy")
+            self.logger.info("terminating launchy")
             await Launchy.stop()
         except asyncio.CancelledError:
-            logger.info("launchy tasks were completed")
+            self.logger.info("launchy tasks were completed")
 
         self.list_active_tasks(debug_pos="At the end of the terminate function:")
 
-        logger.info("terminating app")
-        app.stop()
+        self.logger.info("terminating app")
+        self.stop()
 
 
 @click.command()
@@ -207,10 +179,9 @@ class MoliorServer:
 @click.option("--debug",    default=False, is_flag=True, help="Enable debug")
 @click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
 def main(host, port, debug, coverage):
-    logger.info("starting molior v%s", MOLIOR_VERSION)
 
     if coverage:
-        logger.warning("starting coverage measurement")
+        # logger.warning("starting coverage measurement")
         import coverage
         cov = coverage.Coverage(source=["molior"])
         cov.start()
@@ -219,7 +190,7 @@ def main(host, port, debug, coverage):
     moliorserver = MoliorServer(loop, host, port, logger=logger, debug=debug)
 
     def terminate(signame):
-        logger.info("received %s, terminating...", signame)
+        moliorserver.logger.info("received %s, terminating...", signame)
         asyncio.run_coroutine_threadsafe(moliorserver.terminate(), loop)
         # tasks = [task for task in asyncio.all_tasks() if task is not asyncio.tasks.current_task()]
         # list(map(lambda task: task.cancel(), tasks))
@@ -236,11 +207,11 @@ def main(host, port, debug, coverage):
     moliorserver.run()  # server up and running ...
 
     if coverage:
-        logger.warning("saving coverage measurement")
+        moliorserver.logger.warning("saving coverage measurement")
         cov.stop()
         cov.html_report(directory='/var/lib/molior/buildout/coverage')
 
-    logger.info("terminated")
+    moliorserver.logger.info("terminated")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ import yaml
 
 from pathlib import Path
 
-from ..app import logger
+#from .server import logger
 
 
 class Configuration(object):  # pylint: disable=too-few-public-methods

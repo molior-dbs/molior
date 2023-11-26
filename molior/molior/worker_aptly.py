@@ -8,7 +8,7 @@ from shutil import copy2
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy import func, text, or_, desc
 
-from ..app import logger
+from ..logger import logger
 from ..tools import db2array, array2db
 from ..ops import DebSrcPublish, DebPublish, DeleteBuildEnv
 from ..aptly import get_aptly_connection
