@@ -5,7 +5,7 @@ import aiohttp
 from pathlib import Path
 from enum import Enum
 
-from ..app import logger
+from ..logger import logger
 from .emailer import send_mail
 from .configuration import Configuration
 from .queues import enqueue_notification

@@ -2,7 +2,8 @@ import uuid
 
 from aiohttp import web
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..model.build import Build
 from ..model.buildtask import BuildTask
 from ..model.sourcerepository import SourceRepository

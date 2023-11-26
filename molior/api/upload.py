@@ -4,7 +4,8 @@ import shutil
 from aiohttp import web
 from pathlib import Path
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..molior.configuration import Configuration
 from ..model.database import Session
 from ..model.build import Build

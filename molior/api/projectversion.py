@@ -2,7 +2,8 @@ import re
 
 from sqlalchemy.sql import func, or_
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..auth import req_role
 from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db, escape_for_like
 from ..model.projectversion import ProjectVersion, get_projectversion_deps

@@ -2,7 +2,7 @@ import socket
 
 from jinja2 import Template
 
-from ..app import app, logger
+from ..logger import logger
 from ..model.database import Session
 from ..model.build import Build
 from ..model.sourepprover import SouRepProVer

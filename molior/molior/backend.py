@@ -1,7 +1,7 @@
 import asyncio
 import importlib
 
-from ..app import logger
+from ..logger import logger
 from .configuration import Configuration
 
 

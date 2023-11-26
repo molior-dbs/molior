@@ -5,7 +5,8 @@ from functools import wraps
 from aiohttp import web
 from sqlalchemy.sql import func
 
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 from ..tools import parse_int, db2array, ErrorResponse
 from ..molior.configuration import Configuration
 from ..model.project import Project

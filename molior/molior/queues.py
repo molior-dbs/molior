@@ -5,7 +5,7 @@ from aiofile import AIOFile, Writer
 from pathlib import Path
 from concurrent.futures._base import CancelledError
 
-from ..app import logger
+from ..logger import logger
 from ..tools import get_local_tz
 from ..molior.configuration import Configuration
 

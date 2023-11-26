@@ -1,9 +1,9 @@
 import asyncio
-import time
-from ..app import logger
+
+from ..logger import logger
+from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend, buildlogdone
 from .backend import Backend
 from .notifier import send_mail_notification
-from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend, buildlogdone
 
 from ..model.database import Session
 from ..model.build import Build
@@ -85,7 +85,7 @@ class BackendWorker:
         backend = b.get_backend()
         await backend.abort(build_id)
 
-    
+
 
 
     async def _retention_cleanup(self, build_id):
@@ -145,14 +145,14 @@ class BackendWorker:
                         build_state = successful_build.buildstate
                         build_id = successful_build.id
                         logger.info(f"Sourcename: {sourcename}, Build State: {build_state}, Build Id: {build_id}")
-                    #count how many successful builds there are for the projectversion
+                    # count how many successful builds there are for the projectversion
                     successful_builds_number = len(successful_builds)
                     logger.info(f"Number of Successful Builds: {successful_builds_number}")
-    
-                    #how many builds should be deleted
+
+                    # how many builds should be deleted
                     builds_to_delete = successful_builds_number - retention_successful_builds
                     logger.info(f"Number of builds to delete: {builds_to_delete}")
-                    #if there are more than the retention successful builds, give the list of the oldest build
+                    # if there are more than the retention successful builds, give the list of the oldest build
                     oldest_builds_to_delete = session.query(Build).filter(
                         Build.buildstate == "successful",
                         Build.buildtype == "deb",
@@ -165,15 +165,15 @@ class BackendWorker:
                         logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}")
 
                     # for example: if there are 3 successful builds, but retention_successful builds is 1, the oldest build needs to be deleted
-                    #delete the oldest build
-                    #take the oldest build
+                    # delete the oldest build
+                    # take the oldest build
 
                     oldest_build_to_delete = session.query(Build).filter(
-                    Build.buildstate == "successful",
-                    Build.buildtype == "deb",
-                    Build.sourcename == build.sourcename,
-                    Build.projectversion_id == project_version_id
-                    ).order_by(asc(Build.startstamp)).first()
+                        Build.buildstate == "successful",
+                        Build.buildtype == "deb",
+                        Build.sourcename == build.sourcename,
+                        Build.projectversion_id == project_version_id
+                        ).order_by(asc(Build.startstamp)).first()
 
                     if oldest_build_to_delete:
                         sourcename = oldest_build_to_delete.sourcename
@@ -183,13 +183,13 @@ class BackendWorker:
                     else:
                         logger.info("No oldest build found")
 
-                    #check how many successful builds are now and if the correct build got deleted
-                    #create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
+                    # check how many successful builds are now and if the correct build got deleted
+                    # create new projectversion, use some package (1 sorce, 1 debian package), in this version then it should delete also the topbuild and source package
 
                     await enqueue_aptly({"delete_deb_build": [build_id]})
                     break
-                    #await enqueue_aptly({"delete_build": [build_id]})
-            
+                    # await enqueue_aptly({"delete_build": [build_id]})
+
                 elif build_state in neglected_states:
                     logger.info(f"Build is in the state ({build_state}), skipping retention cleanup")
                     break
@@ -197,10 +197,6 @@ class BackendWorker:
                 else:
                     logger.info(f"Build is in the state ({build_state}), waiting for 5 seconds and checking again")
                     await asyncio.sleep(5)
-                    
-
-
-
 
     async def run(self):
         """
