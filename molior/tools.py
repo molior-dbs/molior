@@ -8,7 +8,7 @@ from launchy import Launchy
 from aiohttp.web import json_response
 from aiofile import AIOFile, Writer
 
-from .app import logger
+from .logger import logger
 from .molior.configuration import Configuration
 
 local_tz = None

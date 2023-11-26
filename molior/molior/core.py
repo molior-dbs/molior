@@ -2,7 +2,7 @@ import re
 
 from sqlalchemy import func
 
-from ..app import logger
+from ..logger import logger
 from ..tools import get_changelog_attr, db2array
 from .configuration import Configuration
 

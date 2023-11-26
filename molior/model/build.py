@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Bool
 from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
-from ..app import logger
+from ..logger import logger
 from ..tools import get_local_tz, db2array
 # from .tools import check_user_role
 from ..molior.notifier import Subject, Event, notify, run_hooks

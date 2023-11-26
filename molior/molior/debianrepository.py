@@ -2,7 +2,7 @@ import asyncio
 
 from datetime import datetime, timedelta
 
-from ..app import logger
+from ..logger import logger
 from ..aptly import get_aptly_connection, get_snapshot_name
 from .configuration import Configuration
 

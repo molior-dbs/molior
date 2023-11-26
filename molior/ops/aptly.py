@@ -5,7 +5,7 @@ from launchy import Launchy
 from pathlib import Path
 from aiofile import AIOFile
 
-from ..app import logger
+from ..logger import logger
 from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
