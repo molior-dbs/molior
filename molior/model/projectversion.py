@@ -27,7 +27,7 @@ class ProjectVersion(Base):
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
     description = Column(String)
-    sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion")
+    sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion", back_populates="projectversions",)
     basemirror_id = Column(ForeignKey("projectversion.id"))
     basemirror = relationship("ProjectVersion", uselist=False,
                               remote_side=[id],
@@ -37,11 +37,13 @@ class ProjectVersion(Base):
                                 secondary=ProjectVersionDependency.__table__,
                                 primaryjoin=id == ProjectVersionDependency.projectversion_id,
                                 secondaryjoin=id == ProjectVersionDependency.dependency_id,
+                                back_populates="dependents"
                                 )
     dependents = relationship("ProjectVersion",
                               secondary=ProjectVersionDependency.__table__,
                               primaryjoin=id == ProjectVersionDependency.dependency_id,
                               secondaryjoin=id == ProjectVersionDependency.projectversion_id,
+                              back_populates="dependencies",
                               )
     mirror_url = Column(String)
     mirror_distribution = Column(String)

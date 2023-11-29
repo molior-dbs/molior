@@ -59,7 +59,7 @@ class Build(Base):
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
     builddeps = Column(String)
-    buildtask = relationship(BuildTask, uselist=False)
+    buildtask = relationship(BuildTask, uselist=False, back_populates="build")
     architecture = Column(String)
     debianpackages = relationship(Debianpackage, secondary=BuildDebianpackage)
     is_deleted = Column(Boolean, default=False)

@@ -17,7 +17,7 @@ class SourceRepository(Base):
     url = Column(String)
     name = Column(String)
     state = Column("state", Enum(*REPO_STATES, name="sourcerepositorystate_enum"), default="new")
-    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion")
+    projectversions = relationship("ProjectVersion", secondary="sourcerepositoryprojectversion", back_populates="sourcerepositories")
 
 #    def __init__(self, url):
 #        self.url = url

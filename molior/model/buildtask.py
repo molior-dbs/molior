@@ -9,5 +9,5 @@ class BuildTask(Base):
 
     id = Column(Integer, primary_key=True)
     build_id = Column(ForeignKey("build.id"), index=True)
-    build = relationship("Build")
+    build = relationship("Build", back_populates="buildtask")
     task_id = Column(String)
