@@ -67,16 +67,28 @@ class MoliorServer:
         self.task_cron = None
     
     def list_active_tasks(self, debug_pos):
-        self.logger.info(debug_pos)
+        logger.info(debug_pos)
         tasks = asyncio.all_tasks()
-        self.logger.info(f"There are {len(tasks)} active tasks")
+        logger.info(f"There are {len(tasks)} active tasks")
         task_ids = [id(task) for task in tasks]  # Get the IDs of all tasks
-        self.logger.info("Active Task IDs: %s", task_ids)
-        self.logger.info("Start of tasks listed: ")
+        logger.info("Active Task IDs: %s", task_ids)
+        logger.info("Start of tasks listed: ")
         for task in tasks:
-            self.logger.info(task.get_name())
-            self.logger.info(task.get_coro())
-        self.logger.info("End of tasks listed: ")
+            logger.info(task.get_name())
+            logger.info(task.get_coro())
+        logger.info("End of tasks listed: ")
+
+    def get_weekday_number(self, weekday_name):
+        weekday_mapping = {
+            'Monday': 0,
+            'Tuesday': 1,
+            'Wednesday': 2,
+            'Thursday': 3,
+            'Friday': 4,
+            'Saturday': 5,
+            'Sunday': 6
+        } 
+        return weekday_mapping.get(weekday_name)
 
     @staticmethod
     def create_cirrina_context(cirrina):
@@ -88,7 +100,7 @@ class MoliorServer:
         cirrina.db_session.close()
 
     async def cleanup_task(self):
-        await enqueue_aptly({"cleanup": []})
+        await self.enqueue_aptly({"cleanup": []})
 
     def run(self):
         self.backend = Backend().init()
@@ -127,28 +139,28 @@ class MoliorServer:
             cleanup_active = session.query(MetaData).filter_by(
                 name="cleanup_active").first()
             cleanup_weekdays = session.query(MetaData).filter_by(
-                name="cleanup_weekday").first()
+                name="cleanup_weekdays").first()
             cleanup_time = session.query(MetaData).filter_by(
                 name="cleanup_time").first()
+                        
             if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
-                logger.error("Cleanup not set")
+                logger.error("cleanup job not set")
             else:
-                cleanup_weekdays_list = cleanup_weekdays.value.split(', ')
-                if cleanup_active.value is False:
-                    self.logger.info("cleanup job disabled")
+                if cleanup_active.value.lower() == "false":
+                    logger.info("cleanup job disabled")
                     return
-                else:
-                    self.logger.info(f"cleanup job enabled for every {str(cleanup_weekdays_list)} at {cleanup_time}")
-    
-                cleanup_sched = Scheduler(locale="en_US")
+                else: 
+                    cleanup_sched = Scheduler(locale="en_US")
+                    cleanup_weekdays_list = cleanup_weekdays.value.split(',')
 
-                # create single cleanup_job for every weekday
-                for weekday in cleanup_weekdays_list:
-                    cleanup_job = CronJob(name=f'cleanup_{weekday}')
-                    cleanup_job.every().weekday(weekday).at(cleanup_time).go(self.cleanup_task)
-                    cleanup_sched.add_job(cleanup_job)
-        
-                self.task_cron = asyncio.ensure_future(cleanup_sched.start())
+                    # create single cleanup_job for every weekday
+                    for weekday in cleanup_weekdays_list:
+                        logger.info(f"cleanup job enabled for every {weekday} at {cleanup_time.value}")
+                        cleanup_job = CronJob(name=f'cleanup_{weekday}')
+                        cleanup_job.every().weekday(self.get_weekday_number(weekday)).at(cleanup_time.value).go(self.cleanup_task)
+                        cleanup_sched.add_job(cleanup_job)
+            
+                    self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
     async def terminate(self):
 
