@@ -12,19 +12,81 @@ from async_cron.schedule import Scheduler
 from molior.model.metadata import MetaData
 
 from ..logger import logger
-# from ..version import MOLIOR_VERSION
+from ..version import MOLIOR_VERSION
 from ..model.database import database, Session
+from .configuration import Configuration
 
 from .worker import Worker
 from .worker_aptly import AptlyWorker
 from .worker_backend import BackendWorker
 from .worker_notification import NotificationWorker
 from .backend import Backend
+from ..auth.auth import Auth
+
+
+async def run_molior(self):
+    logger.info("MoliorServer: run")
+    self.backend = Backend().init()
+
+    if not self.backend:
+        return
+    if not Auth().init():
+        return
+
+    Launchy.attach_loop(self.loop)
+
+    worker = Worker()
+    self.task_worker = asyncio.ensure_future(worker.run())
+
+    backend_worker = BackendWorker()
+    self.task_backend_worker = asyncio.ensure_future(backend_worker.run())
+
+    aptly_worker = AptlyWorker()
+    self.task_aptly_worker = asyncio.ensure_future(aptly_worker.run())
+
+    notification_worker = NotificationWorker()
+    self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
+
+    cfg = Configuration()
+    cleanup_active = cfg.cleanup.get("cleanup_active")
+    cleanup_weekday = cfg.cleanup.get("cleanup_weekday")
+    cleanup_time = cfg.cleanup.get("cleanup_time")
+
+    def get_weekday_number(weekday_name):
+        weekday_mapping = {
+            'Monday': 0,
+            'Tuesday': 1,
+            'Wednesday': 2,
+            'Thursday': 3,
+            'Friday': 4,
+            'Saturday': 5,
+            'Sunday': 6
+        }
+        return weekday_mapping.get(weekday_name)
+
+    if not cleanup_time:
+        cleanup_time = "04:00"
+    if not cleanup_weekday:
+        cleanup_weekday = 'Sunday'
+
+    if cleanup_active is False or cleanup_active == "off" or cleanup_active == "disabled":
+        self.logger.info("cleanup job disabled")
+        return
+    else:
+        self.logger.info(f"cleanup job enabled for every {cleanup_weekday} at {cleanup_time}")
+
+    cleanup_sched = Scheduler(locale="en_US")
+    cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(
+        cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
+    cleanup_sched.add_job(cleanup_job)
+    self.task_cron = asyncio.ensure_future(cleanup_sched.start())
+
+    # self.run(self.host, self.port, logger=self.logger, debug=self.debug)
 
 
 class MoliorServer(cirrina.Server):
 
-    def __init__(self, session_type=None, session_dir=None):
+    def __init__(self, host, port, session_type=None, session_dir=None):
         super().__init__(session_type=session_type, session_dir=session_dir)
         self.task_worker = None
         self.task_backend_worker = None
@@ -33,6 +95,7 @@ class MoliorServer(cirrina.Server):
         self.task_cron = None
 
         self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
+        self.on_startup.append(run_molior)
 
     def list_active_tasks(self, debug_pos):
         logger.info(debug_pos)
@@ -69,36 +132,6 @@ class MoliorServer(cirrina.Server):
 
     async def cleanup_task(self):
         await self.enqueue_aptly({"cleanup": []})
-
-    def run(self, host, port, logger, debug):
-        self.host = host
-        self.port = port
-        self.logger = logger
-        self.debug = debug
-        self.backend = Backend().init()
-        if not self.backend:
-            return
-        if not Auth().init():
-            return
-
-        Launchy.attach_loop(self.loop)
-
-        worker = Worker()
-        self.task_worker = asyncio.ensure_future(worker.run())
-
-        backend_worker = BackendWorker()
-        self.task_backend_worker = asyncio.ensure_future(backend_worker.run())
-
-        aptly_worker = AptlyWorker()
-        self.task_aptly_worker = asyncio.ensure_future(aptly_worker.run())
-
-        notification_worker = NotificationWorker()
-        self.task_notification_worker = asyncio.ensure_future(notification_worker.run())
-
-        self.weekly_cleanup()
-
-        self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
-        self.run(self.host, self.port, logger=self.logger, debug=self.debug)
 
     def weekly_cleanup(self):
         if hasattr(self, 'task_cron') and self.task_cron:
@@ -179,6 +212,7 @@ class MoliorServer(cirrina.Server):
 @click.option("--debug",    default=False, is_flag=True, help="Enable debug")
 @click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
 def main(host, port, debug, coverage):
+    logger.info("starting molior v%s", MOLIOR_VERSION)
 
     if coverage:
         # logger.warning("starting coverage measurement")

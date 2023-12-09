@@ -29,23 +29,20 @@ web:
 web-cached:
 	docker-compose build web
 
-postgres:
-	docker-compose build --no-cache postgres
-
-postgres-cached:
-	docker-compose build postgres
-
 aptly:
 	docker-compose build --no-cache aptly
 
 aptly-cached:
 	docker-compose build aptly
 
+postgres:
+	docker-compose build --no-cache postgres
+
 nginx:
 	docker-compose build --no-cache nginx
 
-nginx-cached:
-	docker-compose build nginx
+registry:
+	docker-compose build --no-cache registry
 
 stop:  ## stop containers
 	@docker-compose --profile serve --profile test down
@@ -65,6 +62,9 @@ logs:  ## show logs
 logs-api:  ## show api logs
 	@docker-compose logs -f api
 
+logs-registry:  ## show registry logs
+	@docker-compose logs -f registry
+
 logs-web:  ## show web logs
 	@docker-compose logs -f web
 
@@ -82,6 +82,9 @@ shell-aptly:  ## login to aptly container
 
 shell-nginx:  ## login to nginx container
 	docker-compose exec nginx /bin/bash
+
+shell-registry:  ## login to registry container
+	docker-compose exec registry /bin/bash
 
 psql:  ## login to api container
 	docker-compose exec postgres su postgres -c "psql molior"
