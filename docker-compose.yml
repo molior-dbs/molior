@@ -17,6 +17,8 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
+      args:
+          DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
     ports:
       - "9999:9999"
     volumes:

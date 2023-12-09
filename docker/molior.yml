@@ -22,7 +22,7 @@ admin:
 
 auth_backend: 'db'
 
-backend: 'http'
+backend: 'docker'
 
 backend_http:
     ping_timeout: 5
@@ -32,7 +32,7 @@ max_parallel_chroots: 2
 
 # Aptly settings
 aptly:
-    apt_url_public: 'http://localhost:8080'
+    apt_url_public: 'http://host.docker.internal:8080'
     apt_url: 'http://nginx:8000'
     api_url: 'http://nginx:3143/api'
     gpg_key: 'reposign@molior.info'

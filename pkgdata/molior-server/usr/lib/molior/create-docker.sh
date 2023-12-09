@@ -25,19 +25,16 @@ REPO_URL=$7
 KEYS="$8"  # separated by space
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
-DEBOOTSTRAP_DIR="/var/lib/molior/upload/dockerbase/$DEBOOTSTRAP_NAME"
-DEBOOTSTRAP_TAR="/var/lib/molior/upload/dockerbase/$DEBOOTSTRAP_NAME.tar"
+target="/var/lib/molior/upload/dockerbase/$DEBOOTSTRAP_NAME"
+DEBOOTSTRAP_TAR="/var/lib/molior/upload/dockerbase//$DEBOOTSTRAP_NAME.tar"
 
 set -e
 #set -x
 
 build_docker()
 {
-  target=$DEBOOTSTRAP_DIR
-
-  if [ -d $target ]; then
-    rm -rf $target
-  fi
+  rm -f $DEBOOTSTRAP_TAR
+  rm -rf $target
   mkdir -p $target
 
   echo
@@ -47,14 +44,12 @@ build_docker()
   echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   echo
 
-  echo " * running docker base for $DIST_NAME/$DIST_VERSION $ARCH"
-
   echo I: Using APT repository $REPO_URL
 
   if [ -n "$COMPONENTS" ]; then
       COMPONENTS="--components main,$COMPONENTS"
   fi
-#  INCLUDE="--include=gnupg1"
+  # INCLUDE="--include=gnupg"
 
   keydir=`mktemp -d /tmp/molior-chrootkeys.XXXXXX`
   i=1
@@ -75,43 +70,48 @@ build_docker()
       i=$((i + 1))
   done
 
-  if echo $ARCH | grep -q arm; then
-    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 1
-    fi
+  rm -rf $target/
+  echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO_URL
+  if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
+    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     if [ "$ARCH" = "armhf" ]; then
       cp /usr/bin/qemu-arm-static $target/usr/bin/
     else
       cp /usr/bin/qemu-aarch64-static $target/usr/bin/
     fi
     chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 2
-    fi
   else
-    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 3
-    fi
+    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
   fi
 
-  echo I: Configuring debootstrap
-  if chroot $target dpkg -s > /dev/null 2>&1; then
-    # The package tzdata cannot be --excluded in debootstrap, so remove it here
-    # In order to use debconf for configuring the timezone, the tzdata package
-    # needs to be installed later as a dependency, i.e. after the config package
-    # preseeding debconf.
-    chroot $target apt-get purge --yes tzdata
-    rm -f $target/etc/timezone
-  fi
+  echo I: Configuring chroot
+  echo 'APT::Install-Recommends "false";' >$target/etc/apt/apt.conf.d/77molior
+  echo 'APT::Install-Suggests "false";'  >>$target/etc/apt/apt.conf.d/77molior
+  echo 'APT::Acquire::Retries "3";'      >>$target/etc/apt/apt.conf.d/77molior
+  echo 'Acquire::Languages "none";'      >>$target/etc/apt/apt.conf.d/77molior
 
-  chroot $target apt-get clean
+  # Disable debconf questions so that automated builds won't prompt
+  echo set debconf/frontend Noninteractive | chroot $target debconf-communicate
+  echo set debconf/priority critical | chroot $target debconf-communicate
 
-  rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
+  # Disable daemons in chroot:
+  cat >> $target/usr/sbin/policy-rc.d <<EOM
+#!/bin/sh
+while true; do
+    case "\$1" in
+      -*) shift ;;
+      makedev) exit 0;;
+      x11-common) exit 0;;
+      *) exit 101;;
+    esac
+done
+EOM
+  chmod +x $target/usr/sbin/policy-rc.d
+
+  # Set up expected /dev entries
+  if [ ! -r $target/dev/stdin ];  then ln -s /proc/self/fd/0 $target/dev/stdin;  fi
+  if [ ! -r $target/dev/stdout ]; then ln -s /proc/self/fd/1 $target/dev/stdout; fi
+  if [ ! -r $target/dev/stderr ]; then ln -s /proc/self/fd/2 $target/dev/stderr; fi
 
   echo I: Adding gpg public keys to chroot
   for keyfile in $keydir/*
@@ -123,6 +123,30 @@ build_docker()
   done
   rm -rf $keydir
 
+#  echo I: Adding gpg public keys to chroot
+#  for keyfile in $keydir/*
+#  do
+#    cat $keyfile | chroot $target apt-key add - >/dev/null || true
+#  done
+#  rm -rf $keydir
+
+  # Add Molior Source signing key
+  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
+  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target apt-key add -
+
+  echo I: Installing build environment
+  chroot $target apt-get update
+  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git
+  chroot $target apt-get clean
+
+  rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
+
+  mkdir $target/app
+  cp -a pkgdata/molior-server/usr/lib/molior/build-docker $target/app/
+  cp -a pkgdata/molior-client-http/usr/lib/molior/find-package-dir.pl $target/app/
+  cp -a pkgdata/molior-client-http/usr/lib/molior/dsc-get-files.pl $target/app/
+
+
   echo I: Created docker base successfully
 }
 
@@ -131,18 +155,16 @@ publish_docker()
   rm -f $DEBOOTSTRAP_TAR
 
   echo I: Compressing docker base image
-  cd $DEBOOTSTRAP_DIR
+  cd $target
   tar -cf $DEBOOTSTRAP_TAR .
   cd - > /dev/null
-  rm -rf $DEBOOTSTRAP_DIR
-
-  set -x
+  rm -rf $target
 
   CONTAINER_NAME=molior
   CONTAINER_VERSION=$DIST_VERSION
 
   echo I: Importing docker base image
-  docker import $DEBOOTSTRAP_TAR $CONTAINER_NAME:$CONTAINER_VERSION
+  su molior -c "docker import $DEBOOTSTRAP_TAR $CONTAINER_NAME:$CONTAINER_VERSION"
     if [ $? -ne 0 ]; then
       echo "docker import failed"
       exit 4
@@ -158,12 +180,12 @@ publish_docker()
 
   if [ -n "$DOCKER_USER" ]; then
       echo I: Logging in to docker registry $REGISTRY
-      echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USER --password-stdin $REGISTRY
+      echo "$DOCKER_PASSWORD" | su molior -c "docker login --username $DOCKER_USER --password-stdin $REGISTRY"
   fi
-  docker tag $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION
+  su molior -c "docker tag $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
   echo I: Publishing docker base image
-  docker push $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION
-  docker rmi $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION
+  su molior -c "docker push $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
+  su molior -c "docker rmi $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
   echo I: docker base $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION is published
 }
 
@@ -178,7 +200,7 @@ case "$ACTION" in
     publish_docker
     ;;
   remove)
-    rm -rf $DEBOOTSTRAP_DIR $DEBOOTSTRAP_TAR
+    rm -rf $target $DEBOOTSTRAP_TAR
     ;;
   *)
     echo "Unknown action $ACTION"

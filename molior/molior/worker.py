@@ -261,7 +261,6 @@ class Worker:
                 ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 if Path(buildout).exists():
-                    logger.info("removing %s", buildout)
                     try:
                         rmtree(buildout)
                     except Exception as exc:
@@ -297,6 +296,12 @@ class Worker:
 
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed" or build.buildstate == "publish_failed":
+                buildout = "/var/lib/molior/buildout/%d" % build_id
+                if Path(buildout).exists():
+                    try:
+                        rmtree(buildout)
+                    except Exception as exc:
+                        logger.exception(exc)
                 ok = True
                 chroot = session.query(Chroot).filter(Chroot.build_id == build_id).first()
                 if chroot:
