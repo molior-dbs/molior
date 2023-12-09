@@ -385,10 +385,9 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                 await create_chroots(mirror, build, mirror_project, mirror_version, session)
             else:
                 await build.set_successful()
-
-            mirror.is_locked = True
-            mirror.mirror_state = "ready"
-            session.commit()
+                mirror.is_locked = True
+                mirror.mirror_state = "ready"
+                session.commit()
 
             await build.log("\n")
             await build.logtitle("Done", no_footer_newline=True)
@@ -612,13 +611,11 @@ class AptlyWorker:
             else:  # external repo
                 if mirror.project.is_basemirror:
                     await create_chroots(mirror, build, mirror.project.name, mirror.name, session)
-
-                mirror.is_locked = True
-                mirror.mirror_state = "ready"
-                session.commit()
-
-                await build.set_successful()
-                session.commit()
+                else:
+                    mirror.is_locked = True
+                    mirror.mirror_state = "ready"
+                    await build.set_successful()
+                    session.commit()
 
                 await build.log("\n")
                 await build.logtitle("Done", no_footer_newline=True)

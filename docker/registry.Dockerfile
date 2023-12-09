@@ -8,6 +8,8 @@ RUN curl -s http://debian.roche.com/repo.asc | gpg --dearmor -o /etc/apt/trusted
 RUN mkdir app
 WORKDIR /app
 
-RUN apt-get install -y --no-install-recommends aptly apg
+RUN apt-get install -y --no-install-recommends docker-registry apache2-utils
 
-CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && su aptly -c "aptly api serve -listen localhost:3142"
+COPY docker/registry/config.yml /etc/docker/registry/config.yml
+
+CMD htpasswd -Bbc /etc/docker/registry/.htpasswd ${USER} ${PASSWORD} && /usr/bin/docker-registry serve /etc/docker/registry/config.yml

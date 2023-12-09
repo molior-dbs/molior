@@ -2,14 +2,14 @@ import cirrina
 
 from .molior.server import MoliorServer
 
-app = MoliorServer(session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
+app = MoliorServer("127.0.0.1", 9999, session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
 app.title = "Molior REST API Documentation"
 app.description = "Documentation of the molior REST API."
 app.api_version = 1
 app.contact = ""
 
 # import api handlers
-from .auth.auth import Auth
+from .auth.auth import Auth          # noqa: F401
 import molior.api.build              # noqa: F401
 import molior.api.gitlab             # noqa: F401
 import molior.api.bitbucket          # noqa: F401

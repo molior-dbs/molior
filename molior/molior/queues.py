@@ -74,7 +74,8 @@ def get_log_file_path(build_id):
     if not dir_path.is_dir():
         try:
             dir_path.mkdir(parents=True)
-        except Exception:
+        except Exception as exc:
+            logger.exception(exc)
             return None
     full_path = dir_path / "build.log"
     return str(full_path)

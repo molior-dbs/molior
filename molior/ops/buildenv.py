@@ -4,7 +4,7 @@ from ..logger import logger
 from ..model.database import Session
 from ..model.build import Build
 from ..model.chroot import Chroot
-from ..molior.queues import enqueue_task
+from ..molior.queues import enqueue_task, buildlog
 
 
 async def CreateBuildEnv(chroot_id, build_id, dist,
@@ -36,8 +36,10 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         logger.info("creating build environments for %s-%s-%s", dist, version, arch)
         await build.log("Creating build environments for %s-%s-%s\n\n" % (dist, version, arch))
 
+        build_id = build.id
+
         async def outh(line):
-            await build.log("%s\n" % line)
+            await buildlog(build_id, f"{line}\n")
 
         process = Launchy(["sudo", "run-parts", "-a", "build", "-a", dist, "-a", name,
                            "-a", version, "-a", arch, "-a", components, "-a", repo_url,
@@ -53,6 +55,8 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             await build.logtitle("Done", no_footer_newline=True)
             await build.set_failed()
             await build.logdone()
+            await build.parent.set_failed()
+            await build.parent.logdone()
             session.commit()
             return False
 
@@ -99,6 +103,9 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
 
         chroot = session.query(Chroot).filter(Chroot.id == chroot_id).first()
         chroot.ready = True
+        chroot.basemirror.is_locked = True
+        chroot.basemirror.mirror_state = "ready"
+
         session.commit()
 
         # Schedule builds

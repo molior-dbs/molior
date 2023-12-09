@@ -21,7 +21,9 @@ services:
       - "9999:9999"
     volumes:
       - ./:/app
-      - postgres:/var/run/postgresql/
+      - pgsock:/var/run/postgresql/
+      - /var/run/docker.sock:/var/run/docker.sock
+      - molior:/var/lib/molior/
 
   postgres:
     container_name: molior-postgres
@@ -29,7 +31,8 @@ services:
       context: .
       dockerfile: docker/postgres.Dockerfile
     volumes:
-      - postgres:/var/run/postgresql/
+      - pgsock:/var/run/postgresql/
+      - postgres:/var/lib/postgresql/15/main
 
   aptly:
     container_name: molior-aptly
@@ -39,6 +42,9 @@ services:
       dockerfile: docker/aptly.Dockerfile
     ports:
       - "3142:3142"
+    volumes:
+      - ../aptly:/app
+      - aptly:/var/lib/aptly/
 
   nginx:
     container_name: molior-nginx
@@ -47,9 +53,29 @@ services:
       context: .
       dockerfile: docker/nginx.Dockerfile
     ports:
-      - "3143:3143"
+      - "8080:8000"
     volumes:
       - ../aptly:/app
+      - aptly:/var/lib/aptly/
+
+  registry:
+    container_name: molior-registry
+    profiles: ["serve"]
+    build:
+      context: .
+      dockerfile: docker/registry.Dockerfile
+    environment:
+      USER: "molior"
+      PASSWORD: "molior-registry"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./:/app
+      - registry:/var/lib/docker-registry/
 
 volumes:
+     pgsock:
      postgres:
+     registry:
+     aptly:
+     molior:

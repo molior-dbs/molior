@@ -20,7 +20,7 @@ class NotificationWorker:
 
     """
 
-    async def run(self):
+    async def run(self, app):
         """
         Run the worker task.
         """
