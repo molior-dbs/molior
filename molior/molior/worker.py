@@ -296,7 +296,7 @@ class Worker:
                 ok = True
 
         if build.buildtype == "chroot":
-            if build.buildstate == "build_failed":
+            if build.buildstate == "build_failed" or build.buildstate == "publish_failed":
                 ok = True
                 chroot = session.query(Chroot).filter(Chroot.build_id == build_id).first()
                 if chroot:
