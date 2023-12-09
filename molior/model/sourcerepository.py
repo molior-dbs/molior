@@ -2,6 +2,7 @@ from pathlib import Path
 from sqlalchemy import Column, String, Integer, Enum
 from sqlalchemy.orm import relationship
 
+from ..logger import logger
 from ..molior.configuration import Configuration
 from .database import Base
 

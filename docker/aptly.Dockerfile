@@ -8,7 +8,7 @@ RUN curl -s http://debian.roche.com/repo.asc | gpg --dearmor -o /etc/apt/trusted
 RUN mkdir app
 WORKDIR /app
 
-RUN apt-get install -y --no-install-recommends aptly apg
+RUN apt-get install -y --no-install-recommends aptly apg bzip2
 
 CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && \
     su aptly -c "aptly api serve -listen 0.0.0.0:3142"
