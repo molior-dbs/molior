@@ -804,7 +804,7 @@ async def schedule_build(build, session):
     arch_any_only = False if arch == get_target_arch(build, session) else True
 
     config = Configuration()
-    apt_url = config.aptly.get("apt_url")
+    apt_url = config.aptly.get("apt_url_public")
 
     token = buildtask.task_id
 

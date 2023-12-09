@@ -1,7 +1,8 @@
 .EXPORT_ALL_VARIABLES:
 .PHONY: MAKECMDGOALS
 
-export COMPOSE_PROJECT_NAME := molior
+export COMPOSE_PROJECT_NAME=molior
+export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
 
 start:  ## run containers (background)
 	@docker-compose --profile serve up -d
@@ -12,7 +13,7 @@ help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 docker-compose-build:  ## build containers
-	docker-compose build --no-cache --build-arg UID=$(shell id -u $$USER)
+	docker-compose build --no-cache
 
 docker-compose-build-cached:  ## build containers (cached)
 	docker-compose build --build-arg UID=$(shell id -u $$USER)
@@ -60,7 +61,7 @@ clean:  ## clean containers and volumes
 	docker-compose --profile serve --profile test down -v
 
 remove: clean   ## remove containers and volumes
-	docker rmi -f molior_web:latest molior_api:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest
+	docker rmi -f molior_web:latest molior_api:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
 logs:  ## show logs
 	@docker-compose logs -f api postgres web aptly nginx

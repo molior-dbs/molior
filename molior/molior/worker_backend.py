@@ -199,9 +199,6 @@ class BackendWorker:
                     await asyncio.sleep(5)
 
     async def run(self):
-        """
-        Run the worker task.
-        """
 
         while True:
             task = await dequeue_backend()
