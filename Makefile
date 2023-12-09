@@ -50,6 +50,12 @@ stop:  ## stop containers
 stop-api:  ## stop api container
 	@docker-compose stop api
 
+stop-nginx:  ## stop nginx container
+	@docker-compose stop nginx
+
+stop-web:  ## stop web container
+	@docker-compose stop web
+
 clean:  ## clean containers and volumes
 	docker-compose --profile serve --profile test down -v
 
