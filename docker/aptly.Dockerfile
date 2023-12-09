@@ -10,4 +10,5 @@ WORKDIR /app
 
 RUN apt-get install -y --no-install-recommends aptly apg
 
-CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && su aptly -c "aptly api serve -listen localhost:3142"
+CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && \
+    su aptly -c "aptly api serve -listen 0.0.0.0:3142"

@@ -800,11 +800,14 @@ class AptlyApi:
         """
         version = "unknown"
         async with aiohttp.ClientSession() as http:
-            async with http.get(self.url + "/version", auth=self.auth) as resp:
-                if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                data = json.loads(await resp.text())
-                version = data.get("Version", "unknown")
+            try:
+                async with http.get(self.url + "/version", auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    data = json.loads(await resp.text())
+                    version = data.get("Version", "unknown")
+            except Exception as exc:
+                logger.exception(exc)
         return version
 
 
