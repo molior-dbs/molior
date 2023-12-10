@@ -58,6 +58,7 @@ stop-web:  ## stop web container
 	@docker-compose stop web
 
 clean:  ## clean containers and volumes
+	@echo; echo "This will delete volumes and data!"; echo Press Enter to continue, Ctrl-C to abort ...; read x
 	docker-compose --profile serve --profile test down -v
 
 remove: clean   ## remove containers and volumes
