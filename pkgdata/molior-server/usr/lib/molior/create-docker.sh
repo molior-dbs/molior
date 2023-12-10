@@ -161,7 +161,7 @@ publish_docker()
   rm -rf $target
 
   CONTAINER_NAME=molior
-  CONTAINER_VERSION=$DIST_VERSION
+  CONTAINER_VERSION=$DIST_VERSION-$ARCH
 
   echo I: Importing docker base image
   su molior -c "docker import $DEBOOTSTRAP_TAR $CONTAINER_NAME:$CONTAINER_VERSION"
