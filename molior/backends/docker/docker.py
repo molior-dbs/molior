@@ -53,10 +53,9 @@ class DockerBackend:
                 await enqueue_backend({"started": build_id})
 
                 async def outh(line):
-                    logger.info(f"{build_id}: {line}")
-                    await buildlog(build_id, f"{line}")
+                    await buildlog(build_id, line)
 
-                process = Launchy(["docker", "run", "-t", "--add-host=host.docker.internal:host-gateway",
+                process = Launchy(["docker", "run", "-t", "--rm", "--add-host=host.docker.internal:host-gateway",
                                    "-e", f"BUILD_ID={task['build_id']}",
                                    "-e", f"BUILD_TOKEN={task['token']}",
                                    "-e", f"PLATFORM={task['distrelease']}",
@@ -73,8 +72,8 @@ class DockerBackend:
                                    "-e", f"APT_KEYS={task['apt_keys']}",
                                    "-e", f"RUN_LINTIAN={task['run_lintian']}",
                                    "-e", f"MOLIOR_SERVER=http://host.docker.internal:8000",
-                                   f"localhost:5000/molior:{task['distversion']}", "/app/build-docker",
-                                   ], outh, outh)
+                                   f"localhost:5000/molior:{task['distversion']}-{task['architecture']}", "/app/build-docker",
+                                   ], out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
 
