@@ -751,7 +751,10 @@ class AptlyWorker:
             successful_builds_number = len(successful_builds)
             logger.info(f"Number of Successful Builds: {successful_builds_number}")
             # how many builds should be deleted
-            builds_to_delete = successful_builds_number - retention_successful_builds
+            if retention_successful_builds is None:
+                builds_to_delete = 0
+            else:
+                builds_to_delete = successful_builds_number - retention_successful_builds                
             if builds_to_delete > 0:
 <<<<<<< HEAD
                 logger.info(f"Number of builds to delete: {builds_to_delete}")
