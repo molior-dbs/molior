@@ -35,3 +35,4 @@ import molior.api2.user              # noqa: F401
 import molior.api2.mirror            # noqa: F401
 import molior.api2.build             # noqa: F401
 import molior.api2.token             # noqa: F401
+import molior.api2.admin             # noqa: F401
