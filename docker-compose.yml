@@ -55,7 +55,7 @@ services:
       context: .
       dockerfile: docker/nginx.Dockerfile
     ports:
-      - "127.0.0.1:8080:8000"
+      - "8080:8000"
     volumes:
       - ../aptly:/app
       - aptly:/var/lib/aptly/
