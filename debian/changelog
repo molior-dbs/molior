@@ -1,3 +1,11 @@
+molior (1.5.0~alpha36) stretch; urgency=medium
+
+  * build after aiofile
+  * docker: add ssh client
+  * docker: expose apt repo
+
+ -- André Roth <neolynx@gmail.com>  Wed, 13 Dec 2023 18:12:29 +0100
+
 molior (1.5.0~alpha35) stretch; urgency=medium
 
   * update molior.yml
