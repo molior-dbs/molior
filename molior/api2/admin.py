@@ -1,9 +1,7 @@
-from aiohttp import web
-from ..auth import req_role
 from molior.model.metadata import MetaData
-from molior.model.projectversion import get_projectversion
 from molior.tools import OKResponse
-from ..app import app, logger
+from ..app import app
+from ..logger import logger
 
 
 @app.http_put("/api2/cleanup")
@@ -38,11 +36,12 @@ async def edit_cleanup(request):
 
     return OKResponse("Cleanup job is being configured")
 
+
 @app.http_get("/api2/cleanup")
 async def get_cleanup(request):
 
     db = request.cirrina.db_session
-    
+
     cleanup_active_metadata = db.query(MetaData).filter_by(name='cleanup_active').first()
     cleanup_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
     cleanup_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
@@ -56,9 +55,9 @@ async def get_cleanup(request):
     cleanup_weekdays = cleanup_weekdays_metadata.value.split(',') if cleanup_weekdays_metadata else None
 
     data = {
-    'cleanup_active': cleanup_active,
-    'cleanup_time': cleanup_time,
-    'cleanup_weekdays': cleanup_weekdays
+        'cleanup_active': cleanup_active,
+        'cleanup_time': cleanup_time,
+        'cleanup_weekdays': cleanup_weekdays
     }
     db.close()
 
