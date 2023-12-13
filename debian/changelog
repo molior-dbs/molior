@@ -1,3 +1,28 @@
+molior (1.5.0~alpha35) stretch; urgency=medium
+
+  * update molior.yml
+  * docker-compose: expose web service
+  * docker: export on localhost only
+  * add admin api
+  * add back_populates statements to avoid warnings
+  * add GET API for weekly cleanup job
+  * Makefile: ask before deleting docker volumes
+  * backend docker: support archs
+  * build in docker
+  * docker: configure proxies
+  * fix running in docker
+  * docker: rename containers
+  * add docker compose dev env
+  * cleanup refinements
+  * mirror: avoid None mirrorcomponents
+  * server: don't execute cleanup if not set (startup)
+  * cleanup: avoiding error in weekly cleanup
+  * ova-confs: sed commands
+  * fixing None error
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Wed, 13 Dec 2023 17:47:33 +0100
+
 molior (1.4.1) stretch; urgency=medium
 
   * server info: get machine id
