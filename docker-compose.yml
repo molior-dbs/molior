@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
     ports:
-      - "127.0.0.1:8000:4200"
+      - "8000:4200"
     volumes:
       - ../molior-web2:/app
 
