@@ -1,7 +1,7 @@
 config_version: "1"
 targets:
   molior:
-  - "1.5-bookworm"
+  - "1.5"
 build_after:
   - "cirrina"
   - "launchy"
