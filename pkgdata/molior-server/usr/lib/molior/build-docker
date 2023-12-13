@@ -98,7 +98,7 @@ log " - $dsc_url"
 curl --max-time 30 -s -O $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "E: Error downloading source package $dsc_url" >&2
-  exit 1
+  exit 2
 fi
 
 for srcfile in `/app/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
@@ -124,13 +124,22 @@ if echo $srcfile | grep -q "\.git$"; then
     git clone ../$srcfile
     cd $srcfile
 else
-    tar xf $srcfile
-    cd `echo $srcfile | cut -d_ -f1`
+    tar xf ../$srcfile
+    cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 
 apt-get -y build-dep .
+if [ "$?" -ne 0 ]; then
+  echo "E: Error installing build dependencies" >&2
+  exit 3
+fi
 
+# TODO: signing?
 debuild -us -uc -b
+if [ "$?" -ne 0 ]; then
+  echo "E: Error building debian package $dsc_url" >&2
+  exit 4
+fi
 
 cd ..
 
@@ -147,7 +156,7 @@ do
   curl -fs -H "Host: localhost" -F "file=@$f" $MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
   if [ $? -ne 0 ]; then
     log_error "Error uploading output files"
-    exit 2
+    exit 5
   fi
 done
 echo
