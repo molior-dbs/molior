@@ -87,7 +87,7 @@ async def run_molior(self):
 class MoliorServer(cirrina.Server):
 
     def __init__(self, host, port, session_type=None, session_dir=None):
-        super().__init__(session_type=session_type, session_dir=session_dir)
+        super().__init__(session_type=session_type, session_dir=session_dir, session_max_age=302400)  # 1 week sessions
         self.task_worker = None
         self.task_backend_worker = None
         self.task_aptly_worker = None
