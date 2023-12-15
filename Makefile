@@ -3,6 +3,7 @@
 
 export COMPOSE_PROJECT_NAME=molior
 export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
+export MOLIOR_APT_SERVER=http://192.168.7.254:8080
 
 start:  ## run containers (background)
 	@docker-compose --profile serve up -d
@@ -19,10 +20,10 @@ docker-compose-build-cached:  ## build containers (cached)
 	docker-compose build --build-arg UID=$(shell id -u $$USER)
 
 api:
-	docker-compose build --no-cache api
+	docker-compose build --build-arg MOLIOR_APT_SERVER=$(MOLIOR_APT_SERVER) --no-cache api
 
 api-cached:
-	docker-compose build api
+	docker-compose build --build-arg MOLIOR_APT_SERVER=$(MOLIOR_APT_SERVER) api
 
 web:
 	docker-compose build --no-cache web
@@ -31,10 +32,10 @@ web-cached:
 	docker-compose build web
 
 aptly:
-	docker-compose build --no-cache aptly
+	docker-compose build --build-arg MOLIOR_APT_SERVER=$(MOLIOR_APT_SERVER) --no-cache aptly
 
 aptly-cached:
-	docker-compose build aptly
+	docker-compose build --build-arg MOLIOR_APT_SERVER=$(MOLIOR_APT_SERVER) aptly
 
 postgres:
 	docker-compose build --no-cache postgres
@@ -69,6 +70,9 @@ logs:  ## show logs
 
 logs-api:  ## show api logs
 	@docker-compose logs -f api
+
+logs-aptly:  ## show aptly logs
+	@docker-compose logs -f aptly
 
 logs-registry:  ## show registry logs
 	@docker-compose logs -f registry

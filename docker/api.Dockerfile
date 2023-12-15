@@ -2,8 +2,10 @@ FROM debian:bookworm-slim
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends curl gnupg
 
-RUN echo deb http://debian.roche.com/bookworm/12.0/repos/molior/1.5-bookworm stable main > /etc/apt/sources.list.d/molior.list
-RUN curl -s http://debian.roche.com/repo.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update
+ARG MOLIOR_APT_SERVER
+RUN test -n "$MOLIOR_APT_SERVER"
+RUN echo deb $MOLIOR_APT_SERVER/bookworm/12.3/repos/molior/1.5 stable main > /etc/apt/sources.list.d/molior.list
+RUN curl -s $MOLIOR_APT_SERVER/archive-keyring.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update
 
 RUN adduser --uid 5432 --system --home /var/lib/postgresql --no-create-home --shell /bin/bash --group --gecos "PostgreSQL administrator" postgres
 
