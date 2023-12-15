@@ -22,6 +22,8 @@ from ..model.sourepprover import SouRepProVer
 from ..model.build import Build
 from ..model.projectversiondependency import ProjectVersionDependency
 from ..model.database import Session
+from ..model.metadata import MetaData
+
 
 
 # find latest builds
@@ -1619,7 +1621,7 @@ async def delete_projectversion_build(request):
 async def get_cleanup(request):
 
     db = request.cirrina.db_session
-    
+
     cleanup_active_metadata = db.query(MetaData).filter_by(name='cleanup_active').first()
     cleanup_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
     cleanup_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
