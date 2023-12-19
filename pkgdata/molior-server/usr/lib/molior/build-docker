@@ -134,11 +134,14 @@ if [ "$?" -ne 0 ]; then
   exit 3
 fi
 
-# TODO: signing?
-debuild -us -uc -b
+dpkg-buildpackage -us -uc -ui -b
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 4
+fi
+
+if [ "$RUN_LINTIAN" = "1" ]; then
+    lintian
 fi
 
 cd ..
