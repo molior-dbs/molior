@@ -1,3 +1,12 @@
+molior (1.5.0~alpha37) stretch; urgency=medium
+
+  * docker: do not run lintian per default in docker
+  * fix import
+  * use 1 week session per default
+  * docker: update apt source
+
+ -- André Roth <neolynx@gmail.com>  Tue, 19 Dec 2023 23:02:25 +0100
+
 molior (1.5.0~alpha36) stretch; urgency=medium
 
   * build after aiofile
