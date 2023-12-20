@@ -1,12 +1,9 @@
 FROM debian:bookworm-slim
 
-RUN apt-get update
-
-RUN adduser --uid 5432 --system --home /var/lib/postgresql --no-create-home --shell /bin/bash --group --gecos "PostgreSQL administrator" postgres
-
+RUN useradd --uid 5432 --shell /bin/bash --home-dir /var/lib/postgresql postgres
 RUN useradd --uid 7777 -m --shell /bin/sh --home-dir /var/lib/molior molior
 
-RUN apt-get install -y --no-install-recommends postgresql
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir app
 WORKDIR /app
