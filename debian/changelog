@@ -1,3 +1,9 @@
+molior (1.5.0~alpha39) stretch; urgency=medium
+
+  * test running server from package
+
+ -- André Roth <neolynx@gmail.com>  Wed, 20 Dec 2023 19:07:53 +0100
+
 molior (1.5.0~alpha38) stretch; urgency=medium
 
   * docker: build as user instead of root
