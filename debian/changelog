@@ -1,3 +1,13 @@
+molior (1.5.0~alpha38) stretch; urgency=medium
+
+  * docker: build as user instead of root
+  * rebuild builenv: delete logfile only
+  * docker: add Makefile target for running aptly commands
+  * docker: cleanuo
+  * docker: use molior.info apt source
+
+ -- André Roth <neolynx@gmail.com>  Wed, 20 Dec 2023 17:52:25 +0100
+
 molior (1.5.0~alpha37) stretch; urgency=medium
 
   * docker: do not run lintian per default in docker
