@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends wget nodejs npm
+RUN apt-get update -y && apt-get install -y --no-install-recommends wget nodejs npm && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN mkdir app
 WORKDIR /app
 
