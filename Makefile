@@ -52,11 +52,17 @@ stop:  ## stop containers
 stop-api:  ## stop api container
 	@docker-compose stop api
 
+stop-aptly:  ## stop aptly container
+	@docker-compose stop aptly
+
 stop-nginx:  ## stop nginx container
 	@docker-compose stop nginx
 
 stop-web:  ## stop web container
 	@docker-compose stop web
+
+run-aptly: stop-aptly
+	docker run -it -v $(CWD)/../aptly:/app -v molior_aptly:/var/lib/aptly/ molior_aptly /bin/bash
 
 clean:  ## clean containers and volumes
 	@echo; echo "This will delete volumes and data!"; echo Press Enter to continue, Ctrl-C to abort ...; read x
