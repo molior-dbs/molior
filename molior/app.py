@@ -2,7 +2,7 @@ import cirrina
 
 from .molior.server import MoliorServer
 
-app = MoliorServer("127.0.0.1", 9999, session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
+app = MoliorServer(session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
 app.title = "Molior REST API Documentation"
 app.description = "Documentation of the molior REST API."
 app.api_version = 1

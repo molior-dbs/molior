@@ -1,7 +1,4 @@
 import asyncio
-import click
-import signal
-import functools
 import cirrina
 
 from sqlalchemy.orm import sessionmaker
@@ -25,7 +22,7 @@ from ..auth.auth import Auth
 
 
 async def run_molior(self):
-    logger.info("MoliorServer: run")
+    logger.info("starting molior v%s", MOLIOR_VERSION)
     self.backend = Backend().init()
 
     if not self.backend:
@@ -81,12 +78,10 @@ async def run_molior(self):
     cleanup_sched.add_job(cleanup_job)
     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
-    # self.run(self.host, self.port, logger=self.logger, debug=self.debug)
-
 
 class MoliorServer(cirrina.Server):
 
-    def __init__(self, host, port, session_type=None, session_dir=None):
+    def __init__(self, session_type=None, session_dir=None):
         super().__init__(session_type=session_type, session_dir=session_dir, session_max_age=302400)  # 1 week sessions
         self.task_worker = None
         self.task_backend_worker = None
@@ -204,49 +199,3 @@ class MoliorServer(cirrina.Server):
 
         self.logger.info("terminating app")
         self.stop()
-
-
-@click.command()
-@click.option("--host",     default="localhost",         help="Hostname, examples: 'localhost' or '0.0.0.0'")
-@click.option("--port",     default=8888,                help="Listen port")
-@click.option("--debug",    default=False, is_flag=True, help="Enable debug")
-@click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
-def main(host, port, debug, coverage):
-    logger.info("starting molior v%s", MOLIOR_VERSION)
-
-    if coverage:
-        # logger.warning("starting coverage measurement")
-        import coverage
-        cov = coverage.Coverage(source=["molior"])
-        cov.start()
-
-    loop = asyncio.get_event_loop()
-    moliorserver = MoliorServer(loop, host, port, logger=logger, debug=debug)
-
-    def terminate(signame):
-        moliorserver.logger.info("received %s, terminating...", signame)
-        asyncio.run_coroutine_threadsafe(moliorserver.terminate(), loop)
-        # tasks = [task for task in asyncio.all_tasks() if task is not asyncio.tasks.current_task()]
-        # list(map(lambda task: task.cancel(), tasks))
-        # await asyncio.gather(*tasks, return_exceptions=True)
-        # try:
-        #     loop.stop()
-        # except Exception as exc:
-        #     logger.exception(exc)
-        # logger.info("event loop stopped")
-
-    for signame in ('SIGINT', 'SIGTERM'):
-        loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
-
-    moliorserver.run()  # server up and running ...
-
-    if coverage:
-        moliorserver.logger.warning("saving coverage measurement")
-        cov.stop()
-        cov.html_report(directory='/var/lib/molior/buildout/coverage')
-
-    moliorserver.logger.info("terminated")
-
-
-if __name__ == "__main__":
-    main()
