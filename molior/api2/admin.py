@@ -47,10 +47,6 @@ async def get_cleanup(request):
     cleanup_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
     cleanup_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
 
-    logger.info(cleanup_active_metadata)
-    logger.info(cleanup_time_metadata)
-    logger.info(cleanup_weekdays_metadata)
-
     cleanup_active = cleanup_active_metadata.value if cleanup_active_metadata else None
     cleanup_time = cleanup_time_metadata.value if cleanup_time_metadata else None
     cleanup_weekdays = cleanup_weekdays_metadata.value.split(',') if cleanup_weekdays_metadata else None
@@ -59,6 +55,25 @@ async def get_cleanup(request):
         'cleanup_active': cleanup_active,
         'cleanup_time': cleanup_time,
         'cleanup_weekdays': cleanup_weekdays
+    }
+    db.close()
+
+    return OKResponse(data)
+
+@app.http_get("/api2/maintenance")
+async def get_maintenance(request):
+
+    db = request.cirrina.db_session
+
+    maintenance_mode_metadata = db.query(MetaData).filter_by(name='maintenance_mode').first()
+    maintenance_message_metadata = db.query(MetaData).filter_by(name='maintenance_message').first()
+
+    maintenance_mode = maintenance_mode_metadata.value if maintenance_mode_metadata else None
+    maintenance_message = maintenance_message_metadata.value if maintenance_message_metadata else None
+
+    data = {
+    'maintenance_mode': maintenance_mode,
+    'maintenance_message': maintenance_message,
     }
     db.close()
 
