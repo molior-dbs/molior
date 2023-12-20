@@ -1,5 +1,6 @@
 import asyncio
 import giturlparse
+import os
 
 from shutil import rmtree
 from pathlib import Path
@@ -297,9 +298,9 @@ class Worker:
         if build.buildtype == "chroot":
             if build.buildstate == "build_failed" or build.buildstate == "publish_failed":
                 buildout = "/var/lib/molior/buildout/%d" % build_id
-                if Path(buildout).exists():
+                if Path(f"{buildout}/build.log").exists():
                     try:
-                        rmtree(buildout)
+                        os.remove(f"{buildout}/build.log")
                     except Exception as exc:
                         logger.exception(exc)
                 ok = True
