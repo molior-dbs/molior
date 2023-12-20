@@ -26,10 +26,10 @@ api-cached:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) api
 
 web:
-	docker-compose build --no-cache web
+	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache web
 
 web-cached:
-	docker-compose build web
+	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) web
 
 aptly:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache aptly
