@@ -118,13 +118,14 @@ done
 #
 
 mkdir src
+chown build src
 cd src
 
 if echo $srcfile | grep -q "\.git$"; then
-    git clone ../$srcfile
+    su build -c "git clone ../$srcfile"
     cd $srcfile
 else
-    tar xf ../$srcfile
+    su build -c "tar xf ../$srcfile"
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 
@@ -134,20 +135,20 @@ if [ "$?" -ne 0 ]; then
   exit 3
 fi
 
-dpkg-buildpackage -us -uc -ui -b
+su build -c "dpkg-buildpackage -us -uc -ui -b"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 4
 fi
 
-if [ "$RUN_LINTIAN" = "1" ]; then
-    lintian
+if [ "$RUN_LINTIAN" = "True" ]; then
+    log_title "Running Lintian"
+    su build -c lintian
 fi
 
 cd ..
 
 log_title "Uploading"
-
 rm -f ${REPO_NAME}_${VERSION}_$ARCH.build
 # FIXME: parse changes files
 OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.build" -o -name "*_$ARCH.buildinfo" -o -name "*_$ARCH.changes"`
@@ -162,4 +163,3 @@ do
     exit 5
   fi
 done
-echo

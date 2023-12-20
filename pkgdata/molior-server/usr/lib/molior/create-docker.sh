@@ -142,10 +142,10 @@ EOM
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
   mkdir $target/app
+  chroot $target useradd -m --shell /bin/sh --home-dir /app build
   cp -a pkgdata/molior-server/usr/lib/molior/build-docker $target/app/
   cp -a pkgdata/molior-client-http/usr/lib/molior/find-package-dir.pl $target/app/
   cp -a pkgdata/molior-client-http/usr/lib/molior/dsc-get-files.pl $target/app/
-
 
   echo I: Created docker base successfully
 }
@@ -173,7 +173,6 @@ publish_docker()
   rm -f $DEBOOTSTRAP_TAR
 
   REGISTRY=localhost:5000
-
   if [ -f /etc/molior/docker-registry.conf ]; then
       . /etc/molior/docker-registry.conf
   fi
