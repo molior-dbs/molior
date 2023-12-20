@@ -78,3 +78,29 @@ async def get_maintenance(request):
     db.close()
 
     return OKResponse(data)
+
+@app.http_put("/api2/maintenance")
+async def edit_maintenance(request):
+
+    params = await request.json()
+    maintenance_mode = params.get("maintenance_mode")
+    maintenance_message = params.get("maintenance_message")
+
+    db = request.cirrina.db_session
+
+    existing_maintenance_mode = db.query(MetaData).filter_by(name='maintenance_mode').first()
+    if existing_maintenance_mode:
+        existing_maintenance_mode.value = str(maintenance_mode)
+    else:
+        db.add(MetaData(name='maintenance_mode', value=str(maintenance_mode)))
+
+    existing_maintenance_message = db.query(MetaData).filter_by(name='maintenance_message').first()
+    if existing_maintenance_message:
+        existing_maintenance_message.value = maintenance_message
+    else:
+        db.add(MetaData(name='maintenance_message', value=maintenance_message))
+
+
+    db.commit()
+
+    return OKResponse("Maintenance details are being changed")
