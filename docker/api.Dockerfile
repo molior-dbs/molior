@@ -14,19 +14,13 @@ ARG MOLIOR_APT_REPO
 RUN test -n "$MOLIOR_APT_REPO"
 RUN echo deb $MOLIOR_APT_REPO stable main > /etc/apt/sources.list.d/molior.list
 RUN curl -s $MOLIOR_APT_REPO/archive-keyring.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update && \
-    apt-get install -y --no-install-recommends devscripts postgresql-client-15 bc python3-aiohttp-devtools python3-pygments python3-devtools python3-watchfiles dh-python dh-exec python3-setuptools python3-yaml python3-sqlalchemy python3-jinja2 python3-cirrina python3-launchy python3-tz python3-giturlparse python3-aiofile python3-psutil python3-dateutil python3-async-cron python3-click python3-psycopg2 debootstrap git git-lfs xz-utils sudo docker.io openssh-client && \
+    apt-get install -y --no-install-recommends molior-server && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION = \"`dpkg-parsechangelog -S Version`\" > molior/version.py; mkdir -p /etc/molior; cp -ar /app/docker/molior.yml /etc/molior; \
-        /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info;\
-        cp /app/docker/docker-registry.conf /etc/molior/; \
-        cp /app/pkgdata/molior-server/etc/sudoers.d/01_molior /etc/sudoers.d/; \
-        mkdir -p /etc/molior/mirror-hooks.d; \
-        ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker; \
-        mkdir -p /var/lib/molior/debootstrap/; \
-        mkdir -p /var/lib/molior/repositories/; \
-        chown molior /var/lib/molior/repositories/; \
-        mkdir -p /var/lib/molior/upload/; \
-        chown molior /var/lib/molior/upload/; \
-        cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
-        su molior -c "exec adev runserver -p 9999 molior/"
+#        cp /app/docker/docker-registry.conf /etc/molior/ &&  \
+
+CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
+        /usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info && \
+        ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker &&  \
+        /usr/lib/molior/db-upgrade.sh && \
+        su molior -c "/usr/bin/python3 -m molior.main --host=0.0.0.0 --port=9999"
