@@ -22,7 +22,7 @@ from ..auth.auth import Auth
 
 
 async def run_molior(self):
-    logger.info("MoliorServer: run")
+    logger.info("starting molior v%s", MOLIOR_VERSION)
     self.backend = Backend().init()
 
     if not self.backend:
@@ -83,7 +83,7 @@ async def run_molior(self):
 
 class MoliorServer(cirrina.Server):
 
-    def __init__(self, host, port, session_type=None, session_dir=None):
+    def __init__(self, session_type=None, session_dir=None):
         super().__init__(session_type=session_type, session_dir=session_dir, session_max_age=302400)  # 1 week sessions
         self.task_worker = None
         self.task_backend_worker = None
@@ -201,5 +201,3 @@ class MoliorServer(cirrina.Server):
 
         self.logger.info("terminating app")
         self.stop()
-
-

@@ -6,9 +6,8 @@ import asyncio
 
 from .molior.server import MoliorServer
 from .logger import logger
-from .version import MOLIOR_VERSION
 
-app = MoliorServer("127.0.0.1", 9999, session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
+app = MoliorServer(session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
 app.title = "Molior REST API Documentation"
 app.description = "Documentation of the molior REST API."
 app.api_version = 1
@@ -50,7 +49,6 @@ import molior.api2.admin             # noqa: F401
 @click.option("--debug",    default=False, is_flag=True, help="Enable debug")
 @click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
 def main(host, port, debug, coverage):
-    logger.info("starting molior v%s", MOLIOR_VERSION)
 
     if coverage:
         # logger.warning("starting coverage measurement")
@@ -75,7 +73,7 @@ def main(host, port, debug, coverage):
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
 
-    app.run()  # server up and running ...
+    app.run_app(host=host, port=port)  # server up and running ...
 
     if coverage:
         logger.warning("saving coverage measurement")
