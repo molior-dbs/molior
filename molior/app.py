@@ -6,6 +6,7 @@ import asyncio
 
 from .molior.server import MoliorServer
 from .logger import logger
+from aiohttp import web
 
 app = MoliorServer(session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
 app.title = "Molior REST API Documentation"
@@ -73,7 +74,7 @@ def main(host, port, debug, coverage):
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
 
-    app.run_app(host=host, port=port)  # server up and running ...
+    web.run_app(app, host=host, port=port)  # server up and running ...
 
     if coverage:
         logger.warning("saving coverage measurement")
