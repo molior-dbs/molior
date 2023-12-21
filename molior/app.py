@@ -5,8 +5,8 @@ import functools
 import asyncio
 
 from .molior.server import MoliorServer
-from ..logger import logger
-from ..version import MOLIOR_VERSION
+from .logger import logger
+from .version import MOLIOR_VERSION
 
 app = MoliorServer("127.0.0.1", 9999, session_type=cirrina.Server.SessionType.FILE, session_dir="/var/lib/molior/web-sessions/")
 app.title = "Molior REST API Documentation"

@@ -22,4 +22,4 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
         cp /app/docker/docker-registry.conf /etc/molior/ &&  \
         ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker &&  \
         /usr/lib/molior/db-upgrade.sh && \
-        su molior -c "/usr/bin/python3 -m molior.molior.app --port=9999"
+        su molior -c "/usr/bin/python3 -m molior.app --port=9999"
