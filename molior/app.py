@@ -59,11 +59,10 @@ def main(host, port, debug, coverage):
         cov.start()
 
     loop = asyncio.get_event_loop()
-    moliorserver = MoliorServer(loop, host, port, debug=debug)
 
     def terminate(signame):
-        moliorserver.logger.info("received %s, terminating...", signame)
-        asyncio.run_coroutine_threadsafe(moliorserver.terminate(), loop)
+        logger.info("received %s, terminating...", signame)
+        asyncio.run_coroutine_threadsafe(app.terminate(), loop)
         # tasks = [task for task in asyncio.all_tasks() if task is not asyncio.tasks.current_task()]
         # list(map(lambda task: task.cancel(), tasks))
         # await asyncio.gather(*tasks, return_exceptions=True)
@@ -76,14 +75,14 @@ def main(host, port, debug, coverage):
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
 
-    moliorserver.run()  # server up and running ...
+    app.run()  # server up and running ...
 
     if coverage:
-        moliorserver.logger.warning("saving coverage measurement")
+        logger.warning("saving coverage measurement")
         cov.stop()
         cov.html_report(directory='/var/lib/molior/buildout/coverage')
 
-    moliorserver.logger.info("terminated")
+    logger.info("terminated")
 
 
 if __name__ == "__main__":
