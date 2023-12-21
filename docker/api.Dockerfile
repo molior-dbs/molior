@@ -17,9 +17,10 @@ RUN curl -s $MOLIOR_APT_REPO/archive-keyring.asc | gpg --dearmor -o /etc/apt/tru
     apt-get install -y --no-install-recommends molior-server && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+#        cp /app/docker/docker-registry.conf /etc/molior/ &&  \
+
 CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
-        /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info && \
-        cp /app/docker/docker-registry.conf /etc/molior/ &&  \
+        /usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info && \
         ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker &&  \
         /usr/lib/molior/db-upgrade.sh && \
-        su molior -c "/usr/bin/python3 -m molior.app --port=9999"
+        su molior -c "/usr/bin/python3 -m molior.main --host=0.0.0.0 --port=9999"

@@ -78,8 +78,6 @@ async def run_molior(self):
     cleanup_sched.add_job(cleanup_job)
     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
-    # self.run(self.host, self.port, logger=self.logger, debug=self.debug)
-
 
 class MoliorServer(cirrina.Server):
 
