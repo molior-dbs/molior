@@ -1,3 +1,9 @@
+molior (1.5.0~alpha40) stretch; urgency=medium
+
+  * fix import
+
+ -- André Roth <neolynx@gmail.com>  Thu, 21 Dec 2023 10:57:46 +0100
+
 molior (1.5.0~alpha39) stretch; urgency=medium
 
   * test running server from package
