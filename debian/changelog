@@ -1,3 +1,9 @@
+molior (1.5.0~alpha44) stretch; urgency=medium
+
+  * bump version 1.5.0~alpha44
+
+ -- André Roth <neolynx@gmail.com>  Thu, 21 Dec 2023 12:27:25 +0100
+
 molior (1.5.0~alpha43) stretch; urgency=medium
 
   * main: start app
