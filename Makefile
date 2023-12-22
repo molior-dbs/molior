@@ -113,3 +113,6 @@ shell-registry:  ## login to registry container
 
 psql:  ## login to api container
 	docker-compose exec postgres su postgres -c "psql molior"
+
+docker-push:
+	for i in web api aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; docker push neolynx/molior_$$i; done
