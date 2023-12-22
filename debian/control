@@ -7,6 +7,13 @@ Build-Depends: python3-all (>= 2.6.6-3), debhelper (>= 7), dh-python, dh-exec, p
     python3-jinja2, python3-cirrina (>= 0.4.7), python3-launchy, python3-tz, flake8, git
 Maintainer: André Roth <neolynx@gmail.com>
 
+Package: molior-common
+Section: misc
+Architecture: all
+Depends: ${misc:Depends}
+Description: common scripts for molior
+ Molior common scripts
+
 Package: molior-server
 Architecture: all
 Pre-Depends: postgresql, postgresql-contrib
@@ -16,7 +23,7 @@ Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf
     python3-jinja2, python3-cirrina (>= 0.4.7), python3-click, devscripts, sensible-utils,
     bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, python3-async-cron,
     python3-giturlparse, python3-aiofile, python3-psutil, openssh-client,
-    debootstrap (>= 1.0.110~bpo9+1)
+    debootstrap (>= 1.0.110~bpo9+1), molior-common
 Tag: devel::buildtools
 Description: Debian Build System
  Debian Build System based on sbuild, schroot and aptly
@@ -27,7 +34,7 @@ Section: misc
 Depends: ${misc:Depends}, ${perl:Depends}, dpkg-dev, lsb-base (>= 3.0-6), adduser, lsb-release, fakeroot,
   haveged, gcc, debhelper, tcl, expect, dh-systemd | debhelper (>= 9.20160709), sudo, sbuild (>= 0.76.0-1~bpo9+1), lintian, openssh-server, wget, curl,
   schroot, gnupg, devscripts, pxz | xz-utils (>= 5.2.4-1),
-  python3, python3-launchy, python3-yaml, python3-aiohttp, python3-aiofiles, python3-psutil, python3-netifaces
+  python3, python3-launchy, python3-yaml, python3-aiohttp, python3-aiofiles, python3-psutil, python3-netifaces, molior-common
 Tag: devel::buildtools
 Description: Molior build node client
  Build node client for molior-server nodes (amd64 or arm64)

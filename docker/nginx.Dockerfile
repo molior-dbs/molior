@@ -2,12 +2,12 @@ FROM debian:bookworm-slim
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends nginx-light apache2-utils && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir app
-WORKDIR /app
+ADD docker/aptly/create-aptly-passwd /usr/sbin/
+ADD docker/aptly/nginx/nginx-conf.d.logging /etc/nginx/conf.d/logging.conf
+ADD docker/aptly/nginx/aptly /etc/nginx/sites-available/
+ADD docker/aptly/nginx/aptlyapi /etc/nginx/sites-available/
+RUN ln -s ../sites-available/aptly /etc/nginx/sites-enabled/
+RUN ln -s ../sites-available/aptlyapi /etc/nginx/sites-enabled/
 
-CMD rm -f /etc/nginx/sites-enabled/default; \
-    cp /app/docker/nginx/aptly /etc/nginx/sites-available/; \
-    cp /app/docker/nginx/aptlyapi /etc/nginx/sites-available/; \
-    cp /app/docker/nginx/nginx-conf.d.logging /etc/nginx/conf.d/logging.conf; \
-    /app/debian/pkgdata/usr/sbin/create-aptly-passwd molior molior-dev && \
-    ln -s ../sites-available/aptly /etc/nginx/sites-enabled/; ln -s ../sites-available/aptlyapi /etc/nginx/sites-enabled/; nginx -g 'daemon off;'
+CMD /usr/sbin/create-aptly-passwd molior molior-dev && \
+    nginx -g 'daemon off;'

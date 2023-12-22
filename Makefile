@@ -6,6 +6,7 @@ export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
 export MOLIOR_APT_REPO=http://molior.info/1.5
 
 start:  ## run containers (background)
+	@docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO)
 	@docker-compose --profile serve up -d
 
 # Self-documenting Makefile
@@ -86,11 +87,17 @@ logs-registry:  ## show registry logs
 logs-web:  ## show web logs
 	@docker-compose logs -f web
 
+logs-nginx:  ## show nginx logs
+	@docker-compose logs -f nginx
+
 logs-postgres:  ## show postgres logs
 	@docker-compose logs -f postgres
 
 shell-api:  ## login to api container
 	docker-compose exec api /bin/bash
+
+shell-web:  ## login to web container
+	docker-compose exec web /bin/bash
 
 shell-postgres:  ## login to postgres container
 	docker-compose exec postgres /bin/bash

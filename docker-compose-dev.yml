@@ -5,7 +5,7 @@ services:
     container_name: molior-web
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
+      dockerfile: docker/web-dev.Dockerfile
     ports:
       - "8000:4200"
     volumes:
@@ -16,7 +16,7 @@ services:
     profiles: ["serve"]
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
+      dockerfile: docker/api-dev.Dockerfile
       args:
           DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
     ports:
@@ -41,7 +41,7 @@ services:
     profiles: ["serve"]
     build:
       context: .
-      dockerfile: docker/aptly.Dockerfile
+      dockerfile: docker/aptly-dev.Dockerfile
     ports:
       - "127.0.0.1:3142:3142"
     volumes:

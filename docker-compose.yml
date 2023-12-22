@@ -7,9 +7,7 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
     ports:
-      - "8000:4200"
-    volumes:
-      - ../molior-web2:/app
+      - "8000:80"
 
   api:
     container_name: molior-api
@@ -19,6 +17,7 @@ services:
       dockerfile: docker/api.Dockerfile
       args:
           DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
+          MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     ports:
       - "127.0.0.1:9999:9999"
     volumes:
@@ -41,10 +40,11 @@ services:
     build:
       context: .
       dockerfile: docker/aptly.Dockerfile
+      args:
+          MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     ports:
       - "127.0.0.1:3142:3142"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   nginx:
@@ -56,7 +56,6 @@ services:
     ports:
       - "8080:8000"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   registry:
