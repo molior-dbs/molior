@@ -14,12 +14,13 @@ ARG MOLIOR_APT_REPO
 RUN test -n "$MOLIOR_APT_REPO"
 RUN echo deb $MOLIOR_APT_REPO stable main > /etc/apt/sources.list.d/molior.list
 RUN curl -s $MOLIOR_APT_REPO/archive-keyring.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update && \
-    apt-get install -y --no-install-recommends molior-server && \
+    apt-get install -y --no-install-recommends molior-server docker.io && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ADD docker/molior.yml /etc/molior/
 ADD docker/docker-registry.conf /etc/molior/
-RUN ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
+RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
+RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
 CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
         /usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info && \
