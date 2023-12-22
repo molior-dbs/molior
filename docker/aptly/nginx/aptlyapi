@@ -1,0 +1,14 @@
+server {
+        listen 3143;
+
+        auth_basic "Restricted";
+        auth_basic_user_file /etc/nginx/.aptlyapipasswd;
+
+        error_log stderr;
+
+        location / {
+                proxy_pass http://aptly:3142;
+                proxy_read_timeout 360s;
+                client_max_body_size 2G;
+        }
+}

@@ -366,8 +366,9 @@ class AptlyApi:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
+        state = {"State": 3}  # fail in case of exception
         progress = {}
-        for i in range(20):
+        for i in range(3):
             try:
                 state = await self.GET(f"/tasks/{task_id}")
                 progress = await self.GET(f"/tasks/{task_id}/detail")
@@ -822,8 +823,12 @@ def get_aptly_connection():
     cfg = Configuration()
     api_url = cfg.aptly.get("api_url")
     gpg_key = cfg.aptly.get("gpg_key")
-    aptly_user = cfg.aptly.get("user")
-    aptly_passwd = cfg.aptly.get("pass")
+    aptly_user = cfg.aptly.get("api_user")
+    if not aptly_user:
+        aptly_user = cfg.aptly.get("user")
+    aptly_passwd = cfg.aptly.get("api_pass")
+    if not aptly_passwd:
+        aptly_passwd = cfg.aptly.get("pass")
     aptly = AptlyApi(api_url, gpg_key, username=aptly_user, password=aptly_passwd)
     return aptly
 
