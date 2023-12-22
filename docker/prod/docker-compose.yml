@@ -2,40 +2,29 @@ version: "3"
 
 services:
   web:
+    image: neolynx/molior_web
     container_name: molior-web
-    build:
-      context: .
-      dockerfile: docker/web-dev.Dockerfile
     networks:
       - molior
     ports:
-      - "8000:4200"
-    volumes:
-      - ../molior-web2:/app
+      - "8000:80"
 
   api:
+    image: neolynx/molior_api
     container_name: molior-api
-    build:
-      context: .
-      dockerfile: docker/api-dev.Dockerfile
     env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - molior
-    ports:
-      - "127.0.0.1:9999:9999"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./:/app
       - pgsock:/var/run/postgresql/
       - /var/run/docker.sock:/var/run/docker.sock
       - molior:/var/lib/molior/
 
   postgres:
+    image: neolynx/molior_postgres
     container_name: molior-postgres
-    build:
-      context: .
-      dockerfile: docker/postgres.Dockerfile
     networks:
       - molior
     volumes:
@@ -43,45 +32,34 @@ services:
       - postgres:/var/lib/postgresql/15/main
 
   aptly:
+    image: neolynx/molior_aptly
     container_name: molior-aptly
-    build:
-      context: .
-      dockerfile: docker/aptly-dev.Dockerfile
     env_file: .env
     networks:
       - molior
-    ports:
-      - "127.0.0.1:3142:3142"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   nginx:
+    image: neolynx/molior_nginx
     container_name: molior-nginx
-    build:
-      context: .
-      dockerfile: docker/nginx.Dockerfile
     env_file: .env
     networks:
       - molior
     ports:
       - "8080:8000"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   registry:
+    image: neolynx/molior_registry
     container_name: molior-registry
-    build:
-      context: .
-      dockerfile: docker/registry.Dockerfile
     env_file: .env
     networks:
       - molior
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./:/app
       - registry:/var/lib/docker-registry/
 
 networks:

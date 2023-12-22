@@ -1,0 +1,11 @@
+#!/bin/sh
+
+aptly_user=$1
+aptly_pass=$2
+
+if [ -z "$aptly_user" -o -z "$aptly_pass" ]; then
+  echo "Usage: $0 APTLY_USER APTLY_PASS"
+  exit 1
+fi
+
+exec htpasswd -bc /etc/nginx/.aptlyapipasswd $aptly_user $aptly_pass 2>/dev/null

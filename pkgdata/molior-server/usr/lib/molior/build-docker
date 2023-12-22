@@ -71,7 +71,7 @@ log "Builder : `hostname`"
 echo
 
 log "APT Sources:"
-curl --max-time 30 -s -H "Host: localhost" "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
+curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
 cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 
 echo
@@ -157,7 +157,7 @@ log "Uploading: "
 for f in $OUTPUT_FILES
 do
   log " - `echo $f | sed 's#^./##'`"
-  curl -fs -H "Host: localhost" -F "file=@$f" $MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
+  curl -fs -F "file=@$f" $MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
   if [ $? -ne 0 ]; then
     log_error "Error uploading output files"
     exit 5

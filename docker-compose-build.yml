@@ -6,23 +6,24 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+    networks:
+      - molior
     ports:
-      - "8000:4200"
-    volumes:
-      - ../molior-web2:/app
+      - "8000:80"
 
   api:
     container_name: molior-api
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/api.Dockerfile
-      args:
-          DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - molior
     ports:
       - "127.0.0.1:9999:9999"
     volumes:
-      - ./:/app
       - pgsock:/var/run/postgresql/
       - /var/run/docker.sock:/var/run/docker.sock
       - molior:/var/lib/molior/
@@ -32,48 +33,54 @@ services:
     build:
       context: .
       dockerfile: docker/postgres.Dockerfile
+    networks:
+      - molior
     volumes:
       - pgsock:/var/run/postgresql/
       - postgres:/var/lib/postgresql/15/main
 
   aptly:
     container_name: molior-aptly
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/aptly.Dockerfile
+    env_file: .env
+    networks:
+      - molior
     ports:
       - "127.0.0.1:3142:3142"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   nginx:
     container_name: molior-nginx
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/nginx.Dockerfile
+    env_file: .env
+    networks:
+      - molior
     ports:
       - "8080:8000"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   registry:
     container_name: molior-registry
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/registry.Dockerfile
-    environment:
-      USER: "molior"
-      PASSWORD: "molior-registry"
+    env_file: .env
+    networks:
+      - molior
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./:/app
       - registry:/var/lib/docker-registry/
+
+networks:
+  molior:
+    name: molior
 
 volumes:
      pgsock:

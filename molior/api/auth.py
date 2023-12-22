@@ -29,9 +29,11 @@ async def auth_admin(request, user, passwd):
     user = user.lower()
     if user == "admin":
         config = Configuration()
-        admin_pass = config.admin.get("pass")
+        admin_pass = config.admin.get("admin_password")
         if not admin_pass:
-            logger.info("admin password is not set in configuration")
+            admin_pass = config.admin.get("pass")
+        if not admin_pass:
+            logger.info("Error: admin/admin_password not found in /etc/molior/molior.yml")
             return False
         if passwd == admin_pass:
             load_user("admin", request.cirrina.db_session)
