@@ -22,13 +22,6 @@ ADD docker/docker-registry.conf /etc/molior/
 RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
-ARG MOLIOR_ADMIN_PASSWD
-ARG DEBSIGN_NAME
-ARG DEBSIGN_EMAIL
-ARG APTLY_USER
-ARG APTLY_PASS
-ARG REPOSIGN_EMAIL
-ARG APT_URL_PUBLIC
 CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
         sed -i "s#admin_password:.*#admin_password: '$MOLIOR_ADMIN_PASSWD'#" /etc/molior/molior.yml && \
         sed -i "s#api_user:.*#api_user: '$APTLY_USER'#" /etc/molior/molior.yml && \
@@ -36,6 +29,8 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
         sed -i "s#debsign_gpg_email:.*#debsign_gpg_email: '$DEBSIGN_EMAIL'#" /etc/molior/molior.yml && \
         sed -i "s#gpg_key:.*#gpg_key: '$REPOSIGN_EMAIL'#" /etc/molior/molior.yml && \
         sed -i "s#apt_url_public:.*#apt_url_public: '$APT_URL_PUBLIC'#" /etc/molior/molior.yml && \
+        sed -i "s#DOCKER_USER=.*#DOCKER_USER='$REGISTRY_USER'#" /etc/molior/docker-registry.conf && \
+        sed -i "s#DOCKER_PASSWORD=.*#DOCKER_PASSWORD='$REGISTRY_PASSWORD'#" /etc/molior/docker-registry.conf && \
         /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL && \
         /usr/lib/molior/db-upgrade.sh && \
         su molior -c "/usr/bin/python3 -m molior.main --host=0.0.0.0 --port=9999"

@@ -76,6 +76,9 @@ stop-nginx:  ## stop nginx container
 stop-web:  ## stop web container
 	@docker-compose stop web
 
+stop-registry:  ## stop registry container
+	@docker-compose stop registry
+
 run-aptly: stop-aptly
 	docker run -it -v $(CWD)/../aptly:/app -v molior_aptly:/var/lib/aptly/ molior_aptly /bin/bash
 
