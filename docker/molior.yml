@@ -7,11 +7,6 @@ database: '/molior'
 # GPG email for signing the source packages
 debsign_gpg_email: 'debsign@molior.info'
 
-email_notifications:
-    enabled: False
-    sender: 'molior <noreply@molior.info>'
-    server: 'localhost'
-
 ci_builds:
     enabled: True
     # Remove ci packages which are older than <ci_packages_ttl> days
@@ -23,9 +18,6 @@ admin:
 auth_backend: 'db'
 
 backend: 'docker'
-
-backend_http:
-    ping_timeout: 5
 
 # Molior server settings
 max_parallel_chroots: 2
@@ -44,7 +36,3 @@ cleanup:
     cleanup_active: 'on'
     cleanup_time: '04:00'
     cleanup_weekday: 'Saturday'
-
-# Gitlab-API settings
-#gitlab:
-#    auth_token: '<top_secret_token>'

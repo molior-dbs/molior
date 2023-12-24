@@ -28,18 +28,23 @@ api: COMPOSE_FILE = docker-compose-build.yml
 api:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache api
 
+api-cached: COMPOSE_FILE = docker-compose-build.yml
 api-cached:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) api
 
+web: COMPOSE_FILE = docker-compose-build.yml
 web:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache web
 
+web-cached: COMPOSE_FILE = docker-compose-build.yml
 web-cached:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) web
 
+aptly: COMPOSE_FILE = docker-compose-build.yml
 aptly:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache aptly
 
+aptly-cached: COMPOSE_FILE = docker-compose-build.yml
 aptly-cached:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) aptly
 
