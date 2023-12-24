@@ -29,7 +29,7 @@ async def auth_admin(request, user, passwd):
     user = user.lower()
     if user == "admin":
         config = Configuration()
-        admin_pass = config.admin.get("admin_pass")
+        admin_pass = config.admin.get("admin_password")
         if not admin_pass:
             admin_pass = config.admin.get("pass")
         if not admin_pass:
