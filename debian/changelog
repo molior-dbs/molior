@@ -1,3 +1,9 @@
+molior (1.5.0~alpha50) stretch; urgency=medium
+
+  * build: use internal apt url
+
+ -- André Roth <neolynx@gmail.com>  Mon, 25 Dec 2023 00:43:49 +0100
+
 molior (1.5.0~alpha49) stretch; urgency=medium
 
   * fix config rename
