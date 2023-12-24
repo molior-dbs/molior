@@ -4,12 +4,14 @@ services:
   web:
     image: neolynx/molior_web
     container_name: molior-web
+    env_file: docker.env
     ports:
       - "8000:80"
 
   api:
     image: neolynx/molior_api
     container_name: molior-api
+    env_file: docker.env
     volumes:
       - pgsock:/var/run/postgresql/
       - /var/run/docker.sock:/var/run/docker.sock
@@ -25,12 +27,14 @@ services:
   aptly:
     image: neolynx/molior_aptly
     container_name: molior-aptly
+    env_file: docker.env
     volumes:
       - aptly:/var/lib/aptly/
 
   nginx:
     image: neolynx/molior_nginx
     container_name: molior-nginx
+    env_file: docker.env
     ports:
       - "8080:8000"
     volumes:
@@ -39,9 +43,7 @@ services:
   registry:
     image: neolynx/molior_registry
     container_name: molior-registry
-    environment:
-      USER: "molior"
-      PASSWORD: "molior-registry"
+    env_file: docker.env
     ports:
       - "127.0.0.1:5000:5000"
     volumes:

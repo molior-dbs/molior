@@ -10,5 +10,7 @@ RUN curl -s $MOLIOR_APT_REPO/archive-keyring.asc | gpg --dearmor -o /etc/apt/tru
 RUN mkdir app
 WORKDIR /app
 
-CMD /usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && \
+ARG REPOSIGN_NAME
+ARG REPOSIGN_EMAIL
+CMD /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL && \
     su aptly -c "aptly api serve -listen 0.0.0.0:3142"

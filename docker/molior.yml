@@ -18,7 +18,7 @@ ci_builds:
     packages_ttl: 7
 
 admin:
-    pass: 'molior-dev'
+    admin_password: 'molior-dev'
 
 auth_backend: 'db'
 
@@ -35,9 +35,9 @@ aptly:
     apt_url_public: 'http://host.docker.internal:8080'
     apt_url: 'http://nginx:8000'
     api_url: 'http://nginx:3143/api'
+    api_user: 'molior'
+    api_pass: 'molior-dev'
     gpg_key: 'reposign@molior.info'
-    user: 'molior'
-    pass: 'molior-dev'
     key: 'archive-keyring.asc'
 
 cleanup:

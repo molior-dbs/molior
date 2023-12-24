@@ -5,8 +5,12 @@ export COMPOSE_PROJECT_NAME=molior
 export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
 export MOLIOR_APT_REPO=http://molior.info/1.5
 
+start: COMPOSE_FILE = docker-compose-build.yml
 start:  ## run containers (background)
 	@docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO)
+	@docker-compose --profile serve up -d
+
+start-prod:  ## run containers (background)
 	@docker-compose --profile serve up -d
 
 # Self-documenting Makefile
@@ -20,6 +24,7 @@ docker-compose-build:  ## build containers
 docker-compose-build-cached:  ## build containers (cached)
 	docker-compose build --build-arg UID=$(shell id -u $$USER)
 
+api: COMPOSE_FILE = docker-compose-build.yml
 api:
 	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache api
 
@@ -41,9 +46,11 @@ aptly-cached:
 postgres:
 	docker-compose build --no-cache postgres
 
+nginx: COMPOSE_FILE = docker-compose-build.yml
 nginx:
 	docker-compose build --no-cache nginx
 
+registry: COMPOSE_FILE = docker-compose-build.yml
 registry:
 	docker-compose build --no-cache registry
 

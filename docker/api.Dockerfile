@@ -22,7 +22,11 @@ ADD docker/docker-registry.conf /etc/molior/
 RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
+ARG MOLIOR_ADMIN_PASSWD
+ARG DEBSIGN_NAME
+ARG DEBSIGN_EMAIL
 CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
-        /usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info && \
+        sed -i 's/admin-password:.*/admin-password: $MOLIOR_ADMIN_PASSWD/' /etc/molior/molior.yml && \
+        /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL && \
         /usr/lib/molior/db-upgrade.sh && \
         su molior -c "/usr/bin/python3 -m molior.main --host=0.0.0.0 --port=9999"
