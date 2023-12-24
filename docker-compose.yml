@@ -4,7 +4,6 @@ services:
   web:
     image: neolynx/molior_web
     container_name: molior-web
-    env_file: docker.env
     ports:
       - "8000:80"
 

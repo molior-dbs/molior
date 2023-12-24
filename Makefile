@@ -18,11 +18,13 @@ start-prod:  ## run containers (background)
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+docker-compose-build: COMPOSE_FILE = docker-compose-build.yml
 docker-compose-build:  ## build containers
-	docker-compose build --no-cache
+	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache
 
+docker-compose-build-cached: COMPOSE_FILE = docker-compose-build.yml
 docker-compose-build-cached:  ## build containers (cached)
-	docker-compose build --build-arg UID=$(shell id -u $$USER)
+	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO)
 
 api: COMPOSE_FILE = docker-compose-build.yml
 api:

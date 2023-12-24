@@ -6,18 +6,20 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+          MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     ports:
       - "8000:80"
 
   api:
     container_name: molior-api
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/api.Dockerfile
       args:
           DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
           MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
+    env_file: docker.env
     ports:
       - "127.0.0.1:9999:9999"
     volumes:
@@ -36,12 +38,12 @@ services:
 
   aptly:
     container_name: molior-aptly
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/aptly.Dockerfile
       args:
           MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
+    env_file: docker.env
     ports:
       - "127.0.0.1:3142:3142"
     volumes:
@@ -49,10 +51,10 @@ services:
 
   nginx:
     container_name: molior-nginx
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/nginx.Dockerfile
+    env_file: docker.env
     ports:
       - "8080:8000"
     volumes:
@@ -60,13 +62,10 @@ services:
 
   registry:
     container_name: molior-registry
-    profiles: ["serve"]
     build:
       context: .
       dockerfile: docker/registry.Dockerfile
-    environment:
-      USER: "molior"
-      PASSWORD: "molior-registry"
+    env_file: docker.env
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
