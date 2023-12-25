@@ -1,0 +1,56 @@
+version: "3"
+
+services:
+  web:
+    image: neolynx/molior_web
+    container_name: molior-web
+    ports:
+      - "8000:80"
+
+  api:
+    image: neolynx/molior_api
+    container_name: molior-api
+    env_file: .env
+    volumes:
+      - pgsock:/var/run/postgresql/
+      - /var/run/docker.sock:/var/run/docker.sock
+      - molior:/var/lib/molior/
+
+  postgres:
+    image: neolynx/molior_postgres
+    container_name: molior-postgres
+    volumes:
+      - pgsock:/var/run/postgresql/
+      - postgres:/var/lib/postgresql/15/main
+
+  aptly:
+    image: neolynx/molior_aptly
+    container_name: molior-aptly
+    env_file: .env
+    volumes:
+      - aptly:/var/lib/aptly/
+
+  nginx:
+    image: neolynx/molior_nginx
+    container_name: molior-nginx
+    env_file: .env
+    ports:
+      - "8080:8000"
+    volumes:
+      - aptly:/var/lib/aptly/
+
+  registry:
+    image: neolynx/molior_registry
+    container_name: molior-registry
+    env_file: .env
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - registry:/var/lib/docker-registry/
+
+volumes:
+     pgsock:
+     postgres:
+     registry:
+     aptly:
+     molior:

@@ -57,6 +57,10 @@ nginx: COMPOSE_FILE = docker-compose-build.yml
 nginx:
 	docker-compose build --no-cache nginx
 
+nginx-cached: COMPOSE_FILE = docker-compose-build.yml
+nginx-cached:
+	docker-compose build nginx
+
 registry: COMPOSE_FILE = docker-compose-build.yml
 registry:
 	docker-compose build --no-cache registry
