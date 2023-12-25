@@ -20,6 +20,8 @@ services:
           DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
           MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     env_file: docker.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:9999:9999"
     volumes:

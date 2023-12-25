@@ -11,6 +11,8 @@ services:
     image: neolynx/molior_api
     container_name: molior-api
     env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - pgsock:/var/run/postgresql/
       - /var/run/docker.sock:/var/run/docker.sock
