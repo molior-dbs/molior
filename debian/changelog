@@ -1,3 +1,11 @@
+molior (1.5.0~alpha51) stretch; urgency=medium
+
+  * docker: add readme
+  * docker: add prod compose file
+  * docker: use consisten variable naming
+
+ -- André Roth <neolynx@gmail.com>  Mon, 25 Dec 2023 12:03:36 +0100
+
 molior (1.5.0~alpha50) stretch; urgency=medium
 
   * build: use internal apt url
