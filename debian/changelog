@@ -1,3 +1,10 @@
+molior (1.5.0~alpha53) stretch; urgency=medium
+
+  * docker: fix internal apt url
+  * Revert "use public apt url for chroots"
+
+ -- André Roth <neolynx@gmail.com>  Mon, 25 Dec 2023 15:35:11 +0100
+
 molior (1.5.0~alpha52) stretch; urgency=medium
 
   * use public apt url for chroots
