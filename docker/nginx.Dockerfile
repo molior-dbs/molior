@@ -9,6 +9,4 @@ ADD docker/aptly/nginx/aptlyapi /etc/nginx/sites-available/
 RUN ln -s ../sites-available/aptly /etc/nginx/sites-enabled/
 RUN ln -s ../sites-available/aptlyapi /etc/nginx/sites-enabled/
 
-ARG APTLY_USER
-ARG APTLY_PASS
-CMD /usr/sbin/create-aptly-passwd $APTLY_USER $APTLY_PASS && nginx -g 'daemon off;'
+CMD /usr/sbin/create-aptly-passwd $APTLY_USER $APTLY_PASSWORD && nginx -g 'daemon off;'

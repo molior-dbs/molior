@@ -23,9 +23,9 @@ RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
 CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; \
-        sed -i "s#admin_password:.*#admin_password: '$MOLIOR_ADMIN_PASSWD'#" /etc/molior/molior.yml && \
+        sed -i "s#admin_password:.*#admin_password: '$ADMIN_PASSWORD'#" /etc/molior/molior.yml && \
         sed -i "s#api_user:.*#api_user: '$APTLY_USER'#" /etc/molior/molior.yml && \
-        sed -i "s#api_pass:.*#api_pass: '$APTLY_PASS'#" /etc/molior/molior.yml && \
+        sed -i "s#api_pass:.*#api_pass: '$APTLY_PASSWORD'#" /etc/molior/molior.yml && \
         sed -i "s#debsign_gpg_email:.*#debsign_gpg_email: '$DEBSIGN_EMAIL'#" /etc/molior/molior.yml && \
         sed -i "s#gpg_key:.*#gpg_key: '$REPOSIGN_EMAIL'#" /etc/molior/molior.yml && \
         sed -i "s#apt_url_public:.*#apt_url_public: '$APT_URL_PUBLIC'#" /etc/molior/molior.yml && \
