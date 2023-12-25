@@ -27,7 +27,7 @@ class Chroot(Base):
 
     def get_mirror_keys(self):
         cfg = Configuration()
-        apt_url = cfg.aptly.get("apt_url")
+        apt_url = cfg.aptly.get("apt_url_public")
         keyfile = cfg.aptly.get("key")
         mirror_keys = apt_url + "/" + keyfile
         if self.basemirror.external_repo:
