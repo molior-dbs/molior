@@ -1,7 +1,6 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends nginx-light apache2-utils && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 RUN mkdir app
 WORKDIR /app
 

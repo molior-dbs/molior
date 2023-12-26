@@ -18,7 +18,6 @@ services:
       dockerfile: docker/api-dev.Dockerfile
       args:
           DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
-          MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     env_file: .env
     ports:
       - "127.0.0.1:9999:9999"
@@ -42,8 +41,6 @@ services:
     build:
       context: .
       dockerfile: docker/aptly-dev.Dockerfile
-      args:
-          MOLIOR_APT_REPO: ${MOLIOR_APT_REPO}
     env_file: .env
     ports:
       - "127.0.0.1:3142:3142"

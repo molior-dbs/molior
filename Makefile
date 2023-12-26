@@ -3,12 +3,11 @@
 
 export COMPOSE_PROJECT_NAME=molior
 export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
-export MOLIOR_APT_REPO=http://molior.info/1.5
 
-start: COMPOSE_FILE = docker-compose-build.yml
-start:  ## run containers (background)
-	@docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO)
-	@docker-compose --profile serve up -d
+dev: COMPOSE_FILE = docker-compose-dev.yml
+dev:  ## run development containers
+	@docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID)
+	@docker-compose up -d
 
 start-prod:  ## run containers (background)
 	@docker-compose --profile serve up -d
@@ -20,35 +19,35 @@ help:  ## Print this help
 
 docker-compose-build: COMPOSE_FILE = docker-compose-build.yml
 docker-compose-build:  ## build containers
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache
+	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) --no-cache
 
 docker-compose-build-cached: COMPOSE_FILE = docker-compose-build.yml
 docker-compose-build-cached:  ## build containers (cached)
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO)
+	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID)
 
 api: COMPOSE_FILE = docker-compose-build.yml
 api:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache api
+	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) --no-cache api
 
 api-cached: COMPOSE_FILE = docker-compose-build.yml
 api-cached:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) api
+	docker-compose build --build-arg api
 
 web: COMPOSE_FILE = docker-compose-build.yml
 web:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache web
+	docker-compose build --no-cache web
 
 web-cached: COMPOSE_FILE = docker-compose-build.yml
 web-cached:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) web
+	docker-compose build web
 
 aptly: COMPOSE_FILE = docker-compose-build.yml
 aptly:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) --no-cache aptly
+	docker-compose build --no-cache aptly
 
 aptly-cached: COMPOSE_FILE = docker-compose-build.yml
 aptly-cached:
-	docker-compose build --build-arg MOLIOR_APT_REPO=$(MOLIOR_APT_REPO) aptly
+	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) aptly
 
 postgres:
 	docker-compose build --no-cache postgres
