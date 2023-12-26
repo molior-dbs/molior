@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends curl nodejs npm gnupg && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends curl gnupg && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN mkdir app
 WORKDIR /app
 
