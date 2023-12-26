@@ -14,8 +14,6 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
-      args:
-          DOCKER_GROUP_ID: ${DOCKER_GROUP_ID}
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"

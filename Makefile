@@ -1,13 +1,14 @@
 .EXPORT_ALL_VARIABLES:
 .PHONY: MAKECMDGOALS
 
-export COMPOSE_PROJECT_NAME=molior
-export DOCKER_GROUP_ID=$(shell getent group docker | cut -d: -f3)
-
 dev: COMPOSE_FILE = docker-compose-dev.yml
 dev:  ## run development containers
-	@docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID)
+	@docker-compose build
 	@docker-compose up -d
+
+build: COMPOSE_FILE = docker-compose.yml
+build:  ## run development containers
+	@docker-compose build
 
 start-prod:  ## run containers (background)
 	@docker-compose --profile serve up -d
@@ -17,17 +18,9 @@ start-prod:  ## run containers (background)
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-docker-compose-build: COMPOSE_FILE = docker-compose-build.yml
-docker-compose-build:  ## build containers
-	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) --no-cache
-
-docker-compose-build-cached: COMPOSE_FILE = docker-compose-build.yml
-docker-compose-build-cached:  ## build containers (cached)
-	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID)
-
 api: COMPOSE_FILE = docker-compose-build.yml
 api:
-	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) --no-cache api
+	docker-compose build --no-cache api
 
 api-cached: COMPOSE_FILE = docker-compose-build.yml
 api-cached:
@@ -47,7 +40,7 @@ aptly:
 
 aptly-cached: COMPOSE_FILE = docker-compose-build.yml
 aptly-cached:
-	docker-compose build --build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) aptly
+	docker-compose build aptly
 
 postgres:
 	docker-compose build --no-cache postgres
