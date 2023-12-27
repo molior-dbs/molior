@@ -5,9 +5,13 @@
 
 Edit .env file and adapt settings:
 ```
-# molior settings
+COMPOSE_PROJECT_NAME=molior
+
+# WebUI admin password
 ADMIN_PASSWORD=molior-dev
-APT_URL_PUBLIC=http://localhost:8080
+
+# URL where the APT repositories are reachable (also from docker build nodes)
+APT_URL_PUBLIC=http://host.docker.internal:8080
 
 # docker registry
 REGISTRY_USER=molior
@@ -22,7 +26,6 @@ DEBSIGN_NAME=molior
 DEBSIGN_EMAIL=debsign@molior
 REPOSIGN_NAME=molior
 REPOSIGN_EMAIL=reposign@molior
-
 ```
 
 ## Start molior
