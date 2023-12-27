@@ -1,13 +1,17 @@
 dev:  ## build and run development containers
-	@docker-compose build
-	@docker-compose up -d
-
-dev-cached:  ## build (cached) and run development containers
 	@docker-compose build --no-cache
 	@docker-compose up -d
 
-build:  ## run development containers
+dev-cached:  ## build (cached) and run development containers
+	@docker-compose build
+	@docker-compose up -d
+
+prod-build:  ## run development containers
 	@docker-compose -f docker-compose-build.yml build --no-cache
+
+prod-docker-push:
+	for i in web api aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
+	for i in web api aptly nginx postgres registry; do docker push neolynx/molior_$$i; done
 
 # Self-documenting Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
@@ -111,6 +115,3 @@ shell-registry:  ## login to registry container
 psql:  ## login to api container
 	docker-compose exec postgres su postgres -c "psql molior"
 
-docker-push:
-	for i in web api aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
-	for i in web api aptly nginx postgres registry; do docker push neolynx/molior_$$i; done
