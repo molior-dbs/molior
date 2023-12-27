@@ -71,7 +71,7 @@ log "Builder : `hostname`"
 echo
 
 log "APT Sources:"
-curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources?internal=true" > /etc/apt/sources.list
+curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
 cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 
 echo
