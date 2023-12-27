@@ -1,18 +1,14 @@
-.EXPORT_ALL_VARIABLES:
-.PHONY: MAKECMDGOALS
-
-export COMPOSE_FILE = docker-compose-dev.yml
-
-dev:  ## run development containers
+dev:  ## build and run development containers
 	@docker-compose build
 	@docker-compose up -d
 
-build: COMPOSE_FILE = docker-compose.yml
+dev-cached:  ## build (cached) and run development containers
+	@docker-compose build --no-cache
+	@docker-compose up -d
+
+build: COMPOSE_FILE = docker-compose-build.yml
 build:  ## run development containers
 	@docker-compose build
-
-start-prod:  ## run containers (background)
-	@docker-compose --profile serve up -d
 
 # Self-documenting Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
@@ -22,7 +18,6 @@ help:  ## Print this help
 api:
 	docker-compose build --no-cache api
 
-api-cached: COMPOSE_FILE = docker-compose-build.yml
 api-cached:
 	docker-compose build api
 
@@ -51,7 +46,7 @@ registry:
 	docker-compose build --no-cache registry
 
 stop:  ## stop containers
-	@docker-compose --profile serve --profile test down
+	@docker-compose down
 
 stop-api:  ## stop api container
 	@docker-compose stop api
@@ -67,9 +62,6 @@ stop-web:  ## stop web container
 
 stop-registry:  ## stop registry container
 	@docker-compose stop registry
-
-run-aptly: stop-aptly
-	docker run -it -v $(CWD)/../aptly:/app -v molior_aptly:/var/lib/aptly/ molior_aptly /bin/su - aptly -c /bin/bash
 
 clean:  ## clean containers and volumes
 	@echo; echo "This will delete volumes and data!"; echo Press Enter to continue, Ctrl-C to abort ...; read x
