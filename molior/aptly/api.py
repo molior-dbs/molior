@@ -366,8 +366,9 @@ class AptlyApi:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
+        state = {"State": 3}  # fail in case of exception
         progress = {}
-        for i in range(20):
+        for i in range(3):
             try:
                 state = await self.GET(f"/tasks/{task_id}")
                 progress = await self.GET(f"/tasks/{task_id}/detail")
