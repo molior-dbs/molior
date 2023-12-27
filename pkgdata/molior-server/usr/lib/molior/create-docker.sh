@@ -49,7 +49,6 @@ build_docker()
   if [ -n "$COMPONENTS" ]; then
       COMPONENTS="--components main,$COMPONENTS"
   fi
-  # INCLUDE="--include=gnupg"
 
   keydir=`mktemp -d /tmp/molior-chrootkeys.XXXXXX`
   i=1
@@ -123,22 +122,12 @@ EOM
   done
   rm -rf $keydir
 
-#  echo I: Adding gpg public keys to chroot
-#  for keyfile in $keydir/*
-#  do
-#    cat $keyfile | chroot $target apt-key add - >/dev/null || true
-#  done
-#  rm -rf $keydir
-
-  # Add Molior Source signing key
-  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target gpg1 --import --no-default-keyring --keyring=trustedkeys.gpg
-  # su molior -c "gpg1 --export --armor $DEBSIGN_GPG_EMAIL" | chroot $target apt-key add -
-
   echo I: Installing build environment
+  cp /etc/hosts $target/etc/hosts  # needed if host.docker.internal is used
   chroot $target apt-get update
   chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git
   chroot $target apt-get clean
-
+  rm -f $target/etc/hosts
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
   mkdir $target/app
@@ -206,4 +195,3 @@ case "$ACTION" in
     exit 1
     ;;
 esac
-

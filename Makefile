@@ -6,9 +6,8 @@ dev-cached:  ## build (cached) and run development containers
 	@docker-compose build --no-cache
 	@docker-compose up -d
 
-build: COMPOSE_FILE = docker-compose-build.yml
 build:  ## run development containers
-	@docker-compose build
+	@docker-compose -f docker-compose-build.yml build --no-cache
 
 # Self-documenting Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
