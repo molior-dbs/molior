@@ -7,10 +7,14 @@ RUN adduser --uid 5432 --system --home /var/lib/postgresql --no-create-home --sh
 RUN mkdir app
 WORKDIR /app
 
+RUN useradd --uid 7777 -m --shell /bin/sh --home-dir /var/lib/molior molior
+
 RUN echo deb http://molior.info/1.5 stable main > /etc/apt/sources.list.d/molior.list
 RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update && \
     apt-get install -y --no-install-recommends molior-server docker.io && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN usermod -G docker molior
 
 ADD docker/molior.yml /etc/molior/
 ADD docker/docker-registry.conf /etc/molior/
