@@ -1,7 +1,8 @@
 .EXPORT_ALL_VARIABLES:
 .PHONY: MAKECMDGOALS
 
-dev: COMPOSE_FILE = docker-compose-dev.yml
+export COMPOSE_FILE = docker-compose-dev.yml
+
 dev:  ## run development containers
 	@docker-compose build
 	@docker-compose up -d
@@ -18,42 +19,34 @@ start-prod:  ## run containers (background)
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-api: COMPOSE_FILE = docker-compose-build.yml
 api:
 	docker-compose build --no-cache api
 
 api-cached: COMPOSE_FILE = docker-compose-build.yml
 api-cached:
-	docker-compose build --build-arg api
+	docker-compose build api
 
-web: COMPOSE_FILE = docker-compose-build.yml
 web:
 	docker-compose build --no-cache web
 
-web-cached: COMPOSE_FILE = docker-compose-build.yml
 web-cached:
 	docker-compose build web
 
-aptly: COMPOSE_FILE = docker-compose-build.yml
 aptly:
 	docker-compose build --no-cache aptly
 
-aptly-cached: COMPOSE_FILE = docker-compose-build.yml
 aptly-cached:
 	docker-compose build aptly
 
 postgres:
 	docker-compose build --no-cache postgres
 
-nginx: COMPOSE_FILE = docker-compose-build.yml
 nginx:
 	docker-compose build --no-cache nginx
 
-nginx-cached: COMPOSE_FILE = docker-compose-build.yml
 nginx-cached:
 	docker-compose build nginx
 
-registry: COMPOSE_FILE = docker-compose-build.yml
 registry:
 	docker-compose build --no-cache registry
 

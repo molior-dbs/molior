@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: docker/web-dev.Dockerfile
+    networks:
+      - molior
     ports:
       - "8000:4200"
     volumes:
@@ -17,6 +19,10 @@ services:
       context: .
       dockerfile: docker/api-dev.Dockerfile
     env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - molior
     ports:
       - "127.0.0.1:9999:9999"
     volumes:
@@ -30,6 +36,8 @@ services:
     build:
       context: .
       dockerfile: docker/postgres.Dockerfile
+    networks:
+      - molior
     volumes:
       - pgsock:/var/run/postgresql/
       - postgres:/var/lib/postgresql/15/main
@@ -40,6 +48,8 @@ services:
       context: .
       dockerfile: docker/aptly-dev.Dockerfile
     env_file: .env
+    networks:
+      - molior
     ports:
       - "127.0.0.1:3142:3142"
     volumes:
@@ -52,6 +62,8 @@ services:
       context: .
       dockerfile: docker/nginx.Dockerfile
     env_file: .env
+    networks:
+      - molior
     ports:
       - "8080:8000"
     volumes:
@@ -64,11 +76,17 @@ services:
       context: .
       dockerfile: docker/registry.Dockerfile
     env_file: .env
+    networks:
+      - molior
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
       - ./:/app
       - registry:/var/lib/docker-registry/
+
+networks:
+  molior:
+    name: molior
 
 volumes:
      pgsock:

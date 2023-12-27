@@ -10,5 +10,5 @@ WORKDIR /app
 
 RUN go install github.com/cosmtrek/air@latest
 
-CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys "Molior Reposign" reposign@molior.info && \
+CMD /app/debian/pkgdata/usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL && \
     su aptly -c "aptly api serve -listen 0.0.0.0:3142"
