@@ -1,3 +1,9 @@
+molior (1.5.0~alpha59) stretch; urgency=medium
+
+  * docker: fix chroot build
+
+ -- André Roth <neolynx@gmail.com>  Wed, 27 Dec 2023 20:06:03 +0100
+
 molior (1.5.0~alpha58) stretch; urgency=medium
 
   * mirror: retry progress only 3 times
