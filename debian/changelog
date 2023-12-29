@@ -1,3 +1,11 @@
+molior (1.5.0~alpha60) stretch; urgency=medium
+
+  * docker: cleanup aptly dev env
+  * mirror: show gpg output in build log
+  * docker: cleanup
+
+ -- André Roth <neolynx@gmail.com>  Fri, 29 Dec 2023 14:03:44 +0100
+
 molior (1.5.0~alpha59) stretch; urgency=medium
 
   * docker: fix chroot build
