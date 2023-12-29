@@ -123,9 +123,14 @@ class AptlyApi:
         data, headers = self.__prepare_content(data)
         async with aiohttp.ClientSession() as http:
             async with http.post(self.url + apipath, auth=self.auth, headers=headers, params=params, data=data) as resp:
+                msg = await resp.text()
+                try:
+                    msg = json.loads(msg)
+                except Exception:
+                    pass
                 if not self.__check_status_code(resp.status):
-                    self.__raise_aptly_error(resp)
-                return json.loads(await resp.text())
+                    raise Exception(msg)
+                return msg
 
     async def DELETE(self, apipath, headers=None, data=None):
         params = {"_async": "true"}
@@ -218,7 +223,11 @@ class AptlyApi:
             data["Keyserver"] = key_server
             data["GpgKeyID"] = " ".join(keys)
 
-        return await self.POST("/gpg/key", data=data)
+        try:
+            ret = await self.POST("/gpg/key", data=data)
+        except Exception as exc:
+            return False, str(exc)
+        return True, ret
 
     async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
                             components, architectures, mirror_filter, download_sources=True,
