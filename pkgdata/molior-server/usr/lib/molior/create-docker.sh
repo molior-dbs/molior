@@ -118,7 +118,7 @@ EOM
     name=`basename $keyfile .asc`
     mv $keyfile $keydir/$name
     gpg --dearmour $keydir/$name
-    mv $keydir/$name.gpg $target//etc/apt/trusted.gpg.d/
+    mv $keydir/$name.gpg $target/etc/apt/trusted.gpg.d/
   done
   rm -rf $keydir
 
