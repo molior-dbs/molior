@@ -20,7 +20,7 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info;\
     mkdir -p /usr/lib/molior; \
     cp /app/pkgdata/molior-common/usr/lib/molior/* /usr/lib/molior/; \
-    cp /app/docker/docker-registry.conf /etc/molior/; \
+    cp /app/docker/backend-docker.yml /etc/molior/; \
     cp /app/pkgdata/molior-server/etc/sudoers.d/01_molior /etc/sudoers.d/; \
     mkdir -p /etc/molior/mirror-hooks.d; \
     ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker; \
@@ -35,7 +35,7 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     sed -i "s#debsign_gpg_email:.*#debsign_gpg_email: '$DEBSIGN_EMAIL'#" /etc/molior/molior.yml && \
     sed -i "s#gpg_key:.*#gpg_key: '$REPOSIGN_EMAIL'#" /etc/molior/molior.yml && \
     sed -i "s#apt_url_public:.*#apt_url_public: '$APT_URL_PUBLIC'#" /etc/molior/molior.yml && \
-    sed -i "s#DOCKER_USER=.*#DOCKER_USER='$REGISTRY_USER'#" /etc/molior/docker-registry.conf && \
-    sed -i "s#DOCKER_PASSWORD=.*#DOCKER_PASSWORD='$REGISTRY_PASSWORD'#" /etc/molior/docker-registry.conf && \
+    sed -i "s#user:.*#user: \"$REGISTRY_USER\"#" /etc/molior/backend-docker.yml && \
+    sed -i "s#password:.*#password: \"$REGISTRY_PASSWORD\"#" /etc/molior/backend-docker.yml && \
     cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
-    su molior -c "exec adev runserver -p 9999 molior/"
+    su molior -c "exec adev runserver -q -p 9999 molior/"
