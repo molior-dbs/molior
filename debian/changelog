@@ -1,3 +1,11 @@
+molior (1.5.0~alpha61) stretch; urgency=medium
+
+  * docker: use backend config
+  * docker: cleanup docker push
+  * docker: do not clean in build
+
+ -- André Roth <neolynx@gmail.com>  Fri, 29 Dec 2023 23:59:53 +0100
+
 molior (1.5.0~alpha60) stretch; urgency=medium
 
   * docker: cleanup aptly dev env
