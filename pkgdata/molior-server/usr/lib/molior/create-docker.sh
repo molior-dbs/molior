@@ -31,6 +31,23 @@ DEBOOTSTRAP_TAR="/var/lib/molior/upload/dockerbase//$DEBOOTSTRAP_NAME.tar"
 set -e
 #set -x
 
+parse_yaml() {
+   prefix="$2"
+   s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\):|\1|" \
+        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  "$1" |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
+}
+
 build_docker()
 {
   rm -f $DEBOOTSTRAP_TAR
@@ -162,8 +179,11 @@ publish_docker()
   rm -f $DEBOOTSTRAP_TAR
 
   REGISTRY=localhost:5000
-  if [ -f /etc/molior/docker-registry.conf ]; then
-      . /etc/molior/docker-registry.conf
+  if [ -f /etc/molior/backend-docker.yml ]; then
+      eval $(parse_yaml /etc/molior/backend-docker.yml)
+      REGISTRY=$registry__server
+      DOCKER_USER=$registry__user
+      DOCKER_PASSWORD=$registry__password
   fi
 
   if [ -n "$DOCKER_USER" ]; then

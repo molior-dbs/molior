@@ -1,0 +1,9 @@
+registry:
+    server: "localhost:5000"
+    user:
+    password:
+
+builder:
+    arm64:
+        remote_cmd: "ssh -o StrictHostKeyChecking=no lynx@192.168.7.122"
+        registry: "192.168.7.254:5000"

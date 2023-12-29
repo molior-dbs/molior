@@ -1,8 +1,10 @@
 import asyncio
+import shlex
+
 from launchy import Launchy
 
 from ...logger import logger
-# from ...molior.configuration import Configuration
+from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enqueue_backend
 
 
@@ -10,7 +12,27 @@ class DockerBackend:
 
     def __init__(self, loop):
         self.loop = loop
-        self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler(), loop=self.loop)
+        self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
+        self.task_scheduler_arm64 = asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
+
+        self.registry = "localhost:5000"
+        self.remotes = {"amd64": "", "arm64": ""}
+        self.registries = {}  # allow overriding per architecture
+
+        cfg = Configuration("/etc/molior/backend-docker.yml")
+        if cfg:
+            self.registry = cfg.registry.get("server")
+
+            for arch in ["amd64", "arm64"]:
+                builder = cfg.builder.get(arch)
+                if builder:
+                    remote_cmd = builder.get("remote_cmd")
+                    if remote_cmd:
+                        self.remotes[arch] = remote_cmd
+
+                    registry = builder.get("registry")
+                    if registry:
+                        self.registries[arch] = registry
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
@@ -39,14 +61,15 @@ class DockerBackend:
     async def stop(self):
         pass
 
-    async def scheduler(self):
+    async def scheduler(self, arch):
         up = True
         while up:
             try:
-                arch = "amd64"
                 task = await dequeue_buildtask(arch)
                 if task is None:
                     break
+
+                logger.info(f"scheduler {arch}: {task}")
 
                 build_id = task["build_id"]
 
@@ -55,32 +78,42 @@ class DockerBackend:
                 async def outh(line):
                     await buildlog(build_id, line)
 
-                process = Launchy(["docker", "run", "-t", "--rm", "--add-host=host.docker.internal:host-gateway",
-                                   "-e", f"BUILD_ID={task['build_id']}",
-                                   "-e", f"BUILD_TOKEN={task['token']}",
-                                   "-e", f"PLATFORM={task['distrelease']}",
-                                   "-e", f"PLATFORM_VERSION={task['distversion']}",
-                                   "-e", f"ARCH={task['architecture']}",
-                                   "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
-                                   "-e", f"REPO_NAME={task['repository_name']}",
-                                   "-e", f"VERSION={task['version']}",
-                                   "-e", f"PROJECT_DIST={task['project_dist']}",
-                                   "-e", f"PROJECT={task['project']}",
-                                   "-e", f"PROJECTVERSION={task['projectversion']}",
-                                   "-e", f"APT_SERVER={task['apt_server']}",
-                                   "-e", f"APT_URLS={task['apt_urls']}",
-                                   "-e", f"APT_KEYS={task['apt_keys']}",
-                                   "-e", f"RUN_LINTIAN={task['run_lintian']}",
-                                   "-e", f"MOLIOR_SERVER=http://host.docker.internal:8000",
-                                   f"localhost:5000/molior:{task['distversion']}-{task['architecture']}", "/app/build-docker",
-                                   ], out_handler=outh, err_handler=outh, buffered=False)
+                registry = self.registry
+                if self.registries[arch]:
+                    registry = self.registries[arch]
+
+                cmd = shlex.split(self.remotes[arch])
+                cmd.extend([
+                    "docker", "run", "-t", "--rm",
+                    "--add-host=host.docker.internal:host-gateway",
+                    "-e", f"BUILD_ID={task['build_id']}",
+                    "-e", f"BUILD_TOKEN={task['token']}",
+                    "-e", f"PLATFORM={task['distrelease']}",
+                    "-e", f"PLATFORM_VERSION={task['distversion']}",
+                    "-e", f"ARCH={task['architecture']}",
+                    "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
+                    "-e", f"REPO_NAME={task['repository_name']}",
+                    "-e", f"VERSION={task['version']}",
+                    "-e", f"PROJECT_DIST={task['project_dist']}",
+                    "-e", f"PROJECT={task['project']}",
+                    "-e", f"PROJECTVERSION={task['projectversion']}",
+                    "-e", f"APT_SERVER={task['apt_server']}",
+                    "-e", f"APT_URLS={task['apt_urls']}",
+                    "-e", f"APT_KEYS={task['apt_keys']}",
+                    "-e", f"RUN_LINTIAN={task['run_lintian']}",
+                    "-e", f"MOLIOR_SERVER=http://host.docker.internal:8000",
+                    f"{registry}/molior:{task['distversion']}-{task['architecture']}",
+                    "/app/build-docker",
+                    ])
+                logger.info(f"running: {cmd}")
+                process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
 
                 await buildlog(build_id, None)  # signal end of logs
 
                 if not ret == 0:
-                    logger.error("error starting docker build")
+                    logger.error("error running docker build")
                     await enqueue_backend({"failed": build_id})
                 else:
                     await enqueue_backend({"succeeded": build_id})
