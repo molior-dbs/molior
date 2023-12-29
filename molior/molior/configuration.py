@@ -4,14 +4,10 @@ from pathlib import Path
 
 from ..logger import logger
 
+CONFIGURATION_PATH = "/etc/molior/molior.yml"
 
-class Configuration(object):  # pylint: disable=too-few-public-methods
-    """
-    Molior Configuration Class
-    """
 
-    CONFIGURATION_PATH = "/etc/molior/molior.yml"
-
+class Configuration(object):
     def __init__(self, config_file=CONFIGURATION_PATH):
         self._config_file = config_file
         self._config = None
