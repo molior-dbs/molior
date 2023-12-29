@@ -79,7 +79,7 @@ class DockerBackend:
                     await buildlog(build_id, line)
 
                 registry = self.registry
-                if self.registries[arch]:
+                if arch in self.registries:
                     registry = self.registries[arch]
 
                 cmd = shlex.split(self.remotes[arch])
