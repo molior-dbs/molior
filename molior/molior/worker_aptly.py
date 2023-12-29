@@ -482,28 +482,26 @@ class AptlyWorker:
                 aptly = get_aptly_connection()
                 if key_url:
                     await build.log("I: adding GPG keys from {}\n".format(key_url))
-                    try:
-                        await aptly.gpg_add_key(key_url=key_url)
-                    except AptlyError as exc:
-                        await build.log("E: Error adding keys from '%s'\n" % key_url)
-                        logger.error("key error: %s", exc)
+                    ret, msg = await aptly.gpg_add_key(key_url=key_url)
+                    if not ret:
+                        await build.log("E: Error adding gpg keys\n{msg}\n")
                         await build.set_failed()
                         await build.logdone()
                         mirror.mirror_state = "init_error"
                         session.commit()
                         return False
+                    await build.log(f"  {msg}\n")
                 elif keyserver and keyids:
                     await build.log("I: adding GPG keys {} from {}\n".format(keyids, keyserver))
-                    try:
-                        await aptly.gpg_add_key(key_server=keyserver, keys=keyids)
-                    except AptlyError as exc:
-                        await build.log("E: Error adding keys %s\n" % str(keyids))
-                        logger.error("key error: %s", exc)
+                    ret, msg = await aptly.gpg_add_key(key_server=keyserver, keys=keyids)
+                    if not ret:
+                        await build.log("E: Error adding gpg keys\n{msg}\n")
                         await build.set_failed()
                         await build.logdone()
                         mirror.mirror_state = "init_error"
                         session.commit()
                         return False
+                    await build.log(f"  {msg}\n")
 
                 await build.log("I: creating mirror\n")
                 if mirror.mirror_filter:
