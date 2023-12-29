@@ -1,3 +1,9 @@
+molior (1.5.0~alpha62) stretch; urgency=medium
+
+  * docker: fix backend registry override
+
+ -- André Roth <neolynx@gmail.com>  Sat, 30 Dec 2023 00:14:25 +0100
+
 molior (1.5.0~alpha61) stretch; urgency=medium
 
   * docker: use backend config
