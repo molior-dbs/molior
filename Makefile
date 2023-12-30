@@ -10,8 +10,8 @@ prod-build:  ## run development containers
 	@docker-compose -f docker-compose-build.yml build --no-cache
 
 prod-docker-push:
-	@for i in web api aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
-	@for i in web api aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
+	@for i in api web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
+	@for i in api web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
 
 # Self-documenting Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
