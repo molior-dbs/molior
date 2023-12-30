@@ -1,5 +1,8 @@
 # Molior configuration
 
+server:
+    url: 'http://localhost:8000'
+
 hostname: '127.0.0.1'
 working_dir: '/var/lib/molior'
 database: '/molior'

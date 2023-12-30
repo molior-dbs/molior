@@ -54,7 +54,7 @@ class DockerBackend:
 
                 build_id = task["build_id"]
 
-                hostname = Configuration().get("hostname")
+                server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-docker.yml")
                 if not cfg:
                     logger.error("docker-backend: config file not found: /etc/molior/backend-docker.yml")
@@ -94,7 +94,7 @@ class DockerBackend:
                     "-e", f"APT_URLS={task['apt_urls']}",
                     "-e", f"APT_KEYS={task['apt_keys']}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
-                    "-e", f"MOLIOR_SERVER={hostname}",
+                    "-e", f"MOLIOR_SERVER={server_url}",
                     f"{registry}/molior:{task['distversion']}-{task['architecture']}",
                     "/app/build-docker",
                     ])
