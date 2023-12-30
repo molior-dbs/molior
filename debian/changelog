@@ -1,3 +1,9 @@
+molior (1.5.0~alpha64) stretch; urgency=medium
+
+  * docker: use server url from config
+
+ -- André Roth <neolynx@gmail.com>  Sat, 30 Dec 2023 01:22:28 +0100
+
 molior (1.5.0~alpha63) stretch; urgency=medium
 
   * docker: allow remote docker builds
