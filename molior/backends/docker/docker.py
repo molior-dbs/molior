@@ -10,10 +10,23 @@ from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enq
 
 class DockerBackend:
 
-    def __init__(self, loop):
-        self.loop = loop
-        self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
-        self.task_scheduler_arm64 = asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
+    def __init__(self, _):
+        self.queue_amd64 = asyncio.Queue(1)
+        self.queue_arm64 = asyncio.Queue(1)
+
+        self.scheduler = {}
+        cfg = Configuration("/etc/molior/backend-docker.yml")
+        if not cfg:
+            logger.error("docker-backend: config file not found: /etc/molior/backend-docker.yml")
+        else:
+            for arch in ["amd64", "arm64"]:
+                self.scheduler[arch] = []
+                builder = cfg.builder.get(arch)
+                parallel = 1
+                if builder:
+                    parallel = builder.get("parallel", 1)
+                for i in range(parallel):
+                    self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
@@ -39,10 +52,13 @@ class DockerBackend:
     async def abort(self, build_id):
         logger.error(f"aborting build {build_id}: NOT IMPLEMENTED")
 
+    def get_nodes_info(self):
+        return []
+
     async def stop(self):
         pass
 
-    async def scheduler(self, arch):
+    async def consumer(self, arch):
         up = True
         while up:
             try:
@@ -67,13 +83,8 @@ class DockerBackend:
                     remote_cmd = builder.get("remote_cmd")
 
                     override_registry = builder.get("registry")
-                    if registry:
+                    if override_registry is not None:
                         registry = override_registry
-
-                async def outh(line):
-                    await buildlog(build_id, line)
-
-                await enqueue_backend({"started": build_id})
 
                 cmd = shlex.split(remote_cmd)
                 cmd.extend([
@@ -98,7 +109,13 @@ class DockerBackend:
                     f"{registry}/molior:{task['distversion']}-{task['architecture']}",
                     "/app/build-docker",
                     ])
+
                 logger.info(f"running: {cmd}")
+
+                async def outh(line):
+                    await buildlog(build_id, line)
+
+                await enqueue_backend({"started": build_id})
                 process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()

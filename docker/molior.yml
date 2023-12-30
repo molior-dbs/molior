@@ -1,7 +1,7 @@
 # Molior configuration
 
 server:
-    url: 'http://localhost:8000'
+    url: 'http://host.docker.internal:8000'
 
 hostname: '127.0.0.1'
 working_dir: '/var/lib/molior'
@@ -27,7 +27,7 @@ max_parallel_chroots: 2
 
 # Aptly settings
 aptly:
-    apt_url_public: 'http://localhost:8080'
+    apt_url_public: 'http://host.docker.internal:8080'
     apt_url: 'http://host.docker.internal:8080'
     api_url: 'http://nginx:3143/api'
     api_user: 'molior'
