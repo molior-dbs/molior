@@ -15,25 +15,6 @@ class DockerBackend:
         self.task_scheduler_amd64 = asyncio.ensure_future(self.scheduler("amd64"), loop=self.loop)
         self.task_scheduler_arm64 = asyncio.ensure_future(self.scheduler("arm64"), loop=self.loop)
 
-        self.registry = "localhost:5000"
-        self.remotes = {"amd64": "", "arm64": ""}
-        self.registries = {}  # allow overriding per architecture
-
-        cfg = Configuration("/etc/molior/backend-docker.yml")
-        if cfg:
-            self.registry = cfg.registry.get("server")
-
-            for arch in ["amd64", "arm64"]:
-                builder = cfg.builder.get(arch)
-                if builder:
-                    remote_cmd = builder.get("remote_cmd")
-                    if remote_cmd:
-                        self.remotes[arch] = remote_cmd
-
-                    registry = builder.get("registry")
-                    if registry:
-                        self.registries[arch] = registry
-
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
         task_id = "build_%d" % build_id
@@ -73,16 +54,28 @@ class DockerBackend:
 
                 build_id = task["build_id"]
 
-                await enqueue_backend({"started": build_id})
+                hostname = Configuration().get("hostname")
+                cfg = Configuration("/etc/molior/backend-docker.yml")
+                if not cfg:
+                    logger.error("docker-backend: config file not found: /etc/molior/backend-docker.yml")
+                    continue
+
+                registry = cfg.registry.get("server")
+                remote_cmd = ""
+                builder = cfg.builder.get(arch)
+                if builder:
+                    remote_cmd = builder.get("remote_cmd")
+
+                    override_registry = builder.get("registry")
+                    if registry:
+                        registry = override_registry
 
                 async def outh(line):
                     await buildlog(build_id, line)
 
-                registry = self.registry
-                if arch in self.registries:
-                    registry = self.registries[arch]
+                await enqueue_backend({"started": build_id})
 
-                cmd = shlex.split(self.remotes[arch])
+                cmd = shlex.split(remote_cmd)
                 cmd.extend([
                     "docker", "run", "-t", "--rm",
                     "--add-host=host.docker.internal:host-gateway",
@@ -101,7 +94,7 @@ class DockerBackend:
                     "-e", f"APT_URLS={task['apt_urls']}",
                     "-e", f"APT_KEYS={task['apt_keys']}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
-                    "-e", f"MOLIOR_SERVER=http://host.docker.internal:8000",
+                    "-e", f"MOLIOR_SERVER={hostname}",
                     f"{registry}/molior:{task['distversion']}-{task['architecture']}",
                     "/app/build-docker",
                     ])
