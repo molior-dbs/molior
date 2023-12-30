@@ -711,13 +711,17 @@ class AptlyWorker:
             version = build.version
             architecture = build.architecture
             is_ci = build.is_ci
+            publish_s3 = None
+            if build.projectversion and build.projectversion.publish_s3:
+                publish_s3 = f"{build.projectversion.s3_endpoint}:{build.projectversion.s3_path}"
 
         await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
 
         ret = False
         try:
             ret = await DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
-                                   basemirror_name, basemirror_version, project_name, project_version, archs)
+                                   basemirror_name, basemirror_version, project_name, project_version,
+                                   archs, publish_s3=publish_s3)
         except Exception as exc:
             logger.exception(exc)
 

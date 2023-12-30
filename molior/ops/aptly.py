@@ -101,6 +101,9 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
                 project_name = projectversion.project.name
                 project_version = projectversion.name
                 archs = db2array(projectversion.mirror_architectures)
+                publish_s3 = None
+                if projectversion.publish_s3:
+                    publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
 
         if not fullname:
             logger.error("publisher: error finding projectversion {}".format(projectversion_id))
@@ -109,7 +112,8 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
         await buildlog(build_id, "I: publishing for project %s\n" % fullname)
 
-        debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
+        debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version,
+                                       archs, publish_s3=publish_s3)
         try:
             ret = await debian_repo.add_packages(publish_files, ci_build=is_ci)
         except Exception as exc:
@@ -134,7 +138,8 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
 
 async def publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
-                           basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
+                           basemirror_name, basemirror_version, project_name, project_version,
+                           archs, out_path, publish_s3=None):
     """
     Publishes given packages to given
     publish point.
@@ -188,7 +193,8 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
 
     logger.debug("publisher: uploading %d file%s", count_files, "" if count_files == 1 else "s")
 
-    debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
+    debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version,
+                                   archs, publish_s3=publish_s3)
     ret = False
     try:
         ret = await debian_repo.add_packages(files2upload, ci_build=is_ci)
@@ -209,7 +215,8 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
 
 
 async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
-                     basemirror_name, basemirror_version, project_name, project_version, archs):
+                     basemirror_name, basemirror_version, project_name, project_version,
+                     archs, publish_s3=None):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -227,7 +234,8 @@ async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_
 
     try:
         if not await publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
-                                      basemirror_name, basemirror_version, project_name, project_version, archs, out_path):
+                                      basemirror_name, basemirror_version, project_name, project_version,
+                                      archs, out_path, publish_s3=publish_s3):
             logger.error("publisher: error publishing build %d" % build_id)
             return False
     except Exception as exc:

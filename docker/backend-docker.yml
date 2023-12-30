@@ -1,5 +1,5 @@
 registry:
-    server: "192.168.7.254:5000"
+    server: "localhost:5000"
     user:
     password:
 

@@ -707,7 +707,7 @@ class AptlyApi:
         logger.info("aptly: cleanup succeeded")
         return True
 
-    async def republish(self, dist, repo_name, publish_name):
+    async def republish(self, dist, repo_name, publish_name, publish_s3=None):
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         snapshot_name_tmp = get_snapshot_name(publish_name, dist, temporary=True)
 
@@ -744,6 +744,15 @@ class AptlyApi:
                             return False
                 break
 
+        if publish_s3:
+            # delete s3 publish
+            try:
+                task = await self.DELETE(f"/publish/s3:{publish_s3}/stable")
+                if not await self.wait_task(task["ID"]):
+                    logger.error(f"Error deleting S3 endpoint {publish_s3}")
+            except Exception:
+                logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
+
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
         if not await self.wait_task(task_id):
             return False
@@ -756,6 +765,13 @@ class AptlyApi:
         task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, publish_name)
         if not await self.wait_task(task_id):
             return False
+
+        if publish_s3:
+            # publish s3
+            archs = ["amd64"]
+            task_id = await self.snapshot_publish(snapshot_name_tmp, "main", archs, dist, f"s3:{publish_s3}")
+            if not await self.wait_task(task_id):
+                logger.error(f"Error creating S3 endpoint {publish_s3}")
 
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         try:
@@ -819,6 +835,24 @@ class AptlyApi:
             except Exception as exc:
                 logger.exception(exc)
         return version
+
+    async def s3_endpoints(self):
+        """
+        Gets S# Endpoints.
+
+        Returns:
+            json: array of endpoints
+        """
+        s3_endpoints = []
+        async with aiohttp.ClientSession() as http:
+            try:
+                async with http.get(self.url + "/s3", auth=self.auth) as resp:
+                    if not self.__check_status_code(resp.status):
+                        self.__raise_aptly_error(resp)
+                    s3_endpoints = json.loads(await resp.text())
+            except Exception as exc:
+                logger.exception(exc)
+        return s3_endpoints
 
 
 def get_aptly_connection():
