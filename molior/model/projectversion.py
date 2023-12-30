@@ -62,6 +62,9 @@ class ProjectVersion(Base):
     baseprojectversion_id = Column(ForeignKey("projectversion.id"))
     retention_successful_builds = Column(Integer, default=1)
     retention_failed_builds = Column(Integer, default=7)
+    publish_s3 = Column(Boolean, default=False)
+    s3_endpoint = Column(String)
+    s3_path = Column(String)
 
     @hybrid_property
     def fullname(self):

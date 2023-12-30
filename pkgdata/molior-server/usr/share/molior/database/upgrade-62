@@ -1,0 +1,9 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+ALTER TABLE projectversion ADD COLUMN publish_s3 boolean;
+ALTER TABLE projectversion ADD COLUMN s3_endpoint character varying;
+ALTER TABLE projectversion ADD COLUMN s3_path character varying;
+
+EOF
