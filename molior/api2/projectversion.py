@@ -7,11 +7,12 @@ from launchy import Launchy
 
 from ..app import app
 from ..logger import logger
-from ..auth import req_role
+from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
 from ..api.projectversion import do_lock, do_unlock, do_overlay
 from ..molior.queues import enqueue_aptly
 from ..molior.configuration import Configuration
+from ..aptly import get_aptly_connection
 
 from ..model.projectversion import (
     ProjectVersion, get_projectversion, get_projectversion_deps,
@@ -23,7 +24,6 @@ from ..model.build import Build
 from ..model.projectversiondependency import ProjectVersionDependency
 from ..model.database import Session
 from ..model.metadata import MetaData
-
 
 
 # find latest builds
@@ -1681,3 +1681,82 @@ async def edit_cleanup(request):
 
     return OKResponse("Cleanup job is being configured")
 
+
+@app.http_post("/api2/project/{project_id}/{projectversion_id}/s3")
+@req_admin
+async def publis_s3(request):
+    """
+    Configures publishing to S3
+
+    ---
+    description: Configures publishing to S3
+    tags:
+        - Projects
+    consumes:
+        - application/json
+        parameters:
+        - name: projectversion_id
+          in: path
+          required: true
+          type: string
+        - name: project_id
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    responses:
+        "201":
+            description: Success
+        "400":
+            description: Projectversion not found
+    """
+    db = request.cirrina.db_session
+
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+    if projectversion.is_locked:
+        return ErrorResponse(400, "Projectversion is locked")
+
+    maintenance_mode = False
+    query = "SELECT value from metadata where name = :key"
+    result = db.execute(query, {"key": "maintenance_mode"})
+    for value in result:
+        if value[0] == "true":
+            maintenance_mode = True
+        break
+    if maintenance_mode:
+        return web.Response(status=503, text="Maintenance Mode")
+
+    params = await request.json()
+    publish_s3 = params.get("publish_s3")
+    s3_endpoint = params.get("s3_endpoint")
+    s3_path = params.get("s3_path")
+
+    projectversion.publish_s3 = publish_s3
+    projectversion.s3_endpoint = s3_endpoint
+    projectversion.s3_path = s3_path
+
+    db.commit()
+
+    logger.info(f"S3: {publish_s3} {s3_endpoint} {s3_path}")
+    return OKResponse(status=201)
+
+
+@app.http_get("/api2/s3")
+async def s3_endpoints(request):
+    """
+    ---
+    description: Lists S3 Endpoints
+    tags:
+        - Projects
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: Success
+    """
+    aptly = get_aptly_connection()
+    data = await aptly.s3_endpoints()
+    return OKResponse(data)

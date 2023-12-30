@@ -17,12 +17,13 @@ class DebianRepository:
     CI_PACKAGES_TTL = 7
     DATETIME_FORMAT = "%Y%m%d%H%M%S"
 
-    def __init__(self, basemirror_name, basemirror_version, project_name, project_version, archs):
+    def __init__(self, basemirror_name, basemirror_version, project_name, project_version, archs, publish_s3=None):
         self.basemirror_name = basemirror_name
         self.basemirror_version = basemirror_version
         self.project_name = project_name
         self.project_version = project_version
         self.archs = archs
+        self.publish_s3 = publish_s3
 
         self.aptly = get_aptly_connection()
         ci_cfg = Configuration().ci_builds
@@ -235,6 +236,6 @@ class DebianRepository:
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
         await self.aptly.delete_directory(upload_dir)
-        if not await self.aptly.republish(dist, repo_name, self.publish_name):
+        if not await self.aptly.republish(dist, repo_name, self.publish_name, publish_s3=self.publish_s3):
             return False
         return True
