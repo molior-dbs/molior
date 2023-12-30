@@ -1,3 +1,9 @@
+molior (1.5.0~alpha66) stretch; urgency=medium
+
+  * add s3 publish support
+
+ -- André Roth <neolynx@gmail.com>  Sat, 30 Dec 2023 20:49:10 +0100
+
 molior (1.5.0~alpha65) stretch; urgency=medium
 
   * docker: support parallel builds
