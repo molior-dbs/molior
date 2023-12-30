@@ -1,3 +1,9 @@
+molior (1.5.0~alpha67) stretch; urgency=medium
+
+  * bump version 1.5.0~alpha67
+
+ -- André Roth <neolynx@gmail.com>  Sat, 30 Dec 2023 21:19:57 +0100
+
 molior (1.5.0~alpha66) stretch; urgency=medium
 
   * add s3 publish support
