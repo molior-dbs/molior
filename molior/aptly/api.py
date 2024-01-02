@@ -746,14 +746,6 @@ class AptlyApi:
                             return False
                 break
 
-        if publish_s3:
-            logger.info(f"Deleting S3 endpoint {publish_s3}")
-            try:
-                task = await self.DELETE(f"/publish/s3:{publish_s3}/stable")
-                if not await self.wait_task(task["ID"]):
-                    logger.error(f"Error deleting S3 endpoint {publish_s3}")
-            except Exception:
-                logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
 
         logger.info(f"Creating tmp snapshot {snapshot_name_tmp}")
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
@@ -771,6 +763,12 @@ class AptlyApi:
             logger.error(f"Error publishing tmp snapshot {snapshot_name_tmp}")
             return False
 
+        if publish_s3:
+            logger.info(f"Publishing to S3 endpoint {publish_s3}")
+            task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, f"s3:{publish_s3}")
+            if not await self.wait_task(task_id):
+                logger.error(f"Error publishing tmp snapshot {snapshot_name_tmp}")
+
         logger.info(f"Deleting snapshot {snapshot_name}")
         try:
             task_id = await self.snapshot_delete(snapshot_name)
@@ -785,12 +783,6 @@ class AptlyApi:
             logger.error(f"Erorr renaming tmp snapshot to {snapshot_name}")
             return False
 
-        if publish_s3:
-            # publish to s3
-            logger.info(f"Publishing to S3 endpoint {publish_s3}")
-            task_id = await self.snapshot_publish(snapshot_name, "main", archs, dist, f"s3:{publish_s3}")
-            if not await self.wait_task(task_id):
-                logger.error(f"Error publishing to S3 endpoint {publish_s3}")
 
         return True
 
