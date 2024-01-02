@@ -12,7 +12,6 @@
 : ${PROJECT?"set PROJECT before running this script"}
 : ${PROJECTVERSION?"set PROJECTVERSION before running this script"}
 : ${APT_SERVER?"set APT_SERVER before running this script"}
-: ${APT_URLS?"set APT_URLS before running this script"}
 : ${APT_KEYS?"set APT_KEYS before running this script"}
 : ${RUN_LINTIAN?"set RUN_LINTIAN before running this script"}
 : ${MOLIOR_SERVER?"set MOLIOR_SERVER before running this script"}
@@ -77,6 +76,15 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
+
+for aptkey in $APT_KEYS
+do
+    tmpkey="/tmp/molior-repo-$idx.asc"
+    curl --max-time 30 -s $aptkey > $tmpkey
+    gpg --dearmour $tmpkey
+    mv $tmpkey.gpg /etc/apt/trusted.gpg.d/
+    idx=$((i + 1))
+done
 
 echo
 apt-get update
