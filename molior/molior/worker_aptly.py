@@ -1322,8 +1322,12 @@ class AptlyWorker:
                                                                   projectversion.basemirror.name, projectversion.project.name,
                                                                   projectversion.name)
                         if projectversion_id not in projectversions:
+                            publish_s3 = None
+                            if projectversion.publish_s3:
+                                publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
                             projectversions[projectversion_id] = (repo_name, publish_name,
-                                                                  db2array(projectversion.mirror_architectures))
+                                                                  db2array(projectversion.mirror_architectures),
+                                                                  publish_s3)
                         if publish_name not in publish_names:
                             publish_names.append(publish_name)
                         if repo_name not in to_delete:
@@ -1358,7 +1362,8 @@ class AptlyWorker:
             await aptly.wait_task(task_id)
 
         for pv in projectversions:
-            await aptly.republish(dist, projectversions[pv][2], projectversions[pv][0], projectversions[pv][1])
+            await aptly.republish(dist, projectversions[pv][2], projectversions[pv][0],
+                                  projectversions[pv][1], publish_s3=projectversions[pv][3])
 
         def remove_buildout():
             for build_id in build_ids:
