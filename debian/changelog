@@ -1,3 +1,9 @@
+molior (1.5.0~alpha69) stretch; urgency=medium
+
+  * docker: support builds with debian backports apt sources
+
+ -- André Roth <neolynx@gmail.com>  Tue, 02 Jan 2024 13:57:18 +0100
+
 molior (1.5.0~alpha68) stretch; urgency=medium
 
   * bump version 1.5.0~alpha68
