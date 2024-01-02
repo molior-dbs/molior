@@ -1,3 +1,9 @@
+molior (1.5.0~alpha81) stretch; urgency=medium
+
+  * docker: fix build via ssh
+
+ -- André Roth <neolynx@gmail.com>  Wed, 03 Jan 2024 00:00:56 +0100
+
 molior (1.5.0~alpha80) stretch; urgency=medium
 
   * improvements
