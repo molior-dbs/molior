@@ -66,8 +66,6 @@ class DockerBackend:
                 if task is None:
                     break
 
-                logger.info(f"scheduler {arch}: {task}")
-
                 build_id = task["build_id"]
 
                 server_url = Configuration().server.get("url")
@@ -109,8 +107,6 @@ class DockerBackend:
                     f"{registry}/molior:{task['distversion']}-{task['architecture']}",
                     "/app/build-docker",
                     ])
-
-                logger.info(f"running: {cmd}")
 
                 async def outh(line):
                     await buildlog(build_id, line)
