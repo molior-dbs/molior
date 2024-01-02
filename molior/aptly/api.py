@@ -771,13 +771,6 @@ class AptlyApi:
             logger.error(f"Error publishing tmp snapshot {snapshot_name_tmp}")
             return False
 
-        if publish_s3:
-            # publish to s3
-            logger.info(f"Publishing to S3 endpoint {publish_s3}")
-            task_id = await self.snapshot_publish(snapshot_name_tmp, "main", archs, dist, f"s3:{publish_s3}")
-            if not await self.wait_task(task_id):
-                logger.error(f"Error publishing to S3 endpoint {publish_s3}")
-
         logger.info(f"Deleting snapshot {snapshot_name}")
         try:
             task_id = await self.snapshot_delete(snapshot_name)
@@ -791,6 +784,13 @@ class AptlyApi:
         if not await self.wait_task(task_id):
             logger.error(f"Erorr renaming tmp snapshot to {snapshot_name}")
             return False
+
+        if publish_s3:
+            # publish to s3
+            logger.info(f"Publishing to S3 endpoint {publish_s3}")
+            task_id = await self.snapshot_publish(snapshot_name, "main", archs, dist, f"s3:{publish_s3}")
+            if not await self.wait_task(task_id):
+                logger.error(f"Error publishing to S3 endpoint {publish_s3}")
 
         return True
 
