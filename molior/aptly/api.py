@@ -707,9 +707,11 @@ class AptlyApi:
         logger.info("aptly: cleanup succeeded")
         return True
 
-    async def republish(self, dist, repo_name, publish_name, publish_s3=None):
+    async def republish(self, dist, archs, repo_name, publish_name, publish_s3=None):
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         snapshot_name_tmp = get_snapshot_name(publish_name, dist, temporary=True)
+
+        logger.info(f"Republishing {snapshot_name}")
 
         # package_refs = await self.__get_packages(ci_build)
         # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
@@ -744,15 +746,8 @@ class AptlyApi:
                             return False
                 break
 
-        if publish_s3:
-            # delete s3 publish
-            try:
-                task = await self.DELETE(f"/publish/s3:{publish_s3}/stable")
-                if not await self.wait_task(task["ID"]):
-                    logger.error(f"Error deleting S3 endpoint {publish_s3}")
-            except Exception:
-                logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
 
+        logger.info(f"Creating tmp snapshot {snapshot_name_tmp}")
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
         if not await self.wait_task(task_id):
             return False
@@ -762,26 +757,30 @@ class AptlyApi:
                      dist,
                      snapshot_name_tmp)
 
+        logger.info(f"Publishing tmp snapshot {snapshot_name_tmp}")
         task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, publish_name)
         if not await self.wait_task(task_id):
+            logger.error(f"Error publishing tmp snapshot {snapshot_name_tmp}")
             return False
 
         if publish_s3:
-            # publish s3
-            archs = ["amd64"]
-            task_id = await self.snapshot_publish(snapshot_name_tmp, "main", archs, dist, f"s3:{publish_s3}")
+            logger.info(f"Publishing to S3 endpoint {publish_s3}")
+            task_id = await self.snapshot_publish_update(snapshot_name_tmp, "main", dist, f"s3:{publish_s3}")
             if not await self.wait_task(task_id):
-                logger.error(f"Error creating S3 endpoint {publish_s3}")
+                logger.error(f"Error publishing tmp snapshot {snapshot_name_tmp}")
 
-        snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
+        logger.info(f"Deleting snapshot {snapshot_name}")
         try:
             task_id = await self.snapshot_delete(snapshot_name)
-            await self.wait_task(task_id)
+            if not await self.wait_task(task_id):
+                logger.error(f"Error deleting snapshot {snapshot_name}")
         except Exception:
-            pass
+            logger.error(f"Error deleting snapshot {snapshot_name}")
 
+        logger.info(f"Renaming tmp snapshot to {snapshot_name}")
         task_id = await self.snapshot_rename(snapshot_name_tmp, snapshot_name)
         if not await self.wait_task(task_id):
+            logger.error(f"Erorr renaming tmp snapshot to {snapshot_name}")
             return False
 
         return True
