@@ -1,3 +1,9 @@
+molior (1.5.0~alpha72) stretch; urgency=medium
+
+  * s3: publish archs
+
+ -- André Roth <neolynx@gmail.com>  Tue, 02 Jan 2024 17:01:46 +0100
+
 molior (1.5.0~alpha71) stretch; urgency=medium
 
   * bump version 1.5.0~alpha71
