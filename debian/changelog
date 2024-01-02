@@ -1,3 +1,9 @@
+molior (1.5.0~alpha76) stretch; urgency=medium
+
+  * docker: be less verbose
+
+ -- André Roth <neolynx@gmail.com>  Tue, 02 Jan 2024 20:31:06 +0100
+
 molior (1.5.0~alpha75) stretch; urgency=medium
 
   * s3: delete builds
