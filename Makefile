@@ -74,7 +74,7 @@ remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_api:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
 logs:  ## show logs
-	@docker-compose logs -f api postgres web aptly nginx
+	@docker-compose logs -f api web aptly
 
 logs-api:  ## show api logs
 	@docker-compose logs -f api
