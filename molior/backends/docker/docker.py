@@ -67,6 +67,8 @@ class DockerBackend:
                     break
 
                 build_id = task["build_id"]
+                await enqueue_backend({"started": build_id})
+                await buildlog(build_id, "starting docker build\n")
 
                 server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-docker.yml")
@@ -80,9 +82,8 @@ class DockerBackend:
                 if builder:
                     remote_cmd = builder.get("remote_cmd")
 
-                    override_registry = builder.get("registry")
-                    if override_registry is not None:
-                        registry = override_registry
+                if remote_cmd:
+                    await buildlog(build_id, f"running docker via {remote_cmd}\n")
 
                 cmd = shlex.split(remote_cmd)
                 cmd.extend([
@@ -111,7 +112,6 @@ class DockerBackend:
                 async def outh(line):
                     await buildlog(build_id, line)
 
-                await enqueue_backend({"started": build_id})
                 process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
@@ -120,6 +120,7 @@ class DockerBackend:
 
                 if not ret == 0:
                     logger.error("error running docker build")
+                    await buildlog(build_id, f"E: error running docker command {cmd}\n")
                     await enqueue_backend({"failed": build_id})
                 else:
                     await enqueue_backend({"succeeded": build_id})
