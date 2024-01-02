@@ -182,6 +182,9 @@ class ProjectVersion(Base):
             "projectversiontype": self.projectversiontype,
             "retention_successful_builds": self.retention_successful_builds,
             "retention_failed_builds": self.retention_failed_builds,
+            "publish_s3": self.publish_s3,
+            "s3_endpoint": self.s3_endpoint,
+            "s3_path": self.s3_path,
         }
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})

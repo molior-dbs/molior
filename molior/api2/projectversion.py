@@ -1684,7 +1684,7 @@ async def edit_cleanup(request):
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/s3")
 @req_admin
-async def publis_s3(request):
+async def publish_s3(request):
     """
     Configures publishing to S3
 
@@ -1730,9 +1730,13 @@ async def publis_s3(request):
         return web.Response(status=503, text="Maintenance Mode")
 
     params = await request.json()
-    publish_s3 = params.get("publish_s3")
+    publish_s3 = params.get("publish_s3", False)
     s3_endpoint = params.get("s3_endpoint")
     s3_path = params.get("s3_path")
+
+    old_publish = projectversion.publish_s3
+    old_endpoint = projectversion.s3_endpoint
+    old_path = projectversion.s3_path
 
     projectversion.publish_s3 = publish_s3
     projectversion.s3_endpoint = s3_endpoint
@@ -1740,7 +1744,16 @@ async def publis_s3(request):
 
     db.commit()
 
-    logger.info(f"S3: {publish_s3} {s3_endpoint} {s3_path}")
+    logger.info(f"s3: {publish_s3} {s3_endpoint} {s3_path} old: {old_publish} {old_endpoint} {old_path}")
+    if publish_s3 and not old_publish:  # create publish to s3
+        await enqueue_aptly({"publish_s3": [projectversion.id]})
+    elif not publish_s3 and old_publish:  # delete s3 publish
+        await enqueue_aptly({"remove_s3": [projectversion.id, old_endpoint, old_path]})
+    if publish_s3 and old_publish:  # stay enabled
+        if old_endpoint != s3_endpoint or old_path != s3_path:  # something changed
+            await enqueue_aptly({"remove_s3": [projectversion.id, old_endpoint, old_path]})
+            await enqueue_aptly({"publish_s3": [projectversion.id]})
+
     return OKResponse(status=201)
 
 
