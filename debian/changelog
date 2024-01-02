@@ -1,3 +1,9 @@
+molior (1.5.0~alpha74) stretch; urgency=medium
+
+  * s3: publish after rename
+
+ -- André Roth <neolynx@gmail.com>  Tue, 02 Jan 2024 17:50:30 +0100
+
 molior (1.5.0~alpha73) stretch; urgency=medium
 
   * republish: add logs
