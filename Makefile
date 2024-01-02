@@ -9,7 +9,15 @@ dev-cached:  ## build (cached) and run development containers
 prod-build:  ## run development containers
 	@docker-compose -f docker-compose-build.yml build --no-cache
 
-prod-docker-push:
+prod-api:  ## build prod api
+	@docker-compose -f docker-compose-build.yml build --no-cache api
+
+prod-publish-api:  ## publish docker api
+	@docker tag molior_api neolynx/molior_api
+	@docker push neolynx/molior_api
+	@docker rmi neolynx/molior_api
+
+prod-publish:  ## publish docker images
 	@for i in api web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
 	@for i in api web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
 
