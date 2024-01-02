@@ -133,7 +133,7 @@ else
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 
-apt-get -y build-dep .
+mk-build-deps debian/control --install --remove -t 'apt-get -q -y'
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
   exit 4

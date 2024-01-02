@@ -139,10 +139,17 @@ EOM
   done
   rm -rf $keydir
 
+  # Allow backports
+  cat > $target/etc/apt/preferences.d/99debian-backports <<EOF
+Package: *
+Pin: release o=Debian Backports
+Pin-Priority: 500
+EOF
+
   echo I: Installing build environment
   cp /etc/hosts $target/etc/hosts  # needed if host.docker.internal is used
   chroot $target apt-get update
-  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git
+  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git equivs
   chroot $target apt-get clean
   rm -f $target/etc/hosts
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
