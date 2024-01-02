@@ -783,7 +783,6 @@ class AptlyApi:
             logger.error(f"Erorr renaming tmp snapshot to {snapshot_name}")
             return False
 
-
         return True
 
     async def wait_task(self, task_id):

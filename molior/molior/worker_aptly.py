@@ -1,17 +1,17 @@
 import asyncio
 import operator
-from datetime import datetime, timezone
+from datetime import datetime
 
 from os import mkdir
 from shutil import rmtree
 from shutil import copy2
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import func, text, or_, desc
+from sqlalchemy import func, or_, desc
 
 from ..logger import logger
 from ..tools import db2array, array2db
 from ..ops import DebSrcPublish, DebPublish, DeleteBuildEnv
-from ..aptly import get_aptly_connection
+from ..aptly import get_aptly_connection, get_snapshot_name
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify, send_mail_notification
@@ -1514,6 +1514,50 @@ class AptlyWorker:
             await topbuild.set_failed()
             session.commit()
 
+    async def _remove_s3(self, args):
+        projectversion_id = args[0]
+        s3_endpoint = args[1]
+        s3_path = args[2]
+
+        with Session() as db:
+            projectversion = get_projectversion_byid(projectversion_id, db)
+            if not projectversion:
+                logger.error("remove s3 projectversion: projectversion %d not found" % projectversion_id)
+                return
+
+        publish_s3 = f"{s3_endpoint}:{s3_path}"
+        logger.info(f"Deleting S3 endpoint {publish_s3}")
+        aptly = get_aptly_connection()
+        try:
+            task = await aptly.DELETE(f"/publish/s3:{publish_s3}/stable")
+            if not await aptly.wait_task(task["ID"]):
+                logger.error(f"Error deleting S3 endpoint {publish_s3}")
+        except Exception:
+            logger.error(f"Error deleting S3 endpoint {publish_s3}")
+
+    async def _publish_s3(self, args):
+        projectversion_id = args[0]
+
+        with Session() as db:
+            projectversion = get_projectversion_byid(projectversion_id, db)
+            if not projectversion:
+                logger.error("remove s3 projectversion: projectversion %d not found" % projectversion_id)
+                return
+            s3_endpoint = projectversion.s3_endpoint
+            s3_path = projectversion.s3_path
+            publish_name = "{}_{}_repos_{}_{}".format(projectversion.basemirror.project.name,
+                                                      projectversion.basemirror.name, projectversion.project.name,
+                                                      projectversion.name)
+            archs = db2array(projectversion.mirror_architectures)
+
+        publish_s3 = f"{s3_endpoint}:{s3_path}"
+        aptly = get_aptly_connection()
+        snapshot_name = get_snapshot_name(publish_name, "stable", temporary=False)
+        logger.info(f"Publishing to S3 endpoint {publish_s3} snapshot {snapshot_name} {archs}")
+        task_id = await aptly.snapshot_publish(snapshot_name, "main", archs, "stable", f"s3:{publish_s3}")
+        if not await aptly.wait_task(task_id):
+            logger.error(f"Error publishing to S3 endpoint {publish_s3}")
+
     async def run(self):
         """
         Run the worker task.
@@ -1602,6 +1646,18 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._abort(args)
+
+                if not handled:
+                    args = task.get("remove_s3")
+                    if args:
+                        handled = True
+                        await self._remove_s3(args)
+
+                if not handled:
+                    args = task.get("publish_s3")
+                    if args:
+                        handled = True
+                        await self._publish_s3(args)
 
                 if not handled:
                     args = task.get("cleanup")
