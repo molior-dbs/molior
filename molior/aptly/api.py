@@ -707,7 +707,7 @@ class AptlyApi:
         logger.info("aptly: cleanup succeeded")
         return True
 
-    async def republish(self, dist, repo_name, publish_name, publish_s3=None):
+    async def republish(self, dist, archs, repo_name, publish_name, publish_s3=None):
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         snapshot_name_tmp = get_snapshot_name(publish_name, dist, temporary=True)
 
@@ -767,11 +767,10 @@ class AptlyApi:
             return False
 
         if publish_s3:
-            # publish s3
-            archs = ["amd64"]
+            # publish to s3
             task_id = await self.snapshot_publish(snapshot_name_tmp, "main", archs, dist, f"s3:{publish_s3}")
             if not await self.wait_task(task_id):
-                logger.error(f"Error creating S3 endpoint {publish_s3}")
+                logger.error(f"Error publishing to S3 endpoint {publish_s3}")
 
         snapshot_name = get_snapshot_name(publish_name, dist, temporary=False)
         try:

@@ -236,6 +236,6 @@ class DebianRepository:
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
         await self.aptly.delete_directory(upload_dir)
-        if not await self.aptly.republish(dist, repo_name, self.publish_name, publish_s3=self.publish_s3):
+        if not await self.aptly.republish(dist, self.archs, repo_name, self.publish_name, publish_s3=self.publish_s3):
             return False
         return True
