@@ -16,7 +16,7 @@ molior/
 
 ## Configuration
 
-1. Configure initial settings
+### Configure initial settings
 
 Adapt setting in the docker-compoer [.env](./.env) file. This is used for creating GPG keys for debian package signing and accounts for aptly and the registry.
 
