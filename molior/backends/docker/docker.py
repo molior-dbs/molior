@@ -87,6 +87,7 @@ class DockerBackend:
 
                 cmd = shlex.split(remote_cmd)
                 cmd.extend([
+                    "unbuffer",
                     "docker", "run", "-t", "--rm",
                     "--add-host=host.docker.internal:host-gateway",
                     "-e", f"BUILD_ID={task['build_id']}",
