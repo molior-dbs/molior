@@ -9,9 +9,9 @@ services:
     ports:
       - "8000:80"
 
-  api:
-    image: neolynx/molior_api
-    container_name: molior-api
+  molior:
+    image: neolynx/molior_molior
+    container_name: molior-server
     env_file: .env
     networks:
       - molior

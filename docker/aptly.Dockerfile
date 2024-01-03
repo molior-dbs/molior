@@ -10,5 +10,6 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
 RUN mkdir app
 WORKDIR /app
 
-CMD /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL && \
-    su aptly -c "aptly api serve -listen 0.0.0.0:3142"
+ADD docker/start-aptly /app/aptly
+
+CMD /app/aptly

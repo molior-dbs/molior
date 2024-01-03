@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+# Set aptly user id from volume
+usermod -u `stat -c %u /var/lib/aptly` aptly;
+
+if [ -n "$REPOSIGN_NAME" ] && [ -n "$REPOSIGN_EMAIL" ]; then
+    echo "Creating gpgs key for '$REPOSIGN_NAME'"
+    /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
+fi
+
+exec su aptly -c "aptly api serve -listen 0.0.0.0:3142"
