@@ -1,6 +1,6 @@
 # Deploy Molior with docker-compose
 
-Download the [molior](./) directory.
+Copy the [docker/prod](./) directory to a ilocation on a docker-compose server.
 
 ## Configuration
 
@@ -8,9 +8,9 @@ Download the [molior](./) directory.
 
 Adapt the settings in the `config/` directory:
 
-- [molior.yml]
-- `backend-docker.yml`
-- `aptly.conf`
+- [molior.yml](config/molior.yml)
+- [backend-docker.yml](config/backend-docker.yml)
+- [aptly.conf](config/aptly.conf)
 
 
 ### Configure GPG key and user/password creation
