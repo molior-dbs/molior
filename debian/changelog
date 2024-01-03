@@ -1,3 +1,28 @@
+molior (1.5.0~alpha84) stretch; urgency=medium
+
+  * docker: improve dev and prod env
+  * docker: fix build via ssh
+  * s3: publish archs
+  * docker: support builds with debian backports apt sources
+  * add s3 publish support
+  * docker: support building architectures and parallel builds
+  * mirror: show gpg output in build log
+  * docker: configure for prod env
+  * test running server from package
+  * docker: build as user instead of root
+  * rebuild builenv: delete logfile only
+  * docker: add Makefile target for running aptly commands
+  * docker: cleanuo
+  * docker: use molior.info apt source
+  * docker: do not run lintian per default in docker
+  * fix import
+  * use 1 week session per default
+  * docker: update apt source
+  * build after aiofile
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Wed, 03 Jan 2024 20:21:02 +0100
+
 molior (1.4.1) stretch; urgency=medium
 
   * server info: get machine id
