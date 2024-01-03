@@ -21,7 +21,7 @@ fi
 groupmod -g `stat -c %g /var/run/docker.sock` docker
 
 while true; do
-    if su postgres -c pg_isready -d molior; then
+    if su postgres -c "pg_isready -d molior"; then
         break
     fi
     echo waiting for database connection ...
