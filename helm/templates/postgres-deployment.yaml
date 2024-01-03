@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: postgres
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: postgres
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/molior: "true"
+        io.kompose.service: postgres
+    spec:
+      containers:
+      - image: neolynx/molior_postgres
+        imagePullPolicy: ""
+        name: molior-postgres
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/run/postgresql/
+          name: pgsock
+        - mountPath: /var/lib/postgresql/15/main
+          name: postgres
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes:
+      - name: pgsock
+        persistentVolumeClaim:
+          claimName: pgsock
+      - name: postgres
+        persistentVolumeClaim:
+          claimName: postgres
+status: {}

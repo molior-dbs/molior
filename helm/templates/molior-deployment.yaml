@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: molior
+  name: molior
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: molior
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/molior: "true"
+        io.kompose.service: molior
+    spec:
+      containers:
+      - env:
+        - name: APTLY_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              key: APTLY_PASSWORD
+              name: env
+        - name: APTLY_USER
+          valueFrom:
+            configMapKeyRef:
+              key: APTLY_USER
+              name: env
+        - name: COMPOSE_PROJECT_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: COMPOSE_PROJECT_NAME
+              name: env
+        - name: DEBSIGN_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              key: DEBSIGN_EMAIL
+              name: env
+        - name: DEBSIGN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: DEBSIGN_NAME
+              name: env
+        - name: REGISTRY_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              key: REGISTRY_PASSWORD
+              name: env
+        - name: REGISTRY_USER
+          valueFrom:
+            configMapKeyRef:
+              key: REGISTRY_USER
+              name: env
+        - name: REPOSIGN_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              key: REPOSIGN_EMAIL
+              name: env
+        - name: REPOSIGN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: REPOSIGN_NAME
+              name: env
+        image: neolynx/molior_molior
+        imagePullPolicy: ""
+        name: molior-server
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/run/postgresql/
+          name: pgsock
+        - mountPath: /var/run/docker.sock
+          name: molior-claim1
+        - mountPath: /var/lib/molior/
+          name: molior
+        - mountPath: /config
+          name: molior-claim3
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes:
+      - name: pgsock
+        persistentVolumeClaim:
+          claimName: pgsock
+      - name: molior-claim1
+        persistentVolumeClaim:
+          claimName: molior-claim1
+      - name: molior
+        persistentVolumeClaim:
+          claimName: molior
+      - name: molior-claim3
+        persistentVolumeClaim:
+          claimName: molior-claim3
+status: {}

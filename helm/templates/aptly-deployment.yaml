@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: aptly
+  name: aptly
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: aptly
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -c
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/molior: "true"
+        io.kompose.service: aptly
+    spec:
+      containers:
+      - env:
+        - name: APTLY_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              key: APTLY_PASSWORD
+              name: env
+        - name: APTLY_USER
+          valueFrom:
+            configMapKeyRef:
+              key: APTLY_USER
+              name: env
+        - name: COMPOSE_PROJECT_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: COMPOSE_PROJECT_NAME
+              name: env
+        - name: DEBSIGN_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              key: DEBSIGN_EMAIL
+              name: env
+        - name: DEBSIGN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: DEBSIGN_NAME
+              name: env
+        - name: REGISTRY_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              key: REGISTRY_PASSWORD
+              name: env
+        - name: REGISTRY_USER
+          valueFrom:
+            configMapKeyRef:
+              key: REGISTRY_USER
+              name: env
+        - name: REPOSIGN_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              key: REPOSIGN_EMAIL
+              name: env
+        - name: REPOSIGN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: REPOSIGN_NAME
+              name: env
+        image: neolynx/molior_aptly
+        imagePullPolicy: ""
+        name: molior-aptly
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/aptly/
+          name: aptly
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes:
+      - name: aptly
+        persistentVolumeClaim:
+          claimName: aptly
+status: {}

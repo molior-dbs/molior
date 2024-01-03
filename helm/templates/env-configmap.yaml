@@ -1,0 +1,17 @@
+apiVersion: v1
+data:
+  APTLY_PASSWORD: molior-dev
+  APTLY_USER: molior
+  COMPOSE_PROJECT_NAME: molior
+  DEBSIGN_EMAIL: debsign@molior
+  DEBSIGN_NAME: molior
+  REGISTRY_PASSWORD: molior-dev
+  REGISTRY_USER: molior
+  REPOSIGN_EMAIL: reposign@molior
+  REPOSIGN_NAME: molior
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: aptly-env
+  name: env
