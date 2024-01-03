@@ -29,13 +29,7 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     chown molior /var/lib/molior/repositories/; \
     mkdir -p /var/lib/molior/upload/; \
     chown molior /var/lib/molior/upload/; \
-    sed -i "s#admin_password:.*#admin_password: '$ADMIN_PASSWORD'#" /etc/molior/molior.yml && \
-    sed -i "s#api_user:.*#api_user: '$APTLY_USER'#" /etc/molior/molior.yml && \
-    sed -i "s#api_pass:.*#api_pass: '$APTLY_PASSWORD'#" /etc/molior/molior.yml && \
-    sed -i "s#debsign_gpg_email:.*#debsign_gpg_email: '$DEBSIGN_EMAIL'#" /etc/molior/molior.yml && \
-    sed -i "s#gpg_key:.*#gpg_key: '$REPOSIGN_EMAIL'#" /etc/molior/molior.yml && \
-    sed -i "s#apt_url_public:.*#apt_url_public: '$APT_URL_PUBLIC'#" /etc/molior/molior.yml && \
-    sed -i "s#user:.*#user: \"$REGISTRY_USER\"#" /etc/molior/backend-docker.yml && \
-    sed -i "s#password:.*#password: \"$REGISTRY_PASSWORD\"#" /etc/molior/backend-docker.yml && \
+    mkdir /etc/molior; \
+    cp -ar docker/dev/config/* /etc/molior/; \
     cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
     su molior -c "exec adev runserver -q -p 9999 molior/"
