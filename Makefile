@@ -9,28 +9,44 @@ dev-cached:  ## build (cached) and run development containers
 prod-build:  ## run development containers
 	@docker-compose -f docker-compose-build.yml build --no-cache
 
-prod-api:  ## build prod api
-	@docker-compose -f docker-compose-build.yml build --no-cache api
+prod-molior:  ## build prod molior
+	@docker-compose -f docker-compose-build.yml build --no-cache molior
 
-prod-publish-api:  ## publish docker api
-	@docker tag molior_api neolynx/molior_api
-	@docker push neolynx/molior_api
-	@docker rmi neolynx/molior_api
+prod-aptly:  ## build prod molior
+	@docker-compose -f docker-compose-build.yml build --no-cache aptly
+
+prod-web:  ## build prod molior
+	@docker-compose -f docker-compose-build.yml build --no-cache web
+
+prod-publish-molior:  ## publish docker molior
+	@docker tag molior_molior neolynx/molior_molior
+	@docker push neolynx/molior_molior
+	@docker rmi neolynx/molior_molior
+
+prod-publish-aptly:  ## publish docker aptly
+	@docker tag molior_aptly neolynx/molior_aptly
+	@docker push neolynx/molior_aptly
+	@docker rmi neolynx/molior_aptly
+
+prod-publish-web:  ## publish docker molior
+	@docker tag molior_web neolynx/molior_web
+	@docker push neolynx/molior_web
+	@docker rmi neolynx/molior_web
 
 prod-publish:  ## publish docker images
-	@for i in api web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
-	@for i in api web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
+	@for i in molior web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
+	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
 
 # Self-documenting Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-api:
-	docker-compose build --no-cache api
+molior:
+	docker-compose build --no-cache molior
 
-api-cached:
-	docker-compose build api
+molior-cached:
+	docker-compose build molior
 
 web:
 	docker-compose build --no-cache web
@@ -59,8 +75,8 @@ registry:
 stop:  ## stop containers
 	@docker-compose down
 
-stop-api:  ## stop api container
-	@docker-compose stop api
+stop-molior:  ## stop molior container
+	@docker-compose stop molior
 
 stop-aptly:  ## stop aptly container
 	@docker-compose stop aptly
@@ -79,13 +95,13 @@ clean:  ## clean containers and volumes
 	docker-compose --profile serve --profile test down -v
 
 remove: clean   ## remove containers and volumes
-	docker rmi -f molior_web:latest molior_api:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
+	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
 logs:  ## show logs
-	@docker-compose logs -f api web aptly
+	@docker-compose logs -f molior web aptly
 
-logs-api:  ## show api logs
-	@docker-compose logs -f api
+logs-molior:  ## show molior logs
+	@docker-compose logs -f molior
 
 logs-aptly:  ## show aptly logs
 	@docker-compose logs -f aptly
@@ -102,8 +118,8 @@ logs-nginx:  ## show nginx logs
 logs-postgres:  ## show postgres logs
 	@docker-compose logs -f postgres
 
-shell-api:  ## login to api container
-	docker-compose exec api /bin/bash
+shell-molior:  ## login to molior container
+	docker-compose exec molior /bin/bash
 
 shell-web:  ## login to web container
 	docker-compose exec web /bin/bash
@@ -120,6 +136,6 @@ shell-nginx:  ## login to nginx container
 shell-registry:  ## login to registry container
 	docker-compose exec registry /bin/bash
 
-psql:  ## login to api container
+psql:  ## run psql
 	docker-compose exec postgres su postgres -c "psql molior"
 

@@ -1,45 +1,63 @@
-# Running molior in docker compose
+# Deploy Molior with docker-compose
 
+Copy the [docker/prod](./) directory to a location on a docker-compose server and call it `molior/`:
+
+```
+molior/
+├── config
+│   ├── aptly.conf
+│   ├── backend-docker.yml
+│   └── molior.yml
+├── docker-compose.yml
+├── .env
+├── Makefile
+└── README.md
+```
 
 ## Configuration
 
-Edit .env file and adapt settings:
+### Configure initial settings
+
+Adapt setting in the docker-compoer [.env](./.env) file. This is used for creating GPG keys for debian package signing and accounts for aptly and the registry.
+
+### Configure Molior server
+
+Adapt the settings in the `config/` directory:
+
+- [molior.yml](config/molior.yml)
+- [backend-docker.yml](config/backend-docker.yml)
+- [aptly.conf](config/aptly.conf)
+
+## Running molior
+
+For convenience, there is a Makefile offering the following:
 ```
-COMPOSE_PROJECT_NAME=molior
-
-# WebUI admin password
-ADMIN_PASSWORD=molior-dev
-
-# URL where the APT repositories are reachable (also from docker build nodes)
-APT_URL_PUBLIC=http://host.docker.internal:8080
-
-# docker registry
-REGISTRY_USER=molior
-REGISTRY_PASSWORD=molior-dev
-
-# aptly api
-APTLY_USER=molior
-APTLY_PASSWORD=molior-dev
-
-# gpg keys
-DEBSIGN_NAME=molior
-DEBSIGN_EMAIL=debsign@molior
-REPOSIGN_NAME=molior
-REPOSIGN_EMAIL=reposign@molior
+$ make help
+help                           Print this help
+logs                           Show logs
+pull                           Pull new images and start
+start                          Start containers
+status                         Show status (default)
+stop                           Stop containers
 ```
 
-## Start molior
+### Start molior
 
+To start molior, run:
 ```
-docker-compose up -d
+make start
 ```
+or run `docker-compose up -d` directly.
+
+### See logs
+
+To the log output of molior and aptly, run:
+```
+make logs
+```
+or run `docker-compose logs -f` directly.
 
 ## Access molior
 
 Go to http://localhost:8000 and login with `admin` and login with configured ADMIN_PASSWORD.
 
-## See logs
-
-```
-docker-compose logs -f
-```

@@ -797,16 +797,6 @@ class AptlyWorker:
         args = {"schedule": []}
         await enqueue_task(args)
 
-    async def _drop_publish(self, args):
-        base_mirror_name = args[0]
-        base_mirror_version = args[1]
-        projectname = args[2]
-        projectversion = args[3]
-        dist = args[4]
-
-        aptly = get_aptly_connection()
-        await aptly.publish_drop(base_mirror_name, base_mirror_version, projectname, projectversion, dist)
-
     async def _init_repository(self, args):
         basemirror_name = args[0]
         basemirror_version = args[1]
@@ -1598,12 +1588,6 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._update_mirror(args)
-
-                if not handled:
-                    args = task.get("drop_publish")
-                    if args:
-                        handled = True
-                        await self._drop_publish(args)
 
                 if not handled:
                     args = task.get("init_repository")

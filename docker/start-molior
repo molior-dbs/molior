@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+if [ -f /config/molior.yml ]; then
+    cp /config/molior.yml /etc/molior/
+    chown molior /etc/molior/molior.yml
+fi
+
+if [ -f /config/backend-docker.yml ]; then
+    cp /config/backend-docker.yml /etc/molior/
+    chown molior /etc/molior/backend-docker.yml
+fi
+
+if [ -n "$DEBSIGN_NAME" ] && [ -n "$DEBSIGN_EMAIL" ]; then
+    echo "Creating gpgs key for '$DEBSIGN_NAME'"
+    /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL
+fi
+
+# allow accessing docker socker from host
+groupmod -g `stat -c %g /var/run/docker.sock` docker
+
+while true; do
+    if su postgres -c "pg_isready -d molior"; then
+        break
+    fi
+    echo waiting for database connection ...
+    sleep 1
+done
+
+/usr/lib/molior/db-upgrade.sh
+
+exec su molior -c "/usr/bin/python3 -m molior.main --host=0.0.0.0 --port=9999"
