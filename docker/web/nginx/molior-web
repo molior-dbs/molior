@@ -33,7 +33,7 @@ server {
         location /api {
             proxy_set_header                Host            $host;
             proxy_set_header                X-Real-Ip       $remote_addr;
-            proxy_pass                      http://api:9999;
+            proxy_pass                      http://molior:9999;
         }
 
         location /api/websocket {
@@ -43,7 +43,7 @@ server {
 
             proxy_set_header                Host            $host;
             proxy_set_header                X-Real-Ip       $remote_addr;
-            proxy_pass                      http://api:9999/api/websocket;
+            proxy_pass                      http://molior:9999/api/websocket;
             proxy_connect_timeout 7d;
             proxy_send_timeout 7d;
             proxy_read_timeout 7d;
@@ -52,7 +52,7 @@ server {
         location /internal/buildupload {
             proxy_set_header                Host            $host;
             proxy_set_header                X-Real-Ip       $remote_addr;
-            proxy_pass                      http://api:9999/internal/buildupload;
+            proxy_pass                      http://molior:9999/internal/buildupload;
             client_max_body_size 4G;
         }
 
@@ -63,7 +63,7 @@ server {
 
             proxy_set_header                Host            $host;
             proxy_set_header                X-Real-Ip       $remote_addr;
-            proxy_pass                      http://api:9999/internal/buildlog;
+            proxy_pass                      http://molior:9999/internal/buildlog;
             proxy_connect_timeout 7d;
             proxy_send_timeout 7d;
             proxy_read_timeout 7d;
@@ -76,7 +76,7 @@ server {
 
             proxy_set_header                Host            $host;
             proxy_set_header                X-Real-Ip       $remote_addr;
-            proxy_pass                      http://api:9999/internal/registry;
+            proxy_pass                      http://molior:9999/internal/registry;
             proxy_connect_timeout 365d;
             proxy_send_timeout 365d;
             proxy_read_timeout 365d;

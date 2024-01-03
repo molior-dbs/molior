@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: docker/web-dev.Dockerfile
+    depends_on:
+      - molior
     networks:
       - molior
     ports:
@@ -13,14 +15,18 @@ services:
     volumes:
       - ../molior-web2:/app
 
-  api:
-    container_name: molior-api
+  molior:
+    container_name: molior-server
     build:
       context: .
-      dockerfile: docker/api-dev.Dockerfile
+      dockerfile: docker/molior-dev.Dockerfile
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+      - nginx
+      - registry
     networks:
       - molior
     ports:
@@ -62,12 +68,13 @@ services:
       context: .
       dockerfile: docker/nginx.Dockerfile
     env_file: .env
+    depends_on:
+      - aptly
     networks:
       - molior
     ports:
       - "8080:8000"
     volumes:
-      - ../aptly:/app
       - aptly:/var/lib/aptly/
 
   registry:
@@ -81,7 +88,6 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./:/app
       - registry:/var/lib/docker-registry/
 
 networks:

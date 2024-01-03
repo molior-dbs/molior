@@ -11,11 +11,11 @@ services:
     ports:
       - "8000:80"
 
-  api:
-    container_name: molior-api
+  molior:
+    container_name: molior-server
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
+      dockerfile: docker/molior.Dockerfile
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+if [ -n "$REGISTRY_USER" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+    echo "Setting password for registry user '$REGISTRY_USER'"
+    htpasswd -Bbc /etc/docker/registry/.htpasswd $REGISTRY_USER $REGISTRY_PASSWORD
+fi
+
+unset REGISTRY_USER REGISTRY_PASSWORD
+exec /usr/bin/docker-registry serve /etc/docker/registry/config.yml

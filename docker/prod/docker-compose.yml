@@ -4,15 +4,21 @@ services:
   web:
     image: neolynx/molior_web
     container_name: molior-web
+    depends_on:
+      - molior
     networks:
       - molior
     ports:
       - "8000:80"
 
-  api:
-    image: neolynx/molior_api
-    container_name: molior-api
+  molior:
+    image: neolynx/molior_molior
+    container_name: molior-server
     env_file: .env
+    depends_on:
+      - postgres
+      - nginx
+      - registry
     networks:
       - molior
     extra_hosts:
@@ -21,6 +27,7 @@ services:
       - pgsock:/var/run/postgresql/
       - /var/run/docker.sock:/var/run/docker.sock
       - molior:/var/lib/molior/
+      - ./config:/config
 
   postgres:
     image: neolynx/molior_postgres
@@ -44,6 +51,8 @@ services:
     image: neolynx/molior_nginx
     container_name: molior-nginx
     env_file: .env
+    depends_on:
+      - aptly
     networks:
       - molior
     ports:
@@ -58,13 +67,17 @@ services:
     networks:
       - molior
     ports:
-      - "127.0.0.1:5000:5000"
+      - "5000:5000"
     volumes:
       - registry:/var/lib/docker-registry/
 
 networks:
   molior:
-    name: molior
+# fixed subnet for firewalling:
+#    ipam:
+#      driver: default
+#      config:
+#      - subnet: 172.42.0.1/24
 
 volumes:
      pgsock:

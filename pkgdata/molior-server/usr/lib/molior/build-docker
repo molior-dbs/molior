@@ -86,6 +86,7 @@ do
     idx=$((i + 1))
 done
 
+log_title "Running apt-get update"
 echo
 apt-get update
 echo
@@ -93,6 +94,7 @@ echo
 mkdir -p build
 cd build
 
+log_title "Getting source package"
 log "Downloading:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
 log " - $sources_url"
@@ -129,6 +131,7 @@ done
 #fi
 #
 
+log_title "Extracting source package"
 mkdir src
 chown build src
 cd src
@@ -141,13 +144,20 @@ else
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 
+log_title "Installing build dependencies"
 mk-build-deps debian/control --install --remove -t 'apt-get -q -y'
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
   exit 4
 fi
 
-su build -c "dpkg-buildpackage -nc -us -uc -ui -b"
+log_title "Building debian package"
+buildargs=""
+if [ "$ARCH_ANY_ONLY" = "True" ]; then
+    buildargs="--build=any"
+fi
+
+su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 5

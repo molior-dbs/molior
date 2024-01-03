@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+if [ -n "$APTLY_USER" ] && [ -n "$APTLY_PASSWORD" ]; then
+    echo "Setting password for aptly user '$APTLY_USER'"
+    /usr/sbin/create-aptly-passwd $APTLY_USER $APTLY_PASSWORD
+fi
+
+exec nginx -g 'daemon off;'

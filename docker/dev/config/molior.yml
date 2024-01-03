@@ -1,0 +1,41 @@
+# Molior configuration
+
+server:
+    url: 'http://host.docker.internal:8000'
+
+hostname: '127.0.0.1'
+working_dir: '/var/lib/molior'
+database: '/molior'
+
+# GPG email for signing the source packages
+debsign_gpg_email: 'debsign@molior'
+
+ci_builds:
+    enabled: True
+    # Remove ci packages which are older than <ci_packages_ttl> days
+    packages_ttl: 7
+
+admin:
+    admin_password: 'molior-dev'
+
+auth_backend: 'db'
+
+backend: 'docker'
+
+# Molior server settings
+max_parallel_chroots: 2
+
+# Aptly settings
+aptly:
+    apt_url_public: 'http://host.docker.internal:8080'
+    apt_url: 'http://host.docker.internal:8080'
+    api_url: 'http://nginx:3143/api'
+    api_user: 'molior'
+    api_pass: 'molior-dev'
+    gpg_key: 'reposign@molior'
+    key: 'archive-keyring.asc'
+
+cleanup:
+    cleanup_active: 'on'
+    cleanup_time: '04:00'
+    cleanup_weekday: 'Saturday'
