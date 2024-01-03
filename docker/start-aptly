@@ -10,4 +10,10 @@ if [ -n "$REPOSIGN_NAME" ] && [ -n "$REPOSIGN_EMAIL" ]; then
     /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
 fi
 
+# Copy aptly configuration
+if [ -f "/config/aptly.conf" ]; then
+    cp -f /config/aptly.conf /var/lib/aptly/.aptly.conf
+    chown aptly /var/lib/aptly/.aptly.conf
+fi
+
 exec su aptly -c "aptly api serve -listen 0.0.0.0:3142"

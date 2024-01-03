@@ -4,10 +4,12 @@ set -e
 
 if [ -f /config/molior.yml ]; then
     cp /config/molior.yml /etc/molior/
+    chown molior /etc/molior/molior.yml
 fi
 
 if [ -f /config/backend-docker.yml ]; then
     cp /config/backend-docker.yml /etc/molior/
+    chown molior /etc/molior/backend-docker.yml
 fi
 
 if [ -n "$DEBSIGN_NAME" ] && [ -n "$DEBSIGN_EMAIL" ]; then
@@ -15,12 +17,11 @@ if [ -n "$DEBSIGN_NAME" ] && [ -n "$DEBSIGN_EMAIL" ]; then
     /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL
 fi
 
-
 # allow accessing docker socker from host
 groupmod -g `stat -c %g /var/run/docker.sock` docker
 
 while true; do
-    if pg_isready -d molior; then
+    if su postgres -c pg_isready -d molior; then
         break
     fi
     echo waiting for database connection ...
