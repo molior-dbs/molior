@@ -1,44 +1,21 @@
-# Deploy molior with docker-compose
+# Deploy Molior with docker-compose
+
+Download the [molior](./) directory.
 
 ## Configuration
 
-### 1. Adapt the settings in the `config/` directory:
+### Configure Molior server
 
-- `molior.yml`
+Adapt the settings in the `config/` directory:
+
+- [molior.yml]
 - `backend-docker.yml`
 - `aptly.conf`
 
 
-### 2. Edit .env file and adapt settings:
+### Configure GPG key and user/password creation
 
-```
-# Molior docker compose env file
-
-# Make sure docker compose uses 'molior' as project name, instead of directory name
-COMPOSE_PROJECT_NAME=molior
-
-# the following settings are for creating credentials and keys on first startup
-
-# debian package signing keys
-
-DEBSIGN_NAME=molior
-DEBSIGN_EMAIL=debsign@molior
-# Note: make sure debsign_gpg_email in config/molior.yml matches DEBSIGN_EMAIL
-
-REPOSIGN_NAME=molior
-REPOSIGN_EMAIL=reposign@molior
-# Note: make sure aptly/gpg_key in config/molior.yml matches REPOSIGN_EMAIL
-
-# Create docker registry login
-REGISTRY_USER=molior
-REGISTRY_PASSWORD=molior-dev
-# Note: make sure registry:user/password in config/backend-docker.yml match these settings
-
-# Create aptly login
-APTLY_USER=molior
-APTLY_PASSWORD=molior-dev
-# Note: make sure aptly:api_user/api_pass in config/molior.yml match these settings
-```
+Adapt setting in the docker-compoer [.env](./.env) file.
 
 ## Running molior
 

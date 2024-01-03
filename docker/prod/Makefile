@@ -2,14 +2,17 @@
 status:  ## Show status (default)
 	@docker-compose ps
 
+perms:
+	chmod 600 config/*
+
 logs:  ## Show logs
 	@docker-compose logs -f aptly molior
 
-pull:  ## Pull new images and start
+pull: perms  ## Pull new images and start
 	@docker-compose pull
 	@docker-compose up -d
 
-start:  ## Start containers
+start: perms   ## Start containers
 	@docker-compose up -d
 
 stop:  ## Stop containers
