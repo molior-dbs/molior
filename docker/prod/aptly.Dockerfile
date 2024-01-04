@@ -10,6 +10,6 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
 RUN mkdir app
 WORKDIR /app
 
-ADD docker/start-aptly /app/aptly
+ADD start-aptly /app/aptly
 
 CMD /app/aptly

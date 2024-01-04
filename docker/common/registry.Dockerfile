@@ -4,8 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends docker-registry
 RUN mkdir app
 WORKDIR /app
 
-ADD docker/registry/config.yml /etc/docker/registry/config.yml
+ADD docker/common/registry-config.yml /etc/docker/registry/config.yml
 
-ADD docker/start-registry /app/registry
+ADD docker/common/start-registry /app/registry
 
 CMD /app/registry
