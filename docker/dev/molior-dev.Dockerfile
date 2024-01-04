@@ -20,7 +20,6 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info;\
     mkdir -p /usr/lib/molior; \
     cp /app/pkgdata/molior-common/usr/lib/molior/* /usr/lib/molior/; \
-    cp /app/docker/backend-docker.yml /etc/molior/; \
     cp /app/pkgdata/molior-server/etc/sudoers.d/01_molior /etc/sudoers.d/; \
     mkdir -p /etc/molior/mirror-hooks.d; \
     ln -sf /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker; \
@@ -30,6 +29,6 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     mkdir -p /var/lib/molior/upload/; \
     chown molior /var/lib/molior/upload/; \
     mkdir /etc/molior; \
-    cp -ar docker/dev/config/* /etc/molior/; \
+    cp -ar docker/dev/backend-docker.yml docker/dev/molior.yml /etc/molior/; \
     cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
     su molior -c "exec adev runserver -q -p 9999 molior/"

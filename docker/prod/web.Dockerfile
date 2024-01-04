@@ -9,6 +9,6 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
     apt-get install -y --no-install-recommends molior-web && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-ADD docker/web/nginx/molior-web /etc/nginx/sites-enabled/
+ADD nginx-molior-web /etc/nginx/sites-enabled/molior-web
 
 CMD nginx -g 'daemon off;'
