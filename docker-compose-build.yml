@@ -5,86 +5,34 @@ services:
     container_name: molior-web
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
-    networks:
-      - molior
-    ports:
-      - "8000:80"
+      dockerfile: docker/prod/web.Dockerfile
 
   molior:
     container_name: molior-server
     build:
       context: .
-      dockerfile: docker/molior.Dockerfile
-    env_file: .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - molior
-    ports:
-      - "127.0.0.1:9999:9999"
-    volumes:
-      - pgsock:/var/run/postgresql/
-      - /var/run/docker.sock:/var/run/docker.sock
-      - molior:/var/lib/molior/
+      dockerfile: docker/prod/molior.Dockerfile
 
   postgres:
     container_name: molior-postgres
     build:
       context: .
-      dockerfile: docker/postgres.Dockerfile
-    networks:
-      - molior
-    volumes:
-      - pgsock:/var/run/postgresql/
-      - postgres:/var/lib/postgresql/15/main
+      dockerfile: docker/common/postgres.Dockerfile
 
   aptly:
     container_name: molior-aptly
     build:
       context: .
-      dockerfile: docker/aptly.Dockerfile
-    env_file: .env
-    networks:
-      - molior
-    ports:
-      - "127.0.0.1:3142:3142"
-    volumes:
-      - aptly:/var/lib/aptly/
+      dockerfile: docker/prod/aptly.Dockerfile
 
   nginx:
     container_name: molior-nginx
     build:
       context: .
-      dockerfile: docker/nginx.Dockerfile
-    env_file: .env
-    networks:
-      - molior
-    ports:
-      - "8080:8000"
-    volumes:
-      - aptly:/var/lib/aptly/
+      dockerfile: docker/common/nginx.Dockerfile
 
   registry:
     container_name: molior-registry
     build:
       context: .
-      dockerfile: docker/registry.Dockerfile
-    env_file: .env
-    networks:
-      - molior
-    ports:
-      - "127.0.0.1:5000:5000"
-    volumes:
-      - registry:/var/lib/docker-registry/
-
-networks:
-  molior:
-    name: molior
-
-volumes:
-     pgsock:
-     postgres:
-     registry:
-     aptly:
-     molior:
+      dockerfile: docker/common/registry.Dockerfile
