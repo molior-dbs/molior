@@ -5,7 +5,7 @@ services:
     container_name: molior-web
     build:
       context: .
-      dockerfile: docker/web-dev.Dockerfile
+      dockerfile: docker/dev/web-dev.Dockerfile
     depends_on:
       - molior
     networks:
@@ -19,7 +19,7 @@ services:
     container_name: molior-server
     build:
       context: .
-      dockerfile: docker/molior-dev.Dockerfile
+      dockerfile: docker/dev/molior-dev.Dockerfile
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -41,7 +41,7 @@ services:
     container_name: molior-postgres
     build:
       context: .
-      dockerfile: docker/postgres.Dockerfile
+      dockerfile: docker/common/postgres.Dockerfile
     networks:
       - molior
     volumes:
@@ -52,7 +52,7 @@ services:
     container_name: molior-aptly
     build:
       context: .
-      dockerfile: docker/aptly-dev.Dockerfile
+      dockerfile: docker/dev/aptly-dev.Dockerfile
     env_file: .env
     networks:
       - molior
@@ -66,7 +66,7 @@ services:
     container_name: molior-nginx
     build:
       context: .
-      dockerfile: docker/nginx.Dockerfile
+      dockerfile: docker/common/nginx.Dockerfile
     env_file: .env
     depends_on:
       - aptly
@@ -81,7 +81,7 @@ services:
     container_name: molior-registry
     build:
       context: .
-      dockerfile: docker/registry.Dockerfile
+      dockerfile: docker/common/registry.Dockerfile
     env_file: .env
     networks:
       - molior
