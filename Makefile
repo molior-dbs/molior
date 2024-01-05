@@ -2,38 +2,41 @@ dev:  ## build and run development containers
 	@docker-compose build --no-cache
 	@docker-compose up -d
 
-dev-cached:  ## build (cached) and run development containers
+dev-cached:  ## Build (cached) and run development containers
 	@docker-compose build
 	@docker-compose up -d
 
-prod-build:  ## run development containers
-	@docker-compose -f docker-compose-build.yml build --no-cache
+prod-build:  ## Build prod containers
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache
 
-prod-molior:  ## build prod molior
-	@docker-compose -f docker-compose-build.yml build --no-cache molior
+prod-build-cached:  ## Build prod containers (cached)
+	@docker-compose -f docker/prod/docker-compose-build.yml build
 
-prod-aptly:  ## build prod molior
-	@docker-compose -f docker-compose-build.yml build --no-cache aptly
+prod-molior:  ## Build prod molior
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache molior
 
-prod-web:  ## build prod molior
-	@docker-compose -f docker-compose-build.yml build --no-cache web
+prod-aptly:  ## Build prod aptly
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache aptly
 
-prod-publish-molior:  ## publish docker molior
+prod-web:  ## Build prod web
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache web
+
+prod-publish-molior:  ## Publish docker molior
 	@docker tag molior_molior neolynx/molior_molior
 	@docker push neolynx/molior_molior
 	@docker rmi neolynx/molior_molior
 
-prod-publish-aptly:  ## publish docker aptly
+prod-publish-aptly:  ## Publish docker aptly
 	@docker tag molior_aptly neolynx/molior_aptly
 	@docker push neolynx/molior_aptly
 	@docker rmi neolynx/molior_aptly
 
-prod-publish-web:  ## publish docker molior
+prod-publish-web:  ## Publish docker molior
 	@docker tag molior_web neolynx/molior_web
 	@docker push neolynx/molior_web
 	@docker rmi neolynx/molior_web
 
-prod-publish:  ## publish docker images
+prod-publish:  ## Publish docker images
 	@for i in molior web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
 	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
 
@@ -92,7 +95,7 @@ stop-registry:  ## stop registry container
 
 clean:  ## clean containers and volumes
 	@echo; echo "This will delete volumes and data!"; echo Press Enter to continue, Ctrl-C to abort ...; read x
-	docker-compose --profile serve --profile test down -v
+	docker-compose test down -v
 
 remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
@@ -139,3 +142,5 @@ shell-registry:  ## login to registry container
 psql:  ## run psql
 	docker-compose exec postgres su postgres -c "psql molior"
 
+docker-compose.tar:
+	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
