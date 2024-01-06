@@ -713,7 +713,9 @@ class AptlyWorker:
             is_ci = build.is_ci
             publish_s3 = None
             if build.projectversion and build.projectversion.publish_s3:
-                publish_s3 = f"{build.projectversion.s3_endpoint}:{build.projectversion.s3_path}"
+                s3_endpoint = build.projectversion.s3_endpoint
+                s3_path = build.projectversion.s3_path
+                publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
 
         await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
 
@@ -941,7 +943,9 @@ class AptlyWorker:
             project_version = projectversion.name
             architectures = db2array(projectversion.mirror_architectures)
             if projectversion.publish_s3:
-                publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
+                s3_endpoint = projectversion.s3_endpoint
+                s3_path = projectversion.s3_path
+                publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
 
             # delete deb builds and parents if needed
             todelete = []
@@ -1318,7 +1322,9 @@ class AptlyWorker:
                         if projectversion_id not in projectversions:
                             publish_s3 = None
                             if projectversion.publish_s3:
-                                publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
+                                s3_endpoint = projectversion.s3_endpoint
+                                s3_path = projectversion.s3_path
+                                publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
                             projectversions[projectversion_id] = (repo_name, publish_name,
                                                                   db2array(projectversion.mirror_architectures),
                                                                   publish_s3)
@@ -1519,7 +1525,7 @@ class AptlyWorker:
                 logger.error("remove s3 projectversion: projectversion %d not found" % projectversion_id)
                 return
 
-        publish_s3 = f"{s3_endpoint}:{s3_path}"
+        publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
         logger.info(f"aptly worker: Deleting S3 endpoint {publish_s3}")
         aptly = get_aptly_connection()
         try:
@@ -1544,7 +1550,7 @@ class AptlyWorker:
                                                       projectversion.name)
             archs = db2array(projectversion.mirror_architectures)
 
-        publish_s3 = f"{s3_endpoint}:{s3_path}"
+        publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
         aptly = get_aptly_connection()
         snapshot_name = get_snapshot_name(publish_name, "stable", temporary=False)
         logger.info(f"Publishing to S3 endpoint {publish_s3} snapshot {snapshot_name} {archs}")

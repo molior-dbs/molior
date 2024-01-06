@@ -103,7 +103,9 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
                 archs = db2array(projectversion.mirror_architectures)
                 publish_s3 = None
                 if projectversion.publish_s3:
-                    publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
+                    s3_endpoint = projectversion.s3_endpoint
+                    s3_path = projectversion.s3_path
+                    publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
 
         if not fullname:
             logger.error("publisher: error finding projectversion {}".format(projectversion_id))
