@@ -1,3 +1,11 @@
+molior (1.5.0~alpha86) stretch; urgency=medium
+
+  * s3: fix deleting projects
+  * molior-aptly: add dependencies
+  * docker: improve example Makefile
+
+ -- André Roth <neolynx@gmail.com>  Sat, 06 Jan 2024 17:53:55 +0100
+
 molior (1.5.0~alpha85) stretch; urgency=medium
 
   * bump version 1.5.0~alpha85
