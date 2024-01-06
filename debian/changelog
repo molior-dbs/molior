@@ -1,3 +1,9 @@
+molior (1.5.0~alpha89) stretch; urgency=medium
+
+  * docker: improve build script
+
+ -- André Roth <neolynx@gmail.com>  Sat, 06 Jan 2024 21:43:45 +0100
+
 molior (1.5.0~alpha88) stretch; urgency=medium
 
   * rebuild: mark builds needs build
