@@ -1,0 +1,92 @@
+#!/bin/sh
+
+log_title ()
+{
+    message=$1
+    shift
+    if ! echo $@ | grep -q "no-header-newline"; then
+      /bin/echo
+    fi
+    color=36
+    if echo $@ | grep -q "error"; then
+      color=31
+    fi
+    /bin/echo -e "\e[${color}m\e[1m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+    /bin/echo -en "\e[${color}m\e[1m"
+    printf "| %-44s %s |" "molior: $message" "`date -R`"
+    /bin/echo -e "\e[0m"
+    /bin/echo -e "\e[${color}m\e[1m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
+    if ! echo $@ | grep -q "no-footer-newline"; then
+      /bin/echo
+    fi
+}
+
+log ()
+{
+    message="$@"
+    /bin/echo -e "$message"
+}
+
+log_error ()
+{
+    message="$@"
+    /bin/echo -e "\e[31m\e[1m$message\e[0m"
+}
+
+finish ()
+{
+    RET=$?  # must be first
+    set +e
+
+    if [ $RET -ne 0 ]; then
+      log_title "Building failed" no-footer-newline error
+    fi
+    exit $RET
+}
+trap finish EXIT
+
+log_title "Molior Build" no-header-newline
+
+log "Building: $REPO_NAME $VERSION"
+log "Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
+log "Builder : `hostname`"
+echo
+
+log "APT Sources:"
+curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
+if [ "$?" -ne 0 ]; then
+  echo "E: Error getting apt sources from $MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" >&2
+  exit 1
+fi
+cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
+
+log_title "Running apt-get update"
+apt-get update
+if [ "$?" -ne 0 ]; then
+  echo "E: Error updating apt sources" >&2
+  exit 2
+fi
+
+log_title "Installing build dependencies"
+mk-build-deps debian/control --install --remove -t 'apt-get -q -y'
+if [ "$?" -ne 0 ]; then
+  echo "E: Error installing build dependencies" >&2
+  exit 5
+fi
+
+log_title "Building debian package"
+buildargs=""
+if [ "$ARCH_ANY_ONLY" = "True" ]; then
+    buildargs="--build=any"
+fi
+
+# use real user
+usermod -u `stat -c %u /app` build
+
+su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
+if [ "$?" -ne 0 ]; then
+  echo "E: Error building debian package $dsc_url" >&2
+fi
+
+echo Dropping to a shell ...
+bash

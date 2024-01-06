@@ -106,7 +106,7 @@ class DockerBackend:
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
                     f"{registry}/molior:{task['distversion']}-{task['architecture']}",
-                    "/app/build-docker",
+                    "/app/docker-build",
                     ])
 
                 async def outh(line):

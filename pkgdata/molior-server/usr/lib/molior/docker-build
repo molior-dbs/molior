@@ -87,21 +87,22 @@ do
 done
 
 log_title "Running apt-get update"
-echo
 apt-get update
-echo
-
-mkdir -p build
-cd build
+if [ "$?" -ne 0 ]; then
+  echo "E: Error updating apt sources" >&2
+  exit 2
+fi
 
 log_title "Getting source package"
+mkdir -p build
+cd build
 log "Downloading:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
 log " - $sources_url"
 pkgdir=`curl --max-time 30 -s $sources_url | /app/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
   echo "E: Directory for source package $REPO_NAME $VERSION not found" >&2
-  exit 2
+  exit 3
 fi
 
 # strip epoch version
@@ -112,7 +113,7 @@ log " - $dsc_url"
 curl --max-time 30 -s -O $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "E: Error downloading source package $dsc_url" >&2
-  exit 3
+  exit 4
 fi
 
 for srcfile in `/app/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
@@ -131,7 +132,7 @@ done
 #fi
 #
 
-log_title "Extracting source package"
+log "Extracting source package"
 mkdir src
 chown build src
 cd src
@@ -145,10 +146,10 @@ else
 fi
 
 log_title "Installing build dependencies"
-mk-build-deps debian/control --install --remove -t 'apt-get -q -y'
+mk-build-deps debian/control --install --remove -t 'apt-get -y'
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
-  exit 4
+  exit 5
 fi
 
 log_title "Building debian package"
@@ -160,7 +161,7 @@ fi
 su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
-  exit 5
+  exit 6
 fi
 
 if [ "$RUN_LINTIAN" = "True" ]; then
@@ -182,6 +183,6 @@ do
   curl -fs -F "file=@$f" $MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
   if [ $? -ne 0 ]; then
     log_error "Error uploading output files"
-    exit 6
+    exit 7
   fi
 done
