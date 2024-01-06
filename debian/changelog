@@ -1,3 +1,10 @@
+molior (1.5.0~alpha87) stretch; urgency=medium
+
+  * s3: allow publishing with subdirectories
+  * docker: fix aptly key generation
+
+ -- André Roth <neolynx@gmail.com>  Sat, 06 Jan 2024 19:45:50 +0100
+
 molior (1.5.0~alpha86) stretch; urgency=medium
 
   * s3: fix deleting projects
