@@ -250,6 +250,7 @@ class Worker:
     async def _rebuild(self, args, session):
         logger.debug("worker: got rebuild task")
         build_id = args[0]
+        oldstate = args[0]
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("rebuild: build %d not found", build_id)
@@ -322,6 +323,8 @@ class Worker:
 
         if not ok:
             logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, build.buildstate))
+            build.buildstate = oldstate
+            session.commit()
 
     async def _schedule(self, _):
         asyncio.ensure_future(ScheduleBuilds())

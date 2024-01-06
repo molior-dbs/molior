@@ -435,7 +435,11 @@ async def rebuild_build(request):
         logger.error("build %d cannot be rebuilt" % build_id)
         return web.Response(text="This build cannot be rebuilt", status=400)
 
-    args = {"rebuild": [build_id]}
+    oldstate = build.buildstate
+    await build.set_needs_build()
+    request.cirrina.db_session.commit()
+
+    args = {"rebuild": [build_id, oldstate]}
     await enqueue_task(args)
     return web.json_response("Rebuild triggered")
 
