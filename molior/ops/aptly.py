@@ -130,7 +130,6 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
         if Path(changes_file).exists():
             files2delete.append(changes_file)
         for f in files2delete:
-            logger.debug("publisher: removing %s", f)
             try:
                 os.remove(f)
             except Exception as exc:
@@ -207,7 +206,6 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     files2delete = files2upload
     files2delete.append("{}/{}".format(out_path, changes_file))
     for f in files2delete:
-        logger.info("publisher: removing %s", f)
         try:
             os.remove(f)
         except Exception as exc:
