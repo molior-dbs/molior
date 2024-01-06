@@ -250,7 +250,7 @@ class Worker:
     async def _rebuild(self, args, session):
         logger.debug("worker: got rebuild task")
         build_id = args[0]
-        oldstate = args[0]
+        oldstate = args[1]
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("rebuild: build %d not found", build_id)
