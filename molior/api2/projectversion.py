@@ -1744,7 +1744,6 @@ async def publish_s3(request):
 
     db.commit()
 
-    logger.info(f"s3: {publish_s3} {s3_endpoint} {s3_path} old: {old_publish} {old_endpoint} {old_path}")
     if publish_s3 and not old_publish:  # create publish to s3
         await enqueue_aptly({"publish_s3": [projectversion.id]})
     elif not publish_s3 and old_publish:  # delete s3 publish

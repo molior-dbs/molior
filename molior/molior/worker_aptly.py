@@ -925,6 +925,7 @@ class AptlyWorker:
         project_name = None
         project_version = None
         architectures = None
+        publish_s3 = None
 
         build_ids = []
         with Session() as db:
@@ -939,6 +940,8 @@ class AptlyWorker:
             project_name = projectversion.project.name
             project_version = projectversion.name
             architectures = db2array(projectversion.mirror_architectures)
+            if projectversion.publish_s3:
+                publish_s3 = f"{projectversion.s3_endpoint}:{projectversion.s3_path}"
 
             # delete deb builds and parents if needed
             todelete = []
@@ -1011,7 +1014,8 @@ class AptlyWorker:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(self.threadexc, remove_buildout)
 
-        await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).delete()
+        await DebianRepository(basemirror_name, basemirror_version, project_name, project_version,
+                               architectures, publish_s3=publish_s3).delete()
 
         with Session() as db:
             build = db.query(Build).filter(Build.id == delete_build_id).first()
@@ -1516,11 +1520,11 @@ class AptlyWorker:
                 return
 
         publish_s3 = f"{s3_endpoint}:{s3_path}"
-        logger.info(f"Deleting S3 endpoint {publish_s3}")
+        logger.info(f"aptly worker: Deleting S3 endpoint {publish_s3}")
         aptly = get_aptly_connection()
         try:
-            task = await aptly.DELETE(f"/publish/s3:{publish_s3}/stable")
-            if not await aptly.wait_task(task["ID"]):
+            task_id = await aptly.publish_drop(f"s3:{publish_s3}", "stable")
+            if not await aptly.wait_task(task_id):
                 logger.error(f"Error deleting S3 endpoint {publish_s3}")
         except Exception:
             logger.error(f"Error deleting S3 endpoint {publish_s3}")

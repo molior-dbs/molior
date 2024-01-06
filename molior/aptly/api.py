@@ -672,7 +672,7 @@ class AptlyApi:
         """
         return await self.GET("/publish")
 
-    async def publish_drop(self, base_mirror, base_mirror_version, repo, version, distribution):
+    async def publish_drop(self, publish_name, distribution):
         """
         Deletes a publish point.
 
@@ -685,7 +685,6 @@ class AptlyApi:
         Returns:
             list: List of publish points
         """
-        _, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, repo, version)
         task = await self.DELETE(f"/publish/{publish_name}/{distribution}")
         return task["ID"]
 

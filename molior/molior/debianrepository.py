@@ -129,17 +129,24 @@ class DebianRepository:
         """
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
+            _, publish_name = self.aptly.get_aptly_names(self.basemirror_name, self.basemirror_version,
+                                                         self.project_name, self.project_version)
             try:
-                task_id = await self.aptly.publish_drop(self.basemirror_name,
-                                                        self.basemirror_version,
-                                                        self.project_name,
-                                                        self.project_version, dist)
+                task_id = await self.aptly.publish_drop(publish_name, dist)
                 await self.aptly.wait_task(task_id)
             except Exception:
                 logger.warning("Error deleting publish point of repo '%s'" % repo_name)
-            await asyncio.sleep(2)
 
-            # FIXME: delete also old timestamped snapshots
+            if dist == "stable" and self.publish_s3:
+                logger.info(f"Deleting S3 endpoint {self.publish_s3}")
+                aptly = get_aptly_connection()
+                try:
+                    task_id = await self.aptly.publish_drop(f"s3:{self.publish_s3}", "stable")
+                    if not await aptly.wait_task(task_id):
+                        logger.error(f"Error deleting S3 endpoint {self.publish_s3}")
+                except Exception:
+                    logger.error(f"Error deleting S3 endpoint {self.publish_s3}")
+
             snapshot_name = get_snapshot_name(self.publish_name, dist)
             try:
                 task_id = await self.aptly.snapshot_delete(snapshot_name)
@@ -156,8 +163,8 @@ class DebianRepository:
                 pass
 
             try:
-                # FIXME: should this aptly task run in background?
-                await self.aptly.repo_delete(repo_name)
+                task_id = await self.aptly.repo_delete(repo_name)
+                await self.aptly.wait_task(task_id)
             except Exception:
                 logger.warning("Error deleting repo '%s'" % repo_name)
 
