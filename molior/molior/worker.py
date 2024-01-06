@@ -258,8 +258,8 @@ class Worker:
 
         ok = False
         if build.buildtype == "deb":
-            if build.buildstate == "build_failed" or \
-               build.buildstate == "publish_failed":
+            if oldstate == "build_failed" or \
+               oldstate == "publish_failed":
                 ok = True
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 if Path(buildout).exists():
@@ -275,13 +275,13 @@ class Worker:
                 await enqueue_task(args)
 
         if build.buildtype == "source":
-            if build.buildstate == "publish_failed":
+            if oldstate == "publish_failed":
                 ok = True
                 await build.set_needs_publish()
                 session.commit()
                 await build.parent.log("I: publishing source package\n")
                 await enqueue_aptly({"src_publish": [build.id]})
-            elif build.buildstate == "build_failed":
+            elif oldstate == "build_failed":
                 if build.sourcerepository.state == "error":
                     await build.log("E: git repo is in error state\n")
                     await build.set_failed()
@@ -297,7 +297,7 @@ class Worker:
                 ok = True
 
         if build.buildtype == "chroot":
-            if build.buildstate == "build_failed" or build.buildstate == "publish_failed":
+            if oldstate == "build_failed" or oldstate == "publish_failed":
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 if Path(f"{buildout}/build.log").exists():
                     try:
@@ -322,7 +322,7 @@ class Worker:
                     ok = True
 
         if not ok:
-            logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, build.buildstate))
+            logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, oldstate))
             build.buildstate = oldstate
             session.commit()
 
