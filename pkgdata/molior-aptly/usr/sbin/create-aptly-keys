@@ -19,6 +19,12 @@ APTLY_USER=aptly
 HOME_DIR=/var/lib/aptly
 PUBLIC_DIR=${HOME_DIR}/.aptly/public
 
+# return successful if already created
+if [ -f ${HOME_DIR}/gpg-pass ]; then
+    exit 0
+fi
+
+
 GPG_TEMP_DIR=`mktemp -d /tmp/aptly-XXXXXX`
 GPG_PASSPHRASE=`apg -q -n 1 -E \' -E \"`
 
@@ -27,7 +33,7 @@ export GPG_TTY=`tty`
 
 if su - $APTLY_USER -c "$GPG_BINARY -K --no-default-keyring --keyring=trustedkeys.gpg | grep -q $GPG_EMAIL"; then
   echo 'gpg: key for aptly already exists'
-  exit 0
+  exit 1
 fi
 
 chown $APTLY_USER $GPG_TEMP_DIR
