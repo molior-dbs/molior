@@ -1,3 +1,9 @@
+molior (1.5.0~alpha93) stretch; urgency=medium
+
+  * fix rebuild
+
+ -- André Roth <neolynx@gmail.com>  Sun, 07 Jan 2024 00:00:54 +0100
+
 molior (1.5.0~alpha92) stretch; urgency=medium
 
   * cleanup logging
