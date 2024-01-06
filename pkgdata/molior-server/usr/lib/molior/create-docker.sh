@@ -156,7 +156,8 @@ EOF
 
   mkdir $target/app
   chroot $target useradd -m --shell /bin/sh --home-dir /app build
-  cp -a /usr/lib/molior/build-docker $target/app/
+  cp -a /usr/lib/molior/docker-build $target/app/
+  cp -a /usr/lib/molior/docker-build-local $target/usr/sbin/
   cp -a /usr/lib/molior/find-package-dir.pl $target/app/
   cp -a /usr/lib/molior/dsc-get-files.pl $target/app/
 
