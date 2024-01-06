@@ -27,7 +27,7 @@ export GPG_TTY=`tty`
 
 if su - $APTLY_USER -c "$GPG_BINARY -K --no-default-keyring --keyring=trustedkeys.gpg | grep -q $GPG_EMAIL"; then
   echo 'gpg: key for aptly already exists'
-  exit 1
+  exit 0
 fi
 
 chown $APTLY_USER $GPG_TEMP_DIR
