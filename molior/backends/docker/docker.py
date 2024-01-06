@@ -105,7 +105,7 @@ class DockerBackend:
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
-                    f"{registry}/molior:{task['distversion']}-{task['architecture']}",
+                    f"{registry}/molior-{task['distversion']}-{task['architecture']}",
                     "/app/docker-build",
                     ])
 

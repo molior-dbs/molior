@@ -26,7 +26,7 @@ KEYS="$8"  # separated by space
 
 DEBOOTSTRAP_NAME="${DIST_NAME}_${DIST_VERSION}_$ARCH"
 target="/var/lib/molior/upload/dockerbase/$DEBOOTSTRAP_NAME"
-DEBOOTSTRAP_TAR="/var/lib/molior/upload/dockerbase//$DEBOOTSTRAP_NAME.tar"
+DEBOOTSTRAP_TAR="/var/lib/molior/upload/dockerbase/$DEBOOTSTRAP_NAME.tar"
 
 set -e
 #set -x
@@ -174,11 +174,10 @@ publish_docker()
   cd - > /dev/null
   rm -rf $target
 
-  CONTAINER_NAME=molior
   CONTAINER_VERSION=$DIST_VERSION-$ARCH
 
   echo I: Importing docker base image
-  su molior -c "docker import $DEBOOTSTRAP_TAR $CONTAINER_NAME:$CONTAINER_VERSION"
+  su molior -c "docker import $DEBOOTSTRAP_TAR molior-$CONTAINER_VERSION"
     if [ $? -ne 0 ]; then
       echo "docker import failed"
       exit 4
@@ -198,11 +197,11 @@ publish_docker()
       echo I: Logging in to docker registry $REGISTRY
       echo "$DOCKER_PASSWORD" | su molior -c "docker login --username $DOCKER_USER --password-stdin $REGISTRY"
   fi
-  su molior -c "docker tag $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
+  su molior -c "docker tag molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
   echo I: Publishing docker base image
-  su molior -c "docker push $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
-  su molior -c "docker rmi $CONTAINER_NAME:$CONTAINER_VERSION $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION"
-  echo I: docker base $REGISTRY/$CONTAINER_NAME:$CONTAINER_VERSION is published
+  su molior -c "docker push $REGISTRY/molior-$CONTAINER_VERSION"
+  su molior -c "docker rmi molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
+  echo I: docker base $REGISTRY/molior-$CONTAINER_VERSION is published
 }
 
 case "$ACTION" in
