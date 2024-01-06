@@ -1,0 +1,2 @@
+/etc/nginx/sites-available/aptly /etc/nginx/sites-enabled/aptly
+/etc/nginx/sites-available/aptlyapi /etc/nginx/sites-enabled/aptlyapi

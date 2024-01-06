@@ -42,7 +42,7 @@ Description: Molior build node client
 Package: molior-aptly
 Section: misc
 Architecture: all
-Depends: ${misc:Depends}, aptly (>> 1.5.0)
+Depends: ${misc:Depends}, aptly (>> 1.5.0), apg, ca-certificates
 Description: aptly configuration for molior
  Aptly configuraiton and scripts for integraiton with molior
 
