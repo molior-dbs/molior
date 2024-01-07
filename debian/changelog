@@ -1,3 +1,9 @@
+molior (1.5.0~alpha95) stretch; urgency=medium
+
+  * docker: improve git clone and docker pull
+
+ -- André Roth <neolynx@gmail.com>  Sun, 07 Jan 2024 12:23:52 +0100
+
 molior (1.5.0~alpha94) stretch; urgency=medium
 
   * docker: fix multiarch build
