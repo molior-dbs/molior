@@ -22,4 +22,4 @@ pull: perms  ## Pull new images and start
 	@docker-compose up -d --remove-orphans
 
 perms:  # fix perms of config files
-	chmod 600 config/*
+	@chmod 600 config/*
