@@ -156,9 +156,11 @@ log_title "Building debian package"
 buildargs=""
 if [ "$ARCH_ANY_ONLY" = "True" ]; then
     buildargs="--build=any"
+else
+    buildargs="--build=any,all"
 fi
 
-su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
+su build -c "dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 6
