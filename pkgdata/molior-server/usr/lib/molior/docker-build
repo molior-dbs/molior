@@ -40,7 +40,7 @@ log_title ()
 log ()
 {
     message="$@"
-    /bin/echo -e "$message"
+    /bin/echo -e "\e[36m\e[1m$message\e[0m"
 }
 
 log_error ()
@@ -161,6 +161,7 @@ else
     buildargs="--build=any,all"
 fi
 
+log "Running: dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 su build -c "dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2

@@ -73,7 +73,7 @@ class DockerBackend:
                 await enqueue_backend({"started": build_id})
 
                 await write_log_title(build_id, "Docker Build")
-                await buildlog(build_id, "Pulling docker build image:\n")
+                await buildlog(build_id, "Pulling build container ...\n")
 
                 server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-docker.yml")
