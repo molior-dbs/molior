@@ -122,6 +122,7 @@ do
   log " - $src_url"
   curl --max-time 30 -s -O $src_url
 done
+echo
 
 #echo
 #echo -n "Validating "
@@ -132,16 +133,17 @@ done
 #fi
 #
 
-log "Extracting source package"
+log "Extracting source package:"
 mkdir src
 chown build src
 cd src
 
 if echo $srcfile | grep -q "\.git$"; then
-    su build -c "git clone ../$srcfile"
+    su build -c "git clone -n ../$srcfile" | sed 's/^/  /'
     cd $srcfile
+    su build -c "git checkout -b build v$VERSION" | sed 's/^/  /'
 else
-    su build -c "tar xf ../$srcfile"
+    su build -c "tar xf ../$srcfile" | sed 's/^/  /'
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 

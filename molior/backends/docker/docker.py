@@ -67,6 +67,8 @@ class DockerBackend:
                     break
 
                 build_id = task["build_id"]
+                arch = task['architecture']
+                distversion = task['distversion']
                 await enqueue_backend({"started": build_id})
                 await buildlog(build_id, "starting docker build\n")
 
@@ -93,8 +95,8 @@ class DockerBackend:
                     "-e", f"BUILD_ID={task['build_id']}",
                     "-e", f"BUILD_TOKEN={task['token']}",
                     "-e", f"PLATFORM={task['distrelease']}",
-                    "-e", f"PLATFORM_VERSION={task['distversion']}",
-                    "-e", f"ARCH={task['architecture']}",
+                    "-e", f"PLATFORM_VERSION={distversion}",
+                    "-e", f"ARCH={arch}",
                     "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
                     "-e", f"REPO_NAME={task['repository_name']}",
                     "-e", f"VERSION={task['version']}",
@@ -105,25 +107,36 @@ class DockerBackend:
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
-                    f"{registry}/molior-{task['distversion']}-{task['architecture']}",
+                    f"{registry}/molior-{distversion}-{arch}",
                     "/app/docker-build",
                     ])
 
                 async def outh(line):
                     await buildlog(build_id, line)
 
-                process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
+                pull_cmd = shlex.split(remote_cmd)
+                pull_cmd.extend(shlex.split(f"unbuffer docker pull {registry}/molior-{distversion}-{arch}"))
+                process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
 
-                await buildlog(build_id, None)  # signal end of logs
-
                 if not ret == 0:
-                    logger.error("error running docker build")
-                    await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
+                    await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
                     await enqueue_backend({"failed": build_id})
+
                 else:
-                    await enqueue_backend({"succeeded": build_id})
+
+                    process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
+                    await process.launch()
+                    ret = await process.wait()
+
+                    await buildlog(build_id, None)  # signal end of logs
+
+                    if not ret == 0:
+                        await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
+                        await enqueue_backend({"failed": build_id})
+                    else:
+                        await enqueue_backend({"succeeded": build_id})
 
             except Exception as exc:
                 logger.exception(exc)
