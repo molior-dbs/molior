@@ -1,3 +1,9 @@
+molior (1.5.0~alpha94) stretch; urgency=medium
+
+  * docker: fix multiarch build
+
+ -- André Roth <neolynx@gmail.com>  Sun, 07 Jan 2024 11:30:44 +0100
+
 molior (1.5.0~alpha93) stretch; urgency=medium
 
   * fix rebuild
