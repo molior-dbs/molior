@@ -140,7 +140,7 @@ cd src
 if echo $srcfile | grep -q "\.git$"; then
     su build -c "git clone -n ../$srcfile"
     cd $srcfile
-    su build -c "git checkout -b build v$VERSION"
+    su build -c "git checkout -b build v$(echo $VERSION tr '~' '-')"
 else
     su build -c "tar xf ../$srcfile"
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
