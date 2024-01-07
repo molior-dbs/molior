@@ -40,6 +40,8 @@ finish ()
 
     if [ $RET -ne 0 ]; then
       log_title "Building failed" no-footer-newline error
+      echo Dropping to a shell ...
+      bash
     fi
     exit $RET
 }
@@ -47,10 +49,18 @@ trap finish EXIT
 
 log_title "Molior Build" no-header-newline
 
-MOLIOR_SERVER=http://192.168.7.254:8000
-
 PROJECT=$1
 PROJECTVERSION=$2
+
+if [ -z "$PROJECT" ] || [ -z "$PROJECTVERSION" ]; then
+    echo "Usage: $0 PROJECT VERSION" >&2
+    exit 10
+fi
+
+if [ -z "" ]; then
+    echo "Error: MOLIOR_SERVER_URL environment variable is not set" >&2
+    exit 11
+fi
 
 log "APT Sources:"
 curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
@@ -88,5 +98,3 @@ if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
 fi
 
-echo Dropping to a shell ...
-bash
