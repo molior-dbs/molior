@@ -1,3 +1,9 @@
+molior (1.5.0~alpha96) stretch; urgency=medium
+
+  * docker: cleanup build logs
+
+ -- André Roth <neolynx@gmail.com>  Sun, 07 Jan 2024 12:47:40 +0100
+
 molior (1.5.0~alpha95) stretch; urgency=medium
 
   * docker: improve git clone and docker pull
