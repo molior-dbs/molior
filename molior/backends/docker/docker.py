@@ -6,6 +6,7 @@ from launchy import Launchy
 from ...logger import logger
 from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enqueue_backend
+from ...tools import write_log_title
 
 
 class DockerBackend:
@@ -70,7 +71,9 @@ class DockerBackend:
                 arch = task['architecture']
                 distversion = task['distversion']
                 await enqueue_backend({"started": build_id})
-                await buildlog(build_id, "starting docker build\n")
+
+                await write_log_title(build_id, "Docker Build")
+                await buildlog(build_id, "Pulling docker build image:\n")
 
                 server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-docker.yml")
@@ -125,6 +128,7 @@ class DockerBackend:
                     await enqueue_backend({"failed": build_id})
 
                 else:
+                    await buildlog(build_id, "\n")
 
                     process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
                     await process.launch()

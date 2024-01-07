@@ -61,15 +61,14 @@ finish ()
 }
 trap finish EXIT
 
-log_title "Molior Build" no-header-newline
-
+log ""
 log "Building: $REPO_NAME $VERSION"
 log "Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
 log "Build ID: $BUILD_ID"
 log "Builder : `hostname`"
 echo
 
-log "APT Sources:"
+log "Adding APT sources:"
 curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
 if [ "$?" -ne 0 ]; then
   echo "E: Error getting apt sources from $MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" >&2
@@ -85,18 +84,18 @@ do
     mv $tmpkey.gpg /etc/apt/trusted.gpg.d/
     idx=$((i + 1))
 done
+echo
 
-log_title "Running apt-get update"
+log "Running apt-get update ..."
 apt-get update
 if [ "$?" -ne 0 ]; then
   echo "E: Error updating apt sources" >&2
   exit 2
 fi
 
-log_title "Getting source package"
 mkdir -p build
 cd build
-log "Downloading:"
+log "Downloading source package:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
 log " - $sources_url"
 pkgdir=`curl --max-time 30 -s $sources_url | /app/find-package-dir.pl $REPO_NAME $VERSION`
@@ -133,17 +132,17 @@ echo
 #fi
 #
 
-log "Extracting source package:"
+log "Extracting source package ..."
 mkdir src
 chown build src
 cd src
 
 if echo $srcfile | grep -q "\.git$"; then
-    su build -c "git clone -n ../$srcfile" | sed 's/^/  /'
+    su build -c "git clone -n ../$srcfile"
     cd $srcfile
-    su build -c "git checkout -b build v$VERSION" | sed 's/^/  /'
+    su build -c "git checkout -b build v$VERSION"
 else
-    su build -c "tar xf ../$srcfile" | sed 's/^/  /'
+    su build -c "tar xf ../$srcfile"
     cd `find . -maxdepth 1 -type d ! -name '.' | head -n 1`
 fi
 
