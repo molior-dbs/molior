@@ -1,3 +1,9 @@
+molior (1.5.0~alpha101) stretch; urgency=medium
+
+  * python3-aiofile in molior.yml
+
+ -- Dominik Schneider <dominik.schneider@accenture.com>  Wed, 10 Jan 2024 16:49:26 +0100
+
 molior (1.5.0~alpha100) stretch; urgency=medium
 
   * rebase and resolve merge conflicts
