@@ -12,7 +12,6 @@ from molior.molior.queues import enqueue_aptly
 from ..logger import logger
 from ..version import MOLIOR_VERSION
 from ..model.database import database, Session
-from .configuration import Configuration
 
 from .worker import Worker
 from .worker_aptly import AptlyWorker
@@ -72,7 +71,7 @@ async def run_molior(self):
     notification_worker = NotificationWorker()
     self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
 
-def list_active_tasks(self, debug_pos):
+def list_active_tasks(debug_pos):
     logger.info(debug_pos)
     tasks = asyncio.all_tasks()
     logger.info(f"There are {len(tasks)} active tasks")
@@ -139,6 +138,9 @@ class MoliorServer(cirrina.Server):
         self.task_aptly_worker = None
         self.task_notification_worker = None
         self.task_cron = None
+
+        self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
+        self.on_startup.append(run_molior)
 
     @staticmethod
     def create_cirrina_context(cirrina):
