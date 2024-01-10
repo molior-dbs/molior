@@ -95,7 +95,7 @@ stop-registry:  ## stop registry container
 
 clean:  ## clean containers and volumes
 	@echo; echo "This will delete volumes and data!"; echo Press Enter to continue, Ctrl-C to abort ...; read x
-	docker-compose test down -v
+	docker-compose down -v
 
 remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
