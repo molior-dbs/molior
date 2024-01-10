@@ -1,3 +1,26 @@
+molior (1.5.0~alpha100) stretch; urgency=medium
+
+  * rebase and resolve merge conflicts
+  * api2/build GET API: add parent_id in response body
+  * vsphere ova creation
+  * admin page: add PUT API for maintenance mode and message
+  * admin page: add GET API for maintenance mode and message
+  * avoid NoneType error
+  * Feature/cleanup api
+  * cleanup: added failed build retention
+  * current cleanup status
+  * retention cleanup: log build delete
+  * debian: add molior-aptly configuration package
+  * worker: cleanup draft
+  * server: cleanup job adjustment
+  * swagger: fix API documentation
+  * server restart: adding debug statement for further investigation on
+    task cancellations
+  * server restart: encapsuled stop/cancel commands in try-except blocks
+  * swagger: fix API documentation
+
+ -- Dominik Schneider <dominik.schneider@accenture.com>  Wed, 10 Jan 2024 16:35:37 +0100
+
 molior (1.5.0~alpha99) stretch; urgency=medium
 
   * docker: improve logs
