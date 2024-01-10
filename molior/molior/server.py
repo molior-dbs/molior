@@ -11,7 +11,6 @@ from molior.model.metadata import MetaData
 from ..logger import logger
 from ..version import MOLIOR_VERSION
 from ..model.database import database, Session
-from .configuration import Configuration
 
 from .worker import Worker
 from .worker_aptly import AptlyWorker
@@ -44,33 +43,54 @@ async def run_molior(self):
     notification_worker = NotificationWorker()
     self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
 
-    cfg = Configuration()
-    cleanup_active = cfg.cleanup.get("cleanup_active")
-    cleanup_weekday = cfg.cleanup.get("cleanup_weekday")
-    cleanup_time = cfg.cleanup.get("cleanup_time")
+def list_active_tasks(debug_pos):
+    logger.info(debug_pos)
+    tasks = asyncio.all_tasks()
+    logger.info(f"There are {len(tasks)} active tasks")
+    task_ids = [id(task) for task in tasks]  # Get the IDs of all tasks
+    logger.info("Active Task IDs: %s", task_ids)
+    logger.info("Start of tasks listed: ")
+    for task in tasks:
+        logger.info(task.get_name())
+        logger.info(task.get_coro())
+    logger.info("End of tasks listed: ")
 
-    def get_weekday_number(weekday_name):
-        weekday_mapping = {
-            'Monday': 0,
-            'Tuesday': 1,
-            'Wednesday': 2,
-            'Thursday': 3,
-            'Friday': 4,
-            'Saturday': 5,
-            'Sunday': 6
-        }
-        return weekday_mapping.get(weekday_name)
+def get_weekday_number(weekday_name):
+    weekday_mapping = {
+        'Monday': 0,
+        'Tuesday': 1,
+        'Wednesday': 2,
+        'Thursday': 3,
+        'Friday': 4,
+        'Saturday': 5,
+        'Sunday': 6
+    }
+    return weekday_mapping.get(weekday_name)
 
-    if not cleanup_time:
-        cleanup_time = "04:00"
-    if not cleanup_weekday:
-        cleanup_weekday = 'Sunday'
+def weekly_cleanup(self):
+    if hasattr(self, 'task_cron') and self.task_cron:
+        # If a scheduler already exists, cancel the existing tasks
+        self.task_cron.cancel()
 
-    if cleanup_active is False or cleanup_active == "off" or cleanup_active == "disabled":
-        self.logger.info("cleanup job disabled")
-        return
-    else:
-        self.logger.info(f"cleanup job enabled for every {cleanup_weekday} at {cleanup_time}")
+    # extract values from db or write default values a new molior-server instance
+    cleanup_weekdays_list = []
+    with Session() as session:
+        cleanup_active = session.query(MetaData).filter_by(
+            name="cleanup_active").first()
+        cleanup_weekdays = session.query(MetaData).filter_by(
+            name="cleanup_weekdays").first()
+        cleanup_time = session.query(MetaData).filter_by(
+            name="cleanup_time").first()
+
+        if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
+            logger.error("cleanup job not set")
+        else:
+            if cleanup_active.value.lower() == "false":
+                logger.info("cleanup job disabled")
+                return
+            else:
+                cleanup_sched = Scheduler(locale="en_US")
+                cleanup_weekdays_list = cleanup_weekdays.value.split(',')
 
     cleanup_sched = Scheduler(locale="en_US")
     cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(
@@ -91,30 +111,6 @@ class MoliorServer(cirrina.Server):
 
         self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
         self.on_startup.append(run_molior)
-
-    def list_active_tasks(self, debug_pos):
-        logger.info(debug_pos)
-        tasks = asyncio.all_tasks()
-        logger.info(f"There are {len(tasks)} active tasks")
-        task_ids = [id(task) for task in tasks]  # Get the IDs of all tasks
-        logger.info("Active Task IDs: %s", task_ids)
-        logger.info("Start of tasks listed: ")
-        for task in tasks:
-            logger.info(task.get_name())
-            logger.info(task.get_coro())
-        logger.info("End of tasks listed: ")
-
-    def get_weekday_number(self, weekday_name):
-        weekday_mapping = {
-            'Monday': 0,
-            'Tuesday': 1,
-            'Wednesday': 2,
-            'Thursday': 3,
-            'Friday': 4,
-            'Saturday': 5,
-            'Sunday': 6
-        }
-        return weekday_mapping.get(weekday_name)
 
     @staticmethod
     def create_cirrina_context(cirrina):
