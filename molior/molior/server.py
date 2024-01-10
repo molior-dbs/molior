@@ -20,34 +20,6 @@ from .worker_notification import NotificationWorker
 from .backend import Backend
 from ..auth.auth import Auth
 
-# import api handlers
-import molior.api.build              # noqa: F401
-import molior.api.gitlab             # noqa: F401
-import molior.api.bitbucket          # noqa: F401
-import molior.api.project            # noqa: F401
-import molior.api.buildstate         # noqa: F401
-import molior.api.mirror             # noqa: F401
-import molior.api.websocket          # noqa: F401
-import molior.api.auth               # noqa: F401
-import molior.api.user               # noqa: F401
-import molior.api.userrole           # noqa: F401
-import molior.api.sourcerepository   # noqa: F401
-import molior.api.projectuserrole    # noqa: F401
-import molior.api.projectversion     # noqa: F401
-import molior.api.info               # noqa: F401
-import molior.api.status             # noqa: F401
-import molior.api.hook               # noqa: F401
-import molior.api.upload             # noqa: F401
-
-import molior.api2.project           # noqa: F401
-import molior.api2.projectversion    # noqa: F401
-import molior.api2.sourcerepository  # noqa: F401
-import molior.api2.user              # noqa: F401
-import molior.api2.mirror            # noqa: F401
-import molior.api2.build             # noqa: F401
-import molior.api2.token             # noqa: F401
-import molior.api2.admin             # noqa: F401
-
 async def run_molior(self):
     logger.info("starting molior v%s", MOLIOR_VERSION)
     self.backend = Backend().init()
