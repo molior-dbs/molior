@@ -14,10 +14,10 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
 
 RUN useradd --uid 7777 -G docker -m --shell /bin/sh --home-dir /var/lib/molior molior
 
-CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION = \"`dpkg-parsechangelog -S Version`\" > molior/version.py; mkdir -p /etc/molior; cp -ar /app/docker/molior.yml /etc/molior; \
+CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION = \"`dpkg-parsechangelog -S Version`\" > molior/version.py; \
     groupmod -g `stat -c %g /var/run/docker.sock` docker; \
     chown molior /var/lib/molior/; \
-    /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info;\
+    /app/pkgdata/molior-server/usr/sbin/create-molior-keys "Molior Debsign" debsign@molior.info; \
     mkdir -p /usr/lib/molior; \
     cp /app/pkgdata/molior-common/usr/lib/molior/* /usr/lib/molior/; \
     cp /app/pkgdata/molior-server/etc/sudoers.d/01_molior /etc/sudoers.d/; \
@@ -28,7 +28,7 @@ CMD echo "Starting api (waiting for postgres 5s)"; sleep 5; echo MOLIOR_VERSION 
     chown molior /var/lib/molior/repositories/; \
     mkdir -p /var/lib/molior/upload/; \
     chown molior /var/lib/molior/upload/; \
-    mkdir /etc/molior; \
+    mkdir -p /etc/molior; \
     cp -ar docker/dev/backend-docker.yml docker/dev/molior.yml /etc/molior/; \
     cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
     su molior -c "exec adev runserver -q -p 9999 molior/"
