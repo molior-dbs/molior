@@ -9,7 +9,7 @@ PermissionsStartOnly=true
 LimitNOFILE=8192
 ExecStartPre=/usr/lib/molior/db-upgrade.sh
 Environment="LANG=C.UTF-8"
-ExecStart=/usr/bin/python3 -m molior.molior.server --host=localhost --port=8888
+ExecStart=/usr/bin/python3 -m molior.molior.main --host=localhost --port=8888
 Type=simple
 KillSignal=SIGTERM
 KillMode=process
