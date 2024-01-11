@@ -1,3 +1,12 @@
+molior (1.5.0~alpha103) stretch; urgency=medium
+
+  * service: start correct python module
+  * docker: fix molior config
+  * fix app and server
+  * minor fix in Makefile
+
+ -- André Roth <neolynx@gmail.com>  Thu, 11 Jan 2024 11:22:38 +0100
+
 molior (1.5.0~alpha102) stretch; urgency=medium
 
   * fix molior startup
