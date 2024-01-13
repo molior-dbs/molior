@@ -1,3 +1,6 @@
+start:  ## run development containers
+	@docker-compose up -d
+
 dev:  ## build and run development containers
 	@docker-compose build --no-cache
 	@docker-compose up -d
