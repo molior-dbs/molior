@@ -1,3 +1,9 @@
+molior (1.5.0~alpha107) stretch; urgency=medium
+
+  * docker: clean local build
+
+ -- André Roth <neolynx@gmail.com>  Sun, 14 Jan 2024 19:40:58 +0100
+
 molior (1.5.0~alpha106) stretch; urgency=medium
 
   * docker: cleanup after successful local build
