@@ -1,3 +1,10 @@
+molior (1.5.0~alpha106) stretch; urgency=medium
+
+  * docker: cleanup after successful local build
+  * update gitignore
+
+ -- André Roth <neolynx@gmail.com>  Sun, 14 Jan 2024 19:33:52 +0100
+
 molior (1.5.0~alpha105) stretch; urgency=medium
 
   * docker: fix local build
