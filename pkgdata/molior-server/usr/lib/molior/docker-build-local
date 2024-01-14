@@ -113,6 +113,8 @@ if [ "$?" -ne 0 ]; then
   exit 6
 fi
 
+su build -c "debclean"
+
 log_title "Copying build output"
 out=`su build -c "mktemp -d /app/src/buildout-XXXXX"`
 cp -av /app/*.deb /app/*.changes /app/*.buildinfo $out/
