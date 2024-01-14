@@ -104,7 +104,7 @@ chown build /app
 
 rm -f /app/*.deb /app/*.changes /app/*.buildinfo
 
-su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
+su build -c "dpkg-buildpackage -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
 
