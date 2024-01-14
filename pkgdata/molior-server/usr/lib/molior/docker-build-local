@@ -1,5 +1,23 @@
 #!/bin/sh
 
+set -e
+
+PROJECT=$1
+PROJECTVERSION=$2
+MOLIOR_SERVER=$3
+
+if [ -z "$PROJECT" ] || [ -z "$PROJECTVERSION" ] || [ -z "$MOLIOR_SERVER" ]; then
+        echo Usage: $0 PROJECT PROJECTVERSION MOLIOR_SERVER
+        exit 1
+fi
+
+if [ ! -d "/app/src" ]; then
+    echo "Error: /app/src directory does not exist"
+    exit 2
+fi
+
+cd /app/src
+
 log_title ()
 {
     message=$1
@@ -40,8 +58,6 @@ finish ()
 
     if [ $RET -ne 0 ]; then
       log_title "Building failed" no-footer-newline error
-      echo Dropping to a shell ...
-      bash
     fi
     exit $RET
 }
@@ -49,18 +65,6 @@ trap finish EXIT
 
 log_title "Molior Build" no-header-newline
 
-PROJECT=$1
-PROJECTVERSION=$2
-
-if [ -z "$PROJECT" ] || [ -z "$PROJECTVERSION" ]; then
-    echo "Usage: $0 PROJECT VERSION" >&2
-    exit 10
-fi
-
-if [ -z "" ]; then
-    echo "Error: MOLIOR_SERVER_URL environment variable is not set" >&2
-    exit 11
-fi
 
 log "APT Sources:"
 curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
@@ -78,11 +82,12 @@ if [ "$?" -ne 0 ]; then
 fi
 
 log_title "Installing build dependencies"
-mk-build-deps debian/control --install --remove -t 'apt-get -q -y'
+apt-get build-dep --yes .
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
   exit 5
 fi
+
 
 log_title "Building debian package"
 buildargs=""
@@ -90,11 +95,28 @@ if [ "$ARCH_ANY_ONLY" = "True" ]; then
     buildargs="--build=any"
 fi
 
-# use real user
-usermod -u `stat -c %u /app` build
+# use real user and group
+usermod -u `stat -c %u /app/src` build
+if getent group `stat -c %g /app/src` >/dev/null; then
+    usermod -g `stat -c %g /app/src` build
+else
+    groupmod -g `stat -c %g /app/src` build
+fi
+chown build /app
 
 su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
+
+  echo Dropping to a shell ...
+  bash
 fi
 
+log_title "Copying build output"
+out=`su build -c "mktemp -d /app/src/buildout-XXXXX"`
+cp -av /app/*.deb /app/*.changes /app/*.buildinfo $out/
+
+echo
+echo "Copied build output to: `basename $out`/"
+
+log_title "Build successful" no-footer-newline

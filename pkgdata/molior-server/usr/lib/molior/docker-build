@@ -147,7 +147,7 @@ else
 fi
 
 log_title "Installing build dependencies"
-mk-build-deps debian/control --install --remove -t 'apt-get -y'
+apt-get build-dep --yes .
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
   exit 5
