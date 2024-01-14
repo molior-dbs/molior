@@ -149,17 +149,19 @@ EOF
   echo I: Installing build environment
   cp /etc/hosts $target/etc/hosts  # needed if host.docker.internal is used
   chroot $target apt-get update
-  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git equivs
+  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git
   chroot $target apt-get clean
   rm -f $target/etc/hosts
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
   mkdir $target/app
   chroot $target useradd -m --shell /bin/sh --home-dir /app build
+
   cp -a /usr/lib/molior/docker-build $target/app/
-  cp -a /usr/lib/molior/docker-build-local $target/usr/sbin/
   cp -a /usr/lib/molior/find-package-dir.pl $target/app/
   cp -a /usr/lib/molior/dsc-get-files.pl $target/app/
+
+  cp -a /usr/lib/molior/docker-build-local $target/usr/local/sbin/
 
   echo I: Created docker base successfully
 }
