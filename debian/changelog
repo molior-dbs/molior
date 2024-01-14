@@ -1,3 +1,9 @@
+molior (1.5.0~alpha105) stretch; urgency=medium
+
+  * docker: fix local build
+
+ -- André Roth <neolynx@gmail.com>  Sun, 14 Jan 2024 19:19:13 +0100
+
 molior (1.5.0~alpha104) stretch; urgency=medium
 
   * docker: improve local build script
