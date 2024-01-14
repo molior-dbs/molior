@@ -1,3 +1,10 @@
+molior (1.5.0~alpha104) stretch; urgency=medium
+
+  * docker: improve local build script
+  * docker: use local ng-server proxy config
+
+ -- André Roth <neolynx@gmail.com>  Sun, 14 Jan 2024 18:30:26 +0100
+
 molior (1.5.0~alpha99) stretch; urgency=medium
 
   * docker: improve logs
