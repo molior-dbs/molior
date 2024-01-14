@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -e
-
 PROJECT=$1
 PROJECTVERSION=$2
 MOLIOR_SERVER=$3
@@ -70,7 +68,7 @@ log "APT Sources:"
 curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
 if [ "$?" -ne 0 ]; then
   echo "E: Error getting apt sources from $MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" >&2
-  exit 1
+  exit 3
 fi
 cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 
@@ -78,7 +76,7 @@ log_title "Running apt-get update"
 apt-get update
 if [ "$?" -ne 0 ]; then
   echo "E: Error updating apt sources" >&2
-  exit 2
+  exit 4
 fi
 
 log_title "Installing build dependencies"
@@ -104,12 +102,15 @@ else
 fi
 chown build /app
 
+rm -f /app/*.deb /app/*.changes /app/*.buildinfo
+
 su build -c "dpkg-buildpackage -nc -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
 
   echo Dropping to a shell ...
   bash
+  exit 6
 fi
 
 log_title "Copying build output"
