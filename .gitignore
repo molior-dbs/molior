@@ -4,6 +4,8 @@
 
 molior/version.py
 
+buildout-*
+
 # Debian
 debian/files
 debian/tmp
@@ -16,6 +18,10 @@ debian/molior-node-amd64/
 debian/molior-node-amd64-efi/
 debian/molior-node-arm64-efi/
 debian/molior-vbox/
+debian/molior-aptly/
+debian/molior-common/
+debian/molior-vm/
+debian/molior-vsphere/
 .pybuild/
 molior.egg-info
 debian/debhelper-build-stamp
