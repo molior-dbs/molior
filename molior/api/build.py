@@ -347,7 +347,15 @@ async def get_build(request):
         "branch": build.ci_branch,
         "git_ref": build.git_ref,
         "architecture": build.architecture,
-        "project": project
+        "project": project,
+        "parent_id": build.parent_id,
+        "children": [
+            {
+                "id": child.id,
+                "sourcename": child.sourcename,
+            }
+            for child in build.children
+        ]
     }
 
     if build.sourcerepository:
