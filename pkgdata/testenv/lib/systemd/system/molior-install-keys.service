@@ -1,0 +1,11 @@
+[Unit]
+Description=Creates the required keys on Install
+ConditionPathExists=/usr/sbin/molior-install-keys
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/sbin/molior-install-keys
+
+[Install]
+WantedBy=multi-user.target

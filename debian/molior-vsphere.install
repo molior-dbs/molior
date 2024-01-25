@@ -1,4 +1,5 @@
 #!/usr/bin/dh-exec
 
 pkgdata/createssh/* .
+pkgdata/testenv/* .
 pkgdata/etc .

@@ -65,7 +65,7 @@ Depends: ${misc:Depends}, linux-image-amd64, lvm2, busybox,
   htop, bzip2, wget, psmisc,
 # molior:
   molior-server, dma, molior-web, molior-tools,
-  aptly (>= 1.3.0.adsy10.molior4), apache2-utils, apg
+  aptly (>= 1.3.0.adsy10.molior4), apache2-utils, apg, molior-aptly, python3-coverage
 Description: molior virtual machine
  Virtual Machine meta package depending on molior and aptly services
 

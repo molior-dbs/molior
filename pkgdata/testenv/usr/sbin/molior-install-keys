@@ -1,0 +1,8 @@
+#!/bin/sh
+
+create-molior-keys "Molior Debsign" debsign@molior.info
+create-aptly-keys "Molior Reposign" reposign@molior.info
+create-aptly-passwd molior molior-dev
+service nginx reload
+
+rm /usr/sbin/molior-install-keys
