@@ -78,6 +78,10 @@ nginx-cached:
 registry:
 	docker-compose build --no-cache registry
 
+run-aptly:  ## run aptly commands
+	@docker-compose stop aptly
+	@docker-compose run aptly bash
+
 stop:  ## stop containers
 	@docker-compose down
 
@@ -103,26 +107,29 @@ clean:  ## clean containers and volumes
 remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
-logs:  ## show logs
-	@docker-compose logs -f molior web aptly
+logs:  ## show logs of molior, web and aptly
+	@docker-compose logs -f --tail 20 molior web aptly
+
+logs-all:  ## show all logs
+	@docker-compose logs -f --tail 20 molior web aptly registry nginx postgres
 
 logs-molior:  ## show molior logs
-	@docker-compose logs -f molior
+	@docker-compose logs -f --tail 20 molior
 
 logs-aptly:  ## show aptly logs
-	@docker-compose logs -f aptly
+	@docker-compose logs -f --tail 20 aptly
 
 logs-registry:  ## show registry logs
-	@docker-compose logs -f registry
+	@docker-compose logs -f --tail 20 registry
 
 logs-web:  ## show web logs
-	@docker-compose logs -f web
+	@docker-compose logs -f --tail 20 web
 
 logs-nginx:  ## show nginx logs
-	@docker-compose logs -f nginx
+	@docker-compose logs -f --tail 20 nginx
 
 logs-postgres:  ## show postgres logs
-	@docker-compose logs -f postgres
+	@docker-compose logs -f --tail 20 postgres
 
 shell-molior:  ## login to molior container
 	docker-compose exec molior /bin/bash
