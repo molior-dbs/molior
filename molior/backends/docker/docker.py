@@ -134,13 +134,13 @@ class DockerBackend:
                     await process.launch()
                     ret = await process.wait()
 
-                    await buildlog(build_id, None)  # signal end of logs
-
                     if not ret == 0:
                         await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
                         await enqueue_backend({"failed": build_id})
                     else:
                         await enqueue_backend({"succeeded": build_id})
+
+                    await buildlog(build_id, None)  # signal end of logs
 
             except Exception as exc:
                 logger.exception(exc)
