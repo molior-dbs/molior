@@ -1,3 +1,4 @@
+import json
 from sqlalchemy.orm import aliased
 from sqlalchemy import func, or_
 from aiohttp import web
@@ -16,7 +17,7 @@ from ..aptly import get_aptly_connection
 
 from ..model.projectversion import (
     ProjectVersion, find_basemirror_or_baseproject, get_projectversion, get_projectversion_deps,
-    get_projectversion_byname, get_projectversion_byid)
+    get_projectversion_byname, get_projectversion_byid, get_source_repositories)
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
@@ -86,6 +87,66 @@ async def get_projectversion2(request):
 
     return OKResponse(projectversion.data())
 
+@app.http_get("/api2/project/{project_name}/{project_version}/export")
+async def export_projectversion2(request):
+    """
+    Export a project with version information.
+
+    ---
+    description: Exports information about a project as JSON file.
+    tags:
+        - Projects
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+        - name: project_version
+          in: path
+          required: true
+          type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Projectversion not found
+    """
+    projectversion = get_projectversion(request)
+    if not projectversion:
+        return ErrorResponse(400, "Projectversion not found")
+
+    if projectversion.project.is_mirror:
+        return ErrorResponse(400, "Projectversion is mirror")
+    db = request.cirrina.db_session
+
+    query = db.query(ProjectVersion, SouRepProVer, SourceRepository).join(ProjectVersion, ProjectVersion.id == SouRepProVer.projectversion_id).join(SourceRepository, SouRepProVer.sourcerepository_id == SourceRepository.id).filter(ProjectVersion.name == projectversion.name).all()
+
+    sourcerepositories_data = []
+
+    for projectversion, srpv, sr in query:
+        sourcerepository_data = {
+            "id": sr.id,
+            "name": sr.name,
+            "url": sr.url,
+            "run_lintian": srpv.run_lintian
+        }
+        sourcerepositories_data.append(sourcerepository_data)
+
+    data_object = projectversion.data()
+
+    data_object["sourcerepositories"] = sourcerepositories_data
+
+    json_data = json.dumps(data_object, indent=4)
+
+    filename = f"{projectversion.project.name}_{projectversion.name}.projectversion_export.json"
+    headers = {
+        "Content-Disposition": f"Attachment; filename={filename}",
+        "Content-Type": "application/json"
+    }
+
+    return web.Response(text=json_data, headers=headers)
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/dependencies")
 @app.authenticated

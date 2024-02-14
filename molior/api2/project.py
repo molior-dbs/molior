@@ -1,4 +1,5 @@
 import hashlib
+import json
 
 from sqlalchemy.sql import or_, func
 from secrets import token_hex
@@ -946,3 +947,158 @@ async def delete_project_token(request):
     db.commit()
 
     return OKResponse()
+
+@app.http_post("/api2/projectbase/projectversion/import")
+@req_role("owner")
+async def import_projectversion(request):
+    """
+    Imports a project version
+
+    ---
+    description: Imports a project version
+    tags:
+        - ProjectVersions
+    parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            required:
+              - name
+              - basemirror
+              - architectures
+            properties:
+                name:
+                    type: string
+                    example: "1.0.0"
+                description:
+                    type: string
+                    example: "This version does this and that"
+                basemirror:
+                    type: string
+                    example: "stretch/9.6"
+                architectures:
+                    type: array
+                    items:
+                        type: string
+                    example: ["amd64", "armhf"]
+                    # FIXME: only accept existing archs on mirror!
+                dependency_policy:
+                    type: string
+                    description: Dependency policy
+                    example: strict
+                cibuilds:
+                    type: boolean
+                baseproject:
+                    type: string
+    produces:
+        - text/json
+    responses:
+        "200":
+            description: successful
+        "400":
+            description: Invalid project name
+    """
+    reader = await request.multipart()
+
+    field = await reader.next()
+    if not field:
+        return ErrorResponse(400, "No file was uploaded.")
+
+    filename = field.filename
+    if not filename.endswith('.json'):
+        return ErrorResponse(400, "Invalid file type.")
+
+    content = await field.read()
+
+    try:
+        json_data = json.loads(content)
+    except json.JSONDecodeError:
+        return ErrorResponse(400, "Failed to parse JSON data.")
+
+    name = json_data.get('name')
+    project_id = json_data.get('project_name')
+    description = json_data.get('description')
+    architectures = json_data.get('architectures')
+    basemirror = json_data.get('basemirror')
+    cibuilds = json_data.get('ci_builds_enabled')
+    dependency_policy = json_data.get('dependency_policy')
+    retention_successful_builds = json_data.get('retention_successful_builds')
+    retention_failed_builds = json_data.get('retention_failed_builds')
+    sourcerepositories = json_data.get('sourcerepositories')
+    baseproject = json_data.get('baseproject', '')
+
+    if not is_name_valid(name):
+        return ErrorResponse(400, "Invalid project name")
+    db = request.cirrina.db_session
+    project = db.query(Project).filter(func.lower(Project.name) == project_id.lower()).first()
+    if not project and isinstance(project_id, int):
+        project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return ErrorResponse(400, "Project '{}' not found".format(project_id))
+    if project.is_mirror:
+        return ErrorResponse(400, "Cannot add projectversion to a mirror")
+
+    projectversion = db.query(ProjectVersion).join(Project).filter(
+            func.lower(ProjectVersion.name) == name.lower(), Project.id == project.id).first()
+    if projectversion:
+        return ErrorResponse(400, "Projectversion '{}' already exists{}".format(
+                                        name,
+                                        ", and is marked as deleted" if projectversion.is_deleted else ""))
+
+    bm = None
+    pv = None
+    if baseproject:
+        baseproject_name, baseproject_version = baseproject.split("/")
+        pv = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(False),
+                func.lower(Project.name) == baseproject_name.lower(),
+                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
+        if not pv:
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+        bm = pv.basemirror
+    else:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(True),
+                func.lower(Project.name) == basemirror_name.lower(),
+                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
+        if not bm:
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+
+    for arch in architectures:
+        if arch not in db2array(bm.mirror_architectures):
+            return ErrorResponse(400, "Architecture not found in basemirror: {}".format(arch))
+
+    projectversion = ProjectVersion(
+            name=name,
+            project=project,
+            description=description,
+            dependency_policy=dependency_policy,
+            ci_builds_enabled=cibuilds,
+            mirror_architectures=array2db(architectures),
+            basemirror=bm,
+            mirror_state=None,
+            retention_successful_builds=retention_successful_builds,
+            retention_failed_builds=retention_failed_builds,)
+    db.add(projectversion)
+    db.commit()
+
+    if baseproject:
+        pdep = ProjectVersionDependency(
+                projectversion_id=projectversion.id,
+                dependency_id=pv.id,
+                use_cibuilds=False)
+        db.add(pdep)
+        db.commit()
+
+    await enqueue_aptly({"init_repository": [
+                bm.project.name,
+                bm.name,
+                projectversion.project.name,
+                projectversion.name,
+                architectures,
+                []]})
+
+    return OKResponse({"projectversion": projectversion.data(), "sourcerepositories": sourcerepositories})
