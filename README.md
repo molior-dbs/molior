@@ -235,11 +235,7 @@ git clone https://github.com/molior-dbs/molior.git
 git clone https://github.com/molior-dbs/molior-web.git
 
 # aptly
-git clone https://github.com/molior-dbs/aptlydeb.git
-cd aptlydeb
-git submodule init
-git submodule update
-cd ..
+git clone --recursive https://github.com/molior-dbs/aptlydeb.git
 
 # optionally:
 git clone https://github.com/neolynx/launchy.git
