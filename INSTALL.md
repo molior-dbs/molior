@@ -94,7 +94,7 @@ Molior is available as ISO installer for test and development purposes.
 
 Install molior/aptly server and build node on VMs or bare metal and follow the Configuration chapter below.
 
-User and Password for these installers is: admin/molior-dev (please change password after first login)
+User and Password for these installers are: admin/molior-dev (please change password after first login)
 
 ### Development Environment
 
@@ -142,8 +142,8 @@ passwd
 ```
 - Create SSH and GPG Keys
   Molior uses 2 GPG key pairs, one for signing the source package (molior user) and one for signing the Debian repositories (aptly user).
-  These keys cannot easily be changes once Molior has created and signed mirrors and packages.
-  If desired, create custom gpg key pairs accoring to what the scripts below perform, or use the provided scripts directly for testing purposes.
+  These keys cannot easily be changed once Molior has created and signed mirrors and packages.
+  If desired, create custom gpg key pairs according to what the scripts below perform, or use the provided scripts directly for testing purposes.
   These scripts also create SSH keys used by molior for accessing the git repositories and the build nodes.
 ```
 sudo create-molior-keys "Molior Debsign" debsign@molior.info
@@ -163,7 +163,7 @@ sudo service nginx reload
 ```
 sudo -u molior cat ~molior/.ssh/id_rsa.pub
 ```
-  This key needs to be added to the ~molior/.ssh/authorized_keys on the build nodes (see below), and the git repositories needs to grant read access to this key.
+  This key needs to be added to the ~molior/.ssh/authorized_keys on the build nodes (see below), and the git repositories need to grant read access to this key.
 
 ```
 $ ssh admin@molior-node
@@ -217,7 +217,7 @@ EOF
 sudo service molior-client-http restart
 ```
 - Export source signing public key to the build nodes
-The build nodes need the public key which molior uses to sing the source packages. The build process will verify the signature of source packages.
+The build nodes need the public key which molior uses to sign the source packages. The build process will verify the signature of source packages.
 
 From the molior server, execute the following for each build machine IP in order to add the gpg public key for source package verification (replace NODE_IPS, separated by blank):
 ```
