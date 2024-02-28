@@ -105,11 +105,11 @@ class ProjectVersion(Base):
 
         if self.project.is_basemirror:
             url = "{0}/{1}/{2}".format(apt_url, self.project.name, self.name)
-            # Workaround for aptly ('/' not supported as mirror dist)
+            # FIXME: Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
-                dist = self.mirror_distribution.replace("/", "_-")
-            comp = "missing"
+                dist = self.mirror_distribution
+            comp = ""
             if self.mirror_components:
                 comp = self.mirror_components.replace(",", " ")
             full = "deb {0} {1} {2}".format(url, dist, comp)
@@ -126,10 +126,14 @@ class ProjectVersion(Base):
             # Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
-                dist = self.mirror_distribution.replace("/", "_-")
-            comp = "missing"
-            if self.mirror_components:
-                comp = self.mirror_components.replace(",", " ")
+                dist = self.mirror_distribution
+            if dist == "./":  # if flat repo originally
+                dist = "."
+                comp = "main"
+            else:
+                comp = "main"
+                if self.mirror_components:
+                    comp = self.mirror_components.replace(",", " ")
             full = "deb {0} {1} {2}".format(url, dist, comp)
             return url if url_only else full
 

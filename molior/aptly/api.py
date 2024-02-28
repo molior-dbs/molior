@@ -244,12 +244,16 @@ class AptlyApi:
         """
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
+        # for mirrors without components, use empty string for loop below
+        if not components:
+            components = [None]
+
         for component in components:
             data = {
-                "Name": "{}-{}".format(name, component),
+                "Name": f"{name}-{component}" if component is not None else name,
                 "ArchiveURL": url,
                 "Distribution": mirror_distribution,
-                "Components": [component],
+                "Components": None if component is None else [component],
                 "Architectures": architectures,
                 "DownloadSources": download_sources,
                 "DownloadUdebs": download_udebs,
@@ -258,8 +262,6 @@ class AptlyApi:
                 "FilterWithDeps": False,
             }
 
-            if mirror_distribution == "./":
-                data.pop("Components", None)
             await self.POST("/mirrors", data=data)
 
     async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
@@ -280,14 +282,15 @@ class AptlyApi:
 
         tasks = []
         for component in components:
+            mirrorname = f"{name}-{component}" if component else name
             data = {
-                "Name": f"{name}-{component}",
+                "Name": mirrorname,
                 "ForceUpdate": True,
                 "SkipExistingPackages": True,
                 "MaxTries": 7,
             }
 
-            task = await self.PUT(f"/mirrors/{name}-{component}", data=data)
+            task = await self.PUT(f"/mirrors/{mirrorname}", data=data)
             tasks.append(task["ID"])
         return tasks
 
@@ -359,8 +362,9 @@ class AptlyApi:
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
         tasks = []
         for component in components:
-            data = {"Name": "{}-{}".format(name, component)}
-            task = await self.POST(f"/mirrors/{name}-{component}/snapshots", data=data)
+            mirrorname = f"{name}-{component}" if component else name
+            data = {"Name": mirrorname}
+            task = await self.POST(f"/mirrors/{mirrorname}/snapshots", data=data)
             tasks.append(task["ID"])
         return tasks
 
@@ -413,7 +417,7 @@ class AptlyApi:
         name, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
         data = {
             # Workaround for aptly ('/' not supported as mirror dist)
-            "Distribution": mirror_distribution.replace("/", "_-"),
+            "Distribution": mirror_distribution,
             "SourceKind": "snapshot",
             "Sources": [],
             "Architectures": architectures,
@@ -425,7 +429,8 @@ class AptlyApi:
             "AcquireByHash": True,
         }
         for component in components:
-            data["Sources"].append({"Component": component, "Name": "{}-{}".format(name, component)})
+            mirrorname = f"{name}-{component}" if component else name
+            data["Sources"].append({"Component": component, "Name": mirrorname})
 
         task = await self.POST(f"/publish/{publish_name}", data=data)
         return task["ID"]
