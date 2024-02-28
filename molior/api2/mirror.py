@@ -348,7 +348,7 @@ async def create_mirror2(request):
     mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
 
     if mirrorcomponents is None:
-        mirrorcomponents = "main"
+        mirrorcomponents = ""
 
     mirrorcomponents = re.split(r"[, ]", mirrorcomponents)
 
@@ -375,7 +375,7 @@ async def create_mirror2(request):
         basemirror_id = entry.id
 
     if not mirrorcomponents:
-        mirrorcomponents = ["main"]
+        mirrorcomponents = []
 
     is_basemirror = mirrortype == "1"
     if is_basemirror:
