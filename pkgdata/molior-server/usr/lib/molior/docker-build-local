@@ -94,7 +94,7 @@ if [ "$ARCH_ANY_ONLY" = "True" ]; then
 fi
 
 # use real user and group
-usermod -u `stat -c %u /app/src` build
+usermod -o -u `stat -c %u /app/src` build
 if getent group `stat -c %g /app/src` >/dev/null; then
     usermod -g `stat -c %g /app/src` build
 else

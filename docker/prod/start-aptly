@@ -3,7 +3,7 @@
 set -e
 
 # Set aptly user id from volume
-usermod -u `stat -c %u /var/lib/aptly` aptly;
+usermod -o -u `stat -c %u /var/lib/aptly` aptly;
 
 if [ -n "$REPOSIGN_NAME" ] && [ -n "$REPOSIGN_EMAIL" ]; then
     echo "Creating gpgs key for '$REPOSIGN_NAME'"

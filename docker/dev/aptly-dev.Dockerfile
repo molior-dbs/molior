@@ -17,7 +17,7 @@ ADD pkgdata/molior-aptly/usr/sbin/create-aptly-keys /usr/sbin/
 
 RUN GOPATH=/usr/local go install github.com/cosmtrek/air@latest
 
-CMD usermod -u `stat -c %u /app` aptly; \
+CMD usermod -o -u `stat -c %u /app` aptly; \
     chown -R `stat -c %u /app` /var/lib/aptly; \
     /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL && \
     su aptly -c "air -build.pre_cmd \"go mod tidy; go generate\" -build.exclude_dir system -build.exclude_dir debian -- api serve -listen 0.0.0.0:3142"
