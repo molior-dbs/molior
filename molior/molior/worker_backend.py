@@ -3,7 +3,6 @@ import asyncio
 from ..logger import logger
 from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend, buildlogdone
 from .backend import Backend
-from .notifier import send_mail_notification
 
 from ..model.database import Session
 from ..model.build import Build
@@ -76,9 +75,6 @@ class BackendWorker:
                 if buildtask:
                     session.delete(buildtask)
                     session.commit()
-
-                if not build.is_ci:
-                    send_mail_notification(build)
 
     async def _abort(self, build_id):
         b = Backend()

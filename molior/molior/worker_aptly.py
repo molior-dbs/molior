@@ -14,7 +14,7 @@ from ..ops import DebSrcPublish, DebPublish, DeleteBuildEnv
 from ..aptly import get_aptly_connection, get_snapshot_name
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
-from .notifier import Subject, Event, notify, send_mail_notification
+from .notifier import Subject, Event, notify
 from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_aptly, buildlog, buildlogtitle, buildlogdone, enqueue_backend
 from ..molior.configuration import Configuration
 
@@ -791,9 +791,6 @@ class AptlyWorker:
             else:
                 await build.set_publish_failed()
             session.commit()
-
-            if not build.is_ci:
-                send_mail_notification(build)
 
         # Schedule builds
         args = {"schedule": []}
