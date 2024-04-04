@@ -87,7 +87,7 @@ def validate_version_format(version: str):
     Returns True if a version name is in the valid format (see below). False otherwise
 
     versions may have
-     - have an optional leading 'v'
+     - have an optional leading builds/version_prefix from config (or "v")
      - 1-4 dot-separated multi-digits (the only mandatory part)
      - optional trailing alphanumeric words, separated by '~', '+' or '-'
 
@@ -96,8 +96,10 @@ def validate_version_format(version: str):
     Args:
         version (str): the version string to check
     """
-
-    version_pattern = "^v[0-9]"
+    cfg = Configuration()
+    builds_cfg = cfg.builds
+    version_prefix = builds_cfg.get("version_prefix") if builds_cfg else "v"
+    version_pattern = f"^{version_prefix}[0-9]"
     pattern = re.compile(version_pattern)
     return pattern.match(version) is not None
 

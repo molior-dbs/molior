@@ -367,7 +367,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                 builds_cfg = cfg.builds
                 version_prefix = builds_cfg.get("version_prefix") if builds_cfg else "v"
                 if not re.match(f"^{version_prefix}?{v}$", gittag) or "+git" in v:
-                    logger.info(f"setting ci because git tag {gittag} does not match {version_prefix}{v}")
+                    logger.info(f"setting ci because git tag {gittag} does not match changelog version {version_prefix}{v}")
                     is_ci = True
 
         ci_cfg = cfg.ci_builds
