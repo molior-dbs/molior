@@ -4,7 +4,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..logger import logger
 from ..molior.configuration import Configuration
-from ..tools import db2array, array2db
+from ..tools import ErrorResponse, db2array, array2db
 
 from .database import Base
 from .project import Project
@@ -321,3 +321,24 @@ def get_mirror(request):
             Project.is_mirror.is_(True),
             ProjectVersion.is_deleted.is_(False)
         ).first()
+
+def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
+    if baseproject:
+        baseproject_name, baseproject_version = baseproject.split("/")
+        pv = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(False),
+                func.lower(Project.name) == baseproject_name.lower(),
+                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
+        if not pv:
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+        bm = pv.basemirror
+        return None, pv, bm
+    else:
+        basemirror_name, basemirror_version = basemirror.split("/")
+        bm = db.query(ProjectVersion).join(Project).filter(
+                Project.is_basemirror.is_(True),
+                func.lower(Project.name) == basemirror_name.lower(),
+                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
+        if not bm:
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+        return None, bm

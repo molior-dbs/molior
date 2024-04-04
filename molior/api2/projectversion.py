@@ -15,7 +15,7 @@ from ..molior.configuration import Configuration
 from ..aptly import get_aptly_connection
 
 from ..model.projectversion import (
-    ProjectVersion, get_projectversion, get_projectversion_deps,
+    ProjectVersion, find_basemirror_or_baseproject, get_projectversion, get_projectversion_deps,
     get_projectversion_byname, get_projectversion_byid)
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
@@ -491,25 +491,9 @@ async def copy_projectversion(request):
                 Project.id == projectversion.project_id).first():
         return ErrorResponse(400, "Projectversion already exists.")
 
-    bm = None
-    pv = None
-    if baseproject:
-        baseproject_name, baseproject_version = baseproject.split("/")
-        pv = db.query(ProjectVersion).join(Project).filter(
-                Project.is_basemirror.is_(False),
-                func.lower(Project.name) == baseproject_name.lower(),
-                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
-        if not pv:
-            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
-        bm = pv.basemirror
-    else:
-        basemirror_name, basemirror_version = basemirror.split("/")
-        bm = db.query(ProjectVersion).join(Project).filter(
-                Project.is_basemirror.is_(True),
-                func.lower(Project.name) == basemirror_name.lower(),
-                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
-        if not bm:
-            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+    error_response, pv, bm = find_basemirror_or_baseproject(db, basemirror, baseproject)
+    if error_response:
+        return error_response
 
     new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds, retention_successful_builds, retention_failed_builds)
 
@@ -575,7 +559,6 @@ async def copy_projectversion(request):
 
     data = {"build_id": copy_build.id, "rebuild_ids": trigger_builds}
     return OKResponse(data)
-
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
 @req_role("owner")

@@ -11,7 +11,7 @@ from ..molior.queues import enqueue_aptly
 from ..model.project import Project
 from ..model.authtoken import Authtoken
 from ..model.authtoken_project import Authtoken_Project
-from ..model.projectversion import ProjectVersion, get_projectversion, DEPENDENCY_POLICIES
+from ..model.projectversion import ProjectVersion, find_basemirror_or_baseproject, get_projectversion, DEPENDENCY_POLICIES
 from ..model.user import User
 from ..model.userrole import UserRole, USER_ROLES
 from ..model.projectversiondependency import ProjectVersionDependency
@@ -263,25 +263,9 @@ async def create_projectversion(request):
                                         name,
                                         ", and is marked as deleted" if projectversion.is_deleted else ""))
 
-    bm = None
-    pv = None
-    if baseproject:
-        baseproject_name, baseproject_version = baseproject.split("/")
-        pv = db.query(ProjectVersion).join(Project).filter(
-                Project.is_basemirror.is_(False),
-                func.lower(Project.name) == baseproject_name.lower(),
-                func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
-        if not pv:
-            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
-        bm = pv.basemirror
-    else:
-        basemirror_name, basemirror_version = basemirror.split("/")
-        bm = db.query(ProjectVersion).join(Project).filter(
-                Project.is_basemirror.is_(True),
-                func.lower(Project.name) == basemirror_name.lower(),
-                func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
-        if not bm:
-            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
+    error_response, pv, bm = find_basemirror_or_baseproject(db, basemirror, baseproject)
+    if error_response:
+        return error_response
 
     for arch in architectures:
         if arch not in db2array(bm.mirror_architectures):
