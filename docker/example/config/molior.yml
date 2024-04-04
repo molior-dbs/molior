@@ -10,6 +10,10 @@ database: '/molior'
 # GPG email for signing the source packages
 debsign_gpg_email: 'debsign@molior'
 
+builds:
+    # git tags to be built in stable need to start with the prefix:
+    version_prefix: "v"
+
 ci_builds:
     enabled: True
     # Remove ci packages which are older than <ci_packages_ttl> days

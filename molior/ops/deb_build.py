@@ -346,6 +346,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
     if force_ci:
         is_ci = True
     else:
+        cfg = Configuration()
         if not source_exists:
             # check if it is a CI build
             # i.e. if gittag does not match version in debian/changelog
@@ -362,11 +363,14 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                 logger.error("error running git describe: %s" % gittag.strip())
             else:
                 v = strip_epoch_version(info.version)
-                if not re.match("^v?{}$".format(v.replace("~", "-").replace("+", "\\+")), gittag) or "+git" in v:
-                    logger.info(f"setting ci because because version {v} does not match tag {gittag}")
+                v = v.replace("~", "-").replace("+", "\\+")
+                builds_cfg = cfg.builds
+                version_prefix = builds_cfg.get("version_prefix") if builds_cfg else "v"
+                if not re.match(f"^{version_prefix}?{v}$", gittag) or "+git" in v:
+                    logger.info(f"setting ci because git tag {gittag} does not match {version_prefix}{v}")
                     is_ci = True
 
-        ci_cfg = Configuration().ci_builds
+        ci_cfg = cfg.ci_builds
         ci_enabled = ci_cfg.get("enabled") if ci_cfg else False
 
         if is_ci and not ci_enabled:
