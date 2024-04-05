@@ -147,3 +147,5 @@ psql:  ## run psql
 
 docker-compose.tar:
 	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
+
+.PHONY: help molior
