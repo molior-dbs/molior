@@ -240,7 +240,7 @@ log_title "Uploading"
 # FIXME: parse changes files
 
 rm -f ${REPO_NAME}_${VERSION}_$ARCH.build
-OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.build" -o -name "*_$ARCH.buildinfo" -o -name "*_$ARCH.changes"`
+OUTPUT_FILES=`find . -maxdepth 1 -name "*.deb" -o -name "*.ddeb" -o -name "*.build" -o -name "*_$ARCH.buildinfo" -o -name "*_$ARCH.changes"`
 
 log "Uploading: "
 for f in $OUTPUT_FILES

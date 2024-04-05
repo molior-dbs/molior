@@ -102,7 +102,7 @@ else
 fi
 chown build /app
 
-rm -f /app/*.deb /app/*.changes /app/*.buildinfo
+rm -f /app/*.deb /app/*.ddeb /app/*.changes /app/*.buildinfo
 
 su build -c "dpkg-buildpackage -us -uc -ui -b --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
@@ -117,7 +117,7 @@ su build -c "debclean"
 
 log_title "Copying build output"
 out=`su build -c "mktemp -d /app/src/buildout-XXXXX"`
-cp -av /app/*.deb /app/*.changes /app/*.buildinfo $out/
+cp -av /app/*.deb /app/*.ddeb /app/*.changes /app/*.buildinfo $out/
 
 echo
 echo "Copied build output to: `basename $out`/"
