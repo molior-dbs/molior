@@ -2,6 +2,7 @@ import uuid
 import json
 import asyncio
 import aiohttp
+import os
 
 from ..logger import logger
 from ..molior.configuration import Configuration
@@ -599,8 +600,10 @@ class AptlyApi:
         for filename in files:
             try:
                 with open(filename, "rb") as _file:
-                    post_files = {"file": _file}
-                    await self.POST(f"/files/{upload_dir}", data=post_files)
+                    uploadname = os.path.basename(filename)
+                    data = aiohttp.FormData(quote_fields=False)
+                    data.add_field('file', _file, filename=uploadname, content_type='application/octet-stream')
+                    await self.POST(f"/files/{upload_dir}", data=data)
             except Exception as exc:
                 logger.exception(exc)
 
