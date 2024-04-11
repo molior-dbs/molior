@@ -120,6 +120,10 @@ do
   src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
   log " - $src_url"
   curl --max-time 30 -s -O $src_url
+  if [ "$?" -ne 0 ]; then
+    echo "E: Error downloading source package $dsc_url" >&2
+    exit 5
+  fi
 done
 echo
 
@@ -150,7 +154,7 @@ log_title "Installing build dependencies"
 apt-get build-dep --yes .
 if [ "$?" -ne 0 ]; then
   echo "E: Error installing build dependencies" >&2
-  exit 5
+  exit 6
 fi
 
 log_title "Building debian package"
@@ -165,7 +169,7 @@ log "Running: dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 su build -c "dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
-  exit 6
+  exit 7
 fi
 
 if [ "$RUN_LINTIAN" = "True" ]; then
@@ -187,6 +191,6 @@ do
   curl -fs -F "file=@$f" $MOLIOR_SERVER/internal/buildupload/$BUILD_TOKEN >/dev/null
   if [ $? -ne 0 ]; then
     log_error "Error uploading output files"
-    exit 7
+    exit 8
   fi
 done
