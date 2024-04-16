@@ -285,7 +285,6 @@ async def get_builds(request):
 
 
 @app.http_get("/api2/build/{build_id:\\d+}")
-@app.http_get("/api/builds/{build_id:\\d+}")
 @app.authenticated
 async def get_build(request):
     """
@@ -392,7 +391,6 @@ async def get_build(request):
 
 
 @app.http_put("/api2/build/{build_id}")
-@app.http_put("/api/builds/{build_id}")
 @app.authenticated
 # FIXME: req_role
 async def rebuild_build(request):

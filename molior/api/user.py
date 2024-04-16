@@ -94,62 +94,6 @@ async def get_users(request):
 
     return web.json_response(data)
 
-
-@app.http_get("/api/users/{user_id}")
-@app.authenticated
-async def get_user_byid(request):
-    """
-    Return a user by its id.
-
-    ---
-    description: Get a user
-    tags:
-      - Users
-    parameters:
-      - name: user_id
-        description: id of the user
-        in: path
-        required: true
-        type: integer
-    responses:
-      "200":
-        description: Return a dict with results
-        schema:
-          type: object
-          properties:
-            username:
-              type: string
-            user_id:
-              type: integer
-            is_admin:
-              type: boolean
-      "400":
-        description: Invalid input where given
-    """
-    user_id = request.match_info["user_id"]
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for user_id")
-
-    currentuser = (
-        request.cirrina.db_session.query(User)
-        .filter(User.username == request.cirrina.web_session["username"])
-        .first()
-    )
-
-    if user_id == -1 or not currentuser.is_admin:
-        user = currentuser
-    else:
-        user = request.cirrina.db_session.query(User).filter_by(id=user_id).first()
-
-    if not user:
-        return ErrorResponse(404, "User not found")
-
-    data = {"username": user.username, "user_id": user.id, "is_admin": user.is_admin}
-    return web.json_response(data)
-
-
 @app.http_put("/api/user/{user_id}")
 @app.http_put("/api/users/{user_id}")
 @req_admin

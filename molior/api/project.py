@@ -241,47 +241,6 @@ async def update_project(request):
     db.commit()
     return OKResponse("project updated")
 
-
-@app.http_delete("/api/projects/{project_id}")
-@app.authenticated
-# FIXME: req_role
-async def delete_project(request):
-    """
-    Removes a project from the database.
-
-    ---
-    description: Deletes a project with the given id.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: project_id
-          in: path
-          required: true
-          type: integer
-    produces:
-        - text/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: project id could not be found
-    """
-    db = request.cirrina.db_session
-    project_id = request.match_info["project_id"]
-    try:
-        project_id = int(project_id)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for project_id")
-
-    project = db.query(Project).filter_by(id=project_id).first()
-    if project:
-        project.delete()
-
-    return OKResponse("project {} deleted".format(project_id))
-
-
 @app.http_get("/api/projectsources/{project_name}/{project_version}")
 async def get_apt_sources(request):
     """
