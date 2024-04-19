@@ -97,8 +97,11 @@ class Build(Base):
     async def set_building(self):
         self.log_state("building")
         self.buildstate = "building"
-        now = get_local_tz().localize(datetime.now(), is_dst=None)
-        self.startstamp = now
+        # set start on new builds or on rebuilds
+        if not self.startstamp and not self.endstamp or \
+           self.startstamp and self.endstamp:
+            now = get_local_tz().localize(datetime.now(), is_dst=None)
+            self.startstamp = now
         await self.build_changed()
 
     async def set_failed(self):
