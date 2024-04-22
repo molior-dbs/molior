@@ -322,6 +322,7 @@ def get_mirror(request):
             ProjectVersion.is_deleted.is_(False)
         ).first()
 
+
 def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
     if baseproject:
         baseproject_name, baseproject_version = baseproject.split("/")
@@ -330,7 +331,7 @@ def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
                 func.lower(Project.name) == baseproject_name.lower(),
                 func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
         if not pv:
-            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version))
+            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version)), None, None
         bm = pv.basemirror
         return None, pv, bm
     else:
@@ -340,5 +341,5 @@ def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
                 func.lower(Project.name) == basemirror_name.lower(),
                 func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
         if not bm:
-            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version))
-        return None, bm
+            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version)), None, None
+        return None, None, bm

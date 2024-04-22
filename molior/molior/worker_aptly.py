@@ -447,6 +447,52 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, session)
         await enqueue_task(args)
 
 
+async def retention_cleanup(session, build):
+
+    # the number of successful builds to retain per sourcerepository
+    max_successful_builds = build.projectversion.retention_successful_builds
+
+    # how many successful builds are for the sourcerepository
+    successful_topbuilds = session.query(Build).filter(
+        Build.buildstate == "successful",
+        Build.buildtype == "deb",
+        Build.sourcename == build.sourcename,
+        Build.projectversion_id == build.projectversion_id).order_by(desc(Build.id)).all()
+    # count the current build as successful
+    successful_builds_number = len(successful_topbuilds) + 1
+    # how many builds should be deleted
+    debbuilds_to_delete = successful_builds_number - max_successful_builds
+    if debbuilds_to_delete > 10:
+        debbuilds_to_delete = 10
+        logger.warning("deleting maximum of 10 successful_builds")
+    remove_packages = []
+    remove_build_ids = []
+    if debbuilds_to_delete > 0:
+        await buildlog(build.parent.parent.id, "I: there is a total of %d build(s) that exceed the amount of retention \n"
+                       % debbuilds_to_delete)
+        # FIXME check order of list (oldest builds should be deleted first)
+        debpkgs = successful_topbuilds[-debbuilds_to_delete:]
+
+        srcpkgs = []
+        for debbuild_to_delete in debpkgs:
+            remove_build_ids.append(debbuild_to_delete.id)
+            # if the source package has no other deb packages, delete it and the toplevel package
+            if len(debbuild_to_delete.parent.children) == 1:
+                srcpkgs.append(debbuild_to_delete.parent)
+                remove_build_ids.append(debbuild_to_delete.parent.id)
+                remove_build_ids.append(debbuild_to_delete.parent.parent.id)
+
+        for src in srcpkgs:
+            for f in src.debianpackages:
+                remove_packages.append((f.name, src.version, "source"))
+
+        for deb in debpkgs:
+            for f in deb.debianpackages:
+                remove_packages.append((f.name, deb.version, f.suffix))
+
+    return remove_build_ids, remove_packages
+
+
 class AptlyWorker:
     """
     Aptly worker thread
@@ -691,6 +737,10 @@ class AptlyWorker:
     async def _publish(self, args):
         build_id = args[0]
 
+        # builds to delete from db and remove buildlogs
+        builds_to_delete = []
+        # remove src and deb packages from aptly
+        remove_packages = {}
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
@@ -717,76 +767,55 @@ class AptlyWorker:
                 s3_path = build.projectversion.s3_path
                 publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
 
+            if not is_ci:
+                builds_to_delete, remove_packages = await retention_cleanup(session, build)
+
         await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
 
         ret = False
         try:
             ret = await DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
                                    basemirror_name, basemirror_version, project_name, project_version,
-                                   archs, publish_s3=publish_s3)
+                                   archs, remove_packages, publish_s3=publish_s3)
         except Exception as exc:
             logger.exception(exc)
 
         if not ret:
             await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
             await buildlog(build_id, "E: publishing build failed\n")
-        else:
-            logger.info(build_id)
-            project_version_id = build.projectversion_id
-            build_state = build.buildstate
-
-            #the number of successful builds to retain per sourcerepository
-            retention_successful_builds = build.projectversion.retention_successful_builds
-
-            #how many successful builds are for the sourcerepository
-            successful_builds = session.query(Build).filter(
-                Build.buildstate == "successful",
-                Build.buildtype == "deb",
-                Build.sourcename == build.sourcename,
-                Build.projectversion_id == project_version_id).order_by(desc(Build.id)).all()
-            successful_builds_number = len(successful_builds)
-            logger.info(f"Number of Successful Builds: {successful_builds_number}")
-            # how many builds should be deleted
-            builds_to_delete = successful_builds_number - retention_successful_builds
-            if builds_to_delete > 0:
-                await buildlog(parent_parent_id, "I: there is a total of %d build(s) that exceed the amount of retention \n" % builds_to_delete)
-                oldest_build_to_delete = successful_builds[-1]
-
-                siblings = 0
-                if oldest_build_to_delete.parent:
-                    siblings =  len(oldest_build_to_delete.parent.children)
-
-                if siblings == 1:
-                    oldest_sourcename = oldest_build_to_delete.parent.parent.sourcename
-                    start_stamp = oldest_build_to_delete.parent.parent.startstamp
-                    oldest_topbuild_id = oldest_build_to_delete.parent.parent.id
-                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_topbuild_id}")
-                    await buildlog(parent_parent_id, "I: deleting debian, source and topbuild of %s-%s\n" % (oldest_sourcename, oldest_build_to_delete.projectversion))
-                    await enqueue_aptly({"delete_build": [oldest_topbuild_id]})
-                else:
-                    oldest_sourcename = oldest_build_to_delete.sourcename
-                    start_stamp = oldest_build_to_delete.startstamp
-                    oldest_build_id = oldest_build_to_delete.id
-                    logger.info(f"Sourcename: {oldest_sourcename}, Start stamp: {start_stamp}, Build ID: {oldest_build_id}")
-                    await buildlog(parent_parent_id, "I: deleting debian package %s-%s\n" % (oldest_sourcename, oldest_build_to_delete.projectversion))
-                    await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
-            else:
-                await buildlog(build.parent.parent_id, "I: no successful builds to delete\n")
-            """
-            search for build to delete
-            log build delete
-            delete the build -> call aptly api here like deb publish
-            """
 
         await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
         await buildlogdone(build_id)
 
         with Session() as session:
+            # set current buildstate
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return
             if ret:
+                # remove buildout of obsolete builds
+                def remove_buildout():
+                    for del_id in builds_to_delete:
+                        buildout = "/var/lib/molior/buildout/%d" % del_id
+                        try:
+                            rmtree(buildout)
+                        except Exception:
+                            pass
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(self.threadexc, remove_buildout)
+
+                # remove obsolete builds from db
+                for del_id in builds_to_delete:
+                    del_build = session.query(Build).filter(Build.id == del_id).first()
+                    if not del_build:
+                        logger.warning("aptly worker: build with id %d not found", del_id)
+                        continue
+                    del_build.debianpackages = []
+                    if del_build.buildtask:
+                        session.delete(del_build.buildtask)
+                    session.delete(del_build)
+
                 await build.set_successful()
             else:
                 await build.set_publish_failed()
@@ -1005,6 +1034,7 @@ class AptlyWorker:
             db.delete(projectversion)
             db.commit()
 
+        # move to model build
         def remove_buildout():
             for build_id in build_ids:
                 buildout = "/var/lib/molior/buildout/%d" % build_id
@@ -1028,8 +1058,9 @@ class AptlyWorker:
 
     # FIXME what are we doing with failed src/topbuild package builds
     # FIXME what about failed mirror builds
-    async def _cleanup(self, args):
+    async def scheduled_cleanup(self, args):
         logger.info("checking for obsolete builds")
+        logger.info("in _scheduled_cleanupin worker_aptly")
 
         with Session() as session:
             mirrors = session.query(ProjectVersion).join(Project).filter(Project.is_mirror).all()
@@ -1183,7 +1214,7 @@ class AptlyWorker:
                     await buildlog(cleanup_build_id, "I: deleting debian package %s-%s\n" % (sourcename, build.version))
                     await enqueue_aptly({"delete_deb_build": [oldest_build_id]})
 
-            logger.info("aptly worker: running cleanup")
+            logger.info("aptly worker: running weekly cleanup")
 
             aptly = get_aptly_connection()
             await aptly.cleanup()
@@ -1355,6 +1386,8 @@ class AptlyWorker:
                 aptly_delete[repo_name].extend(pkgs)
 
         for repo_name in aptly_delete:
+            logger.info("aptly_delete")
+            logger.info(aptly_delete[repo_name])
             task_id = await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
             await aptly.wait_task(task_id)
 
@@ -1441,6 +1474,7 @@ class AptlyWorker:
                 aptly_delete[repo_name].extend(pkgs)
 
         for repo_name in aptly_delete:
+            logger.info("REPONAME" + aptly_delete[repo_name])
             task_id = await aptly.repo_packages_delete(repo_name, aptly_delete[repo_name])
             await aptly.wait_task(task_id)
 
@@ -1554,6 +1588,7 @@ class AptlyWorker:
         task_id = await aptly.snapshot_publish(snapshot_name, "main", archs, "stable", f"s3:{publish_s3}")
         if not await aptly.wait_task(task_id):
             logger.error(f"Error publishing to S3 endpoint {publish_s3}")
+
 
     async def run(self):
         """

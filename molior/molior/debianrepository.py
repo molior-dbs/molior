@@ -168,6 +168,7 @@ class DebianRepository:
             except Exception:
                 logger.warning("Error deleting repo '%s'" % repo_name)
 
+    # FIXME obosolete
     async def __remove_old_packages(self, packages):
         """
         Removes all packages that are older than <today> - <timetolive>
@@ -243,6 +244,27 @@ class DebianRepository:
         logger.debug("deleting temporary upload dir: '%s'", upload_dir)
 
         await self.aptly.delete_directory(upload_dir)
-        if not await self.aptly.republish(dist, self.archs, repo_name, self.publish_name, publish_s3=self.publish_s3):
-            return False
         return True
+
+    async def remove_packages(self, remove_packages, ci_build=False):
+        if not remove_packages:
+            logger.error("remove_packages: empty file list")
+            return False
+        delete_files = []
+        repo_name = self.name + "-stable"
+        # convert remove_packages to delete_files
+        for package in remove_packages:
+            # logger.error("delete %s %s" % (repo_name, pkgname))
+            pkg = await self.aptly.repo_packages_get(repo_name, "%s (= %s) {%s}" % (package[0],   # package name
+                                                                                    package[1],   # version
+                                                                                    package[2]))  # arch
+            delete_files.extend(pkg)
+
+        await self.aptly.repo_packages_delete(repo_name, delete_files)
+
+        return True
+
+    async def republish(self, ci_build=False):
+        dist = "unstable" if ci_build else "stable"
+        repo_name = self.name + "-%s" % dist
+        return await self.aptly.republish(dist, self.archs, repo_name, self.publish_name, publish_s3=self.publish_s3)

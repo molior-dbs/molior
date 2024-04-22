@@ -9,7 +9,8 @@ from ..logger import logger
 from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
-from ..molior.queues import buildlog, buildlogtitle
+from sqlalchemy import func, or_, desc
+from ..molior.queues import buildlog, buildlogtitle, enqueue_aptly
 
 from ..model.database import Session
 from ..model.build import Build
@@ -122,6 +123,12 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
             await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
 
+        try:
+            ret = await debian_repo.republish(ci_build=is_ci)
+        except Exception as exc:
+            await buildlog(build_id, "E: error republishing repository\n")
+            logger.exception(exc)
+
     await buildlog(build_id, "\n")
 
     if ret:  # only delete if published, allow republish
@@ -140,7 +147,7 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
 async def publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                            basemirror_name, basemirror_version, project_name, project_version,
-                           archs, out_path, publish_s3=None):
+                           archs, out_path, remove_packages=[], publish_s3=None):
     """
     Publishes given packages to given
     publish point.
@@ -197,10 +204,24 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version,
                                    archs, publish_s3=publish_s3)
     ret = False
+    # publish new packages to aptly
     try:
         ret = await debian_repo.add_packages(files2upload, ci_build=is_ci)
     except Exception as exc:
         await buildlog(build_id, "E: error uploading files to repository\n")
+        logger.exception(exc)
+
+    # remove obsolete packages from aptly
+    try:
+        ret = await debian_repo.remove_packages(remove_packages, ci_build=is_ci)
+    except Exception as exc:
+        await buildlog(build_id, "E: error adding files\n")
+        logger.exception(exc)
+
+    try:
+        ret = await debian_repo.republish(ci_build=is_ci)
+    except Exception as exc:
+        await buildlog(build_id, "E: error republishing repository\n")
         logger.exception(exc)
 
     files2delete = files2upload
@@ -214,9 +235,9 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     return ret
 
 
-async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_ci,
-                     basemirror_name, basemirror_version, project_name, project_version,
-                     archs, publish_s3=None):
+async def DebPublish(build_id, buildtype, sourcename, version, architecture,
+                     is_ci, basemirror_name, basemirror_version, project_name,
+                     project_version, archs, remove_packages=[], publish_s3=None):
     """
     Publishes given src_files/src package to given
     projectversion debian repo.
@@ -235,13 +256,14 @@ async def DebPublish(build_id, buildtype, sourcename, version, architecture, is_
     try:
         if not await publish_packages(build_id, buildtype, sourcename, version, architecture, is_ci,
                                       basemirror_name, basemirror_version, project_name, project_version,
-                                      archs, out_path, publish_s3=publish_s3):
+                                      archs, out_path, remove_packages=remove_packages, publish_s3=publish_s3):
             logger.error("publisher: error publishing build %d" % build_id)
             return False
     except Exception as exc:
         logger.error("publisher: error publishing build %d" % build_id)
         logger.exception(exc)
         return False
+    # session moved to parent function
     finally:
         with Session() as session:
             buildtask = session.query(BuildTask).filter(BuildTask.build_id == build_id).first()
@@ -296,7 +318,7 @@ def add_files(build_id, buildtype, version, files):
     with Session() as session:
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
-            logger.error("clone: build %d not found", build_id)
+            logger.error("build: build %d not found", build_id)
             return
         for package in packages:
             name, suffix = packages[package]
@@ -306,3 +328,5 @@ def add_files(build_id, buildtype, version, files):
             if pkg not in build.debianpackages:
                 build.debianpackages.append(pkg)
         session.commit()
+
+
