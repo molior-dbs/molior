@@ -1,0 +1,8 @@
+#!/bin/sh
+
+psql molior <<EOF
+
+INSERT INTO metadata (name, value) values ('retention_successful_builds', 1);
+INSERT INTO metadata (name, value) values ('retention_failed_builds', 7);
+
+EOF

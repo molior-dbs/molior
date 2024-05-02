@@ -62,3 +62,95 @@ async def get_cleanup(request):
     db.close()
 
     return OKResponse(data)
+
+
+@app.http_get("/api2/retention")
+async def get_retention(request):
+
+    db = request.cirrina.db_session
+
+    retention_successful_builds_metadata = db.query(MetaData).filter_by(name='retention_successful_builds').first()
+    retention_failed_builds_metadata = db.query(MetaData).filter_by(name='retention_failed_builds').first()
+
+    retention_successful_builds = retention_successful_builds_metadata.value if retention_successful_builds_metadata else None
+    retention_failed_builds = retention_failed_builds_metadata.value if retention_failed_builds_metadata else None
+
+    data = {
+        'retention_successful_builds': retention_successful_builds,
+        'retention_failed_builds': retention_failed_builds,
+    }
+    db.close()
+
+    return OKResponse(data)
+
+
+@app.http_put("/api2/retention")
+async def edit_retention(request):
+
+    params = await request.json()
+    retention_successful_builds = params.get("retention_successful_builds")
+    retention_failed_builds = params.get("retention_failed_builds")
+
+    db = request.cirrina.db_session
+
+    existing_retention_successful_builds_metadata = db.query(MetaData).filter_by(name='retention_successful_builds').first()
+    if existing_retention_successful_builds_metadata:
+        existing_retention_successful_builds_metadata.value = retention_successful_builds
+    else:
+        db.add(MetaData(name='retention_successful_builds', value=retention_successful_builds))
+
+    existing_retention_failed_builds_metadata = db.query(MetaData).filter_by(name='retention_failed_builds').first()
+    if existing_retention_failed_builds_metadata:
+        existing_retention_failed_builds_metadata.value = retention_failed_builds
+    else:
+        db.add(MetaData(name='retention_failed_builds', value=retention_failed_builds))
+
+    db.commit()
+
+    return OKResponse("Package Retention is being configured")
+
+
+@app.http_get("/api2/maintenance")
+async def get_maintenance(request):
+
+    db = request.cirrina.db_session
+
+    maintenance_mode_metadata = db.query(MetaData).filter_by(name='maintenance_mode').first()
+    maintenance_message_metadata = db.query(MetaData).filter_by(name='maintenance_message').first()
+
+    maintenance_mode = maintenance_mode_metadata.value if maintenance_mode_metadata else None
+    maintenance_message = maintenance_message_metadata.value if maintenance_message_metadata else None
+
+    data = {
+        'maintenance_mode': maintenance_mode,
+        'maintenance_message': maintenance_message,
+    }
+    db.close()
+
+    return OKResponse(data)
+
+
+@app.http_put("/api2/maintenance")
+async def edit_maintenance(request):
+
+    params = await request.json()
+    maintenance_mode = params.get("maintenance_mode")
+    maintenance_message = params.get("maintenance_message")
+
+    db = request.cirrina.db_session
+
+    existing_maintenance_mode = db.query(MetaData).filter_by(name='maintenance_mode').first()
+    if existing_maintenance_mode:
+        existing_maintenance_mode.value = str(maintenance_mode)
+    else:
+        db.add(MetaData(name='maintenance_mode', value=str(maintenance_mode)))
+
+    existing_maintenance_message = db.query(MetaData).filter_by(name='maintenance_message').first()
+    if existing_maintenance_message:
+        existing_maintenance_message.value = maintenance_message
+    else:
+        db.add(MetaData(name='maintenance_message', value=maintenance_message))
+
+    db.commit()
+
+    return OKResponse("Maintenance details are being changed")
