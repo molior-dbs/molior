@@ -36,9 +36,9 @@ class ProjectVersion(Base):
     dependencies = relationship("ProjectVersion",
                                 secondary=ProjectVersionDependency.__table__,
                                 primaryjoin=id == ProjectVersionDependency.projectversion_id,
-                                secondaryjoin=id == ProjectVersionDependency.dependency_id,
-                                back_populates="dependents"
-                                )
+                                    secondaryjoin=id == ProjectVersionDependency.dependency_id,
+                                    back_populates="dependents"
+                                    )
     dependents = relationship("ProjectVersion",
                               secondary=ProjectVersionDependency.__table__,
                               primaryjoin=id == ProjectVersionDependency.dependency_id,
@@ -141,97 +141,97 @@ class ProjectVersion(Base):
         full = "deb {0} {1} {2}".format(url, dist, "main")
         return url if url_only else full
 
-        def mirror_changed(self):
-            pass
-            # await app.websocket_broadcast(
-            #    {
-            #        "event": Event.changed.value,
-            #        "subject": Subject.mirror.value,
-            #        "data": {},
-            #    }
-            # )
+    def mirror_changed(self):
+        pass
+        # await app.websocket_broadcast(
+        #    {
+        #        "event": Event.changed.value,
+        #        "subject": Subject.mirror.value,
+        #        "data": {},
+        #    }
+        # )
 
-        def data(self):
-            """
-            Returns the given projectversion object
-            as dist, which can be processed by
-            json_response
-            ---
-            Args:
-                projectversion (object): The projectversion from the database
-                    provided by SQLAlchemy.
-            Returns:
-                dict: The dict which can be processed by json_response
+    def data(self):
+        """
+        Returns the given projectversion object
+        as dist, which can be processed by
+        json_response
+        ---
+        Args:
+            projectversion (object): The projectversion from the database
+                provided by SQLAlchemy.
+        Returns:
+            dict: The dict which can be processed by json_response
 
-            """
-            dependency_ids = []
-            for d in self.dependencies:
-                dependency_ids.append(d.id)
-            dependent_ids = []
-            for d in self.dependents:
-                dependent_ids.append(d.id)
+        """
+        dependency_ids = []
+        for d in self.dependencies:
+            dependency_ids.append(d.id)
+        dependent_ids = []
+        for d in self.dependents:
+            dependent_ids.append(d.id)
 
-            data = {
-                "id": self.id,
-                "name": self.name,
-                "description": self.description,
-                "project_name": self.project.name,
-                "apt_url": self.get_apt_repo(url_only=True),
-                "is_mirror": self.project.is_mirror,
-                "architectures": db2array(self.mirror_architectures),
-                "is_locked": self.is_locked,
-                "ci_builds_enabled": self.ci_builds_enabled,
-                "dependency_policy": self.dependency_policy,
-                "dependency_ids": dependency_ids,
-                "dependent_ids": dependent_ids,
-                "projectversiontype": self.projectversiontype,
-                "retention_successful_builds": self.retention_successful_builds,
-                "retention_failed_builds": self.retention_failed_builds,
-                "publish_s3": self.publish_s3,
-                "s3_endpoint": self.s3_endpoint,
-                "s3_path": self.s3_path,
-            }
-            if self.basemirror:
-                data.update({"basemirror": self.basemirror.fullname})
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "project_name": self.project.name,
+            "apt_url": self.get_apt_repo(url_only=True),
+            "is_mirror": self.project.is_mirror,
+            "architectures": db2array(self.mirror_architectures),
+            "is_locked": self.is_locked,
+            "ci_builds_enabled": self.ci_builds_enabled,
+            "dependency_policy": self.dependency_policy,
+            "dependency_ids": dependency_ids,
+            "dependent_ids": dependent_ids,
+            "projectversiontype": self.projectversiontype,
+            "retention_successful_builds": self.retention_successful_builds,
+            "retention_failed_builds": self.retention_failed_builds,
+            "publish_s3": self.publish_s3,
+            "s3_endpoint": self.s3_endpoint,
+            "s3_path": self.s3_path,
+        }
+        if self.basemirror:
+            data.update({"basemirror": self.basemirror.fullname})
 
-            return data
+        return data
 
-        def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds, retention_successful_builds, retention_failed_builds):
-            new_projectversion = ProjectVersion(
-                name=version,
-                project=self.project,
-                description=description,
-                dependency_policy=dependency_policy,
-                mirror_architectures=array2db(architectures),
-                basemirror_id=basemirror_id,
-                sourcerepositories=self.sourcerepositories,
-                ci_builds_enabled=cibuilds,
-                retention_successful_builds=retention_successful_builds,
-                retention_failed_builds=retention_failed_builds,
-            )
+    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds, retention_successful_builds, retention_failed_builds):
+        new_projectversion = ProjectVersion(
+            name=version,
+            project=self.project,
+            description=description,
+            dependency_policy=dependency_policy,
+            mirror_architectures=array2db(architectures),
+            basemirror_id=basemirror_id,
+            sourcerepositories=self.sourcerepositories,
+            ci_builds_enabled=cibuilds,
+            retention_successful_builds=retention_successful_builds,
+            retention_failed_builds=retention_failed_builds,
+        )
 
-            for dependency in self.dependencies:
-                if basemirror_id != self.basemirror_id:
-                    logger.error("base %d =? %d" % (new_projectversion.basemirror.project_id, self.basemirror.project_id))
-                    if new_projectversion.basemirror.project_id != self.basemirror.project_id:
-                        if dependency.dependency_policy != "any":
-                            continue
-                    if dependency.dependency_policy not in ["distribution", "any"]:
+        for dependency in self.dependencies:
+            if basemirror_id != self.basemirror_id:
+                logger.error("base %d =? %d" % (new_projectversion.basemirror.project_id, self.basemirror.project_id))
+                if new_projectversion.basemirror.project_id != self.basemirror.project_id:
+                    if dependency.dependency_policy != "any":
                         continue
-                new_projectversion.dependencies.append(dependency)
+                if dependency.dependency_policy not in ["distribution", "any"]:
+                    continue
+            new_projectversion.dependencies.append(dependency)
 
-            for repo in new_projectversion.sourcerepositories:
-                sourepprover = db.query(SouRepProVer).filter(
-                        SouRepProVer.sourcerepository_id == repo.id,
-                        SouRepProVer.projectversion_id == self.id).first()
-                new_sourepprover = db.query(SouRepProVer).filter(
-                        SouRepProVer.sourcerepository_id == repo.id,
-                        SouRepProVer.projectversion_id == new_projectversion.id).first()
-                new_sourepprover.architectures = sourepprover.architectures
+        for repo in new_projectversion.sourcerepositories:
+            sourepprover = db.query(SouRepProVer).filter(
+                    SouRepProVer.sourcerepository_id == repo.id,
+                    SouRepProVer.projectversion_id == self.id).first()
+            new_sourepprover = db.query(SouRepProVer).filter(
+                    SouRepProVer.sourcerepository_id == repo.id,
+                    SouRepProVer.projectversion_id == new_projectversion.id).first()
+            new_sourepprover.architectures = sourepprover.architectures
 
-            db.add(new_projectversion)
-            db.commit()
-            return new_projectversion
+        db.add(new_projectversion)
+        db.commit()
+        return new_projectversion
 
 
 def get_projectversion_deps(projectversion_id, session):
