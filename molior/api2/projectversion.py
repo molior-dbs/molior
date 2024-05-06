@@ -17,7 +17,7 @@ from ..aptly import get_aptly_connection
 
 from ..model.projectversion import (
     ProjectVersion, find_basemirror_or_baseproject, get_projectversion, get_projectversion_deps,
-    get_projectversion_byname, get_projectversion_byid, get_source_repositories)
+    get_projectversion_byname, get_projectversion_byid)
 from ..model.project import Project
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
@@ -508,9 +508,14 @@ async def copy_projectversion(request):
     retention_successful_builds = params.get("retention_successful_builds", None)
     retention_failed_builds = params.get("retention_failed_builds", None)
 
-    if (retention_successful_builds is not None and (not isinstance(retention_successful_builds, int))):
+    if retention_successful_builds is None:
+        retention_successful_builds = db.query(MetaData).filter_by(name='retention_successful_builds').first().value
+    elif not isinstance(retention_successful_builds, int):
         return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.")
-    if (retention_failed_builds is not None and (not isinstance(retention_failed_builds, int))):
+
+    if retention_failed_builds is None:
+        retention_failed_builds = db.query(MetaData).filter_by(name='retention_failed_builds').first().value
+    elif not isinstance(retention_failed_builds, int):
         return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
 
     if not new_version:

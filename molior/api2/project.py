@@ -348,10 +348,20 @@ async def edit_projectversion(request):
     retention_successful_builds = params.get("retention_successful_builds")
     retention_failed_builds = params.get("retention_failed_builds")
 
-    if (retention_successful_builds is not None and (not isinstance(retention_successful_builds, int))):
-        return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.")
-    if (retention_failed_builds is not None and (not isinstance(retention_failed_builds, int))):
-        return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
+    if retention_successful_builds is None or retention_failed_builds is None:
+        db = request.cirrina.db_session
+
+        if retention_successful_builds is None:
+            retention_successful_builds = db.query(MetaData).filter_by(name='retention_successful_builds').first().value
+        elif not isinstance(retention_successful_builds, int):
+            return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.")
+
+        if retention_failed_builds is None:
+            retention_failed_builds = db.query(MetaData).filter_by(name='retention_failed_builds').first().value
+        elif not isinstance(retention_failed_builds, int):
+            return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
+
+        db.close()
 
     projectversion = get_projectversion(request)
     if not projectversion:
