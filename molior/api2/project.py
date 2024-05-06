@@ -9,6 +9,7 @@ from ..tools import ErrorResponse, OKResponse, array2db, is_name_valid, paginate
 from ..auth import req_role
 from ..molior.queues import enqueue_aptly
 
+from ..model.metadata import MetaData
 from ..model.project import Project
 from ..model.authtoken import Authtoken
 from ..model.authtoken_project import Authtoken_Project
@@ -206,31 +207,22 @@ async def create_projectversion(request):
     retention_failed_builds = params.get("retention_failed_builds")
     project_id = request.match_info["project_id"]
 
-    min_successful_builds = 1
-    max_successful_builds = 5
-    min_failed_builds = 7
+    if retention_successful_builds is None or retention_failed_builds is None:
+        db = request.cirrina.db_session
 
-    if (
-        retention_successful_builds is not None
-        and (
-            not isinstance(retention_successful_builds, int)
-            or retention_successful_builds <min_successful_builds
-            or retention_successful_builds > max_successful_builds
-        )
-    ):
-        return ErrorResponse(
-            400, f"Invalid retention_successful_builds. It should be an integer between {min_successful_builds} and {max_successful_builds}.",
-        )
-    if (
-        retention_failed_builds is not None
-        and (
-            not isinstance(retention_failed_builds, int)
-            or retention_failed_builds < min_failed_builds
-        )
-    ):
-        return ErrorResponse(
-            400, f"Invalid retention_failed_builds. It should be an integer greater than or equal to {min_failed_builds}."
-        )
+        if retention_successful_builds is None:
+            retention_successful_builds = db.query(MetaData).filter_by(name='retention_successful_builds').first()
+            return OKResponse(200, "No retention_successful_builds value given. Using default value",)
+        elif not isinstance(retention_successful_builds, int):
+            return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.",)
+
+        if retention_failed_builds is None:
+            retention_failed_builds = db.query(MetaData).filter_by(name='retention_failed_builds').first()
+            return OKResponse(200, "No retention_failed_builds value given. Using default value",)
+        elif not isinstance(retention_failed_builds, int):
+            return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
+
+        db.close()
 
     if not project_id:
         return ErrorResponse(400, "No project id received")
@@ -358,31 +350,10 @@ async def edit_projectversion(request):
     retention_successful_builds = params.get("retention_successful_builds")
     retention_failed_builds = params.get("retention_failed_builds")
 
-    min_successful_builds = 1
-    max_successful_builds = 5
-    min_failed_builds = 7
-
-    if (
-        retention_successful_builds is not None
-        and (
-            not isinstance(retention_successful_builds, int)
-            or retention_successful_builds <min_successful_builds
-            or retention_successful_builds > max_successful_builds
-        )
-    ):
-        return ErrorResponse(
-            400, f"Invalid retention_successful_builds. It should be an integer between {min_successful_builds} and {max_successful_builds}.",
-        )
-    if (
-        retention_failed_builds is not None
-        and (
-            not isinstance(retention_failed_builds, int)
-            or retention_failed_builds < min_failed_builds
-        )
-    ):
-        return ErrorResponse(
-            400, f"Invalid retention_failed_builds. It should be an integer greater than or equal to {min_failed_builds}."
-        )
+    if (retention_successful_builds is not None and (not isinstance(retention_successful_builds, int))):
+        return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.")
+    if (retention_failed_builds is not None and (not isinstance(retention_failed_builds, int))):
+        return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
 
     projectversion = get_projectversion(request)
     if not projectversion:
@@ -947,6 +918,7 @@ async def delete_project_token(request):
     db.commit()
 
     return OKResponse()
+
 
 @app.http_post("/api2/projectbase/projectversion/import")
 @req_role("owner")
