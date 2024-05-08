@@ -87,7 +87,7 @@ Description: molior development virtual machine
 Package: molior-vsphere
 Architecture: all
 Depends: ${misc:Depends}, molior-vm,
-    vim, grub-efi-amd64, efibootmgr
+    vim, grub-efi-amd64, efibootmgr, tox, tmux
 Description: molior virtual machine for vSphere
  molior virtual machine template (OVF) meta package
 
