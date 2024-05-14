@@ -307,7 +307,11 @@ async def add_projectversion_dependency(request):
     """
     params = await request.json()
     dependency_name = params.get("dependency")
-    use_cibuilds = params.get("use_cibuilds")
+    use_cibuilds = params.get("use_cibuilds", False)
+    if use_cibuilds == "true":
+        use_cibuilds = True
+    else:
+        use_cibuilds = False
 
     projectversion = get_projectversion(request)
     if not projectversion:
