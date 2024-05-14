@@ -215,6 +215,8 @@ def get_apt_repos(project_version, session, is_ci=False):
     urls = []
     deps = get_projectversion_deps(project_version.id, session)
 
+    urls.append(project_version.basemirror.get_apt_repo(internal=True))
+
     urls.append(project_version.get_apt_repo(internal=True))
     if is_ci:
         urls.append(project_version.get_apt_repo(dist="unstable", internal=True))

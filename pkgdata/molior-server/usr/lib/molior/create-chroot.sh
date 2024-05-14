@@ -142,6 +142,8 @@ EOM
 
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
+  rm -f $target/etc/apt/sources.list
+
   echo I: Creating schroot config
   mkdir -p $CHROOT_D
   cat > $CHROOT_D/sbuild-$CHROOT_NAME <<EOM
