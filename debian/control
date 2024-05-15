@@ -87,7 +87,7 @@ Description: molior development virtual machine
 Package: molior-vsphere
 Architecture: all
 Depends: ${misc:Depends}, molior-vm,
-    vim, grub-efi-amd64, efibootmgr, tox, tmux, genisoimage, xorriso, syslinux-utils, mtools, dosfstools, kpartx, qemu-utils
+    vim, grub-efi-amd64, efibootmgr, tox, tmux, genisoimage, xorriso, syslinux-utils, mtools, dosfstools, kpartx, qemu-utils, docker.io
 Description: molior virtual machine for vSphere
  molior virtual machine template (OVF) meta package
 
