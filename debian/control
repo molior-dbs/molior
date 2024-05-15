@@ -99,7 +99,7 @@ Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
   linux-image-amd64, grub-pc,
   acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
-  libpam-systemd, open-vm-tools,
+  libpam-systemd, open-vm-tools, systemd-timesyncd,
 # editors
   vim-nox,
 # add some tools:
@@ -117,7 +117,7 @@ Depends: ${misc:Depends}, net-tools, ifupdown, isc-dhcp-client,
   linux-image-amd64, grub-efi-amd64, efibootmgr,
   acpi-support-base, acpid, sudo, locales,
   dialog, bsdmainutils, less, gawk, systemd-sysv, bash-completion,
-  libpam-systemd, open-vm-tools,
+  libpam-systemd, open-vm-tools, systemd-timesyncd,
 # editors
   vim-nox,
 # add some tools:
