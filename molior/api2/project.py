@@ -211,14 +211,12 @@ async def create_projectversion(request):
         db = request.cirrina.db_session
 
         if retention_successful_builds is None:
-            retention_successful_builds = db.query(MetaData).filter_by(name='retention_successful_builds').first()
-            return OKResponse(200, "No retention_successful_builds value given. Using default value",)
+            retention_successful_builds = db.query(MetaData).filter_by(name='retention_successful_builds').first().value
         elif not isinstance(retention_successful_builds, int):
             return ErrorResponse(400, "Invalid retention_successful_builds. It should be an integer.",)
 
         if retention_failed_builds is None:
-            retention_failed_builds = db.query(MetaData).filter_by(name='retention_failed_builds').first()
-            return OKResponse(200, "No retention_failed_builds value given. Using default value",)
+            retention_failed_builds = db.query(MetaData).filter_by(name='retention_failed_builds').first().value
         elif not isinstance(retention_failed_builds, int):
             return ErrorResponse(400, "Invalid retention_failed_builds. It should be an integer.")
 

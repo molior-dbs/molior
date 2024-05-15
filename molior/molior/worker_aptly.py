@@ -452,6 +452,10 @@ async def retention_cleanup(session, build):
     # the number of successful builds to retain per sourcerepository
     max_successful_builds = build.projectversion.retention_successful_builds
 
+    # no cleanup_needed
+    if not max_successful_builds:
+        return [], [] 
+
     # how many successful builds are for the sourcerepository
     successful_topbuilds = session.query(Build).filter(
         Build.buildstate == "successful",

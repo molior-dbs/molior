@@ -37,6 +37,7 @@ max_parallel_chroots: 2
 # Aptly settings
 aptly:
     # apt_url_public: 'http://localhost:8080'
+    # required for the build nodes to communicate with molior
     apt_url: 'http://127.0.0.1:8080'
     api_url: 'http://127.0.0.1:3143/api'
     api_user: 'molior'
