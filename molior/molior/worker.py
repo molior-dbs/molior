@@ -17,7 +17,6 @@ from ..model.build import Build
 from ..model.chroot import Chroot
 from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
-from ..model.postbuildhook import PostBuildHook
 
 
 async def cleanup_builds():
@@ -406,10 +405,6 @@ class Worker:
                 SouRepProVer.sourcerepository_id == original.id,
                 SouRepProVer.projectversion_id == sourepprover.projectversion_id).first()
             if t:
-                phs = session.query(PostBuildHook).filter(
-                      PostBuildHook.sourcerepositoryprojectversion_id == sourepprover.id).all()
-                for p in phs:
-                    p.sourcerepositoryprojectversion_id = t.id
                 # delete duplicate from projectversion
                 session.flush()
                 session.delete(sourepprover)

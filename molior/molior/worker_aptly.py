@@ -25,7 +25,6 @@ from ..model.projectversion import ProjectVersion, get_projectversion_byid
 from ..model.chroot import Chroot
 from ..model.mirrorkey import MirrorKey
 from ..model.buildtask import BuildTask
-from ..model.postbuildhook import PostBuildHook
 from ..model.sourepprover import SouRepProVer
 from ..model.metadata import MetaData
 
@@ -454,7 +453,7 @@ async def retention_cleanup(session, build):
 
     # no cleanup_needed
     if not max_successful_builds:
-        return [], [] 
+        return [], []
 
     # how many successful builds are for the sourcerepository
     successful_topbuilds = session.query(Build).filter(
@@ -1014,12 +1013,6 @@ class AptlyWorker:
             todelete = []
             sourepovers = db.query(SouRepProVer).filter(SouRepProVer.projectversion_id == projectversion_id).all()
             for sourcerepositoryprojectversion in sourepovers:
-                hooks = db.query(PostBuildHook).filter(PostBuildHook.sourcerepositoryprojectversion_id ==
-                                                       sourcerepositoryprojectversion.id).all()
-
-                for hook in hooks:
-                    db.delete(hook)
-
                 todelete.append(sourcerepositoryprojectversion)
 
             db.commit()
@@ -1150,7 +1143,7 @@ class AptlyWorker:
                             break
                         amount_successful_builds = len(successful_delete_candidates[sourcename])
                         retention_successful_builds = projectversion.retention_successful_builds
-                        amount_exceeded =  amount_successful_builds - retention_successful_builds
+                        amount_exceeded = amount_successful_builds - retention_successful_builds
 
                         if amount_exceeded > 0:
                             for build in successful_delete_candidates[sourcename][:-amount_exceeded]:
@@ -1163,17 +1156,20 @@ class AptlyWorker:
 
             if len(failed_builds_to_delete) < cleanup_max:
                 if len(successful_builds_to_delete) > 0:
-                    builds_to_delete = failed_builds_to_delete + successful_builds_to_delete[:-(cleanup_max-len(failed_builds_to_delete))]
+                    builds_to_delete = failed_builds_to_delete + \
+                                       successful_builds_to_delete[:-(cleanup_max-len(failed_builds_to_delete))]
                 else:
                     builds_to_delete = failed_builds_to_delete
             elif len(successful_builds_to_delete) < cleanup_max:
                 if len(failed_builds_to_delete) > 0:
-                    builds_to_delete = successful_builds_to_delete + failed_builds_to_delete[:-(cleanup_max-len(successful_builds_to_delete))]
+                    builds_to_delete = successful_builds_to_delete + \
+                                       failed_builds_to_delete[:-(cleanup_max-len(successful_builds_to_delete))]
                 else:
                     builds_to_delete = successful_builds_to_delete
             else:
                 if len(failed_builds_to_delete) > 0 and len(successful_builds_to_delete) > 0:
-                    builds_to_delete = failed_builds_to_delete[:-int(len(failed_builds_to_delete)*0.5)] + successful_builds_to_delete[:-int(len(successful_builds_to_delete)*0.5)]
+                    builds_to_delete = failed_builds_to_delete[:-int(len(failed_builds_to_delete)*0.5)] + \
+                                       successful_builds_to_delete[:-int(len(successful_builds_to_delete)*0.5)]
                 elif len(failed_builds_to_delete) > 0:
                     builds_to_delete = failed_builds_to_delete
                 else:
@@ -1182,7 +1178,7 @@ class AptlyWorker:
             i = 0
             logger.info("length of builds_to_delete: %d", len(builds_to_delete))
             for build in builds_to_delete:
-                i = i +1
+                i += 1
                 logger.info(f"deleting build {i} of {len(builds_to_delete)}")
                 logger.info("build id: %d", build.id)
                 logger.info("buildstate: %s", build.buildstate)
@@ -1191,7 +1187,7 @@ class AptlyWorker:
 
             logger.info("cleanup_build_id: %s", cleanup_build_id)
 
-            i=0
+            i = 0
             for build in builds_to_delete:
                 i = i + 1
 
@@ -1201,14 +1197,15 @@ class AptlyWorker:
 
                 siblings = 0
                 if build.parent:
-                    siblings =  len(build.parent.children)
+                    siblings = len(build.parent.children)
 
                 if siblings == 1:
                     sourcename = build.parent.parent.sourcename
                     start_stamp = build.parent.parent.startstamp
                     topbuild_id = build.parent.parent.id
                     logger.info(f"Sourcename: {sourcename}, Start stamp: {start_stamp}, Build ID: {topbuild_id}")
-                    await buildlog(cleanup_build_id, "I: deleting debian, source and topbuild of %s-%s\n" % (sourcename, build.version))
+                    await buildlog(cleanup_build_id, "I: deleting debian, source and topbuild of %s-%s\n" % (sourcename,
+                                   build.version))
                     await enqueue_aptly({"delete_build": [topbuild_id]})
                 else:
                     sourcename = build.sourcename
@@ -1356,7 +1353,8 @@ class AptlyWorker:
                             if projectversion.publish_s3:
                                 s3_endpoint = projectversion.s3_endpoint
                                 s3_path = projectversion.s3_path
-                                publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
+                                # on aptly, directory separatos is _ for publishing
+                                publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"
                             projectversions[projectversion_id] = (repo_name, publish_name,
                                                                   db2array(projectversion.mirror_architectures),
                                                                   publish_s3)
@@ -1517,8 +1515,6 @@ class AptlyWorker:
 
         logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
 
-
-
     async def _abort(self, args):
         logger.debug("worker: got abort build task")
         build_id = args[0]
@@ -1592,7 +1588,6 @@ class AptlyWorker:
         task_id = await aptly.snapshot_publish(snapshot_name, "main", archs, "stable", f"s3:{publish_s3}")
         if not await aptly.wait_task(task_id):
             logger.error(f"Error publishing to S3 endpoint {publish_s3}")
-
 
     async def run(self):
         """

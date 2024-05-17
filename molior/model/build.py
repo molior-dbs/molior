@@ -5,7 +5,7 @@ from datetime import datetime
 from ..logger import logger
 from ..tools import get_local_tz, db2array
 # from .tools import check_user_role
-from ..molior.notifier import Subject, Event, notify, run_hooks
+from ..molior.notifier import Subject, Event, notify
 from ..molior.queues import buildlog, buildlogtitle, buildlogdone
 
 from .database import Base
@@ -287,19 +287,6 @@ class Build(Base):
         """
         data = self.data()
         await notify(Subject.build.value, Event.changed.value, data)
-
-        # running hooks if needed
-        if self.buildtype != "deb":  # only run hooks for deb builds
-            return
-
-        if (
-           self.buildstate != "building"  # only send building, ok, nok
-           and self.buildstate != "successful"
-           and self.buildstate != "build_failed"
-           and self.buildstate != "publish_failed"):
-            return
-
-        await run_hooks(self.id)
 
 
 def build_logstate(build_id, buildtype, sourcename, version, statemsg):

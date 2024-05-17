@@ -9,30 +9,28 @@ app.api_version = 1
 app.contact = ""
 
 # import api handlers
-from .auth.auth import Auth          # noqa: F401
-import molior.api.build              # noqa: F401
-import molior.api.gitlab             # noqa: F401
-import molior.api.bitbucket          # noqa: F401
-import molior.api.project            # noqa: F401
-import molior.api.buildstate         # noqa: F401
-import molior.api.mirror             # noqa: F401
-import molior.api.websocket          # noqa: F401
-import molior.api.auth               # noqa: F401
-import molior.api.user               # noqa: F401
-import molior.api.userrole           # noqa: F401
-import molior.api.sourcerepository   # noqa: F401
-import molior.api.projectuserrole    # noqa: F401
-import molior.api.projectversion     # noqa: F401
-import molior.api.info               # noqa: F401
-import molior.api.status             # noqa: F401
-import molior.api.hook               # noqa: F401
-import molior.api.upload             # noqa: F401
+from .auth.auth import Auth          # noqa: F401, E402
+import molior.api.build              # noqa: E402
+import molior.api.bitbucket          # noqa: E402
+import molior.api.project            # noqa: E402
+import molior.api.buildstate         # noqa: E402
+import molior.api.mirror             # noqa: E402
+import molior.api.websocket          # noqa: E402
+import molior.api.auth               # noqa: E402
+import molior.api.user               # noqa: E402
+import molior.api.userrole           # noqa: E402
+import molior.api.sourcerepository   # noqa: E402
+import molior.api.projectuserrole    # noqa: E402
+import molior.api.projectversion     # noqa: E402
+import molior.api.info               # noqa: E402
+import molior.api.status             # noqa: E402
+import molior.api.upload             # noqa: E402
 
-import molior.api2.project           # noqa: F401
-import molior.api2.projectversion    # noqa: F401
-import molior.api2.sourcerepository  # noqa: F401
-import molior.api2.user              # noqa: F401
-import molior.api2.mirror            # noqa: F401
-import molior.api2.build             # noqa: F401
-import molior.api2.token             # noqa: F401
-import molior.api2.admin             # noqa: F401
+import molior.api2.project           # noqa: E402
+import molior.api2.projectversion    # noqa: E402
+import molior.api2.sourcerepository  # noqa: E402
+import molior.api2.user              # noqa: E402
+import molior.api2.mirror            # noqa: E402
+import molior.api2.build             # noqa: E402
+import molior.api2.token             # noqa: E402
+import molior.api2.admin             # noqa: F401, E402

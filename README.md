@@ -26,9 +26,6 @@ Molior allows the following via WebUI, REST API or commandline tools:
     * [Example a non-base mirrors](#example-a-non-base-mirrors)
     * [Create a project](#create-a-project)
     * [Add a source repo](#add-a-source-repo)
-    * [Integration](#integration)
-        * [Trigger builds from gitlab](#trigger-builds-from-gitlab)
-        * [Build notification hooks](#build-notification-hooks)
 * [Contributing](#contributing)
     * [Clone the source repositories](#clone-the-source-repositories)
     * [Build](#build)
@@ -175,41 +172,6 @@ Key URL: https://download.docker.com/linux/debian/gpg
 - URL: https://github.com/neolynx/sold.git
 - Click Continue
 - Click Continue
-
-## Integration
-
-### Trigger builds from gitlab
-
-In GitLab:
-- Go to Settings/Integrations (or Administration/System-Hooks)
-- Enter URL: http://moliorserver/api/build/gitlab (replace with your molior instance)
-- Choose secret token id authenticated triggers are desired
-  - Configure secret token in /etc/molior/molior/yml (gitlab/auth_token)
-- Select "Push events" if CI builds are desired
-- Select "Tag push events"
-
-### Build notification hooks
-
-Molior can trigger a REST API when build states change.
-
-```
-    POST https://remoteserver/api/{{build.commit|urlencode}}
-
-    {
-        "key":"molior-{{platform.distrelease}}-{{platform.version}}-{{platform.architecture}}-{{project.name}}-{{project.version}}",
-
-        "name":"Molior {{platform.architecture}} / {{platform.version}} / {{platform.distrelease}} Build for {{build.commit}}",
-        {% if build.status == "building" %}
-        "state":"INPROGRESS",
-        {% elif build.status == "successful" %}
-        "state":"SUCCESSFUL",
-        {% else %}
-        "state":"FAILED",
-        {% endif %}
-        "description":"{{build.status}}",
-        "url":"{{build.url}}"
-    }
-```
 
 # Contributing
 
