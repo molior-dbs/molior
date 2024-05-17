@@ -122,12 +122,14 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
         except Exception as exc:
             await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
+            ret = False
 
         try:
             ret = await debian_repo.republish(ci_build=is_ci)
         except Exception as exc:
             await buildlog(build_id, "E: error republishing repository\n")
             logger.exception(exc)
+            ret = False
 
     await buildlog(build_id, "\n")
 
