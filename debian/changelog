@@ -1,3 +1,28 @@
+molior (1.5.0~beta1) stretch; urgency=medium
+
+  * improve Makefile
+  * return error on publishing
+  * remove obsolete functionality
+  * molior-nodes: add systemd-timesyncd
+  * add vSphere dependencies for tests
+  * add vSphere dependencies for tests
+  * add virtualbox to molior deploy file
+  * improve package_retention handling at create_proctversion API
+  * fixed retention_cleanup issues
+  * improve package_retention handling at create_proctversion API
+  * build: use actual base mirror in chroot
+  * projectversion: fix adding dependencies without ci
+  * add tox and tmux to vm conf
+  * resolve indentation issue (really)
+  * indentation issue resolved
+  * build view: add children id and sourcename to GET API
+  * implement admin page
+  * implement export and import of project versions
+  * implement retention_cleanup
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Fri, 17 May 2024 20:46:49 +0200
+
 molior (1.4.1) stretch; urgency=medium
 
   * server info: get machine id
