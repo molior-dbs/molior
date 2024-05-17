@@ -78,9 +78,9 @@ nginx-cached:
 registry:
 	docker-compose build --no-cache registry
 
-run-aptly:  ## run aptly commands
+run-aptly-cmds:  ## run aptly commands
 	@docker-compose stop aptly
-	@docker-compose run aptly bash
+	@docker-compose run aptly su aptly -c bash
 
 stop:  ## stop containers
 	@docker-compose down

@@ -678,6 +678,8 @@ async def unlock_projectversion(request):
     if projectversion.basemirror.external_repo:
         return ErrorResponse(400, "Projectversion is based on external mirror")
 
+    # FIXME: check if locked, check if dependants are locked
+
     return do_unlock(request, projectversion.id)
 
 
