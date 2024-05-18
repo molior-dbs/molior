@@ -1,3 +1,9 @@
+molior (1.5.0~beta4) stretch; urgency=medium
+
+  * debian: enable flake8
+
+ -- André Roth <neolynx@gmail.com>  Sat, 18 May 2024 21:06:09 +0200
+
 molior (1.5.0~beta3) stretch; urgency=medium
 
   * startup: call setup_swagger
