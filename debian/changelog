@@ -1,3 +1,11 @@
+molior (1.5.0~beta2) stretch; urgency=medium
+
+  * return number of builds and ci builds for projets and
+    projectversions
+  * copy projectversion: respect available architectures
+
+ -- André Roth <neolynx@gmail.com>  Sat, 18 May 2024 15:09:31 +0200
+
 molior (1.5.0~beta1) stretch; urgency=medium
 
   * improve Makefile
