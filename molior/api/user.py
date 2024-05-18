@@ -94,6 +94,7 @@ async def get_users(request):
 
     return web.json_response(data)
 
+
 @app.http_put("/api/user/{user_id}")
 @app.http_put("/api/users/{user_id}")
 @req_admin

@@ -5,11 +5,9 @@ from sqlalchemy.sql import func, or_
 from ..app import app
 from ..logger import logger
 from ..auth import req_role
-from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, array2db, escape_for_like
+from ..tools import ErrorResponse, parse_int, is_name_valid, OKResponse, db2array, escape_for_like
 from ..model.projectversion import ProjectVersion, get_projectversion_deps
 from ..model.project import Project
-from ..model.sourcerepository import SourceRepository
-from ..model.sourepprover import SouRepProVer
 from ..molior.queues import enqueue_aptly
 
 
@@ -120,6 +118,7 @@ async def get_projectversions(request):
 
     return OKResponse(data)
 
+
 async def do_overlay(request, projectversion_id, name):
     if not name:
         return ErrorResponse(400, "No valid name for the projectversion received")
@@ -215,40 +214,6 @@ async def post_projectversion_toggle_ci(request):
 
     return OKResponse("Ci builds are now {}.".format(result))
 
-"""
-@app.http_post("/api/projectversions/{projectversion_id}/lock")
-@req_role("owner")
-async def post_projectversion_lock(request):
-    '''
-    Locks a projectversion.
-
-    ---
-    description: Locks a projectversion.
-    tags:
-        - ProjectVersions
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: projectversion_id
-          in: path
-          required: true
-          type: integer
-    produces:
-        - text/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    '''
-    projectversion_id = request.match_info["projectversion_id"]
-    try:
-        projectversion_id = int(projectversion_id)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for projectversion_id")
-
-    return do_lock(request, projectversion_id)
-"""
 
 def do_lock(request, projectversion_id):
     db = request.cirrina.db_session

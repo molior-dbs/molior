@@ -9,8 +9,7 @@ from ..logger import logger
 from ..tools import strip_epoch_version, db2array
 from ..molior.debianrepository import DebianRepository
 from ..molior.configuration import Configuration
-from sqlalchemy import func, or_, desc
-from ..molior.queues import buildlog, buildlogtitle, enqueue_aptly
+from ..molior.queues import buildlog, buildlogtitle
 
 from ..model.database import Session
 from ..model.build import Build
@@ -330,5 +329,3 @@ def add_files(build_id, buildtype, version, files):
             if pkg not in build.debianpackages:
                 build.debianpackages.append(pkg)
         session.commit()
-
-

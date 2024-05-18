@@ -153,6 +153,7 @@ async def get_mirrors(request):
         )
     return web.json_response(data)
 
+
 @app.http_post("/api/mirror/{id}/update")
 @app.http_put("/api/mirror/{id}")
 @req_admin

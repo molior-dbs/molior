@@ -87,6 +87,7 @@ async def get_projectversion2(request):
 
     return OKResponse(projectversion.data())
 
+
 @app.http_get("/api2/project/{project_name}/{project_version}/export")
 async def export_projectversion2(request):
     """
@@ -121,7 +122,11 @@ async def export_projectversion2(request):
         return ErrorResponse(400, "Projectversion is mirror")
     db = request.cirrina.db_session
 
-    query = db.query(ProjectVersion, SouRepProVer, SourceRepository).join(ProjectVersion, ProjectVersion.id == SouRepProVer.projectversion_id).join(SourceRepository, SouRepProVer.sourcerepository_id == SourceRepository.id).filter(ProjectVersion.name == projectversion.name).all()
+    query = db.query(ProjectVersion, SouRepProVer, SourceRepository).join(
+            ProjectVersion, ProjectVersion.id == SouRepProVer.projectversion_id).join(
+                    SourceRepository,
+                    SouRepProVer.sourcerepository_id == SourceRepository.id
+                    ).filter(ProjectVersion.name == projectversion.name).all()
 
     sourcerepositories_data = []
 
@@ -147,6 +152,7 @@ async def export_projectversion2(request):
     }
 
     return web.Response(text=json_data, headers=headers)
+
 
 @app.http_get("/api2/project/{project_id}/{projectversion_id}/dependencies")
 @app.authenticated
@@ -1654,6 +1660,7 @@ async def delete_projectversion_build(request):
     await enqueue_aptly({"delete_build": [topbuild.id]})
     return OKResponse("Build is being deleted")
 
+
 @app.http_get("/api2/cleanup")
 async def get_cleanup(request):
 
@@ -1676,15 +1683,16 @@ async def get_cleanup(request):
     logger.info(cleanup_weekdays)
 
     data = {
-    'cleanup_active': cleanup_active,
-    'cleanup_time': cleanup_time,
-    'cleanup_weekdays': cleanup_weekdays
+        'cleanup_active': cleanup_active,
+        'cleanup_time': cleanup_time,
+        'cleanup_weekdays': cleanup_weekdays
     }
 
     logger.info(data)
     db.close()
 
     return OKResponse(data)
+
 
 @app.http_put("/api2/cleanup")
 async def edit_cleanup(request):

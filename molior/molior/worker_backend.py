@@ -1,5 +1,3 @@
-import asyncio
-
 from ..logger import logger
 from ..molior.queues import enqueue_task, enqueue_aptly, dequeue_backend, enqueue_backend, buildlogdone
 from .backend import Backend
@@ -7,8 +5,6 @@ from .backend import Backend
 from ..model.database import Session
 from ..model.build import Build
 from ..model.buildtask import BuildTask
-
-from sqlalchemy import asc
 
 
 class BackendWorker:

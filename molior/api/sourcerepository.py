@@ -216,6 +216,7 @@ async def get_repositories(request):
         data["results"].append(repoinfo)
     return web.json_response(data)
 
+
 # FIXME: this should be in projectversion, in order to handle auth
 @app.http_post("/api/repositories/{repository_id}/clone")
 @app.authenticated

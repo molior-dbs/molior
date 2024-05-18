@@ -753,7 +753,6 @@ class AptlyApi:
                             return False
                 break
 
-
         logger.info(f"Creating tmp snapshot {snapshot_name_tmp}")
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
         if not await self.wait_task(task_id):

@@ -813,7 +813,7 @@ async def schedule_build(build, session):
     token = buildtask.task_id
 
     query = session.query(SouRepProVer.run_lintian).filter(SouRepProVer.sourcerepository_id == build.sourcerepository_id,
-                                                                SouRepProVer.projectversion_id == build.projectversion_id).first()
+                                                           SouRepProVer.projectversion_id == build.projectversion_id).first()
     if query is not None:
         run_lintian = query.run_lintian
     if build.is_ci:
@@ -843,6 +843,7 @@ async def schedule_build(build, session):
             ]
         }
     )
+
 
 def get_dependencies_recursive(dependencies, array):
     for dep in dependencies:

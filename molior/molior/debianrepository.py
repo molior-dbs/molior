@@ -1,5 +1,3 @@
-import asyncio
-
 from datetime import datetime, timedelta
 
 from ..logger import logger
