@@ -1,3 +1,12 @@
+molior (1.5.0~beta3) stretch; urgency=medium
+
+  * startup: call setup_swagger
+  * fix flake warnings
+  * Makefile: add db backup restore
+  * fix db upgrade
+
+ -- André Roth <neolynx@gmail.com>  Sat, 18 May 2024 21:02:54 +0200
+
 molior (1.5.0~beta2) stretch; urgency=medium
 
   * return number of builds and ci builds for projets and
