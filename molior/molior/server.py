@@ -20,29 +20,6 @@ from .backend import Backend
 from ..auth.auth import Auth
 
 
-async def run_molior(self):
-    logger.info("starting molior v%s", MOLIOR_VERSION)
-    self.backend = Backend().init()
-
-    if not self.backend:
-        return
-    if not Auth().init():
-        return
-
-    Launchy.attach_loop(self.loop)
-
-    worker = Worker()
-    self.task_worker = asyncio.ensure_future(worker.run())
-
-    backend_worker = BackendWorker()
-    self.task_backend_worker = asyncio.ensure_future(backend_worker.run())
-
-    aptly_worker = AptlyWorker()
-    self.task_aptly_worker = asyncio.ensure_future(aptly_worker.run())
-
-    notification_worker = NotificationWorker()
-    self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
-
 def list_active_tasks(debug_pos):
     logger.info(debug_pos)
     tasks = asyncio.all_tasks()
@@ -54,6 +31,7 @@ def list_active_tasks(debug_pos):
         logger.info(task.get_name())
         logger.info(task.get_coro())
     logger.info("End of tasks listed: ")
+
 
 def get_weekday_number(weekday_name):
     weekday_mapping = {
@@ -67,13 +45,14 @@ def get_weekday_number(weekday_name):
     }
     return weekday_mapping.get(weekday_name)
 
+
 def weekly_cleanup(self):
     if hasattr(self, 'task_cron') and self.task_cron:
         # If a scheduler already exists, cancel the existing tasks
         self.task_cron.cancel()
 
     # extract values from db or write default values a new molior-server instance
-    cleanup_weekdays_list = []
+    # cleanup_weekdays_list = []
     with Session() as session:
         cleanup_active = session.query(MetaData).filter_by(
             name="cleanup_active").first()
@@ -90,12 +69,12 @@ def weekly_cleanup(self):
                 return
             else:
                 cleanup_sched = Scheduler(locale="en_US")
-                cleanup_weekdays_list = cleanup_weekdays.value.split(',')
+                # cleanup_weekdays_list = cleanup_weekdays.value.split(',')
 
     cleanup_sched = Scheduler(locale="en_US")
-    cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(
-        cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
-    cleanup_sched.add_job(cleanup_job)
+    # cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(
+    #     cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
+    # cleanup_sched.add_job(cleanup_job)
     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
 
@@ -110,7 +89,31 @@ class MoliorServer(cirrina.Server):
         self.task_cron = None
 
         self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
-        self.on_startup.append(run_molior)
+        self.on_startup.append(MoliorServer.run_molior)
+
+    async def run_molior(self):
+        logger.info("starting molior v%s", MOLIOR_VERSION)
+        self.setup_swagger()
+        self.backend = Backend().init()
+
+        if not self.backend:
+            return
+        if not Auth().init():
+            return
+
+        Launchy.attach_loop(self.loop)
+
+        worker = Worker()
+        self.task_worker = asyncio.ensure_future(worker.run())
+
+        backend_worker = BackendWorker()
+        self.task_backend_worker = asyncio.ensure_future(backend_worker.run())
+
+        aptly_worker = AptlyWorker()
+        self.task_aptly_worker = asyncio.ensure_future(aptly_worker.run())
+
+        notification_worker = NotificationWorker()
+        self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
 
     @staticmethod
     def create_cirrina_context(cirrina):
