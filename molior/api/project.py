@@ -13,6 +13,7 @@ from ..model.authtoken import Authtoken
 from ..model.authtoken_project import Authtoken_Project
 from ..model.user import User
 from ..model.userrole import UserRole
+from ..model.build import Build
 
 
 @app.http_get("/api/projects")
@@ -61,10 +62,17 @@ async def get_projects(request):
     results = query.all()
 
     data = {"total_result_count": nb_results}
-    data["results"] = [
-        {"id": item.id, "name": item.name, "description": item.description}
-        for item in results
-    ]
+    data["results"] = []
+    for project in results:
+        buildCount = db.query(Build).join(ProjectVersion).join(Project).filter(Project.id == project.id,
+                                                                               Build.is_ci.is_(False)).count()
+        cibuildCount = db.query(Build).join(ProjectVersion).join(Project).filter(Project.id == project.id,
+                                                                                 Build.is_ci.is_(True)).count()
+        data["results"].append({"id": project.id, "name": project.name, "description": project.description,
+                                "projectversionCount": len(project.projectversions),
+                                "buildCount": buildCount,
+                                "cibuildCount": cibuildCount
+                                })
 
     return web.json_response(data)
 
@@ -240,6 +248,7 @@ async def update_project(request):
     project.description = description
     db.commit()
     return OKResponse("project updated")
+
 
 @app.http_get("/api/projectsources/{project_name}/{project_version}")
 async def get_apt_sources(request):

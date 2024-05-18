@@ -66,6 +66,7 @@ class ProjectVersion(Base):
     publish_s3 = Column(Boolean, default=False)
     s3_endpoint = Column(String)
     s3_path = Column(String)
+    builds = relationship("Build")
 
     @hybrid_property
     def fullname(self):
@@ -172,6 +173,14 @@ class ProjectVersion(Base):
         for d in self.dependents:
             dependent_ids.append(d.id)
 
+        buildCount = 0
+        cibuildCount = 0
+        for build in self.builds:
+            if build.buildtype == "deb":
+                if build.is_ci:
+                    cibuildCount += 1
+                else:
+                    buildCount += 1
         data = {
             "id": self.id,
             "name": self.name,
@@ -191,6 +200,8 @@ class ProjectVersion(Base):
             "publish_s3": self.publish_s3,
             "s3_endpoint": self.s3_endpoint,
             "s3_path": self.s3_path,
+            "buildCount": buildCount,
+            "cibuildCount": cibuildCount
         }
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})
