@@ -1,12 +1,12 @@
-start:  ## run development containers
-	@docker-compose up -d
+help:  ## Print this help
+	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-dev:  ## build and run development containers
-	@docker-compose build --no-cache
-	@docker-compose up -d
-
-dev-cached:  ## Build (cached) and run development containers
+start:  ## build and run development containers (using build cache)
 	@docker-compose build
+	@docker-compose up -d
+
+dev:  ## rebuild and run development containers
+	@docker-compose build --no-cache
 	@docker-compose up -d
 
 prod-build:  ## Build prod containers
@@ -42,11 +42,6 @@ prod-publish-web:  ## Publish docker molior
 prod-publish:  ## Publish docker images
 	@for i in molior web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
 	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
-
-# Self-documenting Makefile
-# https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
-help:  ## Print this help
-	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 molior:
 	docker-compose build --no-cache molior
@@ -107,6 +102,7 @@ clean:  ## clean containers and volumes
 remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
+# Logging: ##
 logs:  ## show logs of molior, web and aptly
 	@docker-compose logs -f --tail 20 molior web aptly
 

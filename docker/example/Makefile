@@ -15,7 +15,7 @@ status:  ## Show status
 	@docker-compose ps
 
 logs:  ## Show logs
-	@docker-compose logs -f aptly molior
+	@docker-compose logs -f --tail=20 aptly molior
 
 pull: perms  ## Pull new images and start
 	@docker-compose pull
