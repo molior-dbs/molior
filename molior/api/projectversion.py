@@ -97,7 +97,6 @@ async def get_projectversions(request):
             query = query.filter(Project.is_mirror.is_(False))
 
     if dependant_id:
-        logger.info("dependant_id")
         p_version = db.query(ProjectVersion).filter(ProjectVersion.id == dependant_id).first()
         projectversions = []
         if p_version:
