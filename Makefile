@@ -155,4 +155,11 @@ psql:  ## run psql
 docker-compose.tar:
 	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
 
+restore-backup:
+	@test -n "${backup}" || (echo Usage: make restore backup=path/to/db.tar; exit 1)
+	@test -f "${backup}" || (echo Error: file not found: ${backup}; exit 1)
+	@docker-compose stop molior
+	zcat "${backup}" | docker-compose exec -T postgres su postgres -c "dropdb molior && psql"
+	@docker-compose start molior
+
 .PHONY: help molior
