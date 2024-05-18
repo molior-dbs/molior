@@ -27,7 +27,8 @@ class ProjectVersion(Base):
     project = relationship(Project, back_populates="projectversions")
     name = Column(String, index=True, nullable=False)
     description = Column(String)
-    sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion", back_populates="projectversions",)
+    sourcerepositories = relationship("SourceRepository", secondary="sourcerepositoryprojectversion",
+                                      back_populates="projectversions",)
     basemirror_id = Column(ForeignKey("projectversion.id"))
     basemirror = relationship("ProjectVersion", uselist=False,
                               remote_side=[id],
@@ -36,9 +37,9 @@ class ProjectVersion(Base):
     dependencies = relationship("ProjectVersion",
                                 secondary=ProjectVersionDependency.__table__,
                                 primaryjoin=id == ProjectVersionDependency.projectversion_id,
-                                    secondaryjoin=id == ProjectVersionDependency.dependency_id,
-                                    back_populates="dependents"
-                                    )
+                                secondaryjoin=id == ProjectVersionDependency.dependency_id,
+                                back_populates="dependents"
+                                )
     dependents = relationship("ProjectVersion",
                               secondary=ProjectVersionDependency.__table__,
                               primaryjoin=id == ProjectVersionDependency.dependency_id,
@@ -196,7 +197,8 @@ class ProjectVersion(Base):
 
         return data
 
-    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures, cibuilds, retention_successful_builds, retention_failed_builds):
+    def copy(self, db, version, description, dependency_policy, basemirror_id, architectures,
+             cibuilds, retention_successful_builds, retention_failed_builds):
         new_projectversion = ProjectVersion(
             name=version,
             project=self.project,
@@ -227,7 +229,12 @@ class ProjectVersion(Base):
             new_sourepprover = db.query(SouRepProVer).filter(
                     SouRepProVer.sourcerepository_id == repo.id,
                     SouRepProVer.projectversion_id == new_projectversion.id).first()
-            new_sourepprover.architectures = sourepprover.architectures
+
+            archs = []
+            for arch in db2array(sourepprover.architectures):
+                if arch in db2array(new_projectversion.mirror_architectures):
+                    archs.append(arch)
+            new_sourepprover.architectures = array2db(archs)
 
         db.add(new_projectversion)
         db.commit()

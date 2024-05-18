@@ -544,7 +544,9 @@ async def copy_projectversion(request):
     if error_response:
         return error_response
 
-    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy, bm.id, architectures, cibuilds, retention_successful_builds, retention_failed_builds)
+    new_projectversion = projectversion.copy(db, new_version, description, dependency_policy,
+                                             bm.id, architectures, cibuilds,
+                                             retention_successful_builds, retention_failed_builds)
 
     if baseproject:
         pdep = ProjectVersionDependency(
@@ -608,6 +610,7 @@ async def copy_projectversion(request):
 
     data = {"build_id": copy_build.id, "rebuild_ids": trigger_builds}
     return OKResponse(data)
+
 
 @app.http_post("/api2/project/{project_id}/{projectversion_id}/lock")
 @req_role("owner")
