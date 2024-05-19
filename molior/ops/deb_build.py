@@ -534,7 +534,7 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
         sourcename=info.sourcename,
         buildstate="new",
         buildtype="source",
-        parent_id=parent.id,
+        parent=parent,
         sourcerepository=repo,
         maintainer=maintainer,
     )
@@ -550,7 +550,7 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
     # add build order dependencies
     build_after = get_buildorder(repo.src_path)
     if build_after:
-        await build.parent.log("N: source needs to build after: %s\n" % ", ".join(build_after))
+        await parent.log("N: source needs to build after: %s\n" % ", ".join(build_after))
         build.builddeps = "{" + ",".join(build_after) + "}"
         session.commit()
 
