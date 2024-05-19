@@ -523,7 +523,6 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
     if not maintainer:
         maintainer = Maintainer(firstname=firstname, surname=lastname, email=email)
         session.add(maintainer)
-        session.commit()
 
     # FIXME: assert version == git tag
 
@@ -547,9 +546,6 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
     parent.git_ref = info.commit_hash
 
     session.add(build)
-    session.commit()
-    await parent.build_changed()
-    await build.build_added()
 
     # add build order dependencies
     build_after = get_buildorder(repo.src_path)
@@ -559,7 +555,9 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
         session.commit()
 
     projectversion_ids = []
+    debbuilds = []
     found = False
+    fail = False
     for target in info.targets:
         projectversion = session.query(ProjectVersion).filter(ProjectVersion.id == target.projectversion_id).first()
         if projectversion.is_locked:
@@ -583,6 +581,25 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
                     projectversion.name,
                 ))
             continue
+
+        # prevent releasing older versions
+        previousbuild = session.query(Build).filter(Build.buildtype == "deb",
+                                                    Build.sourcerepository_id == repo.id,
+                                                    Build.projectversion_id == projectversion.id,
+                                                    ).order_by(Build.id.desc()).first()
+        if previousbuild:
+            cmd = f"dpkg --compare-versions '{info.version}' lt '{previousbuild.version}'"
+
+            async def outh(_):
+                pass
+            process = Launchy(cmd, outh, outh)
+            await process.launch()
+            ret = await process.wait()
+            if ret == 0:
+                await parent.log(f"E: {projectversion.fullname}: version {info.version} is lower "
+                                 f"than existing {previousbuild.version}\n")
+                fail = True
+                continue
 
         architectures = db2array(target.architectures)
         for architecture in architectures:
@@ -629,20 +646,26 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
             )
 
             session.add(deb_build)
-            session.commit()
-
-            await deb_build.build_added()
+            debbuilds.append(deb_build)
 
     if not found:
+        session.rollback()
         await parent.log("E: no projectversion found to build for")
         await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
         await parent.logdone()
-        await parent.set_nothing_done()
+        if fail:
+            await parent.set_failed()
+        else:
+            await parent.set_nothing_done()
         repo.set_ready()
         session.commit()
         return
 
     build.projectversions = array2db([str(p) for p in projectversion_ids])
+    await parent.build_changed()
+    await build.build_added()
+    for deb_build in debbuilds:
+        await deb_build.build_added()
     session.commit()
 
     build_id = build.id
