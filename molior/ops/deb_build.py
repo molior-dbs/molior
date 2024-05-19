@@ -472,7 +472,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                     missing_builds = True
 
         if not missing_builds:
-            await parent.log("E: all debian builds already existing for version {}\n".format(info.version))
+            await parent.log(f"W: all debian builds already existing for version {info.version}\n")
             await parent.logtitle("Done", no_footer_newline=True, no_header_newline=False)
             await parent.logdone()
 
