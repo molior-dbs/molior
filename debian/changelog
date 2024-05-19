@@ -1,3 +1,10 @@
+molior (1.5.0~beta6) stretch; urgency=medium
+
+  * fix log
+  * cleanup log
+
+ -- André Roth <neolynx@gmail.com>  Sun, 19 May 2024 14:59:13 +0200
+
 molior (1.5.0~beta5) stretch; urgency=medium
 
   * prevent building older versions
