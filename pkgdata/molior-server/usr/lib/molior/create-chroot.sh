@@ -73,16 +73,30 @@ build_chroot()
 
   rm -rf $target/
   echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO_URL
-  if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
-    debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
-    if [ "$ARCH" = "armhf" ]; then
-      cp /usr/bin/qemu-arm-static $target/usr/bin/
+  if [ "`dpkg-architecture -q DEB_BUILD_ARCH`" = "amd64" ]; then
+    if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
+      debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+      if [ "$ARCH" = "armhf" ]; then
+        cp /usr/bin/qemu-arm-static $target/usr/bin/
+      else
+        cp /usr/bin/qemu-aarch64-static $target/usr/bin/
+      fi
+      chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
     else
-      cp /usr/bin/qemu-aarch64-static $target/usr/bin/
+      debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     fi
-    chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
-  else
-    debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+  elif [ "`dpkg-architecture -q DEB_BUILD_ARCH`" = "arm64" ]; then
+    if [ "$ARCH" = "i386" -o "$ARCH" = "amd64" ]; then
+      debootstrap --foreign --arch $ARCH --variant=buildd --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+      if [ "$ARCH" = "i386" ]; then
+        cp /usr/bin/qemu-i386-static $target/usr/bin/
+      else
+        cp /usr/bin/qemu-x86_64-static $target/usr/bin/
+      fi
+      chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
+    else
+      debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+    fi
   fi
 
   echo I: Configuring chroot

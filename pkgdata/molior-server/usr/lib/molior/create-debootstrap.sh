@@ -75,27 +75,30 @@ build_debootstrap()
       i=$((i + 1))
   done
 
-  if echo $ARCH | grep -q arm; then
-    debootstrap --foreign --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 1
-    fi
-    if [ "$ARCH" = "armhf" ]; then
-      cp /usr/bin/qemu-arm-static $target/usr/bin/
+  echo I: Debootstrapping $DIST_RELEASE/$ARCH from $REPO_URL
+  if [ "`dpkg-architecture -q DEB_BUILD_ARCH`" = "amd64" ]; then
+    if [ "$ARCH" = "armhf" -o "$ARCH" = "arm64" ]; then
+      debootstrap --foreign --arch $ARCH --variant=minbase --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+      if [ "$ARCH" = "armhf" ]; then
+        cp /usr/bin/qemu-arm-static $target/usr/bin/
+      else
+        cp /usr/bin/qemu-aarch64-static $target/usr/bin/
+      fi
+      chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
     else
-      cp /usr/bin/qemu-aarch64-static $target/usr/bin/
+      debootstrap --variant=buildd --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     fi
-    chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 2
-    fi
-  else
-    debootstrap --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg --variant=minbase $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
-    if [ $? -ne 0 ]; then
-      echo "debootstrap failed"
-      exit 3
+  elif [ "`dpkg-architecture -q DEB_BUILD_ARCH`" = "arm64" ]; then
+    if [ "$ARCH" = "i386" -o "$ARCH" = "amd64" ]; then
+      debootstrap --foreign --arch $ARCH --variant=minbase --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
+      if [ "$ARCH" = "i386" ]; then
+        cp /usr/bin/qemu-i386-static $target/usr/bin/
+      else
+        cp /usr/bin/qemu-x86_64-static $target/usr/bin/
+      fi
+      chroot $target /debootstrap/debootstrap --second-stage --no-check-gpg
+    else
+      debootstrap --variant=minbase --arch $ARCH --keyring=/root/.gnupg/trustedkeys.gpg $INCLUDE $COMPONENTS $DIST_RELEASE $target $REPO_URL
     fi
   fi
 
