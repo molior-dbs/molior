@@ -1,13 +1,17 @@
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-start:  ## build and run development containers (using build cache)
-	@docker-compose build
+start:  ## run development containers
 	@docker-compose up -d
 
 dev:  ## rebuild and run development containers
 	@docker-compose build --no-cache
 	@docker-compose up -d
+
+dev-cached:  ## build (cached) and run development containers
+	@docker-compose build
+	@docker-compose up -d
+
 
 prod-build:  ## Build prod containers
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache
@@ -25,23 +29,26 @@ prod-web:  ## Build prod web
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache web
 
 prod-publish-molior:  ## Publish docker molior
-	@docker tag molior_molior neolynx/molior_molior
-	@docker push neolynx/molior_molior
-	@docker rmi neolynx/molior_molior
+	@docker tag molior_molior neolynx/molior_molior-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker push neolynx/molior_molior-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker rmi neolynx/molior_molior-`dpkg-architecture -q DEB_BUILD_ARCH`
 
 prod-publish-aptly:  ## Publish docker aptly
-	@docker tag molior_aptly neolynx/molior_aptly
-	@docker push neolynx/molior_aptly
-	@docker rmi neolynx/molior_aptly
+	@docker tag molior_aptly neolynx/molior_aptly-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker push neolynx/molior_aptly-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker rmi neolynx/molior_aptly-`dpkg-architecture -q DEB_BUILD_ARCH`
 
 prod-publish-web:  ## Publish docker molior
-	@docker tag molior_web neolynx/molior_web
-	@docker push neolynx/molior_web
-	@docker rmi neolynx/molior_web
+	@docker tag molior_web neolynx/molior_web-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker push neolynx/molior_web-`dpkg-architecture -q DEB_BUILD_ARCH`
+	@docker rmi neolynx/molior_web-`dpkg-architecture -q DEB_BUILD_ARCH`
 
 prod-publish:  ## Publish docker images
-	@for i in molior web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i; done
-	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i; docker rmi neolynx/molior_$$i; done
+	@for i in molior web aptly nginx postgres registry; do docker tag molior_$$i neolynx/molior_$$i-`dpkg-architecture -q DEB_BUILD_ARCH`; done
+	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing $$i ...\033[00m"; docker push neolynx/molior_$$i-`dpkg-architecture -q DEB_BUILD_ARCH`; docker rmi neolynx/molior_$$i-`dpkg-architecture -q DEB_BUILD_ARCH`; done
+
+prod-publish-manifest:
+	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing Manifest $$i ...\033[00m"; docker manifest create -a neolynx/molior_$$i neolynx/molior_$$i-amd64 neolynx/molior_$$i-arm64; docker manifest push neolynx/molior_$$i; done
 
 molior:
 	docker-compose build --no-cache molior
