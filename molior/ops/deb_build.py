@@ -625,10 +625,7 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
             if projectversion.id not in projectversion_ids:
                 projectversion_ids.append(projectversion.id)
 
-            await parent.log("I: creating build for projectversion '%s/%s'\n" % (
-                    projectversion.project.name,
-                    projectversion.name,
-                ))
+            await parent.log(f"I: creating {architecture} build for projectversion {projectversion.fullname}\n")
 
             deb_build = Build(
                 version=info.version,
