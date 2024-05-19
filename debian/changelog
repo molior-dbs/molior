@@ -1,3 +1,13 @@
+molior (1.5.0~beta5) stretch; urgency=medium
+
+  * prevent building older versions
+  * cleanup
+  * update test requirements
+  * docker: add readme
+  * cleanup makefiles
+
+ -- André Roth <neolynx@gmail.com>  Sun, 19 May 2024 14:16:47 +0200
+
 molior (1.5.0~beta4) stretch; urgency=medium
 
   * debian: enable flake8
