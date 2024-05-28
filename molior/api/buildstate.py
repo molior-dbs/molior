@@ -13,7 +13,7 @@ async def get_buildstates(*_):
     ---
     description: Returns a list of buildstates.
     tags:
-        - BuildStates
+        - Builds
     produces:
         - text/json
     responses:

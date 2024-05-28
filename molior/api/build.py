@@ -459,7 +459,7 @@ async def trigger_build(request):
     ---
     description: Triggers a build
     tags:
-        - TriggerBuild
+        - Builds
     consumes:
         - application/x-www-form-urlencoded
     parameters:

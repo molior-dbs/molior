@@ -6,6 +6,40 @@ from ..logger import logger
 
 @app.http_put("/api2/cleanup")
 async def edit_cleanup(request):
+    """
+    Edit the cleanup configuration.
+
+    ---
+    description: Update the cleanup configuration settings.
+    tags:
+        - Configuration
+    consumes:
+        - application/json
+    parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                cleanup_active:
+                    type: boolean
+                    description: Whether the cleanup is active.
+                cleanup_weekdays:
+                    type: string
+                    description: Comma-separated list of weekdays when cleanup should run.
+                cleanup_time:
+                    type: string
+                    description: Time when the cleanup should run (e.g., "02:00").
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Cleanup job is being configured.
+        "400":
+            description: Invalid input.
+    """
+
 
     params = await request.json()
     cleanup_active = params.get("cleanup_active")
@@ -39,6 +73,35 @@ async def edit_cleanup(request):
 
 @app.http_get("/api2/cleanup")
 async def get_cleanup(request):
+
+    """
+    Get the current cleanup configuration.
+
+    ---
+    description: Retrieve the current cleanup configuration settings.
+    tags:
+        - Configuration
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Current cleanup configuration.
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            cleanup_active:
+                                type: boolean
+                            cleanup_time:
+                                type: string
+                            cleanup_weekdays:
+                                type: array
+                                items:
+                                    type: string
+        "400":
+            description: Error retrieving cleanup configuration.
+    """
 
     db = request.cirrina.db_session
 

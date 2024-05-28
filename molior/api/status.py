@@ -79,9 +79,9 @@ async def set_maintenance(request):
     Set maintenance mode and message
 
     ---
-    description: Adds given sourcerepositories to given projectversion.
+    description: sets maintenance mode and message
     tags:
-        - Maintenance
+        - Status
     consumes:
         - application/x-www-form-urlencoded
     parameters:

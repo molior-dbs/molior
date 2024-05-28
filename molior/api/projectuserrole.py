@@ -18,10 +18,9 @@ async def get_project_users(request):
     Returns all users with roles for a project.
 
     ---
-    description: >
-      Return the list of project's users with their role on the project
+    description: Return the list of project's users with their role on the project
     tags:
-      - Project UserRole
+      - UserRole
     produces:
       - application/json
     parameters:
@@ -132,7 +131,7 @@ async def get_project_userrole(request):
     ---
     description: Return the role for user_id on project_id
     tags:
-      - Project UserRole
+      - UserRole
     produces:
       - application/json
     parameters:
@@ -205,7 +204,7 @@ async def upsert_project_user_role(request):
     ---
     description: Set or update role for user_id on project_id
     tags:
-      - Project UserRole
+      - UserRole
     produces:
       - application/json
     parameters:
@@ -304,7 +303,7 @@ async def remove_project_user(request):
     ---
     description: Remove role for user_id from project_id
     tags:
-      - Project UserRole
+      - UserRole
     produces:
       - application/json
     parameters:

@@ -1206,7 +1206,7 @@ async def external_build_upload(request):
         - Projects
     consumes:
         - application/json
-        parameters:
+    parameters:
         - name: projectversion_id
           in: path
           required: true
@@ -1220,7 +1220,7 @@ async def external_build_upload(request):
     responses:
         "201":
             description: External build upload initiated successfully.
-        "500":
+        "400":
             description: Projectversion not found
     """
     db = request.cirrina.db_session
@@ -1739,7 +1739,7 @@ async def publish_s3(request):
         - Projects
     consumes:
         - application/json
-        parameters:
+    parameters:
         - name: projectversion_id
           in: path
           required: true

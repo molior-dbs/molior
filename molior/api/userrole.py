@@ -10,7 +10,7 @@ async def get_userroles(*_):
     ---
     description: Return the list of user role enumerator
     tags:
-    - Project UserRole
+    - UserRole
     produces:
     - application/json
     responses:

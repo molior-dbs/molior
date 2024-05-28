@@ -786,7 +786,7 @@ async def create_token(request):
     ---
     description: Create project auth token
     tags:
-        - CreateToken
+        - Token
     consumes:
         - application/x-www-form-urlencoded
     parameters:
@@ -841,7 +841,7 @@ async def add_token(request):
     ---
     description: Add existing auth token to project
     tags:
-        - AddToken
+        - Token
     consumes:
         - application/x-www-form-urlencoded
     parameters:
@@ -890,7 +890,7 @@ async def delete_project_token(request):
     ---
     description: Delete existing auth token from project
     tags:
-        - DeleteToken
+        - Token
     parameters:
         - name: project_name
           in: path

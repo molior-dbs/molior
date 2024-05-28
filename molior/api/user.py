@@ -207,7 +207,7 @@ async def get_user_roles(request):
     ---
     description: Return a list of user project roles
     tags:
-      - Project UserRole
+      - UserRole
     parameters:
       - name: user_id
         description: id of the user

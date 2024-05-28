@@ -14,7 +14,7 @@ async def get_aptlyhostname(*_):
     ---
     description: Returns the aptly hostname from the molior config file
     tags:
-        - Info
+        - Status
     consumes:
         - application/x-www-form-urlencoded
     responses:

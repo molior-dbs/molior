@@ -43,7 +43,7 @@ async def create_token(request):
     ---
     description: Create auth token
     tags:
-        - CreateToken
+        - Token
     responses:
         "200":
             description: successful
@@ -78,7 +78,7 @@ async def delete_token(request):
     ---
     description: Delete auth token
     tags:
-        - DeleteToken
+        - Token
     responses:
         "200":
             description: successful
