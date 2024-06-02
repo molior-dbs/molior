@@ -1,3 +1,16 @@
+molior (1.5.0~beta8) stretch; urgency=medium
+
+  * docker: fix stopping containers
+  * docker: fix armhf/i386 builds
+  * add missing buildstate change
+  * reorganize tags, fix invalid Swagger docstring and complete missing
+    Swagger docstring
+  * change molior-install-keys path
+  * Makefile: fix publish manifest
+  * add release notes
+
+ -- André Roth <neolynx@gmail.com>  Sun, 02 Jun 2024 21:36:26 +0200
+
 molior (1.5.0~beta7) stretch; urgency=medium
 
   * support deboostrap on arm64
