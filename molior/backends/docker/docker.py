@@ -32,7 +32,13 @@ class DockerBackend:
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
         task_id = "build_%d" % build_id
-        queue_arch = arch
+        if arch == "i386" or arch == "amd64":
+            queue_arch = "amd64"
+        elif arch == "armhf" or arch == "arm64":
+            queue_arch = "arm64"
+        else:
+            logger.error("backend: invalid build architecture '%s'", arch)
+            return False
         await enqueue_buildtask(queue_arch, {"build_id": build_id,
                                              "token": token,
                                              "version": build_version,
@@ -59,11 +65,11 @@ class DockerBackend:
     async def stop(self):
         pass
 
-    async def consumer(self, arch):
+    async def consumer(self, queue_arch):
         up = True
         while up:
             try:
-                task = await dequeue_buildtask(arch)
+                task = await dequeue_buildtask(queue_arch)
                 if task is None:
                     break
 
@@ -147,4 +153,4 @@ class DockerBackend:
 
             await asyncio.sleep(1)
 
-        logger.info("scheduler %s task terminated", arch)
+        logger.info("scheduler %s task terminated", queue_arch)
