@@ -321,8 +321,11 @@ class Worker:
                     ok = True
 
         if not ok:
-            logger.error("rebuilding {} build in state {} not supported".format(build.buildtype, oldstate))
+            logger.warning("rebuilding {} build in state {} not supported".format(build.buildtype, oldstate))
+            await build.log("rebuilding {} build in state {} not supported".format(build.buildtype, oldstate))
+            await build.logdone()
             build.buildstate = oldstate
+            await build.build_changed()
             session.commit()
 
     async def _schedule(self, _):
