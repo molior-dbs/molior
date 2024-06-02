@@ -40,7 +40,6 @@ async def edit_cleanup(request):
             description: Invalid input.
     """
 
-
     params = await request.json()
     cleanup_active = params.get("cleanup_active")
     cleanup_weekdays = params.get("cleanup_weekdays")
