@@ -12,4 +12,4 @@ WORKDIR /app
 
 ADD start-aptly /app/aptly
 
-CMD /app/aptly
+CMD ["/app/aptly"]

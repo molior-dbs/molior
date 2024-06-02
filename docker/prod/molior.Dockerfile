@@ -21,4 +21,4 @@ ADD start-molior /app/molior
 RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
-CMD /app/molior
+CMD ["/app/molior"]

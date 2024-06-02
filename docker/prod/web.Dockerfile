@@ -11,4 +11,6 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
 
 ADD nginx-molior-web /etc/nginx/sites-enabled/molior-web
 
-CMD nginx -g 'daemon off;'
+STOPSIGNAL SIGQUIT
+
+CMD ["nginx", "-g", "daemon off;"]

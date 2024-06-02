@@ -12,4 +12,6 @@ RUN ln -s ../sites-available/aptlyapi /etc/nginx/sites-enabled/
 
 ADD docker/common/start-nginx /app/nginx
 
-CMD /app/nginx
+STOPSIGNAL SIGQUIT
+
+CMD ["/app/nginx"]

@@ -8,4 +8,4 @@ ADD docker/common/registry-config.yml /etc/docker/registry/config.yml
 
 ADD docker/common/start-registry /app/registry
 
-CMD /app/registry
+CMD ["/app/registry"]
