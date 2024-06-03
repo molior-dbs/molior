@@ -90,6 +90,7 @@ class MoliorServer(cirrina.Server):
 
         self.set_context_functions(MoliorServer.create_cirrina_context, MoliorServer.destroy_cirrina_context)
         self.on_startup.append(MoliorServer.run_molior)
+        self.on_shutdown.append(MoliorServer.terminate)
 
     async def run_molior(self):
         logger.info("starting molior v%s", MOLIOR_VERSION)
@@ -163,7 +164,7 @@ class MoliorServer(cirrina.Server):
 
     async def terminate(self):
 
-        self.list_active_tasks(debug_pos="At the beginning of the terminate function:")
+        list_active_tasks(debug_pos="At the beginning of the terminate function:")
 
         self.logger.info("terminating tasks")
 
@@ -194,7 +195,7 @@ class MoliorServer(cirrina.Server):
         except asyncio.CancelledError:
             self.logger.info("launchy tasks were completed")
 
-        self.list_active_tasks(debug_pos="At the end of the terminate function:")
+        list_active_tasks(debug_pos="At the end of the terminate function:")
 
         self.logger.info("terminating app")
         self.stop()
