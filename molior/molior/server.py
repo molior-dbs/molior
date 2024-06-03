@@ -20,17 +20,12 @@ from .backend import Backend
 from ..auth.auth import Auth
 
 
-def list_active_tasks(debug_pos):
-    logger.info(debug_pos)
+def list_active_tasks():
     tasks = asyncio.all_tasks()
-    logger.info(f"There are {len(tasks)} active tasks")
-    task_ids = [id(task) for task in tasks]  # Get the IDs of all tasks
-    logger.info("Active Task IDs: %s", task_ids)
-    logger.info("Start of tasks listed: ")
-    for task in tasks:
-        logger.info(task.get_name())
-        logger.info(task.get_coro())
-    logger.info("End of tasks listed: ")
+    if tasks:
+        logger.info("Still active tasks:")
+        for task in tasks:
+            logger.info(f"{task.get_name()}: {task.get_coro()}")
 
 
 def get_weekday_number(weekday_name):
@@ -193,7 +188,7 @@ class MoliorServer(cirrina.Server):
         except asyncio.CancelledError:
             self.logger.info("launchy tasks were completed")
 
-        list_active_tasks(debug_pos="At the end of the terminate function:")
+        list_active_tasks()
 
         self.logger.info("terminating app")
         self.stop()

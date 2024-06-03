@@ -71,6 +71,9 @@ aptly-cached:
 postgres:
 	docker-compose build --no-cache postgres
 
+postgres-cached:
+	docker-compose build postgres
+
 nginx:
 	docker-compose build --no-cache nginx
 
@@ -95,6 +98,9 @@ stop-aptly:  ## stop aptly container
 
 stop-nginx:  ## stop nginx container
 	@docker-compose stop nginx
+
+stop-postgres:  ## stop postgres container
+	@docker-compose stop postgres
 
 stop-web:  ## stop web container
 	@docker-compose stop web

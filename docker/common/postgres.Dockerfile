@@ -7,4 +7,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql && a
 RUN mkdir app
 WORKDIR /app
 
-CMD ["su","postgres","-c","exec /usr/lib/postgresql/15/bin/postgres -D /var/lib/postgresql/15/main -c config_file=/etc/postgresql/15/main/postgresql.conf"]
+COPY docker/common/start-postgres /usr/local/bin/
+CMD [ "start-postgres" ]

@@ -5,7 +5,6 @@ RUN mkdir app
 WORKDIR /app
 
 ADD docker/common/registry-config.yml /etc/docker/registry/config.yml
-
 ADD docker/common/start-registry /app/registry
 
 CMD ["/app/registry"]

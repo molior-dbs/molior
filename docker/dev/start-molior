@@ -1,10 +1,10 @@
 #!/bin/sh
 
 sig() {
-    echo
+    pid=`cat /tmp/molior.pid`
     echo "got sig $1, terminating molior (pid $pid)"
     kill $pid
-    wait $pid
+    wait $supid
     exit 0
 }
 trap 'sig TERM' TERM
@@ -30,6 +30,6 @@ mkdir -p /etc/molior; \
 cp -ar docker/dev/backend-docker.yml docker/dev/molior.yml /etc/molior/; \
 cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
 
-su molior -c "exec adev runserver -q -p 9999 molior/" &
-pid=$!
-wait $pid
+su molior -c 'adev runserver -q -p 9999 molior/ & pid=$!; echo -n $pid >/tmp/molior.pid; wait $pid' &
+supid=$!
+wait $supid

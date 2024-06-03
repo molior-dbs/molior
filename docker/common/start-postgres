@@ -1,0 +1,15 @@
+#!/bin/sh
+
+sig() {
+    pid=`cat /tmp/postgres.pid`
+    echo "got sig $1, terminating postgres (pid $pid)"
+    kill $pid
+    wait $supid
+    exit 0
+}
+trap 'sig TERM' TERM
+
+echo Starting postgres ...
+su postgres -c '/usr/lib/postgresql/15/bin/postgres -D /var/lib/postgresql/15/main -c config_file=/etc/postgresql/15/main/postgresql.conf & pid=$!; echo -n $pid >/tmp/postgres.pid; wait $pid' &
+suppid=$!
+wait $supid

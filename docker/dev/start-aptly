@@ -1,17 +1,19 @@
 #!/bin/sh
 
 sig() {
+    pid=`cat /tmp/aptly.pid`
     echo "got sig $1, terminating aptly (pid $pid)"
-    kill -INT $pid
+    kill $pid
+    wait $supid
     exit 0
 }
 trap 'sig TERM' TERM
 
 echo Starting aptly ...
-usermod -u `stat -c %u /app` aptly
+usermod -u `stat -c %u /app` aptly >/dev/null
 chown -R `stat -c %u /app` /var/lib/aptly
 /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
 
-su aptly -c "air -build.pre_cmd \"go mod tidy; go generate\" -build.exclude_dir system -build.exclude_dir debian -- api serve -listen 0.0.0.0:3142" &
-pid=$!
-wait $pid
+su aptly -c 'air -build.pre_cmd "go mod tidy; go generate" -build.exclude_dir system -build.exclude_dir debian -- api serve -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
+suppid=$!
+wait $supid
