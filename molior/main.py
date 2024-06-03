@@ -26,15 +26,8 @@ def main(host, port, debug, coverage):
 
     def terminate(signame):
         logger.info("received %s, terminating...", signame)
+        asyncio.run_coroutine_threadsafe(app.shutdown(), loop)
         asyncio.run_coroutine_threadsafe(app.terminate(), loop)
-        # tasks = [task for task in asyncio.all_tasks() if task is not asyncio.tasks.current_task()]
-        # list(map(lambda task: task.cancel(), tasks))
-        # await asyncio.gather(*tasks, return_exceptions=True)
-        # try:
-        #     loop.stop()
-        # except Exception as exc:
-        #     logger.exception(exc)
-        # logger.info("event loop stopped")
 
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))

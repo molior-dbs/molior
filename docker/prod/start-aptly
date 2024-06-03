@@ -2,8 +2,19 @@
 
 set -e
 
+sig() {
+    pid=`cat /tmp/aptly.pid`
+    echo "got sig $1, terminating aptly (pid $pid)"
+    kill $pid
+    wait $supid
+    exit 0
+}
+trap 'sig TERM' TERM
+
+echo Starting aptly ...
+
 # Set aptly user id from volume
-usermod -u `stat -c %u /var/lib/aptly` aptly;
+usermod -u `stat -c %u /var/lib/aptly` aptly >/dev/null
 
 if [ -n "$REPOSIGN_NAME" ] && [ -n "$REPOSIGN_EMAIL" ]; then
     echo "Creating gpgs key for '$REPOSIGN_NAME'"
@@ -16,4 +27,6 @@ if [ -f "/config/aptly.conf" ]; then
     chown aptly /var/lib/aptly/.aptly.conf
 fi
 
-exec su aptly -c "aptly api serve -listen 0.0.0.0:3142"
+su aptly -c 'aptly api serve -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
+suppid=$!
+wait $supid

@@ -28,6 +28,9 @@ prod-aptly:  ## Build prod aptly
 prod-web:  ## Build prod web
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache web
 
+prod-postgres:  ## Build prod postgres
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache postgres
+
 prod-publish-molior:  ## Publish docker molior
 	@docker tag molior_molior neolynx/molior_molior-`dpkg-architecture -q DEB_BUILD_ARCH`
 	@docker push neolynx/molior_molior-`dpkg-architecture -q DEB_BUILD_ARCH`

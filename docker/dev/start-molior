@@ -9,8 +9,8 @@ sig() {
 }
 trap 'sig TERM' TERM
 
-echo "Starting api (waiting for postgres 5s)"
-sleep 5
+echo "Starting molior server ..."
+
 echo MOLIOR_VERSION = \"`dpkg-parsechangelog -S Version`\" > molior/version.py
 
 groupmod -g `stat -c %g /var/run/docker.sock` docker; \
@@ -29,6 +29,14 @@ chown molior /var/lib/molior/upload/; \
 mkdir -p /etc/molior; \
 cp -ar docker/dev/backend-docker.yml docker/dev/molior.yml /etc/molior/; \
 cp -ar /app/pkgdata/molior-server/usr/lib/* /usr/lib/; ./pkgdata/molior-server/usr/lib/molior/db-upgrade.sh ./pkgdata/molior-server/usr/share/molior/database && \
+
+while true; do
+    if su postgres -c "pg_isready -d molior"; then
+        break
+    fi
+    echo waiting for database connection ...
+    sleep 1
+done
 
 su molior -c 'adev runserver -q -p 9999 molior/ & pid=$!; echo -n $pid >/tmp/molior.pid; wait $pid' &
 supid=$!
