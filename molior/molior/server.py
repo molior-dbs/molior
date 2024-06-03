@@ -164,8 +164,6 @@ class MoliorServer(cirrina.Server):
 
     async def terminate(self):
 
-        list_active_tasks(debug_pos="At the beginning of the terminate function:")
-
         self.logger.info("terminating tasks")
 
         self.task_worker.cancel()
