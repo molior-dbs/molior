@@ -2,7 +2,6 @@
 
 sig() {
     pid=`cat /tmp/postgres.pid`
-    echo "got sig $1, terminating postgres (pid $pid)"
     kill $pid
     wait $supid
     exit 0

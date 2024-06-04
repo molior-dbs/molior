@@ -30,3 +30,6 @@ class Backend:
             logger.exception(exc)
             return None
         return Backend.backend
+
+    async def stop(self):
+        await Backend.backend.stop()

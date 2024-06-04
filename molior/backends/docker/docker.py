@@ -2,6 +2,7 @@ import asyncio
 import shlex
 
 from launchy import Launchy
+from contextlib import suppress
 
 from ...logger import logger
 from ...molior.configuration import Configuration
@@ -26,6 +27,7 @@ class DockerBackend:
                 parallel = 1
                 if builder:
                     parallel = builder.get("parallel", 1)
+                logger.info(f"docker backend: starting {parallel} {arch} tasks")
                 for i in range(parallel):
                     self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
 
@@ -63,7 +65,12 @@ class DockerBackend:
         return []
 
     async def stop(self):
-        pass
+        logger.info("stopping docker backend")
+        for arch in ["amd64", "arm64"]:
+            for sched in self.scheduler[arch]:
+                sched.cancel()
+                with suppress(asyncio.CancelledError):
+                    await sched
 
     async def consumer(self, queue_arch):
         up = True

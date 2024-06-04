@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from launchy import Launchy
 from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
+from contextlib import suppress
 
 from molior.model.metadata import MetaData
 
@@ -158,29 +159,30 @@ class MoliorServer(cirrina.Server):
                     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
 
     async def terminate(self):
-
         self.logger.info("terminating tasks")
-
         self.task_worker.cancel()
         self.task_backend_worker.cancel()
         self.task_aptly_worker.cancel()
         self.task_notification_worker.cancel()
+        if self.task_cron:
+            self.task_cron.cancel()
 
-        try:
+        with suppress(asyncio.CancelledError):
             await self.task_worker
             await self.task_backend_worker
             await self.task_aptly_worker
             await self.task_notification_worker
-        except asyncio.CancelledError:
-            self.logger.info("tasks were canceled")
-        else:
-            self.logger.info("tasks were completed")
+            if self.task_cron:
+                await self.task_cron
 
+        self.logger.info("terminating backend")
         try:
-            self.logger.info("terminating backend")
             await self.backend.stop()
         except asyncio.CancelledError:
-            self.logger.info("backend tasks were completed")
+            pass
+
+        self.logger.info("terminating websockets")
+        await self.close_websocket_connections()
 
         try:
             self.logger.info("terminating launchy")
@@ -192,3 +194,4 @@ class MoliorServer(cirrina.Server):
 
         self.logger.info("terminating app")
         self.stop()
+        logger.info("terminated")
