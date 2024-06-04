@@ -15,6 +15,6 @@ WORKDIR /app
 
 ADD pkgdata/molior-aptly/usr/sbin/create-aptly-keys /usr/sbin/
 
-RUN GOPATH=/usr/local go install github.com/cosmtrek/air@latest
+RUN GOPATH=/usr/local go install github.com/air-verse/air@latest
 
 CMD [ "/molior/docker/dev/start-aptly" ]
