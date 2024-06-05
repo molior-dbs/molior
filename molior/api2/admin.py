@@ -12,7 +12,7 @@ async def edit_cleanup(request):
     ---
     description: Update the cleanup configuration settings.
     tags:
-        - Configuration
+        - AdminConfiguration
     consumes:
         - application/json
     parameters:
@@ -23,7 +23,7 @@ async def edit_cleanup(request):
             type: object
             properties:
                 cleanup_active:
-                    type: boolean
+                    type: string
                     description: Whether the cleanup is active.
                 cleanup_weekdays:
                     type: string
@@ -79,25 +79,12 @@ async def get_cleanup(request):
     ---
     description: Retrieve the current cleanup configuration settings.
     tags:
-        - Configuration
+        - AdminConfiguration
     produces:
         - application/json
     responses:
         "200":
             description: Current cleanup configuration.
-            content:
-                application/json:
-                    schema:
-                        type: object
-                        properties:
-                            cleanup_active:
-                                type: boolean
-                            cleanup_time:
-                                type: string
-                            cleanup_weekdays:
-                                type: array
-                                items:
-                                    type: string
         "400":
             description: Error retrieving cleanup configuration.
     """
@@ -107,10 +94,6 @@ async def get_cleanup(request):
     cleanup_active_metadata = db.query(MetaData).filter_by(name='cleanup_active').first()
     cleanup_time_metadata = db.query(MetaData).filter_by(name='cleanup_time').first()
     cleanup_weekdays_metadata = db.query(MetaData).filter_by(name='cleanup_weekdays').first()
-
-    logger.info(cleanup_active_metadata)
-    logger.info(cleanup_time_metadata)
-    logger.info(cleanup_weekdays_metadata)
 
     cleanup_active = cleanup_active_metadata.value if cleanup_active_metadata else None
     cleanup_time = cleanup_time_metadata.value if cleanup_time_metadata else None
@@ -128,6 +111,22 @@ async def get_cleanup(request):
 
 @app.http_get("/api2/retention")
 async def get_retention(request):
+
+    """
+    Get the current retention configuration.
+
+    ---
+    description: Retrieve the current retention configuration settings.
+    tags:
+        - AdminConfiguration
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Current retention configuration.
+        "400":
+            description: Error retrieving retention configuration.
+    """
 
     db = request.cirrina.db_session
 
@@ -148,6 +147,37 @@ async def get_retention(request):
 
 @app.http_put("/api2/retention")
 async def edit_retention(request):
+
+    """
+    Edit the retention configuration.
+
+    ---
+    description: Update the retention configuration settings.
+    tags:
+        - AdminConfiguration
+    consumes:
+        - application/json
+    parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                retention_successful_builds:
+                    type: integer
+                    description: Retention policy for successful builds.
+                retention_failed_builds:
+                    type: integer
+                    description: Retention policy for failed builds.
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Package Retention is being configured.
+        "400":
+            description: Invalid input.
+    """
 
     params = await request.json()
     retention_successful_builds = params.get("retention_successful_builds")
@@ -175,6 +205,22 @@ async def edit_retention(request):
 @app.http_get("/api2/maintenance")
 async def get_maintenance(request):
 
+    """
+    Get the current maintenance configuration.
+
+    ---
+    description: Retrieve the current maintenance mode and message.
+    tags:
+        - AdminConfiguration
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Current maintenance configuration.
+        "400":
+            description: Error retrieving maintenance configuration.
+    """
+
     db = request.cirrina.db_session
 
     maintenance_mode_metadata = db.query(MetaData).filter_by(name='maintenance_mode').first()
@@ -194,6 +240,45 @@ async def get_maintenance(request):
 
 @app.http_put("/api2/maintenance")
 async def edit_maintenance(request):
+
+    """
+    Edit the maintenance configuration.
+
+    ---
+    description: Update the maintenance mode and message.
+    tags:
+        - AdminConfiguration
+    consumes:
+        - application/json
+    parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+                maintenance_mode:
+                    type: string
+                    description: The maintenance mode status.
+                maintenance_message:
+                    type: string
+                    description: The maintenance message.
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: Maintenance details are being changed.
+            content:
+                application/json:
+                    schema:
+                        type: string
+        "400":
+            description: Invalid input.
+            content:
+                application/json:
+                    schema:
+                        type: string
+    """
 
     params = await request.json()
     maintenance_mode = params.get("maintenance_mode")

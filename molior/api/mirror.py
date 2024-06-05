@@ -46,7 +46,7 @@ async def get_mirrors(request):
           type: string
           description: filter criteria
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -175,7 +175,7 @@ async def put_update_mirror(request):
           type: integer
           description: id of the mirror
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Mirror update successfully started.

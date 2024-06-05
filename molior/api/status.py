@@ -24,7 +24,7 @@ async def get_status(request):
     tags:
         - Status
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -96,7 +96,7 @@ async def set_maintenance(request):
           type: string
           description: maintenance message
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -171,7 +171,7 @@ async def get_nodes_info(request):
     tags:
         - Status
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -220,7 +220,7 @@ async def get_node(request):
           required: true
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

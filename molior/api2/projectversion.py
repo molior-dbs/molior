@@ -71,7 +71,7 @@ async def get_projectversion2(request):
           required: true
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -102,12 +102,14 @@ async def export_projectversion2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: project_version
           in: path
           required: true
           type: string
+          description: The name of the projectversion
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -168,11 +170,13 @@ async def get_projectversion_dependencies(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: candidates
           in: query
           required: false
@@ -183,7 +187,7 @@ async def get_projectversion_dependencies(request):
           type: string
           description: Filter query
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -285,11 +289,13 @@ async def add_projectversion_dependency(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: body
           in: body
           description: Dependency data
@@ -304,7 +310,7 @@ async def add_projectversion_dependency(request):
                       type: boolean
                       description: Use CI builds?
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -390,21 +396,25 @@ async def delete_projectversion_dependency(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: dependency_name
           in: path
           required: true
           type: string
+          description: The name of the dependency
         - name: dependency_version
           in: path
           required: true
           type: string
+          description: The name of the dependency version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Dependency deleted
@@ -451,11 +461,13 @@ async def copy_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: body
           in: body
           description: Project version data
@@ -494,7 +506,7 @@ async def copy_projectversion(request):
                   retention_failed_builds:
                     type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -625,20 +637,22 @@ async def lock_projectversion(request):
     Lock a project version.
 
     ---
-    description: Clone a project version.
+    description: Lock a project version.
     tags:
         - Projects
     parameters:
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -668,13 +682,15 @@ async def unlock_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -706,14 +722,16 @@ async def overlay_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: name
           in: body
-          description: Name of project version
+          description: Name of project version overlay
           required: true
           schema:
               type: object
@@ -721,7 +739,7 @@ async def overlay_projectversion(request):
                   name:
                       type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -752,11 +770,13 @@ async def snapshot_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: name
           in: body
           description: Name of project version snapshot
@@ -767,7 +787,7 @@ async def snapshot_projectversion(request):
                   name:
                       type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -878,17 +898,19 @@ async def delete_projectversion(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
           type: integer
+          description: The name of the projectversion
         - name: forceremoval
           in: query
           required: false
-          type: boolan
+          type: boolean
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Projectversion deleted successfully.
@@ -970,17 +992,20 @@ async def remove_repository2(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: sourcerepository_id
           in: path
           required: true
           type: integer
+          description: The id of the sourcerepository
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Sourcerepository removed from projectversion
@@ -1031,10 +1056,12 @@ async def get_apt_sources2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: project_version
           in: path
           required: true
           type: string
+          description: The name of the project version
         - name: unstable
           in: query
           required: false
@@ -1046,7 +1073,7 @@ async def get_apt_sources2(request):
           type: boolean
           description: Include internal APT sources. Default is false.
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -1111,11 +1138,13 @@ async def get_projectversion_dependents(request):
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: candidates
           in: query
           required: false
@@ -1126,7 +1155,7 @@ async def get_projectversion_dependents(request):
           type: string
           description: Filter query
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -1210,13 +1239,15 @@ async def external_build_upload(request):
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
     produces:
-        - text/json
+        - application/json
     responses:
         "201":
             description: External build upload initiated successfully.
@@ -1577,17 +1608,20 @@ async def delete_projectversion_build(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: build_id
           in: path
           required: true
           type: integer
+          description: The id of the build
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Build is being deleted
@@ -1749,7 +1783,7 @@ async def publish_s3(request):
           required: true
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "201":
             description: Success
@@ -1809,7 +1843,7 @@ async def s3_endpoints(request):
     tags:
         - Projects
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: Success

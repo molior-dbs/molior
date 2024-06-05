@@ -39,7 +39,7 @@ async def get_mirror2(request):
           type: string
           description: Search for mirrors with this version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -147,7 +147,7 @@ async def get_projectversion_dependents(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -204,7 +204,7 @@ async def get_apt_sources2(request):
           type: string
           description: Mirror version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -321,7 +321,7 @@ async def create_mirror2(request):
                       type: string
                       description: Filter packages to be mirrored
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -648,7 +648,7 @@ async def delete_mirror2(request):
           required: true
           description: Mirror version
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

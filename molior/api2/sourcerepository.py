@@ -33,7 +33,7 @@ async def get_repository(request):
           type: integer
           description: id of the repository to get
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -100,7 +100,7 @@ async def get_sourcerepository_dependents(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -156,7 +156,7 @@ async def get_repositories2(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -218,11 +218,13 @@ async def get_projectversion_repositories(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: filter_url
           in: query
           required: false
@@ -240,7 +242,7 @@ async def get_projectversion_repositories(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -328,11 +330,13 @@ async def add_repository(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: body
           in: body
           required: true
@@ -359,7 +363,7 @@ async def add_repository(request):
                 run_lintian:
                     type: boolean
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -481,18 +485,20 @@ async def get_projectversion_repository(request):
         - name: project_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
-          type: integer
+          type: string
+          description: The name of the project version
         - name: sourcerepository_id
           in: path
           required: true
           type: integer
           description: id of the repository to get
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -529,7 +535,7 @@ async def edit_repository(request):
     Edit the source repositories of a given project version.
 
     ---
-    description: Returns a repository.
+    description: Edits a source repository of a given project version.
     tags:
         - SourceRepositories
     parameters:
@@ -565,7 +571,7 @@ async def edit_repository(request):
                     type: boolean
                     description: Whether to run Lintian.
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -670,6 +676,7 @@ async def delete_repository(request):
           in: path
           required: true
           type: integer
+          description: the id of the repository to delete
     responses:
         "200":
             description: successful
@@ -714,6 +721,7 @@ async def edit_repository2(request):
           in: path
           required: true
           type: integer
+          description: The id of the repository to edit
         - name: body
           in: body
           required: true

@@ -22,7 +22,7 @@ async def delete_build(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -91,7 +91,7 @@ async def abort_build(request):
     Abort a running build
 
     ---
-    description: Delete a build from database.
+    description: Abort a running build.
     tags:
         - Builds
     consumes:
@@ -102,7 +102,7 @@ async def abort_build(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

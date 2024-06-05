@@ -49,7 +49,7 @@ async def get_projectversions(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -182,7 +182,7 @@ async def post_projectversion_toggle_ci(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

@@ -47,7 +47,7 @@ async def get_users(request):
         required: false
         type: boolean
     produces:
-      - text/json
+      - application/json
     responses:
       "200":
         description: successful

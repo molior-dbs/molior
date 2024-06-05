@@ -35,7 +35,7 @@ async def get_project_byname(request):
           required: true
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -94,7 +94,7 @@ async def get_projectversions2(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -147,6 +147,7 @@ async def create_projectversion(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: body
           in: body
           required: true
@@ -185,7 +186,7 @@ async def create_projectversion(request):
                 retention_failed_builds:
                     type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -310,10 +311,12 @@ async def edit_projectversion(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: projectversion_id
           in: path
           required: true
           type: string
+          description: The name of the project version
         - name: body
           in: body
           required: true
@@ -332,7 +335,7 @@ async def edit_projectversion(request):
                 retention_failed_builds:
                     type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -401,8 +404,9 @@ async def delete_project2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -477,7 +481,7 @@ async def get_project_users2(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -557,6 +561,7 @@ async def add_project_users2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: body
           in: body
           required: true
@@ -575,7 +580,7 @@ async def add_project_users2(request):
                     description: User role, e.g. member, manager, owner, ...
                     example: "member"
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -633,6 +638,7 @@ async def edit_project_users2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: body
           in: body
           required: true
@@ -703,6 +709,7 @@ async def delete_project_users2(request):
           in: path
           required: true
           type: string
+          description: The name of the project
         - name: body
           in: body
           required: true
@@ -755,6 +762,32 @@ async def delete_project_users2(request):
 @app.authenticated
 async def get_tokens(request):
 
+    """
+    Returns a list of tokens for a given project
+    ---
+    description: Returns a list of tokens for the specified project.
+    tags:
+        - Token
+    parameters:
+        - name: project_name
+          in: path
+          required: true
+          type: string
+          description: The name of the project
+        - name: description
+          in: query
+          required: false
+          type: string
+          description: Filter tokens by description
+    produces:
+        - application/json
+    responses:
+        "200":
+            description: A list of tokens successfully retrieved
+        "400":
+            description: Project not found
+    """
+
     project_name = request.match_info["project_name"]
     description = request.GET.getone("description", "")
 
@@ -795,7 +828,7 @@ async def create_token(request):
           type: string
           required: true
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -850,7 +883,7 @@ async def add_token(request):
           type: string
           required: true
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -896,8 +929,9 @@ async def delete_project_token(request):
           in: path
           type: string
           required: true
+          description: The name of the project
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -973,7 +1007,7 @@ async def import_projectversion(request):
                 baseproject:
                     type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

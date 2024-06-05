@@ -15,7 +15,7 @@ async def get_buildstates(*_):
     tags:
         - Builds
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

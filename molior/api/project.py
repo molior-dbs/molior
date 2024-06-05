@@ -42,7 +42,7 @@ async def get_projects(request):
           required: false
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -99,7 +99,7 @@ async def get_project(request):
           required: false
           type: boolean
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -157,7 +157,7 @@ async def create_project(request):
               description:
                 type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -224,7 +224,7 @@ async def update_project(request):
           required: false
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -272,7 +272,7 @@ async def get_apt_sources(request):
           required: true
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

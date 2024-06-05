@@ -107,7 +107,7 @@ async def get_builds(request):
           required: false
           type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -302,7 +302,7 @@ async def get_build(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -417,7 +417,7 @@ async def rebuild_build(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -477,7 +477,7 @@ async def trigger_build(request):
               git_branch:
                 type: string
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -552,9 +552,9 @@ async def get_build_info(request):
         - name: build_id
           in: path
           required: true
-          type: string
+          type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful

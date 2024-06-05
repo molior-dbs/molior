@@ -108,7 +108,7 @@ async def get_repositories(request):
           required: false
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -237,7 +237,7 @@ async def trigger_clone(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
@@ -313,7 +313,7 @@ async def trigger_build(request):
           required: true
           type: integer
     produces:
-        - text/json
+        - application/json
     responses:
         "200":
             description: successful
