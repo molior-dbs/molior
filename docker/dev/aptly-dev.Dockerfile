@@ -16,5 +16,6 @@ WORKDIR /app
 ADD pkgdata/molior-aptly/usr/sbin/create-aptly-keys /usr/sbin/
 
 RUN GOPATH=/usr/local go install github.com/air-verse/air@latest
+RUN GOPATH=/usr/local go install github.com/swaggo/swag/cmd/swag@v1.8.12
 
 CMD [ "/molior/docker/dev/start-aptly" ]
