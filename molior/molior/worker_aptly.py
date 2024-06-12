@@ -449,49 +449,63 @@ async def create_chroots(mirror, build, mirror_project, mirror_version, session)
 async def retention_cleanup(session, build):
 
     # the number of successful builds to retain per sourcerepository
-    max_successful_builds = build.projectversion.retention_successful_builds
+    max_successful_versions = build.projectversion.retention_successful_builds
 
     # no cleanup_needed
     if not max_successful_builds:
         return [], []
 
     # how many successful builds are for the sourcerepository
-    successful_topbuilds = session.query(Build).filter(
+    past_debbuilds = session.query(Build).filter(
         Build.buildstate == "successful",
         Build.buildtype == "deb",
+        Build.version != build.version,
+        Build.is_ci.is_(False),
         Build.sourcename == build.sourcename,
         Build.projectversion_id == build.projectversion_id).order_by(desc(Build.id)).all()
+    past_versions = []
+    for debbuild in past_debbuilds:
+        if debbuild.version not in past_versions:
+            past_versions.append(debbuild.version)
+
     # count the current build as successful
-    successful_builds_number = len(successful_topbuilds) + 1
+    version_count = len(past_versions) + 1
+    if version_count < max_successful_versions:
+        return [], []
+
     # how many builds should be deleted
-    debbuilds_to_delete = successful_builds_number - max_successful_builds
-    if debbuilds_to_delete > 10:
-        debbuilds_to_delete = 10
+    delete_count = version_count - max_successful_versions
+    if delete_count > 10:
+        delete_count = 10
         logger.warning("deleting maximum of 10 successful_builds")
+    versions_to_delete = past_versions[-delete_count:]
+
+    debpkgs = []
+    for debbuild in past_debbuild:
+        if debbuild.version in versions_to_delete:
+            debpkgs.append(debbuild)
+
+    await buildlog(build.parent.parent.id, "I: there is a total of %d build(s) that exceed the amount of retention \n"
+                   % debbuilds_to_delete)
+
     remove_packages = []
     remove_build_ids = []
-    if debbuilds_to_delete > 0:
-        await buildlog(build.parent.parent.id, "I: there is a total of %d build(s) that exceed the amount of retention \n"
-                       % debbuilds_to_delete)
-        # FIXME check order of list (oldest builds should be deleted first)
-        debpkgs = successful_topbuilds[-debbuilds_to_delete:]
+    srcpkgs = []
+    for debbuild_to_delete in debpkgs:
+        remove_build_ids.append(debbuild_to_delete.id)
+        # if the source package has no other deb packages, delete it and the toplevel package
+        if len(debbuild_to_delete.parent.children) == 1:
+            srcpkgs.append(debbuild_to_delete.parent)
+            remove_build_ids.append(debbuild_to_delete.parent.id)
+            remove_build_ids.append(debbuild_to_delete.parent.parent.id)
 
-        srcpkgs = []
-        for debbuild_to_delete in debpkgs:
-            remove_build_ids.append(debbuild_to_delete.id)
-            # if the source package has no other deb packages, delete it and the toplevel package
-            if len(debbuild_to_delete.parent.children) == 1:
-                srcpkgs.append(debbuild_to_delete.parent)
-                remove_build_ids.append(debbuild_to_delete.parent.id)
-                remove_build_ids.append(debbuild_to_delete.parent.parent.id)
+    for src in srcpkgs:
+        for f in src.debianpackages:
+            remove_packages.append((f.name, src.version, "source"))
 
-        for src in srcpkgs:
-            for f in src.debianpackages:
-                remove_packages.append((f.name, src.version, "source"))
-
-        for deb in debpkgs:
-            for f in deb.debianpackages:
-                remove_packages.append((f.name, deb.version, f.suffix))
+    for deb in debpkgs:
+        for f in deb.debianpackages:
+            remove_packages.append((f.name, deb.version, f.suffix))
 
     return remove_build_ids, remove_packages
 
