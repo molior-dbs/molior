@@ -584,9 +584,9 @@ class AptlyWorker:
                     session.commit()
                     return False
 
-                except AptlyError as exc:
-                    await build.log("E: failed to create mirror %s on aptly: %s\n" % (mirror, str(exc)))
-                    logger.error("failed to create mirror %s on aptly: %s", mirror, str(exc))
+                except Exception as exc:
+                    await build.log("E: failed to create mirror on aptly: %s\n" % str(exc))
+                    logger.error("failed to create mirror on aptly: %s", str(exc))
                     await build.set_failed()
                     await build.logdone()
                     mirror.mirror_state = "init_error"
