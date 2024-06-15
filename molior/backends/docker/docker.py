@@ -153,7 +153,7 @@ class DockerBackend:
                     else:
                         await enqueue_backend({"succeeded": build_id})
 
-                    await buildlog(build_id, None)  # signal end of logs
+                await buildlog(build_id, None)  # signal end of logs
 
             except Exception as exc:
                 logger.exception(exc)
