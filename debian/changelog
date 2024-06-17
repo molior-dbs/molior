@@ -1,3 +1,15 @@
+molior (1.5.0~beta11) stretch; urgency=medium
+
+  * set build to failed on publish fail
+  * docker prod: use log level info
+  * docker: close log on error
+  * improve logging
+  * docker: enable swagger for aptly
+  * docker dev: update golang air
+  * shutdown backend
+
+ -- André Roth <neolynx@gmail.com>  Mon, 17 Jun 2024 19:28:29 +0200
+
 molior (1.5.0~beta10) stretch; urgency=medium
 
   * implement graceful shutdown in docker prod
