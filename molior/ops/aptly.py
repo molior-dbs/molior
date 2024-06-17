@@ -224,6 +224,7 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
     except Exception as exc:
         await buildlog(build_id, "E: error republishing repository\n")
         logger.exception(exc)
+        ret = False
 
     files2delete = files2upload
     files2delete.append("{}/{}".format(out_path, changes_file))
