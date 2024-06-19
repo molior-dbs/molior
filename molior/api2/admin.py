@@ -1,7 +1,6 @@
 from molior.model.metadata import MetaData
 from molior.tools import OKResponse
 from ..app import app
-from ..logger import logger
 
 
 @app.http_put("/api2/cleanup")

@@ -452,7 +452,7 @@ async def retention_cleanup(session, build):
     max_successful_versions = build.projectversion.retention_successful_builds
 
     # no cleanup_needed
-    if not max_successful_builds:
+    if not max_successful_versions:
         return [], []
 
     # how many successful builds are for the sourcerepository
@@ -481,12 +481,12 @@ async def retention_cleanup(session, build):
     versions_to_delete = past_versions[-delete_count:]
 
     debpkgs = []
-    for debbuild in past_debbuild:
+    for debbuild in past_debbuilds:
         if debbuild.version in versions_to_delete:
             debpkgs.append(debbuild)
 
     await buildlog(build.parent.parent.id, "I: there is a total of %d build(s) that exceed the amount of retention \n"
-                   % debbuilds_to_delete)
+                   % delete_count)
 
     remove_packages = []
     remove_build_ids = []

@@ -27,12 +27,21 @@ class Auth:
         cfg = Configuration()
         try:
             plugin = cfg.auth_backend
-        except Exception as exc:
-            logger.error("please define 'auth_backend' in config")
-            logger.exception(exc)
-            return False
+        except Exception:
+            pass
 
         logger.info("loading auth_backend: %s", plugin)
+        if plugin == "db":
+            try:
+                module = importlib.import_module(".auth.db", package="molior")
+                auth_backend = module.AuthBackend()
+            except Exception as exc:
+                logger.error("error loading auth_backend plugin '%s'", plugin)
+                logger.exception(exc)
+                return False
+            return True
+
+        # handle plugins
         try:
             module = importlib.import_module(".auth.%s" % plugin, package="molior")
             auth_backend = module.AuthBackend()
