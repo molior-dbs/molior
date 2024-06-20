@@ -1,3 +1,13 @@
+molior (1.5.0~beta12) stretch; urgency=medium
+
+  * docker: provide /debootstrap
+  * support ubuntu/noble
+  * fixed syntax
+  * improve Swagger API documentation
+  * cleanup versions instead of builds
+
+ -- André Roth <neolynx@gmail.com>  Thu, 20 Jun 2024 13:47:24 +0200
+
 molior (1.5.0~beta11) stretch; urgency=medium
 
   * set build to failed on publish fail
