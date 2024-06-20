@@ -15,6 +15,7 @@ services:
     volumes:
       - ./:/molior
       - ../molior-web2:/app
+      - molior:/var/lib/molior/
 
   molior:
     container_name: molior-server

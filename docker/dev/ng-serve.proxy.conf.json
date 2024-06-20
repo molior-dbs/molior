@@ -14,5 +14,9 @@
     "/internal": {
         "target": "http://molior:9999",
         "secure": false
+    },
+    "/debootstrap": {
+        "target": "http://molior:9999",
+        "secure": false
     }
 }

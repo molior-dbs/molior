@@ -10,6 +10,8 @@ services:
       - molior
     ports:
       - "8000:80"
+    volumes:
+      - molior:/var/lib/molior/
 
   molior:
     image: neolynx/molior_molior
