@@ -14,4 +14,7 @@ RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/a
 
 RUN useradd --uid 7777 -G docker -m --shell /bin/sh --home-dir /var/lib/molior molior
 
+# not in debian debootstrap yet:
+RUN ln -sf gutsy /usr/share/debootstrap/scripts/noble
+
 CMD [ "/app/docker/dev/start-molior" ]
