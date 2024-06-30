@@ -1,3 +1,12 @@
+molior (1.5.0~beta13) stretch; urgency=medium
+
+  * remove duplicate code
+  * cleanup config files
+  * remove duplicated code
+  * commit buildstate change
+
+ -- André Roth <neolynx@gmail.com>  Sun, 30 Jun 2024 20:59:49 +0200
+
 molior (1.5.0~beta12) stretch; urgency=medium
 
   * docker: provide /debootstrap
