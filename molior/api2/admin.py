@@ -103,7 +103,6 @@ async def get_cleanup(request):
         'cleanup_time': cleanup_time,
         'cleanup_weekdays': cleanup_weekdays
     }
-    db.close()
 
     return OKResponse(data)
 
@@ -139,7 +138,6 @@ async def get_retention(request):
         'retention_successful_builds': retention_successful_builds,
         'retention_failed_builds': retention_failed_builds,
     }
-    db.close()
 
     return OKResponse(data)
 
@@ -232,7 +230,6 @@ async def get_maintenance(request):
         'maintenance_mode': maintenance_mode,
         'maintenance_message': maintenance_message,
     }
-    db.close()
 
     return OKResponse(data)
 
