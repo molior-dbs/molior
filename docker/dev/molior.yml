@@ -38,8 +38,3 @@ aptly:
     api_pass: 'molior-dev'
     gpg_key: 'reposign@molior'
     key: 'archive-keyring.asc'
-
-cleanup:
-    cleanup_active: 'on'
-    cleanup_time: '04:00'
-    cleanup_weekday: 'Saturday'
