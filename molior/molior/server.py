@@ -42,38 +42,6 @@ def get_weekday_number(weekday_name):
     return weekday_mapping.get(weekday_name)
 
 
-def weekly_cleanup(self):
-    if hasattr(self, 'task_cron') and self.task_cron:
-        # If a scheduler already exists, cancel the existing tasks
-        self.task_cron.cancel()
-
-    # extract values from db or write default values a new molior-server instance
-    # cleanup_weekdays_list = []
-    with Session() as session:
-        cleanup_active = session.query(MetaData).filter_by(
-            name="cleanup_active").first()
-        cleanup_weekdays = session.query(MetaData).filter_by(
-            name="cleanup_weekdays").first()
-        cleanup_time = session.query(MetaData).filter_by(
-            name="cleanup_time").first()
-
-        if cleanup_active is None or cleanup_weekdays is None or cleanup_time is None:
-            logger.error("cleanup job not set")
-        else:
-            if cleanup_active.value.lower() == "false":
-                logger.info("cleanup job disabled")
-                return
-            else:
-                cleanup_sched = Scheduler(locale="en_US")
-                # cleanup_weekdays_list = cleanup_weekdays.value.split(',')
-
-    cleanup_sched = Scheduler(locale="en_US")
-    # cleanup_job = CronJob(name='cleanup').every().weekday(get_weekday_number(
-    #     cleanup_weekday)).at(cleanup_time).go(self.cleanup_task)
-    # cleanup_sched.add_job(cleanup_job)
-    self.task_cron = asyncio.ensure_future(cleanup_sched.start())
-
-
 class MoliorServer(cirrina.Server):
 
     def __init__(self, session_type=None, session_dir=None):
