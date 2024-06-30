@@ -405,7 +405,7 @@ async def PrepareBuilds(session, parent, repo, git_ref, ci_branch, custom_target
                 logger.info(f"retry because of src build ({existing_src_build.id}) in new, building, needs_publish or publishing")
                 return BuildPreparationState.RETRY, info
             elif existing_src_build.buildstate == "build_failed" or existing_src_build.buildstate == "publish_failed":
-                logger.info(f"abort because of src build ({existing_src_build.id}) in state build_failed or publish_failed")
+                await parent.log(f"E: abort because of src build ({existing_src_build.id}) in state failed\n")
                 return BuildPreparationState.ERROR, info
 
     # plain targets emtpy FIXME

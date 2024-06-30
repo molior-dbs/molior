@@ -157,10 +157,13 @@ class Worker:
             await build.log("E: error preparing build\n")
             await build.set_failed()
             await build.logdone()
+            session.commit()
             return
         if ret == BuildPreparationState.ALREADY_DONE:
             await build.log("I: build done by different build\n")
+            await build.set_already_exists()
             await build.logdone()
+            session.commit()
             return
 
         # FIXME: this was run as a future in bkg before
