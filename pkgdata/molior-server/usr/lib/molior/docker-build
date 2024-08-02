@@ -109,7 +109,7 @@ fi
 VERSION=`echo $VERSION | sed 's/^[0-9]\+://'`
 
 dsc_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/${REPO_NAME}_$VERSION.dsc"
-log " - $dsc_url"
+echo " - $dsc_url"
 curl --max-time 30 -s -O $dsc_url
 if [ "$?" -ne 0 ]; then
   echo "E: Error downloading source package $dsc_url" >&2
