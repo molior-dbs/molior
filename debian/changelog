@@ -1,3 +1,9 @@
+molior (1.5.0~beta14) stretch; urgency=medium
+
+  * doker build: provide writable home dir
+
+ -- André Roth <neolynx@gmail.com>  Fri, 02 Aug 2024 21:19:38 +0200
+
 molior (1.5.0~beta13) stretch; urgency=medium
 
   * remove duplicate code
