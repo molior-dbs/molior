@@ -165,8 +165,10 @@ else
     buildargs="--build=any,all"
 fi
 
+home=`mktemp -d`
+chown build $home
 log "Running: dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
-su build -c "dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
+su build -c "HOME=$home dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 7

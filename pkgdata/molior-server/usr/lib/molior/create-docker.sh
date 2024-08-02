@@ -168,7 +168,6 @@ EOF
   rm -f $target/etc/hosts
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
 
-  mkdir $target/app
   chroot $target useradd -m --shell /bin/sh --home-dir /app build
 
   cp -a /usr/lib/molior/docker-build $target/app/
