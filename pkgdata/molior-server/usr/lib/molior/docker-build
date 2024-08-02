@@ -61,11 +61,12 @@ finish ()
 }
 trap finish EXIT
 
-log ""
-log "Building: $REPO_NAME $VERSION"
-log "Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
-log "Build ID: $BUILD_ID"
-log "Builder : `hostname`"
+echo
+log "Build Info"
+echo " - Building: $REPO_NAME $VERSION"
+echo " - Platform: $PLATFORM/$PLATFORM_VERSION $ARCH"
+echo " - Build ID: $BUILD_ID"
+echo " - Builder : docker `hostname`"
 echo
 
 log "Adding APT sources:"
@@ -95,9 +96,9 @@ fi
 
 mkdir -p build
 cd build
-log "Downloading source package:"
+log "Downloading source info and packages:"
 sources_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/dists/$PROJECT_DIST/main/source/Sources"
-log " - $sources_url"
+echo " - $sources_url"
 pkgdir=`curl --max-time 30 -s $sources_url | /app/find-package-dir.pl $REPO_NAME $VERSION`
 if [ -z "$pkgdir" ]; then
   echo "E: Directory for source package $REPO_NAME $VERSION not found" >&2
@@ -118,7 +119,7 @@ fi
 for srcfile in `/app/dsc-get-files.pl ${REPO_NAME}_$VERSION.dsc`
 do
   src_url="$APT_SERVER/$PLATFORM/$PLATFORM_VERSION/repos/$PROJECT/$PROJECTVERSION/$pkgdir/$srcfile"
-  log " - $src_url"
+  echo " - $src_url"
   curl --max-time 30 -s -O $src_url
   if [ "$?" -ne 0 ]; then
     echo "E: Error downloading source package $dsc_url" >&2
