@@ -1,3 +1,9 @@
+molior (1.5.0~beta17) stretch; urgency=medium
+
+  * swagger: add summary
+
+ -- André Roth <neolynx@gmail.com>  Mon, 12 Aug 2024 13:37:31 +0200
+
 molior (1.5.0~beta16) stretch; urgency=medium
 
   * docker build: improve log
