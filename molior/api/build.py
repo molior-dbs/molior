@@ -19,9 +19,8 @@ from ..molior.queues import enqueue_task
 @app.http_get("/api/builds")
 async def get_builds(request):
     """
-    Returns a list of builds.
-
     ---
+    summary: Returns a list of builds
     description: Returns a list of builds.
     tags:
         - Builds
