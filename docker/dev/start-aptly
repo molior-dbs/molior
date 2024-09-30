@@ -10,11 +10,9 @@ sig() {
 trap 'sig TERM' TERM
 
 echo Starting aptly ...
-usermod -u `stat -c %u /app` aptly >/dev/null
-cp /molior/docker/dev/aptly.conf /var/lib/aptly/.aptly.conf
-chown -R `stat -c %u /app` /var/lib/aptly
+chown -R aptly /var/lib/aptly
 /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
 
-su aptly -c 'air -build.pre_cmd "go mod tidy; go generate; if grep -q enableSwaggerEndpoint.*true /var/lib/aptly/.aptly.conf; then swag init; fi" -build.exclude_dir system -build.exclude_dir debian -build.exclude_dir docs -- api serve -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
+su aptly -c 'aptly api serve -no-lock -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
 suppid=$!
 wait $supid
