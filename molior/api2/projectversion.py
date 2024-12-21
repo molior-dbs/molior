@@ -11,7 +11,7 @@ from ..logger import logger
 from ..auth import req_role, req_admin
 from ..tools import ErrorResponse, OKResponse, is_name_valid, db2array, array2db, escape_for_like
 from ..api.projectversion import do_lock, do_unlock, do_overlay
-from ..molior.queues import enqueue_aptly
+from ..molior.queues import enqueue_aptly, buildlogdone, buildlogtitle
 from ..molior.configuration import Configuration
 from ..aptly import get_aptly_connection
 
@@ -1580,6 +1580,8 @@ async def finalize_extbuild(build_id, projectversion_id, srcbuild_id, multipart)
             await srcbuild.log("W: no source package to publish\n")
             await srcbuild.set_nothing_done()
             session.commit()
+            await buildlogtitle(srcbuild.id, "Done", no_footer_newline=True, no_header_newline=True)
+            await buildlogdone(srcbuild.id)
 
         # publish debian packages
         for debbuild in debbuilds:
