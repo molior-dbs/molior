@@ -1074,9 +1074,11 @@ class AptlyWorker:
             await build.set_successful()
             db.commit()
 
-    # FIXME what are we doing with failed src/topbuild package builds
-    # FIXME what about failed mirror builds
-    async def scheduled_cleanup(self, args):
+    async def _cleanup(self, args):
+        logger.error("cleanup")
+
+        # FIXME what are we doing with failed src/topbuild package builds
+        # FIXME what about failed mirror builds
         logger.info("checking for obsolete builds")
         logger.info("in _scheduled_cleanupin worker_aptly")
 
@@ -1114,8 +1116,10 @@ class AptlyWorker:
             await cleanup_build.set_building()
             session.commit()
 
-            cleanup_max = int(session.query(MetaData).filter_by(
-                name="cleanup_max").first().value)
+            cleanup_max = 100
+            t = session.query(MetaData).filter_by(name="cleanup_max").first()
+            if t:
+                cleanup_max = int(t.value)
 
             builds_to_delete = []
             successful_builds_to_delete = []

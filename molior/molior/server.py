@@ -19,6 +19,7 @@ from .worker_backend import BackendWorker
 from .worker_notification import NotificationWorker
 from .backend import Backend
 from ..auth.auth import Auth
+from ..molior.queues import enqueue_aptly
 
 
 def list_active_tasks():
@@ -80,24 +81,9 @@ class MoliorServer(cirrina.Server):
         notification_worker = NotificationWorker()
         self.task_notification_worker = asyncio.ensure_future(notification_worker.run(self))
 
-    @staticmethod
-    def create_cirrina_context(cirrina):
-        maker = sessionmaker(bind=database.engine)
-        cirrina.add_context("db_session", maker())
+        async def cleanup_task():
+            await enqueue_aptly({"cleanup": []})
 
-    @staticmethod
-    def destroy_cirrina_context(cirrina):
-        cirrina.db_session.close()
-
-    async def cleanup_task(self):
-        await self.enqueue_aptly({"cleanup": []})
-
-    def weekly_cleanup(self):
-        if hasattr(self, 'task_cron') and self.task_cron:
-            # If a scheduler already exists, cancel the existing tasks
-            self.task_cron.cancel()
-
-        # extract values from db or write default values a new molior-server instance
         cleanup_weekdays_list = []
         with Session() as session:
             cleanup_active = session.query(MetaData).filter_by(
@@ -121,10 +107,19 @@ class MoliorServer(cirrina.Server):
                     for weekday in cleanup_weekdays_list:
                         logger.info(f"cleanup job enabled for every {weekday} at {cleanup_time.value}")
                         cleanup_job = CronJob(name=f'cleanup_{weekday}')
-                        cleanup_job.every().weekday(self.get_weekday_number(weekday)).at(cleanup_time.value).go(self.cleanup_task)
+                        cleanup_job.every().weekday(get_weekday_number(weekday)).at(cleanup_time.value).go(cleanup_task)
                         cleanup_sched.add_job(cleanup_job)
 
                     self.task_cron = asyncio.ensure_future(cleanup_sched.start())
+
+    @staticmethod
+    def create_cirrina_context(cirrina):
+        maker = sessionmaker(bind=database.engine)
+        cirrina.add_context("db_session", maker())
+
+    @staticmethod
+    def destroy_cirrina_context(cirrina):
+        cirrina.db_session.close()
 
     async def terminate(self):
         self.logger.info("terminating tasks")
