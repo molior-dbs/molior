@@ -5,6 +5,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from ..logger import logger
 from ..molior.configuration import Configuration
 from ..tools import ErrorResponse, db2array, array2db
+from ..molior.notifier import Subject, Event, notify
 
 from .database import Base
 from .project import Project
@@ -143,16 +144,6 @@ class ProjectVersion(Base):
         full = "deb {0} {1} {2}".format(url, dist, "main")
         return url if url_only else full
 
-    def mirror_changed(self):
-        pass
-        # await app.websocket_broadcast(
-        #    {
-        #        "event": Event.changed.value,
-        #        "subject": Subject.mirror.value,
-        #        "data": {},
-        #    }
-        # )
-
     def data(self):
         """
         Returns the given projectversion object
@@ -175,12 +166,14 @@ class ProjectVersion(Base):
 
         buildCount = 0
         cibuildCount = 0
-        for build in self.builds:
-            if build.buildtype == "deb":
-                if build.is_ci:
-                    cibuildCount += 1
-                else:
-                    buildCount += 1
+        if not self.project.is_mirror:
+            for build in self.builds:
+                if build.buildtype == "deb":
+                    if build.is_ci:
+                        cibuildCount += 1
+                    else:
+                        buildCount += 1
+
         data = {
             "id": self.id,
             "name": self.name,
@@ -190,19 +183,27 @@ class ProjectVersion(Base):
             "is_mirror": self.project.is_mirror,
             "architectures": db2array(self.mirror_architectures),
             "is_locked": self.is_locked,
-            "ci_builds_enabled": self.ci_builds_enabled,
             "dependency_policy": self.dependency_policy,
             "dependency_ids": dependency_ids,
             "dependent_ids": dependent_ids,
             "projectversiontype": self.projectversiontype,
-            "retention_successful_builds": self.retention_successful_builds,
-            "retention_failed_builds": self.retention_failed_builds,
-            "publish_s3": self.publish_s3,
-            "s3_endpoint": self.s3_endpoint,
-            "s3_path": self.s3_path,
-            "buildCount": buildCount,
-            "cibuildCount": cibuildCount
         }
+        if self.project.is_mirror:
+            data.update({
+                "state": self.mirror_state,
+            })
+        else:
+            data.update({
+                "ci_builds_enabled": self.ci_builds_enabled,
+                "retention_successful_builds": self.retention_successful_builds,
+                "retention_failed_builds": self.retention_failed_builds,
+                "publish_s3": self.publish_s3,
+                "s3_endpoint": self.s3_endpoint,
+                "s3_path": self.s3_path,
+                "buildCount": buildCount,
+                "cibuildCount": cibuildCount
+            })
+
         if self.basemirror:
             data.update({"basemirror": self.basemirror.fullname})
 
@@ -250,6 +251,13 @@ class ProjectVersion(Base):
         db.add(new_projectversion)
         db.commit()
         return new_projectversion
+
+    async def mirror_changed(self):
+        await notify(Subject.mirror.value, Event.changed.value, self.data())
+
+    async def set_mirror_state(self, state):
+        self.mirror_state = state
+        await self.mirror_changed()
 
 
 def get_projectversion_deps(projectversion_id, session):
