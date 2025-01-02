@@ -1269,7 +1269,7 @@ class AptlyWorker:
             mirror_version = mirror.name
             mirror_architectures = mirror.mirror_architectures
             mirror_distribution = mirror.mirror_distribution
-            mirror_components = mirror.mirror_components.split(",")
+            mirror_components = mirror.mirror_components.split(",") if mirror.mirror_components else []
 
         try:
             # FIXME: use altpy queue !
@@ -1280,12 +1280,13 @@ class AptlyWorker:
             # FIXME: handle mirror has snapshots and cannot be deleted?
             logger.exception(exc)
 
-        archs = db2array(mirror_architectures)
-        for arch in archs:
-            try:
-                await DeleteBuildEnv(mirror_distribution, mirror_name, mirror_version, arch)
-            except Exception as exc:
-                logger.exception(exc)
+        if is_basemirror:
+            archs = db2array(mirror_architectures)
+            for arch in archs:
+                try:
+                    await DeleteBuildEnv(mirror_distribution, mirror_name, mirror_version, arch)
+                except Exception as exc:
+                    logger.exception(exc)
 
         with Session() as session:
             mirror = session.query(ProjectVersion).join(Project).filter(ProjectVersion.id == mirror_id,
