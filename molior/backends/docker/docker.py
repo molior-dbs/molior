@@ -127,7 +127,11 @@ class DockerBackend:
                     "/app/docker-build",
                     ])
 
+                has_output = False
+
                 async def outh(line):
+                    nonlocal has_output
+                    has_output = True
                     await buildlog(build_id, line)
 
                 pull_cmd = shlex.split(remote_cmd)
@@ -136,7 +140,7 @@ class DockerBackend:
                 await process.launch()
                 ret = await process.wait()
 
-                if not ret == 0:
+                if not ret == 0 and not has_output:
                     await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
                     await enqueue_backend({"failed": build_id})
 

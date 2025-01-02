@@ -1,11 +1,34 @@
 #!/bin/sh
 
-PROJECT=$1
-PROJECTVERSION=$2
-MOLIOR_SERVER=$3
+debug=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -d|--debug)
+      debug=1
+      shift 1
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+    *)
+      if [ -z "$PROJECT" ]; then
+        PROJECT=$1
+      elif [ -z "$PROJECTVERSION" ]; then
+        PROJECTVERSION=$1
+      elif [ -z "$MOLIOR_SERVER" ]; then
+        MOLIOR_SERVER=$1
+      else
+        echo "Unknown argument: $1"
+        exit 1
+      fi
+      shift 1
+      ;;
+  esac
+done
 
 if [ -z "$PROJECT" ] || [ -z "$PROJECTVERSION" ] || [ -z "$MOLIOR_SERVER" ]; then
-        echo Usage: $0 PROJECT PROJECTVERSION MOLIOR_SERVER
+        echo "Usage: $0 [-d|--debug] PROJECT PROJECTVERSION MOLIOR_SERVER" >&2
         exit 1
 fi
 
@@ -49,13 +72,35 @@ log_error ()
     /bin/echo -e "\e[31m\e[1m$message\e[0m"
 }
 
+interrupted=0
+buildcmd=""
+
+sigint()
+{
+    echo
+    interrupted=1
+}
+trap sigint INT
+
 finish ()
 {
     RET=$?  # must be first
     set +e
 
-    if [ $RET -ne 0 ]; then
+    if [ $RET -ne 0 ] && [ $interrupted -ne 1 ]; then
       log_title "Building failed" no-footer-newline error
+    fi
+
+    if [ $debug -eq 1 ] && [ $interrupted -ne 1 ]; then
+      echo
+      echo Dropping to a shell ...
+      echo
+      if [ -n "$buildcmd" ]; then
+          echo " - run 'rebuild' to build the debian package again ..."
+          echo
+          echo "alias rebuild='$buildcmd -nc'" > ~build/.bash_aliases
+      fi
+      su build -s /bin/bash
     fi
     exit $RET
 }
@@ -75,14 +120,18 @@ cat /etc/apt/sources.list | sed -e '/^#/d' -e '/^$/d' -e 's/^/ - /'
 log_title "Running apt-get update"
 apt-get update
 if [ "$?" -ne 0 ]; then
-  echo "E: Error updating apt sources" >&2
+  if [ $interrupted -ne 1 ]; then
+    echo "E: Error updating apt sources" >&2
+  fi
   exit 4
 fi
 
 log_title "Installing build dependencies"
 apt-get build-dep --yes .
 if [ "$?" -ne 0 ]; then
-  echo "E: Error installing build dependencies" >&2
+  if [ $interrupted -ne 1 ]; then
+    echo "E: Error installing build dependencies" >&2
+  fi
   exit 5
 fi
 
@@ -94,22 +143,22 @@ if [ "$ARCH_ANY_ONLY" = "True" ]; then
 fi
 
 # use real user and group
-usermod -u `stat -c %u /app/src` build
+usermod -u `stat -c %u /app/src` build >/dev/null
 if getent group `stat -c %g /app/src` >/dev/null; then
-    usermod -g `stat -c %g /app/src` build
+    usermod -g `stat -c %g /app/src` build >/dev/null
 else
-    groupmod -g `stat -c %g /app/src` build
+    groupmod -g `stat -c %g /app/src` build 2>/dev/null
 fi
 chown build /app
 
 rm -f /app/*.deb /app/*.ddeb /app/*.changes /app/*.buildinfo
 
-su build -c "dpkg-buildpackage -us -uc -ui -b --target-arch $ARCH $buildargs"
+buildcmd="dpkg-buildpackage -us -uc -ui -b $buildargs"
+su build -c "$buildcmd"
 if [ "$?" -ne 0 ]; then
-  echo "E: Error building debian package $dsc_url" >&2
-
-  echo Dropping to a shell ...
-  bash
+  if [ $interrupted -ne 1 ]; then
+    echo "E: Error building debian package $dsc_url" >&2
+  fi
   exit 6
 fi
 
@@ -117,9 +166,13 @@ su build -c "debclean"
 
 log_title "Copying build output"
 out=`su build -c "mktemp -d /app/src/buildout-XXXXX"`
-cp -av /app/*.deb /app/*.ddeb /app/*.changes /app/*.buildinfo $out/
+cp -a /app/*.deb /app/*.changes /app/*.buildinfo $out/
+if [ -n "`ls /app/*.ddeb`" ]; then
+    cp -a /app/*.ddeb $out/
+fi
 
 echo
 echo "Copied build output to: `basename $out`/"
+ls -l $out/
 
 log_title "Build successful" no-footer-newline
