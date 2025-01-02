@@ -279,6 +279,7 @@ async def create_mirror2(request):
                   external:
                       type: boolean
                       description: Is it an external repository?
+                      example: bla bla
                   mirrorurl:
                       type: string
                       description: Mirror URL
@@ -296,7 +297,7 @@ async def create_mirror2(request):
                       items:
                           type: string
                       description: E.g. i386, amd64, arm64, armhf, ...
-                      example: ["amd64", "armhf"]
+                      example: ["amd64", "armhf"] # E.g. i386, amd64, arm64, armhf, ...
                   mirrorsrc:
                       type: boolean
                       description: Is a mirror with sources?

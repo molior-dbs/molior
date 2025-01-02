@@ -533,6 +533,7 @@ class AptlyWorker:
                 logger.error("aptly worker: no build found for mirror with id %d", str(mirror_id))
                 return False
 
+            build.set_building()
             await build.logtitle("Create Mirror")
 
             mirrorkey = session.query(MirrorKey).filter(MirrorKey.projectversion_id == mirror.id).first()
@@ -545,9 +546,15 @@ class AptlyWorker:
                 aptly = get_aptly_connection()
                 if key_url:
                     await build.log("I: adding GPG keys from {}\n".format(key_url))
-                    ret, msg = await aptly.gpg_add_key(key_url=key_url)
+                    ret = False
+                    try:
+                        ret, msg = await aptly.gpg_add_key(key_url=key_url)
+                    except Exception as exc:
+                        pass
+                        msg = exc
+
                     if not ret:
-                        await build.log("E: Error adding gpg keys\n{msg}\n")
+                        await build.log(f"E: Error adding gpg keys: {msg}\n")
                         await build.set_failed()
                         await build.logdone()
                         mirror.mirror_state = "init_error"
