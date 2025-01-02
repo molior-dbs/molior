@@ -311,10 +311,11 @@ class AptlyApi:
 
         # remove publish (may fail)
         try:
-            task = await self.DELETE(f"/publish/{publish_name}/{mirror_distribution}")
+            dist = mirror_distribution.replace("/", "_")
+            task = await self.DELETE(f"/publish/{publish_name}/{dist}")
             await self.wait_task(task["ID"])
         except Exception:
-            logger.warning("Error deleting mirror publish  {}/{}".format(publish_name, mirror_distribution))
+            logger.warning("Error deleting mirror publish {} ({})".format(publish_name, mirror_distribution))
 
         # remove snapshots (may fail)
         try:
@@ -323,9 +324,16 @@ class AptlyApi:
             logger.warning("Error deleting mirror snapshot {}/{}".format(publish_name, mirror_distribution))
 
         # remove mirrors
-        for component in components:
+        if components:
+            for component in components:
+                try:
+                    task = await self.DELETE(f"/mirrors/{name}-{component}")
+                    await self.wait_task(task["ID"])
+                except Exception:
+                    logger.warning("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
+        else:  # flat mirror
             try:
-                task = await self.DELETE(f"/mirrors/{name}-{component}")
+                task = await self.DELETE(f"/mirrors/{name}")
                 await self.wait_task(task["ID"])
             except Exception:
                 logger.warning("Error deleting mirror {}/{}".format(publish_name, mirror_distribution))
@@ -343,8 +351,12 @@ class AptlyApi:
         """
         name, _ = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
 
-        for component in components:
-            task = await self.DELETE(f"/snapshots/{name}-{component}")
+        if components:
+            for component in components:
+                task = await self.DELETE(f"/snapshots/{name}-{component}")
+                await self.wait_task(task["ID"])
+        else:
+            task = await self.DELETE(f"/snapshots/{name}")
             await self.wait_task(task["ID"])
         return True
 
@@ -429,9 +441,12 @@ class AptlyApi:
             },
             "AcquireByHash": True,
         }
-        for component in components:
-            mirrorname = f"{name}-{component}" if component else name
-            data["Sources"].append({"Component": component, "Name": mirrorname})
+        if components:
+            for component in components:
+                mirrorname = f"{name}-{component}" if component else name
+                data["Sources"].append({"Component": component, "Name": mirrorname})
+        else:  # flat mirrors
+            data["Sources"].append({"Name": mirrorname})
 
         task = await self.POST(f"/publish/{publish_name}", data=data)
         return task["ID"]

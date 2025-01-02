@@ -331,22 +331,22 @@ async def create_mirror2(request):
     """
     params = await request.json()
 
-    mirrorname        = params.get("mirrorname")        # noqa: E221
-    mirrorversion     = params.get("mirrorversion")     # noqa: E221
-    mirrortype        = params.get("mirrortype")        # noqa: E221
-    basemirror        = params.get("basemirror")        # noqa: E221
-    external_repo     = params.get("external")          # noqa: E221
-    mirrorurl         = params.get("mirrorurl")         # noqa: E221
-    mirrordist        = params.get("mirrordist")        # noqa: E221
-    mirrorcomponents  = params.get("mirrorcomponents")  # noqa: E221
-    architectures     = params.get("architectures")     # noqa: E221
-    mirrorsrc         = params.get("mirrorsrc")         # noqa: E221
-    mirrorinst        = params.get("mirrorinst")        # noqa: E221
-    mirrorkeyurl      = params.get("mirrorkeyurl")      # noqa: E221
-    mirrorkeyids      = params.get("mirrorkeyids")      # noqa: E221
-    mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
-    dependency_policy = params.get("dependencylevel")   # noqa: E221
-    mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
+    mirrorname        = params.get("mirrorname").strip()        # noqa: E221
+    mirrorversion     = params.get("mirrorversion").strip()     # noqa: E221
+    mirrortype        = params.get("mirrortype").strip()        # noqa: E221
+    basemirror        = params.get("basemirror").strip()        # noqa: E221
+    external_repo     = params.get("external")                  # noqa: E221
+    mirrorurl         = params.get("mirrorurl").strip()         # noqa: E221
+    mirrordist        = params.get("mirrordist").strip()        # noqa: E221
+    mirrorcomponents  = params.get("mirrorcomponents").strip()  # noqa: E221
+    architectures     = params.get("architectures")             # noqa: E221
+    mirrorsrc         = params.get("mirrorsrc")                 # noqa: E221
+    mirrorinst        = params.get("mirrorinst")                # noqa: E221
+    mirrorkeyurl      = params.get("mirrorkeyurl").strip()      # noqa: E221
+    mirrorkeyids      = params.get("mirrorkeyids").strip()      # noqa: E221
+    mirrorkeyserver   = params.get("mirrorkeyserver").strip()   # noqa: E221
+    dependency_policy = params.get("dependencylevel").strip()   # noqa: E221
+    mirrorfilter      = params.get("mirrorfilter").strip()      # noqa: E221
 
     if mirrorcomponents is None:
         mirrorcomponents = ""
@@ -404,6 +404,10 @@ async def create_mirror2(request):
             func.lower(ProjectVersion.name) == mirrorversion.lower()).first()
     if project_version:
         return ErrorResponse(400, f"mirror with name {mirrorname} and version {mirrorversion} already exists")
+
+    # aptly bug with / becoming .// in some cases
+    if mirrordist == "/":
+        mirrordist = "./"
 
     # FIXME: check basemirror exists
     # FIXME: until here, should be in api
@@ -566,19 +570,23 @@ async def edit_mirror(request):
     if mirror.is_locked:
         return ErrorResponse(400, "Mirror is locked")
 
-    mirrortype        = params.get("mirrortype")        # noqa: E221
-    basemirror        = params.get("basemirror")        # noqa: E221
-    mirrorurl         = params.get("mirrorurl")         # noqa: E221
-    mirrordist        = params.get("mirrordist")        # noqa: E221
-    mirrorcomponents  = params.get("mirrorcomponents")  # noqa: E221
-    architectures     = params.get("architectures")     # noqa: E221
-    mirrorsrc         = params.get("mirrorsrc")         # noqa: E221
-    mirrorinst        = params.get("mirrorinst")        # noqa: E221
-    mirrorkeyurl      = params.get("mirrorkeyurl")      # noqa: E221
-    mirrorkeyids      = params.get("mirrorkeyids")      # noqa: E221
-    mirrorkeyserver   = params.get("mirrorkeyserver")   # noqa: E221
-    dependency_policy = params.get("dependencylevel")   # noqa: E221
-    mirrorfilter      = params.get("mirrorfilter")      # noqa: E221
+    mirrortype        = params.get("mirrortype").strip()        # noqa: E221
+    basemirror        = params.get("basemirror").strip()        # noqa: E221
+    mirrorurl         = params.get("mirrorurl").strip()         # noqa: E221
+    mirrordist        = params.get("mirrordist").strip()        # noqa: E221
+    mirrorcomponents  = params.get("mirrorcomponents").strip()  # noqa: E221
+    architectures     = params.get("architectures")             # noqa: E221
+    mirrorsrc         = params.get("mirrorsrc").strip()         # noqa: E221
+    mirrorinst        = params.get("mirrorinst").strip()        # noqa: E221
+    mirrorkeyurl      = params.get("mirrorkeyurl").strip()      # noqa: E221
+    mirrorkeyids      = params.get("mirrorkeyids").strip()      # noqa: E221
+    mirrorkeyserver   = params.get("mirrorkeyserver").strip()   # noqa: E221
+    dependency_policy = params.get("dependencylevel").strip()   # noqa: E221
+    mirrorfilter      = params.get("mirrorfilter").strip()      # noqa: E221
+
+    # aptly bug with / becoming .// in some cases
+    if mirrordist == "/":
+        mirrordist = "./"
 
     if basemirror:
         basemirror_name, basemirror_version = basemirror.split("/")
