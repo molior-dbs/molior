@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    molior.service: molior
+  name: molior
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      molior.service: molior
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        molior.service: molior
+
+    spec:
+
+      initContainers:
+
+        - name: init-postgres
+          image: molior_postgres
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c", "test -e /data/PG_VERSION || ( echo Initializing PostgreSQL database; cp -ar /var/lib/postgresql/15/main/* /data/; chown postgres:postgres /data; chmod 700 /data)"]
+          volumeMounts:
+            - mountPath: /data
+              name: postgres
+
+        - name: init-molior
+          image: molior_molior
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c", "test -e /data/buildout || ( echo Initializing Molior; cp -ar /var/lib/molior/* /data/; chown molior /data; chmod 755 /data )"]
+          volumeMounts:
+            - mountPath: /data
+              name: molior
+
+      containers:
+
+        - name: molior-server
+          image: molior_molior
+          imagePullPolicy: Never
+          securityContext:
+            capabilities:
+              add:
+                - "SYS_ADMIN"
+                - "MKNOD"
+                - "SYS_CHROOT"
+                - "SETFCAP"
+          env:
+            - name: APTLY_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: APTLY_PASSWORD
+                  name: env
+            - name: APTLY_USER
+              valueFrom:
+                configMapKeyRef:
+                  key: APTLY_USER
+                  name: env
+            - name: DEBSIGN_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  key: DEBSIGN_EMAIL
+                  name: env
+            - name: DEBSIGN_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: DEBSIGN_NAME
+                  name: env
+            - name: REPOSIGN_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  key: REPOSIGN_EMAIL
+                  name: env
+            - name: REPOSIGN_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: REPOSIGN_NAME
+                  name: env
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/run/postgresql
+              name: pgsock
+            - mountPath: /var/lib/molior
+              name: molior
+            - mountPath: /config
+              name: molior-cm3
+
+        - name: molior-postgres
+          image: molior_postgres
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/run/postgresql
+              name: pgsock
+            - mountPath: /var/lib/postgresql/15/main
+              name: postgres
+      restartPolicy: Always
+      volumes:
+        - name: molior
+          persistentVolumeClaim:
+            claimName: molior
+        - name: pgsock
+          persistentVolumeClaim:
+            claimName: pgsock
+        - name: postgres
+          persistentVolumeClaim:
+            claimName: postgres
+        - configMap:
+            name: molior-cm3
+          name: molior-cm3

@@ -1,0 +1,8 @@
+name: molior
+description: A generated Helm Chart for molior from Skippbox Kompose
+version: 0.0.1
+apiVersion: v2
+keywords:
+  - molior
+sources:
+home:

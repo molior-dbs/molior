@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  APTLY_PASSWORD: molior-dev
+  APTLY_USER: molior
+  DEBSIGN_EMAIL: debsign@molior
+  DEBSIGN_NAME: molior
+  REGISTRY_PASSWORD: molior-dev
+  REGISTRY_USER: molior
+  REPOSIGN_EMAIL: reposign@molior
+  REPOSIGN_NAME: molior
+kind: ConfigMap
+metadata:
+  labels:
+    molior.service: aptly-env
+  name: env

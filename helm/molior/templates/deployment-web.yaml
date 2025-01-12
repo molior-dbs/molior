@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    molior.service: web
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      molior.service: web
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        molior.service: web
+    spec:
+      containers:
+        - image: molior_web
+          imagePullPolicy: Never
+          name: molior-web
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/molior
+              name: molior
+      restartPolicy: Always
+      volumes:
+        - name: molior
+          persistentVolumeClaim:
+            claimName: molior

@@ -26,8 +26,10 @@ if [ -n "$DEBSIGN_NAME" ] && [ -n "$DEBSIGN_EMAIL" ]; then
     /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL
 fi
 
-# allow accessing docker socker from host
-groupmod -g `stat -c %g /var/run/docker.sock` docker
+if [ -e /var/run/docker.sock ]; then  # docker environment
+    # allow accessing docker socker from host
+    groupmod -g `stat -c %g /var/run/docker.sock` docker
+fi
 
 while true; do
     if su postgres -c "pg_isready -d molior"; then

@@ -191,15 +191,6 @@ publish_docker()
 
   CONTAINER_VERSION=$DIST_VERSION-$ARCH
 
-  echo I: Importing docker base image
-  su molior -c "docker import $DEBOOTSTRAP_TAR molior-$CONTAINER_VERSION"
-    if [ $? -ne 0 ]; then
-      echo "docker import failed"
-      exit 4
-    fi
-
-  rm -f $DEBOOTSTRAP_TAR
-
   REGISTRY=localhost:5000
   if [ -f /etc/molior/backend-docker.yml ]; then
       eval $(parse_yaml /etc/molior/backend-docker.yml)
@@ -208,14 +199,30 @@ publish_docker()
       DOCKER_PASSWORD=$registry__password
   fi
 
+  container_tool=docker
+  registry_args=""
+  if [ ! -e /var/run/docker.sock ]; then  ## use docker
+      container_tool=podman
+      registry_args="--tls-verify=false"
+  fi
+
+  echo I: Importing docker base image
+  su molior -c "$container_tool import $DEBOOTSTRAP_TAR molior-$CONTAINER_VERSION"
+  if [ $? -ne 0 ]; then
+    echo "docker import failed"
+    exit 4
+  fi
+
+  rm -f $DEBOOTSTRAP_TAR
+
   if [ -n "$DOCKER_USER" ]; then
       echo I: Logging in to docker registry $REGISTRY
-      echo "$DOCKER_PASSWORD" | su molior -c "docker login --username $DOCKER_USER --password-stdin $REGISTRY"
+      echo "$DOCKER_PASSWORD" | su molior -c "$container_tool login $registry_args --username $DOCKER_USER --password-stdin $REGISTRY"
   fi
-  su molior -c "docker tag molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
+  su molior -c "$container_tool tag molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
   echo I: Publishing docker base image
-  su molior -c "docker push $REGISTRY/molior-$CONTAINER_VERSION"
-  su molior -c "docker rmi molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
+  su molior -c "$container_tool push $registry_args $REGISTRY/molior-$CONTAINER_VERSION"
+  su molior -c "$container_tool rmi molior-$CONTAINER_VERSION $REGISTRY/molior-$CONTAINER_VERSION"
   echo I: docker base $REGISTRY/molior-$CONTAINER_VERSION is published
 }
 

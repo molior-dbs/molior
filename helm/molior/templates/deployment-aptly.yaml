@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    molior.service: aptly
+  name: aptly
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      molior.service: aptly
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        molior.service: aptly
+    spec:
+      containers:
+        - name: aptly-server
+          image: molior_aptly
+          imagePullPolicy: Never
+          env:
+            - name: REPOSIGN_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  key: REPOSIGN_EMAIL
+                  name: env
+            - name: REPOSIGN_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: REPOSIGN_NAME
+                  name: env
+          ports:
+            - containerPort: 3143
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/aptly
+              name: aptly
+
+        - name: aptly-nginx
+          image: molior_nginx
+          imagePullPolicy: Never
+          env:
+            - name: APTLY_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: APTLY_PASSWORD
+                  name: env
+            - name: APTLY_USER
+              valueFrom:
+                configMapKeyRef:
+                  key: APTLY_USER
+                  name: env
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/aptly
+              name: aptly
+      restartPolicy: Always
+      volumes:
+        - name: aptly
+          persistentVolumeClaim:
+            claimName: aptly
