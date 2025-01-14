@@ -9,7 +9,7 @@ WORKDIR /app
 
 RUN useradd --uid 7777 -m --shell /bin/sh --home-dir /var/lib/molior molior
 
-RUN echo deb http://molior.info/1.5 stable main > /etc/apt/sources.list.d/molior.list
+RUN echo deb http://molior.info/1.5-next stable main > /etc/apt/sources.list.d/molior.list
 RUN curl -s http://molior.info/1.5/archive-keyring.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/molior.gpg && apt-get update && \
     apt-get install -y --no-install-recommends molior-server docker.io podman uidmap && \
     apt-get clean && rm -rf /var/lib/apt/lists/*

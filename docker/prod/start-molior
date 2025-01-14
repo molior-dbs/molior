@@ -21,6 +21,11 @@ if [ -f /config/backend-docker.yml ]; then
     chown molior /etc/molior/backend-docker.yml
 fi
 
+if [ -f /config/backend-kubernetes.yml ]; then
+    cp /config/backend-kubernetes.yml /etc/molior/
+    chown molior /etc/molior/backend-kubernetes.yml
+fi
+
 if [ -n "$DEBSIGN_NAME" ] && [ -n "$DEBSIGN_EMAIL" ]; then
     echo "Creating gpgs key for '$DEBSIGN_NAME'"
     /usr/sbin/create-molior-keys $DEBSIGN_NAME $DEBSIGN_EMAIL

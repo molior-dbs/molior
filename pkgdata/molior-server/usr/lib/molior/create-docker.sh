@@ -199,6 +199,13 @@ publish_docker()
       DOCKER_PASSWORD=$registry__password
   fi
 
+  if [ -f /etc/molior/backend-kubernetes.yml ]; then
+      eval $(parse_yaml /etc/molior/backend-kubernetes.yml)
+      REGISTRY=$registry__server
+      DOCKER_USER=$registry__user
+      DOCKER_PASSWORD=$registry__password
+  fi
+
   container_tool=docker
   registry_args=""
   if [ ! -e /var/run/docker.sock ]; then  ## use docker
