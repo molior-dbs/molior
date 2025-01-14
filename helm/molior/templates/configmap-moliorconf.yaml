@@ -33,7 +33,7 @@ data:
       "logFormat": "default",
       "serveInAPIMode": false
     }
-  backend-docker.yml: |
+  backend-kubernetes.yml: |
     registry:
         server: "registry:5000"
         user: molior
@@ -72,14 +72,14 @@ data:
 
     auth_backend: 'db'
 
-    backend: 'docker'
+    backend: 'kubernetes'
 
     # Molior server settings
     max_parallel_chroots: 2
 
     # Aptly settings
     aptly:
-        apt_url_public: 'http://aptly:8000'
+        apt_url_public: 'http://localhost:8080'
         apt_url: 'http://aptly:8000'
         api_url: 'http://aptly:3143/api'
         api_user: 'molior'

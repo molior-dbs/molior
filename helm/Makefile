@@ -1,5 +1,5 @@
 create-cluster:
-	k3d cluster create molior --port "8000:80@loadbalancer"
+	k3d cluster create molior --port "8000:80@loadbalancer" --port "8080:30080"
 
 delete-cluster:
 	k3d cluster delete molior

@@ -53,7 +53,7 @@ spec:
                   key: APTLY_USER
                   name: env
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
               protocol: TCP
           volumeMounts:
             - mountPath: /var/lib/aptly

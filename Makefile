@@ -25,6 +25,9 @@ prod-molior:  ## Build prod molior
 prod-aptly:  ## Build prod aptly
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache aptly
 
+prod-nginx:  ## Build prod nginx
+	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache nginx
+
 prod-web:  ## Build prod web
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache web
 

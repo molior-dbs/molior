@@ -9,6 +9,7 @@ ADD docker/common/nginx-aptly /etc/nginx/sites-available/aptly
 ADD docker/common/nginx-aptlyapi /etc/nginx/sites-available/aptlyapi
 RUN ln -s ../sites-available/aptly /etc/nginx/sites-enabled/
 RUN ln -s ../sites-available/aptlyapi /etc/nginx/sites-enabled/
+RUN rm -f /etc/nginx/sites-enabled/default
 
 ADD docker/common/start-nginx /app/nginx
 

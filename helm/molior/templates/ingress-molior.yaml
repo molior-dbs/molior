@@ -3,7 +3,6 @@ kind: Ingress
 metadata:
   name: molior-ingress
   annotations:
-    # traefik.ingress.kubernetes.io/router.entrypoints: web
     ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   rules:
