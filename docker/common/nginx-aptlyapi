@@ -7,7 +7,7 @@ server {
         error_log stderr;
 
         location / {
-                proxy_pass http://aptly:3142;
+                proxy_pass http://localhost:3142;
                 proxy_read_timeout 360s;
                 client_max_body_size 2G;
         }
