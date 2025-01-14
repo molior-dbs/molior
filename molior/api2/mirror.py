@@ -576,8 +576,8 @@ async def edit_mirror(request):
     mirrordist        = params.get("mirrordist").strip()        # noqa: E221
     mirrorcomponents  = params.get("mirrorcomponents").strip()  # noqa: E221
     architectures     = params.get("architectures")             # noqa: E221
-    mirrorsrc         = params.get("mirrorsrc").strip()         # noqa: E221
-    mirrorinst        = params.get("mirrorinst").strip()        # noqa: E221
+    mirrorsrc         = params.get("mirrorsrc")                 # noqa: E221
+    mirrorinst        = params.get("mirrorinst")                # noqa: E221
     mirrorkeyurl      = params.get("mirrorkeyurl").strip()      # noqa: E221
     mirrorkeyids      = params.get("mirrorkeyids").strip()      # noqa: E221
     mirrorkeyserver   = params.get("mirrorkeyserver").strip()   # noqa: E221
