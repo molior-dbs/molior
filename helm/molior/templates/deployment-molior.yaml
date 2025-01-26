@@ -17,6 +17,7 @@ spec:
         molior.service: molior
 
     spec:
+      serviceAccountName: molior-serviceaccount
 
       initContainers:
 

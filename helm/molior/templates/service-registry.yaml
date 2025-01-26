@@ -5,9 +5,11 @@ metadata:
     molior.service: registry
   name: registry
 spec:
+  type: NodePort
   ports:
     - name: "5000"
       port: 5000
       targetPort: 5000
+      nodePort: 30500
   selector:
     molior.service: registry

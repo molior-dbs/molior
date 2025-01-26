@@ -1,8 +1,9 @@
 import asyncio
-import shlex
 
-from launchy import Launchy
 from contextlib import suppress
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
+
 
 from ...logger import logger
 from ...molior.configuration import Configuration
@@ -30,6 +31,8 @@ class KubernetesBackend:
                 logger.info(f"kubernetes backend: starting {parallel} {arch} tasks")
                 for i in range(parallel):
                     self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
+
+        config.load_incluster_config()
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
@@ -72,6 +75,45 @@ class KubernetesBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
+    def create_kubernetes_job(namespace, job_name, image):
+        container = client.V1Container(
+            name=job_name,
+            image=image,
+            args=["echo", "Hello, Kubernetes!"]
+        )
+
+        # Define the Pod template spec
+        template = client.V1PodTemplateSpec(
+            metadata=client.V1ObjectMeta(labels={"job-name": job_name}),
+            spec=client.V1PodSpec(restart_policy="Never", containers=[container])
+        )
+
+        # Define the Job spec
+        job_spec = client.V1JobSpec(
+            template=template,
+            # spec=V1PodSpec(
+            #     node_selector={"kubernetes.io/hostname": "node-name"},  # Specify the node label here
+            #     containers=[client.V1Container(name="my-container", image="nginx")]
+            # ),
+            backoff_limit=4  # Number of retries before failing the Job
+        )
+
+        # Define the Job resource
+        job = client.V1Job(
+            api_version="batch/v1",
+            kind="Job",
+            metadata=client.V1ObjectMeta(name=job_name),
+            spec=job_spec
+        )
+
+        # Create the Job in the specified namespace
+        try:
+            batch_v1 = client.BatchV1Api()
+            batch_v1.create_namespaced_job(body=job, namespace=namespace)
+            print(f"Job '{job_name}' created successfully.")
+        except ApiException as e:
+            print(f"Error creating Job: {e}")
+
     async def consumer(self, queue_arch):
         up = True
         while up:
@@ -95,67 +137,66 @@ class KubernetesBackend:
                     continue
 
                 registry = cfg.registry.get("server")
-                remote_cmd = ""
                 builder = cfg.builder.get(arch)
-                if builder:
-                    remote_cmd = builder.get("remote_cmd")
 
-                if remote_cmd:
-                    await buildlog(build_id, f"running docker via {remote_cmd}\n")
+                namespace = "default"
+                job_name = "example-job"
+                image = f"{registry}/molior-{distversion}-{arch}"
+                create_kubernetes_job(namespace, job_name, image)
 
-                cmd = shlex.split(remote_cmd)
-                cmd.extend([
-                    "unbuffer",
-                    "docker", "run", "-t", "--rm",
-                    "--add-host=host.docker.internal:host-gateway",
-                    "-e", f"BUILD_ID={task['build_id']}",
-                    "-e", f"BUILD_TOKEN={task['token']}",
-                    "-e", f"PLATFORM={task['distrelease']}",
-                    "-e", f"PLATFORM_VERSION={distversion}",
-                    "-e", f"ARCH={arch}",
-                    "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
-                    "-e", f"REPO_NAME={task['repository_name']}",
-                    "-e", f"VERSION={task['version']}",
-                    "-e", f"PROJECT_DIST={task['project_dist']}",
-                    "-e", f"PROJECT={task['project']}",
-                    "-e", f"PROJECTVERSION={task['projectversion']}",
-                    "-e", f"APT_SERVER={task['apt_server']}",
-                    "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
-                    "-e", f"RUN_LINTIAN={task['run_lintian']}",
-                    "-e", f"MOLIOR_SERVER={server_url}",
-                    f"{registry}/molior-{distversion}-{arch}",
-                    "/app/docker-build",
-                    ])
+                # cmd = shlex.split(remote_cmd)
+                # cmd.extend([
+                #     "unbuffer",
+                #     "docker", "run", "-t", "--rm",
+                #     "--add-host=host.docker.internal:host-gateway",
+                #     "-e", f"BUILD_ID={task['build_id']}",
+                #     "-e", f"BUILD_TOKEN={task['token']}",
+                #     "-e", f"PLATFORM={task['distrelease']}",
+                #     "-e", f"PLATFORM_VERSION={distversion}",
+                #     "-e", f"ARCH={arch}",
+                #     "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
+                #     "-e", f"REPO_NAME={task['repository_name']}",
+                #     "-e", f"VERSION={task['version']}",
+                #     "-e", f"PROJECT_DIST={task['project_dist']}",
+                #     "-e", f"PROJECT={task['project']}",
+                #     "-e", f"PROJECTVERSION={task['projectversion']}",
+                #     "-e", f"APT_SERVER={task['apt_server']}",
+                #     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
+                #     "-e", f"RUN_LINTIAN={task['run_lintian']}",
+                #     "-e", f"MOLIOR_SERVER={server_url}",
+                #     f"{registry}/molior-{distversion}-{arch}",
+                #     "/app/docker-build",
+                #     ])
 
-                has_output = False
+                # has_output = False
 
-                async def outh(line):
-                    nonlocal has_output
-                    has_output = True
-                    await buildlog(build_id, line)
+                # async def outh(line):
+                #     nonlocal has_output
+                #     has_output = True
+                #     await buildlog(build_id, line)
 
-                pull_cmd = shlex.split(remote_cmd)
-                pull_cmd.extend(shlex.split(f"unbuffer docker pull {registry}/molior-{distversion}-{arch}"))
-                process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
-                await process.launch()
-                ret = await process.wait()
+                # pull_cmd = shlex.split(remote_cmd)
+                # pull_cmd.extend(shlex.split(f"unbuffer docker pull {registry}/molior-{distversion}-{arch}"))
+                # process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
+                # await process.launch()
+                # ret = await process.wait()
 
-                if not ret == 0 and not has_output:
-                    await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
-                    await enqueue_backend({"failed": build_id})
+                # if not ret == 0 and not has_output:
+                #     await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
+                #     await enqueue_backend({"failed": build_id})
 
-                else:
-                    await buildlog(build_id, "\n")
+                # else:
+                #     await buildlog(build_id, "\n")
 
-                    process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
-                    await process.launch()
-                    ret = await process.wait()
+                #     process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
+                #     await process.launch()
+                #     ret = await process.wait()
 
-                    if not ret == 0:
-                        await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
-                        await enqueue_backend({"failed": build_id})
-                    else:
-                        await enqueue_backend({"succeeded": build_id})
+                #     if not ret == 0:
+                #         await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
+                #         await enqueue_backend({"failed": build_id})
+                #     else:
+                #         await enqueue_backend({"succeeded": build_id})
 
                 await buildlog(build_id, None)  # signal end of logs
 

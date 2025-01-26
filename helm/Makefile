@@ -1,10 +1,15 @@
+
+help:
+
 create-cluster:
-	k3d cluster create molior --port "8000:80@loadbalancer" --port "8080:30080"
+	#k3d cluster create --config k3d/cluster.yaml
+	k3d cluster create molior --port "8000:80@loadbalancer" --port "8080:30080" --port "5000:30500" --registry-config k3d/registry.yaml
 
 delete-cluster:
 	k3d cluster delete molior
 
-import: import-aptly import-molior import-nginx import-postgres import-nginx import-web import-registry
+import:
+	k3d image import --cluster molior molior_web molior_registry molior_nginx molior_postgres molior_molior molior_aptly
 
 import-web:
 	k3d image import --cluster molior molior_web

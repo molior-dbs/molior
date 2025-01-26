@@ -1,0 +1,12 @@
+mirrors:
+  "k3d-molior-server-0:30500":
+    endpoint:
+    - "http://k3d-molior-server-0:30500"
+configs:
+  "k3d-molior-server-0:30500":
+    auth:
+      username: molior
+      password: molior-dev
+    tls:
+      insecure_skip_verify: true
+
