@@ -75,11 +75,12 @@ class KubernetesBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
-    def create_kubernetes_job(self, namespace, job_name, image):
+    def create_kubernetes_job(self, namespace, job_name, image, envvars):
         container = client.V1Container(
             name=job_name,
             image=image,
-            args=["echo", "Hello, Kubernetes!"]
+            env=[client.V1EnvVar(name=en, value=ev) for en, ev in envvars],
+            args=["env"]
         )
 
         # Define the Pod template spec
@@ -88,7 +89,6 @@ class KubernetesBackend:
             spec=client.V1PodSpec(restart_policy="Never", containers=[container])
         )
 
-        # Define the Job spec
         job_spec = client.V1JobSpec(
             template=template,
             # spec=V1PodSpec(
@@ -130,7 +130,7 @@ class KubernetesBackend:
                 await write_log_title(build_id, "Kubernetes Build")
                 await buildlog(build_id, "\x1b[36m\x1b[1mPulling build container ...\x1b[0m\n")
 
-                # server_url = Configuration().server.get("url")
+                server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-kubernetes.yml")
                 if not cfg:
                     logger.error("kubernetes-backend: config file not found: /etc/molior/backend-kubernetes.yml")
@@ -143,28 +143,30 @@ class KubernetesBackend:
                 job_name = "example-job"
                 image = f"{registry}/molior-{distversion}-{arch}"
 
-                self.create_kubernetes_job(namespace, job_name, image)
+                envvars = [
+                        ("BUILD_ID", task['build_id']),
+                        ("BUILD_TOKEN", task['token']),
+                        ("PLATFORM", task['distrelease']),
+                        ("PLATFORM_VERSION", distversion),
+                        ("ARCH", arch),
+                        ("ARCH_ANY_ONLY", task['arch_any_only']),
+                        ("REPO_NAME", task['repository_name']),
+                        ("VERSION", task['version']),
+                        ("PROJECT_DIST", task['project_dist']),
+                        ("PROJECT", task['project']),
+                        ("PROJECTVERSION", task['projectversion']),
+                        ("APT_SERVER", task['apt_server']),
+                        ("APT_KEYS", ' '.join(task['apt_keys'])),
+                        ("RUN_LINTIAN", task['run_lintian']),
+                        ("MOLIOR_SERVER", server_url)
+                ]
+                self.create_kubernetes_job(namespace, job_name, image, envvars)
 
                 # cmd = shlex.split(remote_cmd)
                 # cmd.extend([
                 #     "unbuffer",
                 #     "docker", "run", "-t", "--rm",
                 #     "--add-host=host.docker.internal:host-gateway",
-                #     "-e", f"BUILD_ID={task['build_id']}",
-                #     "-e", f"BUILD_TOKEN={task['token']}",
-                #     "-e", f"PLATFORM={task['distrelease']}",
-                #     "-e", f"PLATFORM_VERSION={distversion}",
-                #     "-e", f"ARCH={arch}",
-                #     "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
-                #     "-e", f"REPO_NAME={task['repository_name']}",
-                #     "-e", f"VERSION={task['version']}",
-                #     "-e", f"PROJECT_DIST={task['project_dist']}",
-                #     "-e", f"PROJECT={task['project']}",
-                #     "-e", f"PROJECTVERSION={task['projectversion']}",
-                #     "-e", f"APT_SERVER={task['apt_server']}",
-                #     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
-                #     "-e", f"RUN_LINTIAN={task['run_lintian']}",
-                #     "-e", f"MOLIOR_SERVER={server_url}",
                 #     f"{registry}/molior-{distversion}-{arch}",
                 #     "/app/docker-build",
                 #     ])
