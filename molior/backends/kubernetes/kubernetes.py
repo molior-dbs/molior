@@ -75,7 +75,7 @@ class KubernetesBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
-    def create_kubernetes_job(namespace, job_name, image):
+    def create_kubernetes_job(self, namespace, job_name, image):
         container = client.V1Container(
             name=job_name,
             image=image,
@@ -130,19 +130,20 @@ class KubernetesBackend:
                 await write_log_title(build_id, "Kubernetes Build")
                 await buildlog(build_id, "\x1b[36m\x1b[1mPulling build container ...\x1b[0m\n")
 
-                server_url = Configuration().server.get("url")
+                # server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-kubernetes.yml")
                 if not cfg:
                     logger.error("kubernetes-backend: config file not found: /etc/molior/backend-kubernetes.yml")
                     continue
 
                 registry = cfg.registry.get("server")
-                builder = cfg.builder.get(arch)
+                # builder = cfg.builder.get(arch)
 
                 namespace = "default"
                 job_name = "example-job"
                 image = f"{registry}/molior-{distversion}-{arch}"
-                create_kubernetes_job(namespace, job_name, image)
+
+                self.create_kubernetes_job(namespace, job_name, image)
 
                 # cmd = shlex.split(remote_cmd)
                 # cmd.extend([
