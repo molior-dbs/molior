@@ -1,3 +1,10 @@
+molior (1.5.0~beta22) stretch; urgency=medium
+
+  * stream pod logs and delete job
+  * pass env vars
+
+ -- André Roth <neolynx@gmail.com>  Mon, 27 Jan 2025 13:25:20 +0100
+
 molior (1.5.0~beta21) stretch; urgency=medium
 
   * fix
