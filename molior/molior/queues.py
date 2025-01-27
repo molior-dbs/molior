@@ -112,6 +112,13 @@ async def enqueue_buildlog(build_id, msg):
     await buildlogs[build_id].put(msg)
 
 
+def enqueue_buildlog_nowait(loop, build_id, msg):
+    if build_id not in buildlogs:
+        buildlogs[build_id] = asyncio.Queue()
+        asyncio.run_coroutine_threadsafe(buildlog_writer(build_id), loop)
+    buildlogs[build_id].put_nowait(msg)
+
+
 async def buildlogdone(build_id):
     await enqueue_buildlog(build_id, False)
 

@@ -1,13 +1,14 @@
 import asyncio
+import concurrent
+import time
 
 from contextlib import suppress
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
-
 
 from ...logger import logger
 from ...molior.configuration import Configuration
-from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enqueue_backend
+from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enqueue_backend, enqueue_buildlog_nowait
 from ...tools import write_log_title
 
 
@@ -79,26 +80,17 @@ class KubernetesBackend:
         container = client.V1Container(
             name=job_name,
             image=image,
-            env=[client.V1EnvVar(name=en, value=ev) for en, ev in envvars],
-            args=["env"]
+            env=[client.V1EnvVar(name=en, value=str(ev)) for en, ev in envvars],
+            args=["/app/docker-build"]
         )
 
-        # Define the Pod template spec
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"job-name": job_name}),
             spec=client.V1PodSpec(restart_policy="Never", containers=[container])
         )
 
-        job_spec = client.V1JobSpec(
-            template=template,
-            # spec=V1PodSpec(
-            #     node_selector={"kubernetes.io/hostname": "node-name"},  # Specify the node label here
-            #     containers=[client.V1Container(name="my-container", image="nginx")]
-            # ),
-            backoff_limit=4  # Number of retries before failing the Job
-        )
+        job_spec = client.V1JobSpec(template=template)
 
-        # Define the Job resource
         job = client.V1Job(
             api_version="batch/v1",
             kind="Job",
@@ -106,13 +98,85 @@ class KubernetesBackend:
             spec=job_spec
         )
 
-        # Create the Job in the specified namespace
         try:
             batch_v1 = client.BatchV1Api()
             batch_v1.create_namespaced_job(body=job, namespace=namespace)
-            print(f"Job '{job_name}' created successfully.")
+            return True
         except ApiException as e:
-            print(f"Error creating Job: {e}")
+            logger.error(f"Error creating Job: {e}")
+        return False
+
+    def monitor_job_status(self, job_name, namespace):
+        w = watch.Watch()
+        batch_v1 = client.BatchV1Api()
+        for event in w.stream(batch_v1.list_namespaced_job, namespace=namespace):
+            job = event["object"]
+            if job.metadata.name == job_name:
+                status = job.status
+                if status.succeeded:
+                    w.stop()
+                    return True
+                elif status.failed:
+                    w.stop()
+        return False
+
+    def stream_pod_logs(self, loop, build_id, job_name, namespace):
+        core_v1 = client.CoreV1Api()
+        pod_name = None
+        for i in range(300):
+            pod_list = core_v1.list_namespaced_pod(namespace=namespace, label_selector=f"job-name={job_name}")
+            if not pod_list.items:
+                time.sleep(1)
+                continue
+            pod_name = pod_list.items[0].metadata.name
+
+        if not pod_name:
+            logger.error(f"No pods found for Job {job_name}")
+            return False
+
+        phase = None
+        for i in range(300):
+            pod_status = core_v1.read_namespaced_pod_status(name=pod_name, namespace=namespace)
+            phase = pod_status.status.phase
+            if phase == "Running":
+                break
+            elif phase == "Failed" or phase == "Unknown":
+                logger.error(f"Pod {pod_name} failed to start. Current phase: {phase}")
+                return False
+            else:
+                time.sleep(1)
+
+        if phase != "Running":
+            logger.error(f"timeout waiting for pod {pod_name} to start")
+            return False
+
+        try:
+            logs = core_v1.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=namespace,
+                follow=True,
+                pretty=False,
+                _preload_content=False
+            )
+
+            for chunk in logs.stream(1024):
+                if chunk:
+                    enqueue_buildlog_nowait(loop, build_id, chunk.decode())
+
+        except Exception as e:
+            logger.error(f"Error streaming logs: {e}")
+
+    def delete_job(self, job_name, namespace):
+        batch_v1 = client.BatchV1Api()
+        try:
+            delete_options = client.V1DeleteOptions(propagation_policy="Foreground")
+            batch_v1.delete_namespaced_job(
+                    name=job_name,
+                    namespace=namespace,
+                    body=delete_options
+                    )
+        except ApiException as e:
+            logger.info(f"Exception when deleting Job: {e}")
 
     async def consumer(self, queue_arch):
         up = True
@@ -128,7 +192,6 @@ class KubernetesBackend:
                 await enqueue_backend({"started": build_id})
 
                 await write_log_title(build_id, "Kubernetes Build")
-                await buildlog(build_id, "\x1b[36m\x1b[1mPulling build container ...\x1b[0m\n")
 
                 server_url = Configuration().server.get("url")
                 cfg = Configuration("/etc/molior/backend-kubernetes.yml")
@@ -137,10 +200,9 @@ class KubernetesBackend:
                     continue
 
                 registry = cfg.registry.get("server")
-                # builder = cfg.builder.get(arch)
 
                 namespace = "default"
-                job_name = "example-job"
+                job_name = f"build-{task['build_id']}-{arch}-{distversion}".replace(".", "-")
                 image = f"{registry}/molior-{distversion}-{arch}"
 
                 envvars = [
@@ -158,50 +220,30 @@ class KubernetesBackend:
                         ("APT_SERVER", task['apt_server']),
                         ("APT_KEYS", ' '.join(task['apt_keys'])),
                         ("RUN_LINTIAN", task['run_lintian']),
-                        ("MOLIOR_SERVER", server_url)
+                        ("MOLIOR_SERVER", server_url),
+                        ("APT_SOURCES_INTERNAL", "1"),
                 ]
-                self.create_kubernetes_job(namespace, job_name, image, envvars)
 
-                # cmd = shlex.split(remote_cmd)
-                # cmd.extend([
-                #     "unbuffer",
-                #     "docker", "run", "-t", "--rm",
-                #     "--add-host=host.docker.internal:host-gateway",
-                #     f"{registry}/molior-{distversion}-{arch}",
-                #     "/app/docker-build",
-                #     ])
+                executor = concurrent.futures.ThreadPoolExecutor()
+                loop = asyncio.get_event_loop()
+                ret = await loop.run_in_executor(executor, lambda:
+                                                 self.create_kubernetes_job(namespace, job_name, image, envvars))
+                if not ret:
+                    await enqueue_backend({"failed": build_id})
+                else:
+                    future = loop.run_in_executor(executor, lambda: self.stream_pod_logs(loop, build_id, job_name, namespace))
 
-                # has_output = False
+                    ret = await loop.run_in_executor(executor, lambda: self.monitor_job_status(job_name, namespace))
+                    if ret is True:
+                        await enqueue_backend({"succeeded": build_id})
+                    else:
+                        await enqueue_backend({"failed": build_id})
 
-                # async def outh(line):
-                #     nonlocal has_output
-                #     has_output = True
-                #     await buildlog(build_id, line)
-
-                # pull_cmd = shlex.split(remote_cmd)
-                # pull_cmd.extend(shlex.split(f"unbuffer docker pull {registry}/molior-{distversion}-{arch}"))
-                # process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
-                # await process.launch()
-                # ret = await process.wait()
-
-                # if not ret == 0 and not has_output:
-                #     await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
-                #     await enqueue_backend({"failed": build_id})
-
-                # else:
-                #     await buildlog(build_id, "\n")
-
-                #     process = Launchy(cmd, out_handler=outh, err_handler=outh, buffered=False)
-                #     await process.launch()
-                #     ret = await process.wait()
-
-                #     if not ret == 0:
-                #         await buildlog(build_id, f"E: error running docker command {shlex.join(cmd)}\n")
-                #         await enqueue_backend({"failed": build_id})
-                #     else:
-                #         await enqueue_backend({"succeeded": build_id})
+                    await future
 
                 await buildlog(build_id, None)  # signal end of logs
+
+                ret = await loop.run_in_executor(executor, lambda: self.delete_job(job_name, namespace))
 
             except Exception as exc:
                 logger.exception(exc)

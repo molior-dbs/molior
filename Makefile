@@ -22,6 +22,9 @@ prod-build-cached:  ## Build prod containers (cached)
 prod-molior:  ## Build prod molior
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache molior
 
+prod-molior-cached:  ## Build prod molior (cached)
+	@docker-compose -f docker/prod/docker-compose-build.yml build molior
+
 prod-aptly:  ## Build prod aptly
 	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache aptly
 

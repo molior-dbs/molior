@@ -49,7 +49,7 @@ data:
     # Molior configuration
 
     server:
-        url: 'http://aptly:8000'
+        url: 'http://molior:9999'
 
     hostname: '127.0.0.1'
     working_dir: '/var/lib/molior'

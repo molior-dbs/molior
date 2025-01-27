@@ -70,7 +70,12 @@ echo " - Builder : docker `hostname`"
 echo
 
 log "Adding APT sources:"
-curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" > /etc/apt/sources.list
+apiargs=""
+if [ -n "$APT_SOURCES_INTERNAL" ] && [ "$APT_SOURCES_INTERNAL" -eq 1 ]; then
+    apiargs="?internal=true"
+fi
+
+curl --max-time 30 -s "$MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources$apiargs" > /etc/apt/sources.list
 if [ "$?" -ne 0 ]; then
   echo "E: Error getting apt sources from $MOLIOR_SERVER/api2/project/$PROJECT/$PROJECTVERSION/aptsources" >&2
   exit 1
