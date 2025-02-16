@@ -11,7 +11,7 @@ trap 'sig TERM' TERM
 
 echo Starting aptly ...
 chown -R aptly /var/lib/aptly
-/usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
+create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
 
 su aptly -c 'aptly api serve -no-lock -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
 suppid=$!

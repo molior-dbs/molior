@@ -24,9 +24,11 @@ class DockerBackend:
             for arch in ["amd64", "arm64"]:
                 self.scheduler[arch] = []
                 builder = cfg.builder.get(arch)
+                self.internal_apt_sources = False
                 parallel = 1
                 if builder:
                     parallel = builder.get("parallel", 1)
+                    self.internal_apt_sources = builder.get("internal-apt-sources", False)
                 logger.info(f"docker backend: starting {parallel} {arch} tasks")
                 for i in range(parallel):
                     self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
@@ -120,6 +122,7 @@ class DockerBackend:
                     "-e", f"PROJECT={task['project']}",
                     "-e", f"PROJECTVERSION={task['projectversion']}",
                     "-e", f"APT_SERVER={task['apt_server']}",
+                    "-e", f"APT_SOURCES_INTERNAL={1 if self.internal_apt_sources else 0}",
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
