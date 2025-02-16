@@ -122,7 +122,7 @@ class DockerBackend:
                     "-e", f"PROJECT={task['project']}",
                     "-e", f"PROJECTVERSION={task['projectversion']}",
                     "-e", f"APT_SERVER={task['apt_server']}",
-                    "-e", f"APT_SOURCES_INTERNAL={1 if self.internal_apt_sources else 0}",
+                    "-e", f"APT_SOURCES_INTERNAL={1 if internal_apt_sources else 0}",
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
