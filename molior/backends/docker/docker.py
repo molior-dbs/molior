@@ -125,7 +125,7 @@ class DockerBackend:
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
-                    f"{registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}",
+                    f"{registry}/molior/{task['distrelease']}-{arch}:{task['distversion']}",
                     "/app/docker-build",
                     ])
 
@@ -138,14 +138,14 @@ class DockerBackend:
 
                 pull_cmd = shlex.split(remote_cmd)
                 pull_cmd.extend(
-                        shlex.split(f"unbuffer docker pull {registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}"))
+                        shlex.split(f"unbuffer docker pull {registry}/molior/{task['distrelease']}-{arch}:{task['distversion']}"))
                 process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
 
                 if not ret == 0 and not has_output:
                     await buildlog(build_id, "E: error pulling docker build image "
-                                   f"{registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}")
+                                   f"{registry}/molior/{task['distrelease']}-{arch}:{task['distversion']}")
                     await enqueue_backend({"failed": build_id})
 
                 else:

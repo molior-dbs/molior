@@ -189,7 +189,7 @@ publish_docker()
   cd - > /dev/null
   rm -rf $target
 
-  CONTAINER_VERSION=$DIST_RELEASE-$DIST_VERSION-$ARCH
+  CONTAINER_VERSION=$DIST_RELEASE-$ARCH:$DIST_VERSION
 
   REGISTRY=localhost:5000
   if [ -f /etc/molior/backend-docker.yml ]; then
