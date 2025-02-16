@@ -203,8 +203,10 @@ class KubernetesBackend:
                 registry = cfg.registry.get("server")
 
                 namespace = "default"
-                job_name = f"build-{task['build_id']}-{task['repository_name']}-{task['version']}-" \
-                           f"{distrelease}-{distversion}-{arch}".replace(".", "-")
+                jobversion = task['version'].replace("~", "-")
+                job_name = f"build-{task['build_id']}-{task['repository_name']}-{jobversion}-" \
+                           f"{distrelease}-{distversion}-{arch}"
+                job_name = job_name.replace(".", "-")
                 image = f"{registry}/molior/{distrelease}{distversion}-{arch}"
 
                 envvars = [
