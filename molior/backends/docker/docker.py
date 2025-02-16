@@ -24,14 +24,14 @@ class DockerBackend:
             for arch in ["amd64", "arm64"]:
                 self.scheduler[arch] = []
                 builder = cfg.builder.get(arch)
-                self.internal_apt_sources = False
+                internal_apt_sources = False
                 parallel = 1
                 if builder:
                     parallel = builder.get("parallel", 1)
-                    self.internal_apt_sources = builder.get("internal_apt_sources", False)
-                logger.info(f"docker backend: starting {parallel} {arch} tasks")
+                    internal_apt_sources = builder.get("internal_apt_sources", False)
+                logger.info(f"docker backend: starting {parallel} {arch} tasks (internal apt source: {internal_apt_sources})")
                 for i in range(parallel):
-                    self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
+                    self.scheduler[arch].append(asyncio.create_task(self.consumer(arch, internal_apt_sources)))
 
     async def build(self, build_id, token, build_version, apt_server, arch, arch_any_only, distrelease_name, distrelease_version,
                     project_dist, sourcename, project_name, project_version, apt_urls, apt_keys, run_lintian):
@@ -74,7 +74,7 @@ class DockerBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
-    async def consumer(self, queue_arch):
+    async def consumer(self, queue_arch, internal_apt_sources):
         up = True
         while up:
             try:
