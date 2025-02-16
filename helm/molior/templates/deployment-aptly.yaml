@@ -52,6 +52,8 @@ spec:
                 configMapKeyRef:
                   key: APTLY_USER
                   name: env
+            - name: APTLY_URL
+              value: http://localhost:3142
           ports:
             - containerPort: 8080
               protocol: TCP

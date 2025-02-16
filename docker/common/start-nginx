@@ -7,4 +7,10 @@ if [ -n "$APTLY_USER" ] && [ -n "$APTLY_PASSWORD" ]; then
     /usr/sbin/create-aptly-passwd $APTLY_USER $APTLY_PASSWORD
 fi
 
+if [ -z "$APTLY_URL" ]; then
+    APTLY_URL=http://aptly:3142
+fi
+
+sed "s#__APTLY_URL__#$APTLY_URL#" /etc/nginx/sites-available/aptlyapi.tpl > /etc/nginx/sites-available/aptlyapi
+
 exec nginx -g 'daemon off;'
