@@ -1,3 +1,9 @@
+molior (1.5.0~beta28) stretch; urgency=medium
+
+  * kubernetes: fix job name
+
+ -- André Roth <neolynx@gmail.com>  Sun, 16 Feb 2025 18:57:19 +0100
+
 molior (1.5.0~beta27) stretch; urgency=medium
 
   * rename build container image
