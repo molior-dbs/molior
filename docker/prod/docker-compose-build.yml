@@ -22,8 +22,8 @@ services:
   aptly:
     container_name: molior-aptly
     build:
-      context: .
-      dockerfile: aptly.Dockerfile
+      context: ../..
+      dockerfile: docker/prod/aptly.Dockerfile
 
   nginx:
     container_name: molior-nginx

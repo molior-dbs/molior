@@ -23,7 +23,7 @@ fi
 
 if [ -n "$REPOSIGN_NAME" ] && [ -n "$REPOSIGN_EMAIL" ]; then
     echo "Creating gpgs key for '$REPOSIGN_NAME'"
-    /usr/sbin/create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
+    create-aptly-keys $REPOSIGN_NAME $REPOSIGN_EMAIL
 fi
 
 # Copy aptly configuration
