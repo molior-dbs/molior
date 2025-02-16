@@ -1,3 +1,9 @@
+molior (1.5.0~beta24) stretch; urgency=medium
+
+  * fix
+
+ -- André Roth <neolynx@gmail.com>  Sun, 16 Feb 2025 17:36:39 +0100
+
 molior (1.5.0~beta23) stretch; urgency=medium
 
   * fix dev env
