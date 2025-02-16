@@ -189,6 +189,7 @@ class KubernetesBackend:
                 build_id = task["build_id"]
                 arch = task['architecture']
                 distversion = task['distversion']
+                distrelease = task['distrelease']
                 await enqueue_backend({"started": build_id})
 
                 await write_log_title(build_id, "Kubernetes Build")
@@ -202,8 +203,9 @@ class KubernetesBackend:
                 registry = cfg.registry.get("server")
 
                 namespace = "default"
-                job_name = f"build-{task['build_id']}-{arch}-{distversion}".replace(".", "-")
-                image = f"{registry}/molior-{distversion}-{arch}"
+                job_name = f"build-{task['build_id']}-{task['repository_name']}-{task['version']}-" \
+                           f"{distrelease}-{distversion}-{arch}".replace(".", "-")
+                image = f"{registry}/molior/{distrelease}{distversion}-{arch}"
 
                 envvars = [
                         ("BUILD_ID", task['build_id']),

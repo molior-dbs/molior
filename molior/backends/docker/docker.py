@@ -84,7 +84,6 @@ class DockerBackend:
 
                 build_id = task["build_id"]
                 arch = task['architecture']
-                distversion = task['distversion']
                 await enqueue_backend({"started": build_id})
 
                 await write_log_title(build_id, "Docker Build")
@@ -113,7 +112,7 @@ class DockerBackend:
                     "-e", f"BUILD_ID={task['build_id']}",
                     "-e", f"BUILD_TOKEN={task['token']}",
                     "-e", f"PLATFORM={task['distrelease']}",
-                    "-e", f"PLATFORM_VERSION={distversion}",
+                    "-e", f"PLATFORM_VERSION={task['distversion']}",
                     "-e", f"ARCH={arch}",
                     "-e", f"ARCH_ANY_ONLY={task['arch_any_only']}",
                     "-e", f"REPO_NAME={task['repository_name']}",
@@ -126,7 +125,7 @@ class DockerBackend:
                     "-e", f"APT_KEYS={' '.join(task['apt_keys'])}",
                     "-e", f"RUN_LINTIAN={task['run_lintian']}",
                     "-e", f"MOLIOR_SERVER={server_url}",
-                    f"{registry}/molior-{distversion}-{arch}",
+                    f"{registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}",
                     "/app/docker-build",
                     ])
 
@@ -138,13 +137,15 @@ class DockerBackend:
                     await buildlog(build_id, line)
 
                 pull_cmd = shlex.split(remote_cmd)
-                pull_cmd.extend(shlex.split(f"unbuffer docker pull {registry}/molior-{distversion}-{arch}"))
+                pull_cmd.extend(
+                        shlex.split(f"unbuffer docker pull {registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}"))
                 process = Launchy(pull_cmd, out_handler=outh, err_handler=outh, buffered=False)
                 await process.launch()
                 ret = await process.wait()
 
                 if not ret == 0 and not has_output:
-                    await buildlog(build_id, f"E: error pulling docker build image {registry}/molior-{distversion}-{arch}")
+                    await buildlog(build_id, "E: error pulling docker build image "
+                                   f"{registry}/molior/{task['distrelease']}-{task['distversion']}-{arch}")
                     await enqueue_backend({"failed": build_id})
 
                 else:
