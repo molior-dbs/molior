@@ -28,7 +28,7 @@ class DockerBackend:
                 parallel = 1
                 if builder:
                     parallel = builder.get("parallel", 1)
-                    self.internal_apt_sources = builder.get("internal-apt-sources", False)
+                    self.internal_apt_sources = builder.get("internal_apt_sources", False)
                 logger.info(f"docker backend: starting {parallel} {arch} tasks")
                 for i in range(parallel):
                     self.scheduler[arch].append(asyncio.create_task(self.consumer(arch)))
