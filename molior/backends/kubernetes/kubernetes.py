@@ -207,7 +207,7 @@ class KubernetesBackend:
                 job_name = f"build-{task['build_id']}-{task['repository_name']}-{jobversion}-" \
                            f"{distrelease}-{distversion}-{arch}"
                 job_name = job_name.replace(".", "-")
-                image = f"{registry}/molior/{distrelease}{distversion}-{arch}"
+                image = f"{registry}/molior/{distrelease}-{distversion}-{arch}"
 
                 envvars = [
                         ("BUILD_ID", task['build_id']),
