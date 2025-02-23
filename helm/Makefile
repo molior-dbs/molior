@@ -1,45 +1,52 @@
 
-help:
+NAMESPACE := molior
 
-create-cluster:
+export HELM_NAMESPACE=$(NAMESPACE)
+
+help:  ## Print this help
+	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+create-cluster:  ## Create k3d cluster
 	#k3d cluster create --config k3d/cluster.yaml
 	k3d cluster create molior --port "8000:80@loadbalancer" --port "8080:30080" --port "5000:30500" --registry-config k3d/registry.yaml
+	kubectl config set-context --current --namespace=$(NAMESPACE)
 
-delete-cluster:
+delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
 
-import:
+import:  ## Import local prod images into k3d
 	k3d image import --cluster molior molior_web molior_registry molior_nginx molior_postgres molior_molior molior_aptly
 
-import-web:
+import-web:  ## Import web image into k3d
 	k3d image import --cluster molior molior_web
-import-registry:
+import-registry:  ## Import registry image into k3d
 	k3d image import --cluster molior molior_registry
-import-nginx:
+import-nginx:  ## Import nginx image into k3d
 	k3d image import --cluster molior molior_nginx
-import-postgres:
+import-postgres:  ## Import postgres image into k3d
 	k3d image import --cluster molior molior_postgres
-import-molior:
+import-molior:  ## Import molior image into k3d
 	k3d image import --cluster molior molior_molior
-import-aptly:
+import-aptly:  ## Import aptly image into k3d
 	k3d image import --cluster molior molior_aptly
 
-package:
+package:  ## Create molior helm package
 	helm package molior
 
-install: package
-	helm install molior molior-0.0.1.tgz
-	rm -f molior-0.0.1.tgz
+install: ## Install molior helm chart
+	helm install --create-namespace molior molior/
 
-uninstall:
+uninstall:  ## Uninstall molior helm package
 	helm uninstall molior
 
-update: package
+update: package  ## Update molior helm chart
 	helm upgrade molior molior-0.0.1.tgz
 
-list:
+list:  ## List pods
 	kubectl get pods -A
 
+watch:  ## Watch pods
+	watch kubectl get pods -A
 
 .PHONY: create-cluster delete-cluster import import-aptly import-molior import-nginx import-postgres import-registry import-web install list package uninstall update
 

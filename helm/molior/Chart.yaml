@@ -1,6 +1,6 @@
 name: molior
-description: A generated Helm Chart for molior from Skippbox Kompose
-version: 0.0.1
+description: Molior Debian Build System and Repository Management
+version: 1.5.0
 apiVersion: v2
 keywords:
   - molior
