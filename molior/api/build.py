@@ -228,6 +228,8 @@ async def get_builds(request):
                                   func.lower(Project.name) == project_name.lower(),
                                   func.lower(ProjectVersion.name) == project_version.lower(),
                                   ).first()
+        if not projectversion:
+            return ErrorResponse(400, f"Projectversion not found")
 
     if projectversion:
         builds = builds.join(ProjectVersion).filter(ProjectVersion.id == projectversion.id)
