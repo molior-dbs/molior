@@ -98,7 +98,7 @@ The molior Debian Build System consists of the following components:
 
 ## Login to the Web UI
 
-Point your browser to the URL of the molior server, login with admin and the password defined in /etc/molior/molior/yml.
+Point your browser to the URL of the molior server, login with admin and the password defined in `/etc/molior/molior.yml`.
 
 ## Creating Mirrors
 
@@ -125,7 +125,7 @@ The following will mirror Debian/stretch for amd64 and arm64. It will take appro
 
 Depending on the network and disk performance, this might take a 2-3 hours.
 
-Note: if you are mirroring Debian/buster use these keys: 04EE7237B7D453EC 648ACFD622F3D138 DCC9EFBF77E11517)
+Note: if you are mirroring Debian/buster use these keys: 04EE7237B7D453EC 648ACFD622F3D138 DCC9EFBF77E11517
 
 ## Example a non-base mirrors
 
@@ -221,6 +221,22 @@ Debian packages can be build with:
 ```
 debuild -us -uc -b
 ```
+
+## Docker Compose Environment
+
+Its important to clone the [molior-web2]() repository next to molior, the docker compose of the web service relies on it.
+
+Start the docker setup with the following commands:
+
+```bash
+docker compose up -d # to start all docker containers
+```
+
+Additionally the default login credentials are the following:
+Username: admin
+Password: molior-dev
+
+Note: If the login resets everytime you login, clear your application data specifically your cookies to make sure that there is nothing that was left from a previous login test.
 
 # Authors
 
