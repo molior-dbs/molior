@@ -224,7 +224,7 @@ debuild -us -uc -b
 
 ## Docker Compose Environment
 
-Its important to clone the [molior-web2]() repository next to molior, the docker compose of the web service relies on it.
+Its important to clone the [molior-web2](https://github.com/molior-dbs/molior-web2) repository next to molior, the docker compose of the web service relies on it.
 
 Start the docker setup with the following commands:
 
