@@ -71,7 +71,7 @@ logs-molior:
 	kubectl logs -l app=molior -f
 
 logs-aptly:
-	kubectl logs -l molior.service=aptly -f
+	kubectl logs -l app=aptly -f
 
 
 restart-molior:

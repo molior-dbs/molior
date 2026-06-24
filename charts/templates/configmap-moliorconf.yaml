@@ -90,5 +90,5 @@ data:
 kind: ConfigMap
 metadata:
   labels:
-    molior.service: molior
+    app: molior
   name: molior-cm3

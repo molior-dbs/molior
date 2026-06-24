@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 data:
   APTLY_PASSWORD: molior-dev
@@ -11,5 +12,5 @@ data:
 kind: ConfigMap
 metadata:
   labels:
-    molior.service: aptly-env
+    app: aptly-env
   name: env

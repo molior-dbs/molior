@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    molior.service: aptly
+    app: aptly
   name: aptly
 spec:
   ports:
@@ -14,4 +14,4 @@ spec:
       port: 8000
       targetPort: 8000
   selector:
-    molior.service: aptly
+    app: aptly

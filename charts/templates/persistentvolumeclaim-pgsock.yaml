@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   labels:
-    molior.service: pgsock
+    app: pgsock
   name: pgsock
 spec:
   accessModes:

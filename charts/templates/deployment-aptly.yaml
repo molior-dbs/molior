@@ -3,19 +3,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    molior.service: aptly
+    app: aptly
   name: aptly
 spec:
   replicas: 1
   selector:
     matchLabels:
-      molior.service: aptly
+      app: aptly
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        molior.service: aptly
+        app: aptly
     spec:
       containers:
         - name: aptly-server

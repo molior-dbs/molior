@@ -2,11 +2,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: molior-job-manager-binding
-    #namespace: molior
 subjects:
   - kind: ServiceAccount
     name: molior-serviceaccount
-      #namespace: molior
 roleRef:
   kind: Role
   name: molior-job-manager
