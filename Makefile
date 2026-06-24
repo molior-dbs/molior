@@ -67,19 +67,24 @@ list:
 watch:
 	watch kubectl get pods
 
-logs-molior:
+logs:  ## Show logs
+	kubectl logs -l "app in (molior, aptly)" -f
+
+logs-molior:  ## Show molior logs
 	kubectl logs -l app=molior -f
 
-logs-aptly:
+logs-aptly:  ## Show aptly logs
 	kubectl logs -l app=aptly -f
 
 
-restart-molior:
+restart-molior:  ## Restart molior pod
 	kubectl delete pod -l app=molior
 
-psql:  ## run psql
+psql:  ## Run psql
 	kubectl exec -it molior-6c76b45685-ktsqv -- su molior -c psql molior
 
+clean:  ## Remove containers and volumes
+	docker rmi -f molior-base:dev
 
 
 
@@ -122,9 +127,6 @@ prod-publish-manifest:
 run-aptly-cmds:  ## run aptly commands
 	@docker-compose stop aptly
 	@docker-compose run aptly su aptly -c bash
-
-remove: clean   ## remove containers and volumes
-	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
 
 docker-compose.tar:
 	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
