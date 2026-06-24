@@ -1,15 +1,14 @@
 """
 /api/userroles
-Replaces molior/api/userrole.py
 """
 
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/api", tags=["users"])
+from ....model.userrole import USER_ROLES
 
-USER_ROLES = ["owner", "manager", "member"]
+router = APIRouter(tags=["userroles"])
 
 
-@router.get("/userroles")
+@router.get("/api/userroles")
 def get_userroles():
     return USER_ROLES

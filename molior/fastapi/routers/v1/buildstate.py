@@ -1,21 +1,15 @@
 """
 /api/buildstates
-Replaces molior/api/buildstate.py
 """
 
 from fastapi import APIRouter, Depends
 
-from ...auth import CurrentUser, authenticated
+from ...auth import authenticated, CurrentUser
+from ....model.build import BUILD_STATES
 
-router = APIRouter(prefix="/api", tags=["builds"])
-
-BUILD_STATES = [
-    "new", "cloning", "cloned", "clone_error",
-    "building", "build_failed", "build_failed_upload", "successful",
-    "needs_build", "scheduled", "already_failed", "already_built",
-]
+router = APIRouter(tags=["builds"])
 
 
-@router.get("/buildstates")
-def get_buildstates(current_user: CurrentUser = Depends(authenticated)):
-    return BUILD_STATES
+@router.get("/api/buildstates")
+def get_buildstates(_: CurrentUser = Depends(authenticated)):
+    return {"total_result_count": len(BUILD_STATES), "results": BUILD_STATES}

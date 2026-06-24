@@ -1,16 +1,15 @@
 """
-/api/info/aptlyhostname
-Replaces molior/api/info.py
+/api/info/*
 """
 
 from fastapi import APIRouter, Depends
 
-from ...auth import CurrentUser, authenticated
+from ...auth import authenticated, CurrentUser
 from ....molior.configuration import Configuration
 
-router = APIRouter(prefix="/api/info", tags=["info"])
+router = APIRouter(tags=["info"])
 
 
-@router.get("/aptlyhostname")
-def aptly_hostname(current_user: CurrentUser = Depends(authenticated)):
-    return {"hostname": Configuration().aptly_server.get("hostname", "")}
+@router.get("/api/info/aptlyhostname")
+def get_aptly_hostname(_: CurrentUser = Depends(authenticated)):
+    return Configuration().aptly.get("host")

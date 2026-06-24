@@ -129,7 +129,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from .routers.api_v2 import router
-    app.include_router(router)
+    from .routers.api_v1 import router as v1_router
+    from .routers.api_v2 import router as v2_router
+    app.include_router(v1_router)
+    app.include_router(v2_router)
 
     return app
