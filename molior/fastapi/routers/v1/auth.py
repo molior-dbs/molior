@@ -1,99 +1,69 @@
-from aiohttp import web
-from sqlalchemy.sql import func
+"""
+/api/login, /api/logout, /api/userinfo
+Replaces molior/api/auth.py
+"""
 
-from ..app import app
-from ..molior.configuration import Configuration
-from ..logger import logger
-from ..auth.auth import Auth, load_user, setup_token
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from ..model.user import User
-from ..model.project import Project
-from ..model.authtoken import Authtoken
-from ..model.authtoken_project import Authtoken_Project
+from ...auth import CurrentUser, authenticated, create_session_cookie
+from ....auth.auth import Auth
+from ...db import get_db
+from ....model.user import User
+from ....molior.configuration import Configuration
 
-
-@app.auth_handler
-async def auth_admin(request, user, passwd):
-    """
-    Authenticates admin user
-
-    Args:
-        user (str): The user's name.
-        passwd (str): The user's password.
-
-    Returns:
-        bool: True if successfully authenticated, otherwise False.
-    """
-    if not user:
-        return False
-    user = user.lower()
-    if user == "admin":
-        config = Configuration()
-        admin_pass = config.admin.get("admin_password")
-        if not admin_pass:
-            admin_pass = config.admin.get("pass")
-        if not admin_pass:
-            logger.info("Error: admin/admin_password not found in /etc/molior/molior.yml")
-            return False
-        if passwd == admin_pass:
-            load_user("admin", request.cirrina.db_session)
-            return True
-    return False
+router = APIRouter(prefix="/api", tags=["auth"])
 
 
-@app.auth_handler
-async def authenticate(request, user, passwd):
-    """
-    Authenticates a user.
-
-    Args:
-        user (str): The user's name.
-        passwd (str): The user's password.
-
-    Returns:
-        bool: True if successfully authenticated, otherwise False.
-    """
-    if not user:
-        return False
-    user = user.lower().strip()  # FIXME: move to cirrina
-    if user == "admin":
-        logger.error("admin account not allowed via auth plugin")
-        return False
-
-    return Auth().login(user, passwd)
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 
-@app.http_get("/api/userinfo")
-@app.authenticated
-async def get_userinfo(request):
-    username = request.cirrina.web_session.get("username")
-    if username:
-        user = request.cirrina.db_session.query(User).filter_by(username=username.lower()).first()
-        if user:
-            return web.json_response({"username": username, "user_id": user.id, "is_admin": user.is_admin})
-    return web.json_response({"username": username, "user_id": -1, "is_admin": False})
+@router.post("/login", status_code=200)
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    """Authenticate and set a signed session cookie."""
+    cfg = Configuration()
 
-
-@app.auth_handler
-async def authenticate_token(request, *kw):
-    setup_token(request)
-    auth_token = None
-    if hasattr(request.cirrina.web_session, "auth_token"):
-        auth_token = request.cirrina.web_session.auth_token
-    if not auth_token:
-        return False
-    token = None
-    project_name = request.match_info.get("project_name")
-    if project_name:
-        p = request.cirrina.db_session.query(Project).filter(func.lower(Project.name) == project_name.lower()).first()
-        if p:
-            project_id = p.id
-        query = request.cirrina.db_session.query(Authtoken).join(Authtoken_Project)
-        query = query.filter(Authtoken_Project.project_id == project_id, Authtoken.token == auth_token)
-        token = query.first()
+    # Built-in admin
+    if body.username == "admin":
+        if body.password != cfg.admin.get("admin_password", ""):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     else:
-        query = request.cirrina.db_session.query(Authtoken)
-        query = query.filter(Authtoken.token == auth_token)
-        token = query.first()
+        if not Auth().login(body.username, body.password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    return token is not None
+        # Ensure user exists in DB (create on first login)
+        user = db.query(User).filter_by(username=body.username).first()
+        if not user:
+            user = User(username=body.username)
+            if db.query(User).count() < 1:
+                user.is_admin = True
+            db.add(user)
+            db.commit()
+
+    cookie = create_session_cookie(body.username)
+    response.set_cookie(
+        key="MOLIOR_SESSION",
+        value=cookie,
+        httponly=True,
+        max_age=302400,  # 1 week
+        samesite="lax",
+    )
+
+
+@router.get("/logout", status_code=200)
+def logout(response: Response):
+    """Clear the session cookie."""
+    response.delete_cookie("MOLIOR_SESSION")
+
+
+@router.get("/userinfo")
+def userinfo(current_user: CurrentUser = Depends(authenticated)):
+    """Return info about the currently authenticated user."""
+    return {
+        "username": current_user.username,
+        "user_id": current_user.user_id,
+        "is_admin": current_user.is_admin,
+    }

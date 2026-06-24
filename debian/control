@@ -23,6 +23,7 @@ Depends: ${python3:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), dh-autoreconf
     python3-jinja2, python3-cirrina (>= 0.4.7), python3-click, devscripts,
     bc, pxz | xz-utils (>= 5.2.4-1), python3-launchy, python3-dateutil, python3-async-cron,
     python3-giturlparse, python3-aiofile, python3-psutil,
+    python3-fastapi, python3-itsdangerous, python3-starlette, python3-pydantic, python3-python-multipart,
     debootstrap (>= 1.0.110~bpo9+1), molior-common
 Tag: devel::buildtools
 Description: Debian Build and Repository Management System

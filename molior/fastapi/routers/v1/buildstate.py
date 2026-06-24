@@ -1,26 +1,21 @@
-from aiohttp import web
+"""
+/api/buildstates
+Replaces molior/api/buildstate.py
+"""
 
-from ..app import app
-from ..model.build import BUILD_STATES
+from fastapi import APIRouter, Depends
+
+from ...auth import CurrentUser, authenticated
+
+router = APIRouter(prefix="/api", tags=["builds"])
+
+BUILD_STATES = [
+    "new", "cloning", "cloned", "clone_error",
+    "building", "build_failed", "build_failed_upload", "successful",
+    "needs_build", "scheduled", "already_failed", "already_built",
+]
 
 
-@app.http_get("/api/buildstates")
-@app.authenticated
-async def get_buildstates(*_):
-    """
-    Returns a list of all buildstates.
-
-    ---
-    description: Returns a list of buildstates.
-    tags:
-        - Builds
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    """
-    data = {"total_result_count": len(BUILD_STATES), "results": BUILD_STATES}
-    return web.json_response(data)
+@router.get("/buildstates")
+def get_buildstates(current_user: CurrentUser = Depends(authenticated)):
+    return BUILD_STATES

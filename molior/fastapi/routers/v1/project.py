@@ -1,314 +1,43 @@
-from aiohttp import web
-from sqlalchemy import func
+"""
+/api/projects, /api/projectsources
+Replaces molior/api/project.py
+"""
 
-from ..app import app
-from ..logger import logger
-from ..auth import req_role, req_admin
-from ..molior.configuration import Configuration
-from ..tools import ErrorResponse, paginate, is_name_valid, OKResponse, escape_for_like, array2db
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from ..model.project import Project
-from ..model.projectversion import ProjectVersion, get_projectversion_deps, get_projectversion
-from ..model.authtoken import Authtoken
-from ..model.authtoken_project import Authtoken_Project
-from ..model.user import User
-from ..model.userrole import UserRole
-from ..model.build import Build
+from ...auth import CurrentUser, authenticated, require_admin, require_role
+from ...db import get_db
+from ...responses import PaginationParams
+
+router = APIRouter(prefix="/api", tags=["projects"])
 
 
-@app.http_get("/api/projects")
-@app.authenticated
-async def get_projects(request):
-    """
-    Return a list of projects.
-
-    ---
-    description: Returns a list of projects.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: page
-          in: query
-          required: false
-          type: integer
-        - name: page_size
-          in: query
-          required: false
-          type: integer
-        - name: q
-          in: query
-          required: false
-          type: string
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    """
-    db = request.cirrina.db_session
-    filter_name = request.GET.getone("q", "")
-
-    query = db.query(Project).filter(Project.is_mirror.is_(False)).order_by(func.lower(Project.name))
-
-    if filter_name:
-        query = query.filter(Project.name.ilike("%{}%".format(escape_for_like(filter_name))))
-
-    nb_results = query.count()
-    query = paginate(request, query)
-    results = query.all()
-
-    data = {"total_result_count": nb_results}
-    data["results"] = []
-    for project in results:
-        buildCount = db.query(Build).join(ProjectVersion).join(Project).filter(Project.id == project.id,
-                                                                               Build.is_ci.is_(False)).count()
-        cibuildCount = db.query(Build).join(ProjectVersion).join(Project).filter(Project.id == project.id,
-                                                                                 Build.is_ci.is_(True)).count()
-        data["results"].append({"id": project.id, "name": project.name, "description": project.description,
-                                "projectversionCount": len(project.projectversions),
-                                "buildCount": buildCount,
-                                "cibuildCount": cibuildCount
-                                })
-
-    return web.json_response(data)
+@router.get("/projects")
+def list_projects(
+    pagination: PaginationParams = Depends(),
+    current_user: CurrentUser = Depends(authenticated),
+    db: Session = Depends(get_db),
+):
+    raise NotImplementedError
 
 
-@app.http_get("/api/projects/{project_id}")
-@app.authenticated
-async def get_project(request):
-    """
-    Returns a project with version information.
-
-    ---
-    description: Returns information about a project.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: project_id
-          in: path
-          required: true
-          type: integer
-        - name: show_deleted
-          in: query
-          required: false
-          type: boolean
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    """
-    db = request.cirrina.db_session
-    project_id = request.match_info["project_id"]
-    show_deleted = request.GET.getone("show_deleted", "").lower() == "true"
-    try:
-        project_id = int(project_id)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for project_id")
-
-    project = db.query(Project).filter_by(id=project_id).first()
-    if not project:
-        return ErrorResponse(404, "Project with id {} could not be found!".format(project_id))
-
-    versions = db.query(ProjectVersion).filter_by(project_id=project.id,
-                                                  is_deleted=show_deleted).order_by(func.lower(ProjectVersion.name).desc()).all()
-    data = {
-        "id": project.id,
-        "name": project.name,
-        "description": project.description,
-        "versions": [
-            {"id": version.id, "name": version.name, "is_locked": version.is_locked}
-            for version in versions
-        ],
-        "versions_map": {version.id: version.name for version in versions},
-    }
-    return web.json_response(data)
+@router.get("/projects/{project_id}")
+def get_project(project_id: int, current_user: CurrentUser = Depends(authenticated), db: Session = Depends(get_db)):
+    raise NotImplementedError
 
 
-@app.http_post("/api/projects")
-@req_admin
-# FIXME: req_role
-async def create_project(request):
-    """
-    Creates a new project.
-
-    ---
-    description: Creates a new project.
-    tags:
-        - Projects
-    parameters:
-        - in: body
-          name: body
-          description: Created user object
-          required: true
-          schema:
-            type: object
-            properties:
-              name:
-                type: string
-              description:
-                type: string
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Invalid project name
-    """
-    db = request.cirrina.db_session
-    params = await request.json()
-    name = params.get("name")
-    description = params.get("description")
-    if not name:
-        return ErrorResponse(400, "No project name given")
-
-    if not is_name_valid(name):
-        return ErrorResponse(400, "Invalid project name")
-
-    if db.query(Project).filter(func.lower(Project.name) == name.lower()).first():
-        return ErrorResponse(400, "Projectname is already taken")
-
-    project = Project(name=name, description=description)
-    db.add(project)
-    db.commit()
-
-    username = request.cirrina.web_session.get('username')
-    auth_token = request.cirrina.web_session.get("auth_token", None)
-    if username:
-        user = db.query(User).filter(User.username == username).first()
-        if user:
-            userrole = UserRole(user_id=user.id, project_id=project.id, role="owner")
-            db.add(userrole)
-            db.commit()
-    elif auth_token:
-        token = db.query(Authtoken).filter(Authtoken.token == auth_token).first()
-        if token:
-            # FIXME: check already added
-            mapping = Authtoken_Project(project_id=project.id, authtoken_id=token.id, roles=array2db(['owner']))
-            db.add(mapping)
-            db.commit()
-
-    return OKResponse()
+@router.post("/projects")
+def create_project(current_user: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
+    raise NotImplementedError
 
 
-@app.http_put("/api/projectbase/{project_id}")
-@app.http_put("/api/projects/{project_id}")
-@app.authenticated
-@req_role("owner")
-async def update_project(request):
-    """
-    Update a project.
-
-    ---
-    description: Update a project.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: project_id
-          in: path
-          required: true
-          type: integer
-        - name: description
-          in: query
-          required: false
-          type: string
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "500":
-            description: internal server error
-    """
-    db = request.cirrina.db_session
-    # TODO: Implement this api method.
-    project_id = request.match_info["project_id"]
-    params = await request.json()
-    description = params.get("description")
-
-    try:
-        project_id = int(project_id)
-    except (ValueError, TypeError):
-        return ErrorResponse(400, "Incorrect value for project_id")
-
-    project = db.query(Project).filter_by(id=project_id).first()
-    if not project:
-        return ErrorResponse(404, "project {} not found".format(project_id))
-    project.description = description
-    db.commit()
-    return OKResponse("project updated")
+@router.put("/projects/{project_id}")
+@router.put("/projectbase/{project_id}")
+def update_project(project_id: str, current_user: CurrentUser = Depends(require_role("owner")), db: Session = Depends(get_db)):
+    raise NotImplementedError
 
 
-@app.http_get("/api/projectsources/{project_name}/{project_version}")
-async def get_apt_sources(request):
-    """
-    Returns apt sources list for given project,
-    projectversion and distrelease.
-
-    ---
-    description: Returns apt sources list.
-    tags:
-        - Projects
-    consumes:
-        - application/x-www-form-urlencoded
-    parameters:
-        - name: project_name
-          in: path
-          required: true
-          type: string
-        - name: project_version
-          in: path
-          required: true
-          type: string
-    produces:
-        - application/json
-    responses:
-        "200":
-            description: successful
-        "400":
-            description: Parameter missing
-    """
-    db = request.cirrina.db_session
-    unstable = request.GET.getone("unstable", "")
-
-    projectversion = get_projectversion(request)
-    if not projectversion:
-        return ErrorResponse(400, "projectversion not found")
-
-    deps = [(projectversion.id, projectversion.ci_builds_enabled)]
-    deps += get_projectversion_deps(projectversion.id, db)
-
-    cfg = Configuration()
-    apt_url = cfg.aptly.get("apt_url_public")
-    if not apt_url:
-        apt_url = cfg.aptly.get("apt_url")
-    keyfile = cfg.aptly.get("key")
-
-    sources_list = "# APT Sources for project {0} {1}\n".format(projectversion.project.name, projectversion.name)
-    sources_list += "# GPG-Key: {0}/{1}\n".format(apt_url, keyfile)
-    if not projectversion.project.is_basemirror and projectversion.basemirror:
-        sources_list += "# Base Mirror\n"
-        sources_list += "{}\n".format(projectversion.basemirror.get_apt_repo())
-
-    sources_list += "# Project Sources\n"
-    for d in deps:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d[0]).first()
-        if not dep:
-            logger.error("projectsources: projecversion %d not found", d[0])
-        sources_list += "{}\n".format(dep.get_apt_repo())
-        # ci builds requested & use ci builds from this dep & dep has ci builds
-        if unstable == "true" and d[1] and dep.ci_builds_enabled:
-            sources_list += "{}\n".format(dep.get_apt_repo(dist="unstable"))
-
-    return web.Response(status=200, text=sources_list)
+@router.get("/projectsources/{project_name}/{project_version}")
+def project_sources(project_name: str, project_version: str, db: Session = Depends(get_db)):
+    raise NotImplementedError

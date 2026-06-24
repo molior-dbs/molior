@@ -1,20 +1,15 @@
-from aiohttp import web
+"""
+/api/userroles
+Replaces molior/api/userrole.py
+"""
 
-from ..app import app
-from ..model.userrole import USER_ROLES
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/api", tags=["users"])
+
+USER_ROLES = ["owner", "manager", "member"]
 
 
-@app.http_get("/api/userroles")
-async def get_userroles(*_):
-    """
-    ---
-    description: Return the list of user role enumerator
-    tags:
-    - UserRole
-    produces:
-    - application/json
-    responses:
-        "200":
-            description: Return an array with results
-    """
-    return web.json_response(USER_ROLES)
+@router.get("/userroles")
+def get_userroles():
+    return USER_ROLES
