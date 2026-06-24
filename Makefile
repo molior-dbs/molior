@@ -32,12 +32,12 @@ create-cluster:  ## Create k3d cluster
 delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
 
-deploy-cluster:  ## Import local images into k3d
-	k3d image import --cluster molior molior:dev molior-nginx:dev molior-postgres:dev aptly:dev molior-web:dev
+deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web  ## Import local images into k3d
 
-deploy-cluster-molior:  ## Import local image into k3d: molior
-	docker tag molior:dev localhost:5000/molior:dev
-	docker push localhost:5000/molior:dev
+deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
+	docker tag $*:dev localhost:5000/$*:dev
+	docker push localhost:5000/$*:dev
+	docker rmi localhost:5000/$*:dev
 
 install-k3d:
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \

@@ -3,23 +3,23 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    molior.service: web
+    app: web
   name: web
 spec:
   replicas: 1
   selector:
     matchLabels:
-      molior.service: web
+      app: web
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        molior.service: web
+        app: web
     spec:
       containers:
-        - image: molior-web:dev
-          imagePullPolicy: Never
+        - image: molior-registry:5000/molior-web:dev
+          imagePullPolicy: Always
           name: molior-web
           ports:
             - containerPort: 80
