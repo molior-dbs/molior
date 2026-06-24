@@ -2,6 +2,39 @@
 
 This guide covers running the full Molior stack locally using k3d (Kubernetes in Docker).
 
+## Clone the repositories
+
+The main development repositories (checked out side by side):
+
+```sh
+git clone https://github.com/molior-dbs/molior
+git clone https://github.com/molior-dbs/molior-web2
+```
+
+The directory layout should be:
+```
+./molior/
+./molior-web2/
+```
+
+All subsequent commands are run from inside the `molior/` directory.
+
+The following related source repositories are part of the molior 1.5 project version
+and will be built inside the cluster:
+
+```sh
+git clone https://github.com/molior-dbs/aiofile
+git clone https://github.com/molior-dbs/aiohttp-session-file
+git clone https://github.com/neolynx/aiohttp-swagger
+git clone https://github.com/molior-dbs/async-cron
+git clone https://github.com/neolynx/cirrina
+git clone https://github.com/molior-dbs/git-url-parse
+git clone https://github.com/neolynx/launchy
+git clone https://github.com/molior-dbs/molior-tools
+```
+
+---
+
 ## Prerequisites
 
 - Linux host with `podman` or `docker` installed
@@ -45,7 +78,7 @@ This builds: `molior`, `molior-postgres`, `molior-nginx`, `molior-web`, `aptly`.
 Individual images can also be built separately:
 
 ```sh
-make docker-molior
+make docker-image-molior
 make docker-web
 make docker-aptly
 ```
