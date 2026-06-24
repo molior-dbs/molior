@@ -1,24 +1,25 @@
 NAMESPACE := molior
-
 export HELM_NAMESPACE=$(NAMESPACE)
+
+DOCKERCMD := $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
 
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 docker-images: docker-molior docker-web docker-aptly  ## Create docker images
-	docker build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
-	docker build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
+	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
+	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
 docker-molior:
-	@docker inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
-		docker build -f docker/molior-base.Dockerfile -t molior-base:dev .)
-	docker build -f docker/molior.Dockerfile -t molior:dev .
+	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
+		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
+	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
 
 docker-web:
-	docker build -f docker/web.Dockerfile -t molior-web:dev ../molior-web2
+	$(DOCKERCMD) build -f docker/web.Dockerfile -t molior-web:dev ../molior-web2
 
 docker-aptly:
-	docker build -f docker/aptly.Dockerfile -t aptly:dev .
+	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
 
 create-cluster:  ## Create k3d cluster
 	k3d cluster create molior \
@@ -35,9 +36,9 @@ delete-cluster:  ## Delete k3d cluster
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web deploy-image-aptly  ## Import local images into k3d
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
-	docker tag $*:dev localhost:5000/$*:dev
-	docker push localhost:5000/$*:dev
-	docker rmi localhost:5000/$*:dev
+	$(DOCKERCMD) tag $*:dev localhost:5000/$*:dev
+	$(DOCKERCMD) push localhost:5000/$*:dev
+	$(DOCKERCMD) rmi localhost:5000/$*:dev
 
 install-k3d:
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \
