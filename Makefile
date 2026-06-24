@@ -1,7 +1,14 @@
 NAMESPACE := molior
 export HELM_NAMESPACE=$(NAMESPACE)
 
-DOCKERCMD := $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
+ifneq ($(shell which podman 2>/dev/null),)
+  DOCKERCMD := podman
+  PODMAN_K3D_REGISTRY_ARGS := --default-network podman
+else ifneq ($(shell which docker 2>/dev/null),)
+  DOCKERCMD := docker
+else
+  $(error Neither podman nor docker found in PATH)
+endif
 
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -22,8 +29,9 @@ docker-aptly:
 	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
 
 create-cluster:  ## Create k3d cluster
+	k3d registry list molior-registry >/dev/null 2>&1 || k3d registry create molior-registry --port 0.0.0.0:5000 $(PODMAN_K3D_REGISTRY_ARGS)
 	k3d cluster create molior \
-		--registry-create molior-registry:0.0.0.0:5000 \
+		--registry-use k3d-molior-registry:5000 \
 		--port "8000:30080@server:0" \
 		--port "8080:30088@server:0" \
 		--k3s-arg "--disable=traefik@server:0" \
@@ -83,8 +91,9 @@ restart-molior:  ## Restart molior pod
 psql:  ## Run psql
 	kubectl exec -it molior-6c76b45685-ktsqv -- su molior -c psql molior
 
-clean:  ## Remove containers and volumes
+clean: delete-cluster  ## Remove cluster and registry
 	docker rmi -f molior-base:dev
+	k3d registry delete k3d-molior-registry
 
 
 
