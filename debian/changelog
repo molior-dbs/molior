@@ -1,3 +1,28 @@
+molior (1.5.0~beta31) stretch; urgency=medium
+
+  * projectversion: export and imports archs
+  * docs: update INSTALL.md
+  * Makefile: cleanup
+  * Makefile: add shell-molior
+  * charts: use version from values
+  * helm: use values.yaml
+  * Makefile: use variables
+  * Makefile: cleanup
+  * Makefile: cleanup
+  * docker: fix dev install
+  * charts: fix labels
+  * Makefile: use podman if available
+  * k3d: deploy aptly image
+  * k3d: fix cluster from scratch
+  * helm: move charts dir
+  * builds: handle the case when projectversion does not exist
+  * chart: fix repo service
+  * projectversion: fix copy
+  * cleanup
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Wed, 24 Jun 2026 23:41:57 +0200
+
 molior (1.5.0~beta30) stretch; urgency=medium
 
   * rename build containers
