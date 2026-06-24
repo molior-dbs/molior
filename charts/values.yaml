@@ -1,3 +1,6 @@
 registry:
   host: k3d-molior-registry
   port: 5000
+
+molior:
+  version: dev

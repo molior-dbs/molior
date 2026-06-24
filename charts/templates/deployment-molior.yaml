@@ -22,7 +22,7 @@ spec:
       initContainers:
 
         - name: init-postgres
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-postgres:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-postgres:{{ .Values.molior.version }}
           imagePullPolicy: Always
           command: ["/bin/sh", "-c", "test -e /data/PG_VERSION || ( echo Initializing PostgreSQL database; cp -ar /var/lib/postgresql/17/main/* /data/; chown postgres:postgres /data; chmod 700 /data)"]
           volumeMounts:
@@ -30,7 +30,7 @@ spec:
               name: postgres
 
         - name: init-molior
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior:{{ .Values.molior.version }}
           imagePullPolicy: Always
           command: ["/bin/sh", "-c", "test -e /data/buildout || ( echo Initializing Molior; cp -ar /var/lib/molior/* /data/; chown molior /data; chmod 755 /data )"]
           volumeMounts:
@@ -40,7 +40,7 @@ spec:
       containers:
 
         - name: molior-server
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior:{{ .Values.molior.version }}
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -92,7 +92,7 @@ spec:
               name: molior-cm3
 
         - name: molior-postgres
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-postgres:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-postgres:{{ .Values.molior.version }}
           imagePullPolicy: Never
           ports:
             - containerPort: 5432
