@@ -3,20 +3,23 @@ Real-time channels
 ==================
 
 GET /api/events
-    Server-Sent Events (SSE) for push notifications.
-    Replaces the broadcast half of the cirrina single-WebSocket design.
-    The browser uses EventSource('/api/events').
+    Server-Sent Events (SSE) — alternative push channel for clients that
+    prefer EventSource over WebSocket.
 
 WS /api/websocket
-    WebSocket for build-log streaming only.
-    Keeps the same URL so the existing nginx WebSocket proxy block works.
-    Protocol (client → server):
-        {"subject": "buildlog", "action": "start", "data": {"build_id": <int>}}
-        {"subject": "buildlog", "action": "stop"}
-    Protocol (server → client):
-        {"subject": "buildlog", "event": "added",  "data": "<log chunk>"}
-        {"subject": "buildlog", "event": "done"}
-        {"subject": "websocket", "event": "connected"}
+    Single WebSocket endpoint, preserving the original cirrina design.
+    The server pushes build/mirror/userrole change notifications to every
+    connected client (same as cirrina's websocket_broadcast).
+    The client may additionally request build-log streaming:
+        → {"subject": 8, "action": 4, "data": {"build_id": <int>}}   start
+        → {"subject": 8, "action": 5}                                  stop
+        ← {"subject": 8, "event": 1, "data": "<chunk>"}               log data
+        ← {"subject": 8, "event": 5}                                   done
+    Connected event on both channels:
+        ← {"subject": 1, "event": 4}
+
+WS /internal/buildlog/{token}
+    Used by build agents to stream log lines into the server.
 """
 
 import asyncio
@@ -37,47 +40,60 @@ from ..molior.notifier import Subject, Event, Action
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# SSE broadcast hub
+# Shared broadcast hub — fans out to SSE subscribers AND WebSocket connections
 # ---------------------------------------------------------------------------
 
-_subscribers: set = set()   # set[asyncio.Queue]
+_sse_queues: set = set()    # set[asyncio.Queue]  one per SSE client
+_ws_queues: set = set()     # set[asyncio.Queue]  one per WebSocket client
 
-
-async def broadcast(msg: dict):
-    """
-    Fan a notification out to all connected SSE clients.
-    Called by NotificationWorker and any handler that emits events
-    (e.g. userrole changes).
-    """
-    dead = set()
-    for q in list(_subscribers):
-        try:
-            q.put_nowait(msg)
-        except asyncio.QueueFull:
-            dead.add(q)
-    _subscribers.difference_update(dead)
-
-
-# Pre-built constant messages (integers match the frontend enum values)
 _MSG_CONNECTED = json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value})
 _MSG_BUILDLOG_DONE = json.dumps({"subject": Subject.buildlog.value, "event": Event.done.value})
 
 
+async def broadcast(msg: dict):
+    """
+    Fan a notification dict out to every connected SSE client and every
+    connected WebSocket client.  Called by NotificationWorker and any
+    handler that emits inline events (e.g. userrole changes).
+    """
+    payload = json.dumps(msg)
+    dead: set = set()
+
+    for q in list(_sse_queues):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.add(q)
+    _sse_queues.difference_update(dead)
+
+    dead = set()
+    for q in list(_ws_queues):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.add(q)
+    _ws_queues.difference_update(dead)
+
+
+# ---------------------------------------------------------------------------
+# SSE endpoint
+# ---------------------------------------------------------------------------
+
 async def _sse_stream(request: Request):
     q: asyncio.Queue = asyncio.Queue(maxsize=256)
-    _subscribers.add(q)
+    _sse_queues.add(q)
     try:
         yield f"data: {_MSG_CONNECTED}\n\n"
         while True:
             if await request.is_disconnected():
                 break
             try:
-                msg = await asyncio.wait_for(q.get(), timeout=20)
-                yield f"data: {json.dumps(msg)}\n\n"
+                payload = await asyncio.wait_for(q.get(), timeout=20)
+                yield f"data: {payload}\n\n"
             except asyncio.TimeoutError:
                 yield ": keepalive\n\n"
     finally:
-        _subscribers.discard(q)
+        _sse_queues.discard(q)
 
 
 @router.get("/api/events")
@@ -85,12 +101,7 @@ async def sse_events(
     request: Request,
     _: CurrentUser = Depends(authenticated),
 ):
-    """
-    Server-Sent Events endpoint.
-    Pushes build, mirror and userrole change notifications to the browser.
-    X-Accel-Buffering: no disables nginx proxy buffering without needing
-    a config change in the web image.
-    """
+    """Server-Sent Events — push notifications without a WebSocket."""
     return StreamingResponse(
         _sse_stream(request),
         media_type="text/event-stream",
@@ -102,7 +113,7 @@ async def sse_events(
 
 
 # ---------------------------------------------------------------------------
-# Build-log WebSocket
+# Build-log streaming helper
 # ---------------------------------------------------------------------------
 
 _TERMINAL_STATES = frozenset({
@@ -129,7 +140,6 @@ class _BuildLogger:
 
     async def run(self):
         from aiofile import AIOFile, Reader
-
         self._running = True
         filepath = BUILD_OUT_PATH / str(self._build_id) / "build.log"
         while self._running:
@@ -145,7 +155,6 @@ class _BuildLogger:
                                 "data": chunk.decode("utf-8", errors="ignore"),
                             }
                             await self._send(json.dumps(msg))
-                        # EOF — poll until build finishes or we're stopped
                         ticks += 1
                         if ticks % 100 == 0:
                             ticks = 0
@@ -165,17 +174,26 @@ class _BuildLogger:
             await self._send(_MSG_BUILDLOG_DONE)
 
 
-@router.websocket("/api/websocket")
-async def buildlog_websocket(websocket: WebSocket):
-    """
-    WebSocket endpoint for build-log streaming.
+# ---------------------------------------------------------------------------
+# Main WebSocket endpoint
+# ---------------------------------------------------------------------------
 
-    The client sends a start message to begin tailing a build log,
-    and a stop message (or simply disconnects) to end it.
-    Only one active build log stream per connection is supported.
+@router.websocket("/api/websocket")
+async def main_websocket(websocket: WebSocket):
+    """
+    Single WebSocket endpoint.
+
+    On connect the server sends a 'connected' event.
+    The server pushes all build/mirror/userrole notifications to the client
+    via a per-connection asyncio queue (same fan-out as SSE).
+    The client may start/stop a build-log stream by sending action messages.
     """
     await websocket.accept()
     await websocket.send_text(_MSG_CONNECTED)
+
+    # Per-connection notification queue — broadcast() will put payloads here
+    notify_q: asyncio.Queue = asyncio.Queue(maxsize=256)
+    _ws_queues.add(notify_q)
 
     logger_task: asyncio.Task | None = None
     active_logger: _BuildLogger | None = None
@@ -191,33 +209,41 @@ async def buildlog_websocket(websocket: WebSocket):
         logger_task = None
         active_logger = None
 
+    async def _push_notifications():
+        """Forward broadcast payloads to this WebSocket."""
+        while True:
+            payload = await notify_q.get()
+            await websocket.send_text(payload)
+
+    push_task = asyncio.create_task(_push_notifications())
+
     try:
         while True:
             try:
                 raw = await asyncio.wait_for(websocket.receive_text(), timeout=30)
             except asyncio.TimeoutError:
-                continue  # keepalive — client still connected
+                continue
 
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                logger.error("buildlog ws: invalid JSON from client")
+                logger.error("ws: invalid JSON from client")
                 continue
 
             subject = msg.get("subject")
             action = msg.get("action")
 
             if subject != Subject.buildlog.value:
-                logger.warning("buildlog ws: unexpected subject %s", subject)
+                logger.warning("ws: unexpected subject %s", subject)
                 continue
 
             if action == Action.start.value:
                 await _stop_logger()
                 build_id = (msg.get("data") or {}).get("build_id")
                 if not build_id:
-                    logger.error("buildlog ws: start message missing build_id")
+                    logger.error("ws: start message missing build_id")
                     continue
-                logger.debug("buildlog ws: starting stream for build %s", build_id)
+                logger.debug("ws: starting log stream for build %s", build_id)
                 active_logger = _BuildLogger(websocket.send_text, int(build_id))
                 logger_task = asyncio.create_task(active_logger.run())
 
@@ -225,9 +251,13 @@ async def buildlog_websocket(websocket: WebSocket):
                 await _stop_logger()
 
             else:
-                logger.warning("buildlog ws: unknown action %s", action)
+                logger.warning("ws: unknown action %s", action)
 
     except WebSocketDisconnect:
         pass
     finally:
+        _ws_queues.discard(notify_q)
+        push_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await push_task
         await _stop_logger()
