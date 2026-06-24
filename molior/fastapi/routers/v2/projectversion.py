@@ -765,8 +765,6 @@ def list_repositories(
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
 ):
-    from ....api.sourcerepository import get_last_gitref, get_last_build
-
     pv = resolve_projectversion(project_id, projectversion_id, db)
     if not pv:
         raise HTTPException(status_code=400, detail="Projectversion not found")
@@ -783,16 +781,27 @@ def list_repositories(
     query = query.order_by(SourceRepository.name)
     results_raw = pagination.apply(query).all()
 
-    def get_last_successful_build(repo):
-        from sqlalchemy import func as _func
-        subq = db.query(_func.max(Build.id).label("latest_id")).filter(
-            Build.projectversion_id == pv.id,
-            Build.is_ci.is_(False),
+    def _last_gitref(repo):
+        b = db.query(Build).filter(
             Build.sourcerepository_id == repo.id,
+            Build.buildtype == "source",
+        ).order_by(Build.id.desc()).first()
+        return b.git_ref if b else None
+
+    def _last_build(repo):
+        return db.query(Build).filter(
+            Build.sourcerepository_id == repo.id,
+            Build.projectversion_id == pv.id,
+            Build.buildtype == "deb",
+        ).order_by(Build.id.desc()).first()
+
+    def _last_successful_build(repo):
+        return db.query(Build).filter(
+            Build.sourcerepository_id == repo.id,
+            Build.projectversion_id == pv.id,
             Build.buildtype == "deb",
             Build.buildstate == "successful",
-        ).subquery()
-        return db.query(Build).join(subq, Build.id == subq.c.latest_id).first()
+        ).order_by(Build.id.desc()).first()
 
     results = []
     for repo, srpv in results_raw:
@@ -801,18 +810,18 @@ def list_repositories(
             "name": repo.name,
             "url": repo.url,
             "state": repo.state,
-            "last_gitref": get_last_gitref(repo, db),
+            "last_gitref": _last_gitref(repo),
             "architectures": db2array(srpv.architectures),
             "run_lintian": srpv.run_lintian,
         }
-        build = get_last_build(db, pv, repo)
+        build = _last_build(repo)
         if build:
             entry["last_build"] = {
                 "id": build.id, "version": build.version,
                 "buildstate": build.buildstate, "sourcename": build.sourcename,
             }
             if build.buildstate != "successful":
-                suc = get_last_successful_build(repo)
+                suc = _last_successful_build(repo)
                 if suc:
                     entry["last_successful_build"] = {
                         "id": suc.id, "version": suc.version,

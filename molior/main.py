@@ -1,46 +1,20 @@
 import click
-import signal
-import functools
-import asyncio
-
-from aiohttp import web
-
-from .app import app
-from .logger import logger
+import uvicorn
 
 
 @click.command()
-@click.option("--host",     default="localhost",         help="Hostname, examples: 'localhost' or '0.0.0.0'")
-@click.option("--port",     default=8888,                help="Listen port")
-@click.option("--debug",    default=False, is_flag=True, help="Enable debug")
-@click.option("--coverage", default=False, is_flag=True, help="Enable coverage testing")
-def main(host, port, debug, coverage):
-
-    if coverage:
-        # logger.warning("starting coverage measurement")
-        import coverage
-        cov = coverage.Coverage(source=["molior"])
-        cov.start()
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    def terminate(signame):
-        logger.info("received %s, terminating...", signame)
-        asyncio.run_coroutine_threadsafe(app.shutdown(), loop)
-        asyncio.run_coroutine_threadsafe(app.terminate(), loop)
-
-    for signame in ('SIGINT', 'SIGTERM'):
-        loop.add_signal_handler(getattr(signal, signame), functools.partial(terminate, signame))
-
-    web.run_app(app, host=host, port=port)  # server up and running ...
-
-    if coverage:
-        logger.warning("saving coverage measurement")
-        cov.stop()
-        cov.html_report(directory='/var/lib/molior/buildout/coverage')
-
-    logger.info("terminated")
+@click.option("--host",  default="localhost", help="Hostname, e.g. 'localhost' or '0.0.0.0'")
+@click.option("--port",  default=8888,        help="Listen port")
+@click.option("--debug", default=False, is_flag=True, help="Enable debug / reload")
+def main(host, port, debug):
+    uvicorn.run(
+        "molior.fastapi.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        log_level="debug" if debug else "info",
+        loop="asyncio",  # uvloop does not support set_child_watcher (needed by Launchy)
+    )
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ from ..tools import parse_int, db2array
 # ---------------------------------------------------------------------------
 
 def _get_serializer() -> URLSafeTimedSerializer:
-    secret = Configuration().session_secret or "molior-dev-secret-CHANGE-ME"
+    secret = Configuration().admin.get("admin_password") or "molior-dev"
     return URLSafeTimedSerializer(secret)
 
 

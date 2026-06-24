@@ -1,63 +1,64 @@
 """
 FastAPI application factory.
 
-Mirrors the role of molior/app.py but wires up FastAPI instead of cirrina.
-Startup/shutdown lifecycle (workers, backend, cron) is unchanged — only the
-HTTP layer is replaced.
+Replaces cirrina/aiohttp as the HTTP layer.  Owns the full server lifecycle:
+workers, backend init, and cron scheduling (previously in MoliorServer).
+
+Only /api2/ routes are active.  /api/ v1 and WebSockets will be added in
+later iterations.
 """
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
+from async_cron.job import CronJob
+from async_cron.schedule import Scheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from launchy import Launchy
 
-from ..logger import logger
-from ..version import MOLIOR_VERSION
-from ..molior.backend import Backend
 from ..auth.auth import Auth
+from ..logger import logger
+from ..model.database import Session
+from ..model.metadata import MetaData
+from ..molior.backend import Backend
+from ..molior.queues import enqueue_aptly
 from ..molior.worker import Worker
 from ..molior.worker_aptly import AptlyWorker
 from ..molior.worker_backend import BackendWorker
 from ..molior.worker_notification import NotificationWorker
-from ..molior.queues import enqueue_aptly
-import asyncio
-from async_cron.job import CronJob
-from async_cron.schedule import Scheduler
-from contextlib import suppress
-from launchy import Launchy
-from ..model.metadata import MetaData
-from ..model.database import Session
+from ..version import MOLIOR_VERSION
 
 
-def get_weekday_number(weekday_name):
-    return {
-        "Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
-        "Friday": 4, "Saturday": 5, "Sunday": 6,
-    }.get(weekday_name)
+def _get_weekday_number(name):
+    return {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+            "Friday": 4, "Saturday": 5, "Sunday": 6}.get(name)
+
+
+class _NoopBroadcaster:
+    """Stand-in for cirrina's websocket_broadcast until WebSockets are ported."""
+    async def websocket_broadcast(self, msg):
+        logger.debug("websocket_broadcast (noop): %s", msg)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start workers on startup, cancel them on shutdown — identical logic to MoliorServer.run_molior."""
     logger.info("starting molior v%s (fastapi)", MOLIOR_VERSION)
 
-    app.state.backend = Backend().init()
-    if not app.state.backend:
+    backend = Backend().init()
+    if not backend:
         raise RuntimeError("Backend init failed")
     if not Auth().init():
         raise RuntimeError("Auth init failed")
 
-    Launchy.attach_loop(asyncio.get_event_loop())
+    # Launchy.attach_loop() calls asyncio.SafeChildWatcher() which needs a
+    # running loop.  We're inside the lifespan coroutine so the loop is live.
+    Launchy.attach_loop(asyncio.get_running_loop())
 
-    worker = Worker()
-    aptly_worker = AptlyWorker()
-    backend_worker = BackendWorker()
-    notification_worker = NotificationWorker()
-
-    task_worker = asyncio.ensure_future(worker.run())
-    task_aptly = asyncio.ensure_future(aptly_worker.run())
-    task_backend = asyncio.ensure_future(backend_worker.run())
-    task_notification = asyncio.ensure_future(notification_worker.run(app))
+    task_worker = asyncio.ensure_future(Worker().run())
+    task_aptly = asyncio.ensure_future(AptlyWorker().run())
+    task_backend = asyncio.ensure_future(BackendWorker().run())
+    task_notification = asyncio.ensure_future(NotificationWorker().run(_NoopBroadcaster()))
 
     task_cron = None
     with Session() as session:
@@ -71,13 +72,17 @@ async def lifespan(app: FastAPI):
                 for weekday in cleanup_weekdays.value.split(","):
                     logger.info("cleanup job: every %s at %s", weekday, cleanup_time.value)
                     job = CronJob(name=f"cleanup_{weekday}")
-                    job.every().weekday(get_weekday_number(weekday)).at(cleanup_time.value).go(
+                    job.every().weekday(_get_weekday_number(weekday)).at(cleanup_time.value).go(
                         lambda: asyncio.ensure_future(enqueue_aptly({"cleanup": []}))
                     )
                     sched.add_job(job)
                 task_cron = asyncio.ensure_future(sched.start())
+            else:
+                logger.info("cleanup job disabled")
+        else:
+            logger.error("cleanup job metadata not set")
 
-    yield  # ---- application runs here ----
+    yield  # ---- application is running ----
 
     logger.info("shutting down molior")
     for task in [task_worker, task_aptly, task_backend, task_notification]:
@@ -93,7 +98,7 @@ async def lifespan(app: FastAPI):
             await task_cron
 
     try:
-        await app.state.backend.stop()
+        await backend.stop()
     except asyncio.CancelledError:
         pass
 
@@ -111,6 +116,9 @@ def create_app() -> FastAPI:
         description="Molior Debian build system REST API.",
         version=MOLIOR_VERSION,
         lifespan=lifespan,
+        docs_url="/api2/docs",
+        redoc_url="/api2/redoc",
+        openapi_url="/api2/openapi.json",
     )
 
     app.add_middleware(
@@ -121,9 +129,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Register routers
-    from .routers import api_v1, api_v2
-    app.include_router(api_v1.router)
-    app.include_router(api_v2.router)
+    from .routers.api_v2 import router
+    app.include_router(router)
 
     return app

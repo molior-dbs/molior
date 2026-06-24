@@ -84,7 +84,7 @@ class ProjectVersion(Base):
         Returns the project name and the version name
         """
         return func.concat(
-            (select([Project.name]).where(Project.id == cls.project_id).as_scalar()),
+            (select(Project.name).where(Project.id == cls.project_id).scalar_subquery()),
             " ",
             cls.name,
         )
