@@ -50,7 +50,7 @@ install-k3d:
 
 
 install-cluster:
-	helm install --create-namespace molior helm/molior
+	helm install --create-namespace molior charts/
 	sleep 2
 
 uninstall-cluster:
