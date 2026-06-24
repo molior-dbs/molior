@@ -151,7 +151,7 @@ EOM
 
   echo I: Installing build environment
   chroot $target apt-get update
-  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl aptitude lintian
+  chroot $target apt-get install -y --no-install-recommends build-essential fakeroot eatmydata libfile-fcntllock-perl aptitude lintian
   chroot $target apt-get clean
 
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*

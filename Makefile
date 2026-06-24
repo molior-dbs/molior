@@ -10,6 +10,8 @@ docker-images: docker-molior docker-web docker-aptly  ## Create docker images
 	docker build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
 docker-molior:
+	@docker inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
+		docker build -f docker/molior-base.Dockerfile -t molior-base:dev .)
 	docker build -f docker/molior.Dockerfile -t molior:dev .
 
 docker-web:
@@ -34,7 +36,8 @@ deploy-cluster:  ## Import local images into k3d
 	k3d image import --cluster molior molior:dev molior-nginx:dev molior-postgres:dev aptly:dev molior-web:dev
 
 deploy-cluster-molior:  ## Import local image into k3d: molior
-	k3d image import --cluster molior molior:dev
+	docker tag molior:dev localhost:5000/molior:dev
+	docker push localhost:5000/molior:dev
 
 install-k3d:
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \
@@ -51,7 +54,7 @@ install-cluster:
 	sleep 2
 
 uninstall-cluster:
-	helm uninstall molior || true
+	helm uninstall --wait molior || true
 
 reinstall-cluster: uninstall-cluster install-cluster
 
@@ -64,14 +67,14 @@ watch:
 	watch kubectl get pods
 
 logs-molior:
-	kubectl logs -l molior.service=molior -f
+	kubectl logs -l app=molior -f
 
 logs-aptly:
 	kubectl logs -l molior.service=aptly -f
 
 
 restart-molior:
-	kubectl delete pod -l molior.service=molior
+	kubectl delete pod -l app=molior
 
 
 

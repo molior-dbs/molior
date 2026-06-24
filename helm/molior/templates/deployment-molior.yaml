@@ -2,19 +2,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    molior.service: molior
+    app: molior
   name: molior
 spec:
   replicas: 1
   selector:
     matchLabels:
-      molior.service: molior
+      app: molior
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        molior.service: molior
+        app: molior
 
     spec:
       serviceAccountName: molior-serviceaccount
@@ -22,16 +22,16 @@ spec:
       initContainers:
 
         - name: init-postgres
-          image: molior-postgres:dev
-          imagePullPolicy: Never
+          image: molior-registry:5000/molior-postgres:dev
+          imagePullPolicy: Always
           command: ["/bin/sh", "-c", "test -e /data/PG_VERSION || ( echo Initializing PostgreSQL database; cp -ar /var/lib/postgresql/17/main/* /data/; chown postgres:postgres /data; chmod 700 /data)"]
           volumeMounts:
             - mountPath: /data
               name: postgres
 
         - name: init-molior
-          image: molior:dev
-          imagePullPolicy: Never
+          image: molior-registry:5000/molior:dev
+          imagePullPolicy: Always
           command: ["/bin/sh", "-c", "test -e /data/buildout || ( echo Initializing Molior; cp -ar /var/lib/molior/* /data/; chown molior /data; chmod 755 /data )"]
           volumeMounts:
             - mountPath: /data
@@ -40,8 +40,8 @@ spec:
       containers:
 
         - name: molior-server
-          image: molior:dev
-          imagePullPolicy: Never
+          image: molior-registry:5000/molior:dev
+          imagePullPolicy: Always
           securityContext:
             capabilities:
               add:
@@ -92,7 +92,7 @@ spec:
               name: molior-cm3
 
         - name: molior-postgres
-          image: molior-postgres:dev
+          image: molior-registry:5000/molior-postgres:dev
           imagePullPolicy: Never
           ports:
             - containerPort: 5432

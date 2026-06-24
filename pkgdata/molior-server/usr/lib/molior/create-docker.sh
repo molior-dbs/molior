@@ -161,9 +161,9 @@ Pin-Priority: 500
 EOF
 
   echo I: Installing build environment
-  cp /etc/hosts $target/etc/hosts  # needed if host.docker.internal is used
+  #cp /etc/hosts $target/etc/hosts  # needed if host.docker.internal is used
   chroot $target apt-get update
-  chroot $target apt-get -y --force-yes install build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git passwd
+  chroot $target apt-get install -y --no-install-recommends build-essential fakeroot eatmydata libfile-fcntllock-perl lintian devscripts curl git passwd
   chroot $target apt-get clean
   rm -f $target/etc/hosts
   rm -f $target/var/lib/apt/lists/*Packages* $target/var/lib/apt/lists/*Release*
@@ -189,7 +189,7 @@ publish_docker()
   cd - > /dev/null
   rm -rf $target
 
-  CONTAINER_VERSION=$DIST_RELEASE-$ARCH:$DIST_VERSION
+  CONTAINER_VERSION=$DIST_NAME-$ARCH:$DIST_VERSION
 
   REGISTRY=localhost:5000
   if [ -f /etc/molior/backend-docker.yml ]; then
@@ -200,10 +200,12 @@ publish_docker()
   fi
 
   if [ -f /etc/molior/backend-kubernetes.yml ]; then
-      eval $(parse_yaml /etc/molior/backend-kubernetes.yml)
-      REGISTRY=$registry__server
-      DOCKER_USER=$registry__user
-      DOCKER_PASSWORD=$registry__password
+      REGISTRY=`yq -r '.registry["server-push"]' /etc/molior/backend-kubernetes.yml`
+      if [ -z "$REGISTRY" ]; then
+          REGISTRY=`yq -r .registry.server /etc/molior/backend-kubernetes.yml`
+      fi
+      DOCKER_USER=`yq -r .registry.user /etc/molior/backend-kubernetes.yml`
+      DOCKER_PASSWORD=`yq -r .registry.password /etc/molior/backend-kubernetes.yml`
   fi
 
   container_tool=docker

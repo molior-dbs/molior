@@ -2,9 +2,14 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  labels:
-    molior.service: aptly
   name: aptly
+  labels:
+    app: aptly
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: molior
+    meta.helm.sh/release-namespace: molior
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
     - ReadWriteOnce

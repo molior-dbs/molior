@@ -200,11 +200,7 @@ class KubernetesBackend:
                     logger.error("kubernetes-backend: config file not found: /etc/molior/backend-kubernetes.yml")
                     continue
 
-                registry = cfg.registry.get("server-push", None)
-                if not registry:
-                    registry = cfg.registry.get("server", None)
-                if not registry:
-                    registry = "localhost:5000"
+                registry = cfg.registry.get("server")
 
                 namespace = "molior"
                 jobversion = task['version'].replace("~", "-")
