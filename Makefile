@@ -19,15 +19,15 @@ docker-images: docker-molior docker-web docker-aptly  ## Create docker images
 	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
 	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
-docker-molior:
+docker-molior:  ## Build molior docker image
 	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
 		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
 	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
 
-docker-web:
+docker-web:  ## Build web docker image
 	$(DOCKERCMD) build -f docker/web.Dockerfile -t molior-web:dev ../molior-web2
 
-docker-aptly:
+docker-aptly:  ## Build aptly docker image
 	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
 
 create-cluster:  ## Create k3d cluster
@@ -50,7 +50,7 @@ deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-
 	$(DOCKERCMD) push localhost:$(REGISTRY_PORT)/$*:dev
 	$(DOCKERCMD) rmi localhost:$(REGISTRY_PORT)/$*:dev
 
-install-k3d:
+install-k3d:  ## Download and install k3d binary
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \
 		mkdir -p ~/.local/bin; \
 		curl -fL -o ~/.local/bin/k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64; \
@@ -60,21 +60,21 @@ install-k3d:
 
 
 
-install-cluster:
+install-cluster:  ## Install molior helm chart into k3d
 	printf 'registry:\n  host: %s\n  port: %s\n' $(REGISTRY) $(REGISTRY_PORT) > /tmp/molior-registry-values.yaml
 	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml
 
-uninstall-cluster:
+uninstall-cluster:  ## Uninstall molior helm chart from k3d
 	helm uninstall --wait molior || true
 
-reinstall-cluster: uninstall-cluster install-cluster
+reinstall-cluster: uninstall-cluster install-cluster  ## Uninstall and reinstall molior helm chart
 
-redeploy-cluster: uninstall-cluster deploy-cluster install-cluster watch
+redeploy-cluster: uninstall-cluster deploy-cluster install-cluster watch  ## Redeploy images and reinstall helm chart
 
-list:
+list:  ## List pods
 	kubectl get pods
 
-watch:
+watch:  ## Watch pods
 	watch kubectl get pods
 
 logs:  ## Show logs
@@ -102,55 +102,15 @@ clean: delete-cluster  ## Remove cluster and registry
 	docker system prune
 
 
+#prod-publish-manifest:  ## Push multi-arch manifests for all prod images
+#	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing Manifest $$i ...\033[00m"; docker manifest rm neolynx/molior_$$i; docker manifest create neolynx/molior_$$i neolynx/molior_$$i-amd64 neolynx/molior_$$i-arm64; docker manifest push neolynx/molior_$$i; done
 
+#restore-backup:  ## Restore a database backup (usage: make restore-backup backup=path/to/db.tar)
+#	@test -n "${backup}" || (echo Usage: make restore backup=path/to/db.tar; exit 1)
+#	@test -f "${backup}" || (echo Error: file not found: ${backup}; exit 1)
+#	@docker-compose stop molior
+#	zcat "${backup}" | docker-compose exec -T postgres su postgres -c "dropdb molior && psql"
+#	@docker-compose start molior
 
-
-
-
-
-
-
-
-
-
-
-start:  ## run development containers
-	@docker-compose up -d
-
-dev:  ## rebuild and run development containers
-	@docker-compose build --no-cache
-	@docker-compose up -d
-
-dev-cached:  ## build (cached) and run development containers
-	@docker-compose build
-	@docker-compose up -d
-
-
-prod-build:  ## Build prod containers
-	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache
-
-prod-build-cached:  ## Build prod containers (cached)
-	@docker-compose -f docker/prod/docker-compose-build.yml build
-
-prod-molior:  ## Build prod molior
-	@docker-compose -f docker/prod/docker-compose-build.yml build --no-cache molior
-
-
-prod-publish-manifest:
-	@for i in molior web aptly nginx postgres registry; do echo "\033[01;34mPushing Manifest $$i ...\033[00m"; docker manifest rm neolynx/molior_$$i; docker manifest create neolynx/molior_$$i neolynx/molior_$$i-amd64 neolynx/molior_$$i-arm64; docker manifest push neolynx/molior_$$i; done
-
-run-aptly-cmds:  ## run aptly commands
-	@docker-compose stop aptly
-	@docker-compose run aptly su aptly -c bash
-
-docker-compose.tar:
-	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
-
-restore-backup:
-	@test -n "${backup}" || (echo Usage: make restore backup=path/to/db.tar; exit 1)
-	@test -f "${backup}" || (echo Error: file not found: ${backup}; exit 1)
-	@docker-compose stop molior
-	zcat "${backup}" | docker-compose exec -T postgres su postgres -c "dropdb molior && psql"
-	@docker-compose start molior
-
-.PHONY: help
+# Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
+.PHONY: help docker-images docker-molior docker-web docker-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean
