@@ -41,6 +41,7 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
 
 
 @router.get("/api/logout")
+@router.post("/api/logout")
 def logout(response: Response):
     response.delete_cookie("molior_session")
     return ""

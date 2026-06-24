@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from ...auth import CurrentUser, authenticated, require_role
 from ...db import get_db
 from ...responses import PaginationParams
+from ...ws import broadcast
 from ....model.project import Project
 from ....model.user import User
 from ....model.userrole import UserRole, USER_ROLES
+from ....molior.notifier import Subject, Event
 
 router = APIRouter(tags=["projectuserroles"])
 
@@ -81,7 +83,7 @@ class UpsertRoleBody(BaseModel):
 
 
 @router.put("/api/projects/{project_id}/users/{user_id}")
-def upsert_project_user_role(
+async def upsert_project_user_role(
     project_id: int,
     user_id: int,
     body: UpsertRoleBody,
@@ -106,11 +108,15 @@ def upsert_project_user_role(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
 
+    await broadcast({
+        "event": Event.changed.value, "subject": Subject.userrole.value,
+        "changed": {"id": user_id, "project_id": project_id, "role": body.role},
+    })
     return {"result": f"{user.username} is now {body.role} on {project.name}"}
 
 
 @router.delete("/api/projects/{project_id}/users/{user_id}")
-def remove_project_user(
+async def remove_project_user(
     project_id: int,
     user_id: int,
     _: CurrentUser = Depends(require_role("owner")),
@@ -134,4 +140,8 @@ def remove_project_user(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
 
+    await broadcast({
+        "event": Event.removed.value, "subject": Subject.userrole.value,
+        "changed": {"id": user_id, "project_id": project_id},
+    })
     return {"result": f"{user.username} is removed from {project.name}"}

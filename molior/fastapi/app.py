@@ -35,12 +35,6 @@ def _get_weekday_number(name):
             "Friday": 4, "Saturday": 5, "Sunday": 6}.get(name)
 
 
-class _NoopBroadcaster:
-    """Stand-in for cirrina's websocket_broadcast until WebSockets are ported."""
-    async def websocket_broadcast(self, msg):
-        logger.debug("websocket_broadcast (noop): %s", msg)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("starting molior v%s (fastapi)", MOLIOR_VERSION)
@@ -58,7 +52,8 @@ async def lifespan(app: FastAPI):
     task_worker = asyncio.ensure_future(Worker().run())
     task_aptly = asyncio.ensure_future(AptlyWorker().run())
     task_backend = asyncio.ensure_future(BackendWorker().run())
-    task_notification = asyncio.ensure_future(NotificationWorker().run(_NoopBroadcaster()))
+    from .ws import broadcast
+    task_notification = asyncio.ensure_future(NotificationWorker().run(broadcast))
 
     task_cron = None
     with Session() as session:
@@ -131,7 +126,9 @@ def create_app() -> FastAPI:
 
     from .routers.api_v1 import router as v1_router
     from .routers.api_v2 import router as v2_router
+    from .ws import router as ws_router
     app.include_router(v1_router)
     app.include_router(v2_router)
+    app.include_router(ws_router)
 
     return app

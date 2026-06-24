@@ -9,9 +9,12 @@ class NotificationWorker:
 
     """
 
-    async def run(self, app):
+    async def run(self, broadcast):
         """
         Run the worker task.
+
+        broadcast: async callable(dict) that fans the notification out to
+                   all connected clients (SSE subscribers, etc.).
         """
 
         while True:
@@ -23,7 +26,7 @@ class NotificationWorker:
 
                 notification = task.get("notify")
                 if notification:
-                    await app.websocket_broadcast(notification)
+                    await broadcast(notification)
                     handled = True
 
                 if not handled:

@@ -10,13 +10,107 @@ from sqlalchemy.orm import Session
 from ...auth import CurrentUser, authenticated, require_role
 from ...db import get_db
 from ....logger import logger
-from ....model.build import Build
+from ....model.build import Build, DATETIME_FORMAT
 from ....model.projectversion import ProjectVersion
-from ....molior.queues import enqueue_aptly
+from ....molior.queues import enqueue_aptly, enqueue_task
 
 router = APIRouter(prefix="/api2", tags=["builds"])
 
 ACTIVE_STATES = {"scheduled", "building", "needs_publish", "publishing"}
+
+
+@router.get("/build/{build_id}")
+def get_build(
+    build_id: int,
+    current_user: CurrentUser = Depends(authenticated),
+    db: Session = Depends(get_db),
+):
+    build = db.query(Build).filter(Build.id == build_id).first()
+    if not build:
+        raise HTTPException(status_code=404, detail="Build not found")
+
+    maintainer = ""
+    if build.maintainer:
+        maintainer = "{} {}".format(build.maintainer.firstname, build.maintainer.surname)
+
+    project = {}
+    if build.projectversion:
+        project = {
+            "id": build.projectversion.project.id,
+            "name": build.projectversion.project.name,
+            "is_mirror": build.projectversion.project.is_mirror,
+            "version": {
+                "id": build.projectversion.id,
+                "name": build.projectversion.name,
+                "is_locked": build.projectversion.is_locked,
+            },
+        }
+
+    data = {
+        "id": build.id,
+        "buildstate": build.buildstate,
+        "buildtype": build.buildtype,
+        "startstamp": build.startstamp.strftime(DATETIME_FORMAT) if build.startstamp else "",
+        "endstamp": build.endstamp.strftime(DATETIME_FORMAT) if build.endstamp else "",
+        "version": build.version,
+        "maintainer": maintainer,
+        "sourcename": build.sourcename,
+        "can_rebuild": build.can_rebuild(None, db),
+        "branch": build.ci_branch,
+        "git_ref": build.git_ref,
+        "architecture": build.architecture,
+        "project": project,
+        "parent_id": build.parent_id,
+        "children": [{"id": c.id, "sourcename": c.sourcename} for c in build.children],
+    }
+
+    if build.sourcerepository:
+        data["sourcerepository"] = {
+            "name": build.sourcerepository.name,
+            "url": build.sourcerepository.url,
+            "id": build.sourcerepository.id,
+        }
+
+    if build.projectversion and build.projectversion.basemirror:
+        bm = build.projectversion.basemirror
+        bm_name = bm.project.name
+        bm_version = bm.name
+        arch = build.architecture or ""
+        data["buildvariant"] = {
+            "architecture": {"name": arch},
+            "base_mirror": {"name": bm_name, "version": bm_version},
+            "name": f"{bm_name}-{bm_version}/{arch}",
+        }
+    elif build.projectversion:
+        data["buildvariant"] = {
+            "architecture": {"name": build.architecture or ""},
+            "base_mirror": {"name": "", "version": ""},
+            "name": "",
+        }
+
+    return data
+
+
+@router.put("/build/{build_id}")
+async def rebuild_build(
+    build_id: int,
+    current_user: CurrentUser = Depends(authenticated),
+    db: Session = Depends(get_db),
+):
+    build = db.query(Build).filter(Build.id == build_id).first()
+    if not build:
+        raise HTTPException(status_code=404, detail="Build not found")
+
+    if not build.can_rebuild(None, db):
+        raise HTTPException(status_code=400, detail="This build cannot be rebuilt")
+
+    logger.info("rebuilding build %d", build_id)
+    oldstate = build.buildstate
+    await build.set_needs_build()
+    db.commit()
+
+    await enqueue_task({"rebuild": [build_id, oldstate]})
+    return "Rebuild triggered"
 
 
 def _collect_build_tree(build):
