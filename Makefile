@@ -76,6 +76,9 @@ logs-aptly:
 restart-molior:
 	kubectl delete pod -l app=molior
 
+psql:  ## run psql
+	kubectl exec -it molior-6c76b45685-ktsqv -- su molior -c psql molior
+
 
 
 
@@ -121,9 +124,6 @@ run-aptly-cmds:  ## run aptly commands
 
 remove: clean   ## remove containers and volumes
 	docker rmi -f molior_web:latest molior_molior:latest molior_postgres:latest molior_aptly:latest molior_nginx:latest molior_registry:latest
-
-psql:  ## run psql
-	docker-compose exec postgres su postgres -c "psql molior"
 
 docker-compose.tar:
 	d=`mktemp -d tmp-XXXXX`; cp -ar docker/example $$d/molior; tar -C $$d/ -cvf docker-compose.tar molior/; rm -rf $$d/; echo Created: docker-compose.tar
