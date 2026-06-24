@@ -18,7 +18,7 @@ spec:
         app: web
     spec:
       containers:
-        - image: molior-registry:5000/molior-web:dev
+        - image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-web:dev
           imagePullPolicy: Always
           name: molior-web
           ports:

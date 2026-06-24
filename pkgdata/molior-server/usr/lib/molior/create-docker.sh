@@ -200,10 +200,7 @@ publish_docker()
   fi
 
   if [ -f /etc/molior/backend-kubernetes.yml ]; then
-      REGISTRY=`yq -r '.registry["server-push"]' /etc/molior/backend-kubernetes.yml`
-      if [ -z "$REGISTRY" ]; then
-          REGISTRY=`yq -r .registry.server /etc/molior/backend-kubernetes.yml`
-      fi
+      REGISTRY=`yq -r .registry.server /etc/molior/backend-kubernetes.yml`
       DOCKER_USER=`yq -r .registry.user /etc/molior/backend-kubernetes.yml`
       DOCKER_PASSWORD=`yq -r .registry.password /etc/molior/backend-kubernetes.yml`
   fi

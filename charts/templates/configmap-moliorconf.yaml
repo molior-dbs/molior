@@ -35,8 +35,7 @@ data:
     }
   backend-kubernetes.yml: |
     registry:
-        server-push: "molior-registry:5000"
-        server: "molior-registry:5000"
+        server: "{{ .Values.registry.host }}:{{ .Values.registry.port }}"
         user: ""
         password: ""
 

@@ -61,8 +61,8 @@ install-k3d:
 
 
 install-cluster:
-	helm install --create-namespace molior charts/
-	sleep 2
+	printf 'registry:\n  host: %s\n  port: %s\n' $(REGISTRY) $(REGISTRY_PORT) > /tmp/molior-registry-values.yaml
+	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml
 
 uninstall-cluster:
 	helm uninstall --wait molior || true

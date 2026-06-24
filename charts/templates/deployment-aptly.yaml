@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: aptly-server
-          image: molior-registry:5000/aptly:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/aptly:dev
           imagePullPolicy: Always
           env:
             - name: REPOSIGN_EMAIL
@@ -40,7 +40,7 @@ spec:
               name: aptly
 
         - name: aptly-nginx
-          image: molior-registry:5000/molior-nginx:dev
+          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-nginx:dev
           imagePullPolicy: Always
           env:
             - name: APTLY_PASSWORD
