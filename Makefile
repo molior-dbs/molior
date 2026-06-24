@@ -1,4 +1,6 @@
 NAMESPACE := molior
+REGISTRY := k3d-molior-registry
+REGISTRY_PORT := 5000
 export HELM_NAMESPACE=$(NAMESPACE)
 
 ifneq ($(shell which podman 2>/dev/null),)
@@ -29,9 +31,9 @@ docker-aptly:
 	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
 
 create-cluster:  ## Create k3d cluster
-	k3d registry list molior-registry >/dev/null 2>&1 || k3d registry create molior-registry --port 0.0.0.0:5000 $(PODMAN_K3D_REGISTRY_ARGS)
+	k3d registry list molior-registry >/dev/null 2>&1 || k3d registry create molior-registry --port 0.0.0.0:$(REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
 	k3d cluster create molior \
-		--registry-use k3d-molior-registry:5000 \
+		--registry-use $(REGISTRY):$(REGISTRY_PORT) \
 		--port "8000:30080@server:0" \
 		--port "8080:30088@server:0" \
 		--k3s-arg "--disable=traefik@server:0" \
@@ -44,9 +46,9 @@ delete-cluster:  ## Delete k3d cluster
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web deploy-image-aptly  ## Import local images into k3d
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
-	$(DOCKERCMD) tag $*:dev localhost:5000/$*:dev
-	$(DOCKERCMD) push localhost:5000/$*:dev
-	$(DOCKERCMD) rmi localhost:5000/$*:dev
+	$(DOCKERCMD) tag $*:dev localhost:$(REGISTRY_PORT)/$*:dev
+	$(DOCKERCMD) push localhost:$(REGISTRY_PORT)/$*:dev
+	$(DOCKERCMD) rmi localhost:$(REGISTRY_PORT)/$*:dev
 
 install-k3d:
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \
@@ -93,7 +95,7 @@ psql:  ## Run psql
 
 clean: delete-cluster  ## Remove cluster and registry
 	docker rmi -f molior-base:dev
-	k3d registry delete k3d-molior-registry
+	k3d registry delete $(REGISTRY)
 
 
 
