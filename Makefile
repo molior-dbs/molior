@@ -32,7 +32,7 @@ create-cluster:  ## Create k3d cluster
 delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
 
-deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web  ## Import local images into k3d
+deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web deploy-image-aptly  ## Import local images into k3d
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
 	docker tag $*:dev localhost:5000/$*:dev
