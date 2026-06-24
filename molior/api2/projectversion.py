@@ -137,7 +137,8 @@ async def export_projectversion2(request):
             "id": sr.id,
             "name": sr.name,
             "url": sr.url,
-            "run_lintian": srpv.run_lintian
+            "run_lintian": srpv.run_lintian,
+            "architectures": db2array(srpv.architectures)
         }
         sourcerepositories_data.append(sourcerepository_data)
 

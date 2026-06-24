@@ -17,6 +17,8 @@ from ..model.projectversion import ProjectVersion, find_basemirror_or_baseprojec
 from ..model.user import User
 from ..model.userrole import UserRole, USER_ROLES
 from ..model.projectversiondependency import ProjectVersionDependency
+from ..model.sourepprover import SouRepProVer
+from ..model.sourcerepository import SourceRepository
 
 
 @app.http_get("/api2/projectbase/{project_name}")
@@ -1097,7 +1099,7 @@ async def import_projectversion(request):
             retention_successful_builds=retention_successful_builds,
             retention_failed_builds=retention_failed_builds,)
     db.add(projectversion)
-    db.commit()
+    db.flush()  # assign projectversion.id before creating SouRepProVer rows
 
     if baseproject:
         pdep = ProjectVersionDependency(
@@ -1105,7 +1107,24 @@ async def import_projectversion(request):
                 dependency_id=pv.id,
                 use_cibuilds=False)
         db.add(pdep)
-        db.commit()
+
+    for repo_data in (sourcerepositories or []):
+        repo_url = repo_data.get('url')
+        repo_archs = repo_data.get('architectures', architectures)
+        # filter to only archs valid for this projectversion
+        repo_archs = [a for a in repo_archs if a in architectures]
+        repo = db.query(SourceRepository).filter(SourceRepository.url == repo_url).first()
+        if repo:
+            if repo not in projectversion.sourcerepositories:
+                projectversion.sourcerepositories.append(repo)
+                db.flush()  # create SouRepProVer row
+            srpv = db.query(SouRepProVer).filter(
+                    SouRepProVer.sourcerepository_id == repo.id,
+                    SouRepProVer.projectversion_id == projectversion.id).first()
+            if srpv:
+                srpv.architectures = array2db(repo_archs)
+
+    db.commit()
 
     await enqueue_aptly({"init_repository": [
                 bm.project.name,

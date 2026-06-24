@@ -416,14 +416,20 @@ async def add_repository(request):
             repo = SourceRepository(url=url, name=repoinfo.name.lower(), state="new")
             db.add(repo)
 
-    if repo not in projectversion.sourcerepositories:
+    already_attached = repo in projectversion.sourcerepositories
+    if not already_attached:
         projectversion.sourcerepositories.append(repo)
         db.commit()
 
     sourepprover = db.query(SouRepProVer).filter(
                           SouRepProVer.sourcerepository_id == repo.id,
                           SouRepProVer.projectversion_id == projectversion.id).first()
-    sourepprover.architectures = array2db(architectures)
+    # Only overwrite architectures if this is a new attachment; if the repo was
+    # already present (e.g. added by the import API with correct per-repo archs)
+    # preserve the existing value so the frontend's post-import add() calls
+    # don't clobber the correct architecture set.
+    if not already_attached:
+        sourepprover.architectures = array2db(architectures)
     sourepprover.run_lintian = run_lintian
     db.commit()
 

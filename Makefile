@@ -15,11 +15,11 @@ endif
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-docker-images: docker-molior docker-web docker-aptly  ## Create docker images
+docker-images: docker-image-molior docker-web docker-aptly  ## Create docker images
 	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
 	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
-docker-molior:  ## Build molior docker image
+docker-image-molior:  ## Build molior docker image
 	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
 		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
 	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
@@ -113,4 +113,4 @@ clean: delete-cluster  ## Remove cluster and registry
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-molior docker-web docker-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean
+.PHONY: help docker-images docker-image-molior docker-web docker-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean

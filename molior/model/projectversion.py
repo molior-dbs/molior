@@ -234,6 +234,9 @@ class ProjectVersion(Base):
                     continue
             new_projectversion.dependencies.append(dependency)
 
+        db.add(new_projectversion)
+        db.flush()  # assign new_projectversion.id and materialise SouRepProVer join rows
+
         for repo in new_projectversion.sourcerepositories:
             sourepprover = db.query(SouRepProVer).filter(
                     SouRepProVer.sourcerepository_id == repo.id,
@@ -248,7 +251,6 @@ class ProjectVersion(Base):
                     archs.append(arch)
             new_sourepprover.architectures = array2db(archs)
 
-        db.add(new_projectversion)
         db.commit()
         return new_projectversion
 
