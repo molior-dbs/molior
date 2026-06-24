@@ -15,6 +15,7 @@ from .v1 import (
     projectversion,
     sourcerepository,
     status,
+    upload,
     user,
     userrole,
 )
@@ -32,4 +33,5 @@ router.include_router(projectversion.router)
 router.include_router(sourcerepository.router)
 router.include_router(status.router)
 router.include_router(user.router)
+router.include_router(upload.router)
 router.include_router(userrole.router)
