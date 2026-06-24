@@ -1,229 +1,137 @@
-# Installation
+# Development Setup
 
-Molior can be installed on a Debian distribution (buster/bullseye) from APT sources, or a VM can be installed via ISO installers. Molior and aptly can also run as containers via docker-compose.
-
-Molior build nodes are using sbuild for building which cannot run in a container (i.e. docker, lxd) and need to run in a VM or on bare metal.
-
-<!-- vim-markdown-toc GFM -->
-
-* [Prerequisites](#prerequisites)
-* [Installation via APT sources](#installation-via-apt-sources)
-    * [Debian buster](#debian-buster)
-    * [Configure APT](#configure-apt)
-    * [Install molior](#install-molior)
-    * [Install aptly](#install-aptly)
-    * [Install build node](#install-build-node)
-    * [Install molior-tools](#install-molior-tools)
-* [ISO Installers / VMs](#iso-installers--vms)
-    * [Development Environment](#development-environment)
-    * [Build nodes](#build-nodes)
-* [Installation on docker](#installation-on-docker)
-* [Configuration](#configuration)
-    * [Configure molior server](#configure-molior-server)
-    * [Configure aptly server](#configure-aptly-server)
-    * [Configure build nodes](#configure-build-nodes)
-
-<!-- vim-markdown-toc -->
+This guide covers running the full Molior stack locally using k3d (Kubernetes in Docker).
 
 ## Prerequisites
 
-Debian installation (VM, bare metal, docker) for:
-- molior server machine
-- aptly server machine (might be on the same installation as molior server)
+- Linux host with `podman` or `docker` installed
+- `kubectl` and `helm` available in `PATH`
+- `k3d`, install it with:
 
-Debian installation (VM, bare metal) for:
-- one or more build nodes (amd64 or arm64)
-
-## Installation via APT sources
-
-### Debian buster
-
-- Add the molior apt source:
-```
-cat >/etc/apt/sources.list.d/molior.list <<EOF
-deb [arch=amd64,arm64] http://molior.info/1.4/buster stable main
-EOF
+```sh
+make install-k3d
 ```
 
-### Configure APT
+> This downloads the k3d binary to `~/.local/bin/k3d`. Make sure `~/.local/bin` is in your `PATH`.
 
-- Add repository key
-```
-wget -q -O- http://molior.info/archive-keyring.asc | apt-key add -
-```
+---
 
-- Update APT sources
-```
-apt update
-```
+## 1. Create the local cluster
 
-### Install molior
+Creates a local k3d registry and Kubernetes cluster with the required port mappings:
 
-```
-apt install molior-server molior-web
+```sh
+make create-cluster
 ```
 
-### Install aptly
+This sets up:
+- A local image registry at `k3d-molior-registry:5000`
+- A k3d cluster named `molior`
+- Port `8000` → Molior web UI
+- Port `8080` → Aptly repository
 
-```
-apt install aptly
-```
+---
 
-### Install build node
+## 2. Build the Docker images
 
-On your build machines (amd64 or arm64), install molior-client-http:
-```
-apt install molior-client-http
-```
+Build all local development images:
 
-### Install molior-tools
-
-In your working environment (Debian/Ubuntu) configure the molior APT sources, and install:
-
-```
-apt install molior-tools
+```sh
+make docker-images
 ```
 
-This will provide tools like:
-- create-release
-- molior-deploy
+This builds: `molior`, `molior-postgres`, `molior-nginx`, `molior-web`, `aptly`.
 
-## ISO Installers / VMs
+Individual images can also be built separately:
 
-Molior is available as ISO installer for test and development purposes.
-
-Install molior/aptly server and build node on VMs or bare metal and follow the Configuration chapter below.
-
-User and Password for these installers are: admin/molior-dev (please change password after first login)
-
-### Development Environment
-
-For development on molior or aptly, the following VM can be used:
-
-Download molior and aptly server as VirtualBox Appliance:
-- http://molior.info/installers/molior_1.4_1.4.1_vbox-dev.ova
-
-### Build nodes
-
-Download amd64 build node installer:
-- http://molior.info/installers/molior_1.4_1.4.1_iso-installer-node-amd64.iso
-
-Download EFI installer for amd64 or arm64:
-- http://molior.info/installers/molior_1.4_1.4.1_efi-installer-node-amd64-UNATTENDED.iso
-- http://molior.info/installers/molior_1.4_1.4.1_efi-installer-node-arm64-UNATTENDED.iso
-
-Note: these are unattended installers, overwriting the disk without asking when booted
-
-## Installation on docker
-
-Molior server and aptly can be run in docker containers according to the following docker-compose example:
-
-[docker-compose.yml](docker/docker-compose.yml)
-
-Set the following variables:
-- DEBSIGN_NAME
-- DEBSIGN_EMAIL
-- REPOSIGN_NAME
-- REPOSIGN_EMAIL
-- MOLIOR_ADMIN_PASSWD
-- APTLY_USER
-- APTLY_PASS
-
-and run docker-compose up. Molior Web is exposed on port 8000.
-
-## Configuration
-
-### Configure molior server
-
-- Login to the molior server via SSH
-- Change password:
-```
-passwd
-```
-- Create SSH and GPG Keys
-  Molior uses 2 GPG key pairs, one for signing the source package (molior user) and one for signing the Debian repositories (aptly user).
-  These keys cannot easily be changed once Molior has created and signed mirrors and packages.
-  If desired, create custom gpg key pairs according to what the scripts below perform, or use the provided scripts directly for testing purposes.
-  These scripts also create SSH keys used by molior for accessing the git repositories and the build nodes.
-```
-sudo create-molior-keys "Molior Debsign" debsign@molior.info
-sudo create-aptly-keys "Molior Reposign" reposign@molior.info
-sudo create-aptly-passwd molior molior-dev
-sudo service nginx reload
-```
-- Edit /etc/molior/molior.yml and configure:
-  - hostname: the fqdn of the server or its IP address
-  - debsign_gpg_email: the email provided to create-molior-keys above
-  - admin/pass: set a new password
-  - aptly/apt_url: URL of molior repository server
-  - aptly/api_url: URL of aptly server
-  - aptly API user and passwd
-  - aptly/gpg_key: the email provided to create-aptly-keys above
-- Remember the SSH public key of the molior user:
-```
-sudo -u molior cat ~molior/.ssh/id_rsa.pub
-```
-  This key needs to be added to the ~molior/.ssh/authorized_keys on the build nodes (see below), and the git repositories need to grant read access to this key.
-
-```
-$ ssh admin@molior-node
-admin@molior-node:~$ sudo su molior
-$ cd
-$ mkdir .ssh
-$ chmod 700 .ssh
-$ cat >.ssh/authorized_keys << EOF
-[ paste SSH ub key above ]
-EOF
+```sh
+make docker-molior
+make docker-web
+make docker-aptly
 ```
 
-### Configure aptly server
+---
 
-If you run aptly on a separate machine, you might want to configure it:
+## 3. Push images into the cluster
 
-- Login on a build node via SSH
-- Change the password
-- Change password:
-```
-passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
+Tag and push the local images into the k3d registry so the cluster can use them:
+
+```sh
+make deploy-cluster
 ```
 
-### Configure build nodes
+Individual images can be pushed separately, e.g.:
 
-- Login on a build node via SSH
-- Change password:
-```
-passwd
-```
-- Configure your timezone if needed:
-```
-sudo dpkg-reconfigure tzdata
-```
-- Copy the molior SSH public key from the molior server to the molior user on each build machine
-```
-sudo -u molior mkdir ~molior/.ssh
-sudo chmod 700 ~molior/.ssh
-sudo -u molior sh -c "cat >~molior/.ssh/authorized_keys" <<EOF
-(paste the SSH public key of the molior user from the molior server)
-EOF
+```sh
+make deploy-image-molior
+make deploy-image-aptly
 ```
 
-- Edit /etc/default/molior-client and set the MOLIOR_SERVER (i.e. hostname of the molior server).
-- Restart the client service on the build node:
-```
-sudo service molior-client-http restart
-```
-- Export source signing public key to the build nodes
-The build nodes need the public key which molior uses to sign the source packages. The build process will verify the signature of source packages.
+---
 
-From the molior server, execute the following for each build machine IP in order to add the gpg public key for source package verification (replace NODE_IPS, separated by blank):
+## 4. Install the Helm chart
+
+Deploy Molior into the cluster:
+
+```sh
+make install-cluster
 ```
-DEBSIGN_KEY=debsign@molior.info
-for molior_node in NODE_IPS
-do
-  sudo -u molior gpg --armor --export $DEBSIGN_KEY | sudo -u molior ssh -o StrictHostKeyChecking=no $molior_node "gpg --import --no-default-keyring --keyring=trustedkeys.gpg"
-done
+
+Installs the `charts/` Helm chart into the cluster.
+
+---
+
+## 5. Monitor Kubernetes pods
+
+```sh
+make watch
 ```
+
+Once all pods are running, Molior is available at **http://localhost:8000** and the Aptly repository at **http://localhost:8080**.
+
+---
+
+## Common workflows
+
+### Rebuild and redeploy everything
+
+```sh
+make docker-images
+make redeploy-cluster
+```
+
+### Reinstall the Helm chart only (no image rebuild)
+
+```sh
+make reinstall-cluster
+```
+
+### View logs
+
+```sh
+make logs          # molior + aptly combined
+make logs-molior
+make logs-aptly
+```
+
+### Open a shell in the molior pod
+
+```sh
+make shell-molior
+```
+
+### Restart the molior pod
+
+```sh
+make restart-molior
+```
+
+---
+
+## Teardown
+
+```sh
+make clean
+```
+
+This deletes the k3d cluster, the local registry, and the `molior-base` Docker image. All persistent data including the database and Molior repositories will be lost.
