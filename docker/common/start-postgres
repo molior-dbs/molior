@@ -8,7 +8,9 @@ sig() {
 }
 trap 'sig TERM' TERM
 
+pg_version=17
+
 echo Starting postgres ...
-su postgres -c '/usr/lib/postgresql/15/bin/postgres -D /var/lib/postgresql/15/main -c config_file=/etc/postgresql/15/main/postgresql.conf & pid=$!; echo -n $pid >/tmp/postgres.pid; wait $pid' &
+su postgres -c "/usr/lib/postgresql/$pg_version/bin/postgres -D /var/lib/postgresql/$pg_version/main -c config_file=/etc/postgresql/$pg_version/main/postgresql.conf & pid=\$!; echo -n \$pid >/tmp/postgres.pid; wait \$pid" &
 suppid=$!
 wait $supid

@@ -22,15 +22,15 @@ spec:
       initContainers:
 
         - name: init-postgres
-          image: molior_postgres
+          image: molior-postgres:dev
           imagePullPolicy: Never
-          command: ["/bin/sh", "-c", "test -e /data/PG_VERSION || ( echo Initializing PostgreSQL database; cp -ar /var/lib/postgresql/15/main/* /data/; chown postgres:postgres /data; chmod 700 /data)"]
+          command: ["/bin/sh", "-c", "test -e /data/PG_VERSION || ( echo Initializing PostgreSQL database; cp -ar /var/lib/postgresql/17/main/* /data/; chown postgres:postgres /data; chmod 700 /data)"]
           volumeMounts:
             - mountPath: /data
               name: postgres
 
         - name: init-molior
-          image: molior_molior
+          image: molior:dev
           imagePullPolicy: Never
           command: ["/bin/sh", "-c", "test -e /data/buildout || ( echo Initializing Molior; cp -ar /var/lib/molior/* /data/; chown molior /data; chmod 755 /data )"]
           volumeMounts:
@@ -40,7 +40,7 @@ spec:
       containers:
 
         - name: molior-server
-          image: molior_molior
+          image: molior:dev
           imagePullPolicy: Never
           securityContext:
             capabilities:
@@ -92,7 +92,7 @@ spec:
               name: molior-cm3
 
         - name: molior-postgres
-          image: molior_postgres
+          image: molior-postgres:dev
           imagePullPolicy: Never
           ports:
             - containerPort: 5432
@@ -100,7 +100,7 @@ spec:
           volumeMounts:
             - mountPath: /var/run/postgresql
               name: pgsock
-            - mountPath: /var/lib/postgresql/15/main
+            - mountPath: /var/lib/postgresql/17/main
               name: postgres
       restartPolicy: Always
       volumes:

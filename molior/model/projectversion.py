@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func, select
+from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func, select, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
@@ -277,7 +277,7 @@ def get_projectversion_deps(projectversion_id, session):
     Returns:
         list: A list of ProjectVersions).
     """
-    query = """
+    query = text("""
     WITH RECURSIVE getparents(projectversion_id, dependency_id) AS (
         SELECT projectversion_id, dependency_id, use_cibuilds
         FROM projectversiondependency
@@ -290,7 +290,7 @@ def get_projectversion_deps(projectversion_id, session):
         WHERE s2.projectversion_id = s1.dependency_id
     )
     SELECT projectversion_id, dependency_id, use_cibuilds FROM getparents;
-    """
+    """)
     result = session.execute(query, {"projectversion_id": projectversion_id})
 
     projectversion_ids = []

@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +18,7 @@ spec:
         molior.service: web
     spec:
       containers:
-        - image: molior_web
+        - image: molior-web:dev
           imagePullPolicy: Never
           name: molior-web
           ports:

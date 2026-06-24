@@ -4,6 +4,7 @@ import hashlib
 from functools import wraps
 from aiohttp import web
 from sqlalchemy.sql import func
+from sqlalchemy import text
 
 from ..logger import logger
 from ..tools import parse_int, db2array, ErrorResponse
@@ -260,7 +261,7 @@ class req_role(object):
         @wraps(function)
         async def _wrapper(request):
             maintenance_mode = False
-            query = "SELECT value from metadata where name = :key"
+            query = text("SELECT value from metadata where name = :key")
             result = request.cirrina.db_session.execute(query, {"key": "maintenance_mode"})
             for value in result:
                 if value[0] == "true":

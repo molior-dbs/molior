@@ -145,11 +145,7 @@ def get_local_tz():
     if local_tz:
         return local_tz
 
-    timezone = "Europe/Zurich"
-    f = open("/etc/timezone", "r")
-    if f:
-        timezone = f.read().strip()
-        f.close()
+    timezone = "Etc/UTC"
     local_tz = pytz.timezone(timezone)
     return local_tz
 

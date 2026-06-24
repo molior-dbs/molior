@@ -4,6 +4,7 @@ from os import getloadavg
 
 from psutil import virtual_memory, disk_usage
 from multiprocessing import cpu_count
+from sqlalchemy import text
 
 from ..app import app  # , logger
 from ..auth import req_admin
@@ -34,7 +35,7 @@ async def get_status(request):
     maintenance_message = ""
     maintenance_mode = False
 
-    query = "select value from metadata where name = :key"
+    query = text("select value from metadata where name = :key")
     result = request.cirrina.db_session.execute(query, {"key": "maintenance_mode"})
     for value in result:
         if value[0] == "true":

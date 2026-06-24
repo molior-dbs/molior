@@ -35,9 +35,10 @@ data:
     }
   backend-kubernetes.yml: |
     registry:
-        server: "k3d-molior-server-0:30500"
-        user: molior
-        password: molior-dev
+        server-push: "molior-registry:5000"
+        server: "localhost:5000"
+        user: ""
+        password: ""
 
     builder:
         amd64:
