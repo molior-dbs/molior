@@ -583,6 +583,8 @@ async def copy_projectversion(request):
             #     continue
             if topbuild.sourcerepository is None:
                 continue
+            if topbuild.sourcerepository not in new_projectversion.sourcerepositories:
+                continue
             build = Build(
                 version=topbuild.version,
                 git_ref=topbuild.git_ref,
