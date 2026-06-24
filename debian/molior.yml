@@ -1,7 +1,8 @@
+---
 config_version: "1"
 targets:
   molior:
-  - "1.5-next"
+    - "1.5"
 build_after:
   - "cirrina"
   - "launchy"
