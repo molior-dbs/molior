@@ -87,6 +87,9 @@ logs-aptly:  ## Show aptly logs
 	kubectl logs -l app=aptly -f
 
 
+shell-molior:  ## Open a bash shell in the molior pod
+	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- bash
+
 restart-molior:  ## Restart molior pod
 	kubectl delete pod -l app=molior
 
@@ -96,6 +99,7 @@ psql:  ## Run psql
 clean: delete-cluster  ## Remove cluster and registry
 	docker rmi -f molior-base:dev
 	k3d registry delete $(REGISTRY)
+	docker system prune
 
 
 
