@@ -4,3 +4,6 @@ registry:
 
 molior:
   version: dev
+  # Set to true on dev clusters: allows plain-HTTP session cookies and
+  # treats a missing admin_password as a warning rather than a hard error.
+  dev: false

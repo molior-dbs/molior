@@ -2,6 +2,8 @@
 /api/login, /api/logout, /api/userinfo
 """
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,9 @@ from ...db import get_db
 from ....auth.auth import Auth
 from ....model.user import User
 from ....molior.configuration import Configuration
+
+# Set MOLIOR_DEV=1 in development to allow the cookie over plain HTTP.
+_SECURE_COOKIE = not os.environ.get("MOLIOR_DEV")
 
 router = APIRouter(tags=["auth"])
 
@@ -36,7 +41,12 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
             raise HTTPException(status_code=400, detail="Login failed")
 
     cookie = create_session_cookie(username)
-    response.set_cookie("molior_session", cookie, httponly=True, samesite="lax")
+    response.set_cookie(
+        "molior_session", cookie,
+        httponly=True,
+        samesite="lax",
+        secure=_SECURE_COOKIE,
+    )
     return ""
 
 

@@ -37,6 +37,8 @@ def _get_weekday_number(name):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from .auth import assert_secret_configured
+    assert_secret_configured()
     logger.info("starting molior v%s (fastapi)", MOLIOR_VERSION)
 
     backend = Backend().init()

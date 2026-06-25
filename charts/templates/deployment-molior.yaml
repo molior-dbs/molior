@@ -50,6 +50,10 @@ spec:
                 - "SYS_CHROOT"
                 - "SETFCAP"
           env:
+            {{- if .Values.molior.dev }}
+            - name: MOLIOR_DEV
+              value: "1"
+            {{- end }}
             - name: APTLY_PASSWORD
               valueFrom:
                 configMapKeyRef:

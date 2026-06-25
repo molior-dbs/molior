@@ -40,8 +40,25 @@ from ..tools import parse_int, db2array
 # ---------------------------------------------------------------------------
 
 def _get_serializer() -> URLSafeTimedSerializer:
-    secret = Configuration().admin.get("admin_password") or "molior-dev"
+    secret = Configuration().admin.get("admin_password")
+    if not secret:
+        raise RuntimeError("admin_password is not set in molior.yml")
     return URLSafeTimedSerializer(secret)
+
+
+def assert_secret_configured() -> None:
+    """
+    Call once at startup. Raises RuntimeError if admin_password is missing
+    from molior.yml so the server refuses to start with no signing secret.
+    """
+    from ..logger import logger
+    secret = Configuration().admin.get("admin_password")
+    if not secret:
+        raise RuntimeError(
+            "admin_password is not set in molior.yml — "
+            "cannot sign session cookies. Server will not start."
+        )
+    logger.debug("auth: session secret loaded from admin_password")
 
 
 def create_session_cookie(username: str) -> str:

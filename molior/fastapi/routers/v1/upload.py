@@ -11,6 +11,7 @@ Internal endpoints used by build agents:
       A None sentinel (on disconnect) signals end-of-log to the backend.
 """
 
+import hashlib
 import shutil
 import tempfile
 from pathlib import Path
@@ -25,6 +26,12 @@ from ....molior.configuration import Configuration
 from ....molior.queues import buildlog
 
 router = APIRouter(tags=["internal"])
+
+
+def _token_hint(token: str) -> str:
+    """Return a short identifier safe for logs — never the raw token value."""
+    return hashlib.sha256(token.encode()).hexdigest()[:8]
+
 
 _config = Configuration()
 _upload_dir = Path(_config.working_dir) / "upload"
@@ -46,12 +53,12 @@ async def file_upload(token: str, file: UploadFile = File(...)):
     """
     build_id = _build_id_for_token(token)
     if build_id is None:
-        logger.error("buildupload: no build found for token '%s'", token)
+        logger.error("buildupload: no build found for token hint=%s", _token_hint(token))
         raise HTTPException(status_code=400, detail="Invalid upload token")
 
     dest_dir = _buildout_path / str(build_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / file.filename
+    dest = dest_dir / Path(file.filename).name   # strip any directory components
 
     # Stream via a named temp file in the same filesystem to allow atomic rename
     _upload_dir.mkdir(parents=True, exist_ok=True)
@@ -85,7 +92,7 @@ async def buildlog_ws(websocket: WebSocket):
     token = websocket.path_params["token"]
     build_id = _build_id_for_token(token)
     if build_id is None:
-        logger.error("buildlog ws: no build found for token '%s'", token)
+        logger.error("buildlog ws: no build found for token hint=%s", _token_hint(token))
         await websocket.close(code=4400)
         return
 

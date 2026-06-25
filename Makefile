@@ -1,6 +1,7 @@
 NAMESPACE := molior
 REGISTRY := k3d-molior-registry
 REGISTRY_PORT := 5000
+MOLIOR_DEV ?= true
 export HELM_NAMESPACE=$(NAMESPACE)
 
 ifneq ($(shell which podman 2>/dev/null),)
@@ -61,8 +62,8 @@ install-k3d:  ## Download and install k3d binary
 
 
 install-cluster:  ## Install molior helm chart into k3d
-	printf 'registry:\n  host: %s\n  port: %s\n' $(REGISTRY) $(REGISTRY_PORT) > /tmp/molior-registry-values.yaml
-	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml
+	printf 'registry:\n  host: %s\n  port: %s\nmolior:\n  dev: %s\n' $(REGISTRY) $(REGISTRY_PORT) $(MOLIOR_DEV) > /tmp/molior-registry-values.yaml
+	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml; rm -f /tmp/molior-registry-values.yaml
 
 uninstall-cluster:  ## Uninstall molior helm chart from k3d
 	helm uninstall --wait molior || true

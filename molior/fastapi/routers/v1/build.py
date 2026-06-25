@@ -27,6 +27,7 @@ router = APIRouter(tags=["builds"])
 
 @router.get("/api/builds")
 def get_builds(
+    _: CurrentUser = Depends(authenticated),
     search: Optional[str] = Query(default=None),
     search_project: Optional[str] = Query(default=None),
     project: Optional[str] = Query(default=None),
