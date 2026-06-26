@@ -13,28 +13,35 @@
 .build-log-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+  font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #d4d4d4;
+  color: lime;
 }
 .build-lognr {
-  width: 1px;
+  width: 4em;
+  min-width: 4em;
+  max-width: 4em;
   white-space: nowrap;
   padding: 0 6px;
   user-select: none;
-  color: #666;
+  color: #02c602;
   vertical-align: top;
+  text-align: right;
+  box-sizing: border-box;
 }
 .build-lognr-link {
-  color: #666;
+  color: #02c602;
   text-decoration: none;
 }
-.build-lognr-link:hover { color: #aaa; }
+.build-lognr-link:hover { color: #7fff7f; }
 .build-logline {
   padding: 0 6px;
   white-space: pre-wrap;
   word-break: break-all;
   vertical-align: top;
+}
+.build-log-table tr:hover {
+  background: grey;
 }
 .build-errorline > .build-lognr {
   color: #f44 !important;

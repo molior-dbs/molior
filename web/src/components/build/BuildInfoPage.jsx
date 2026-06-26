@@ -123,9 +123,13 @@ export default function BuildInfoPage() {
 
   // ── Pagination (visible line range) ──────────────────────────────────────
   const [visRange, setVisRange] = useState({ start: 0, end: 0 });
+  const [logLineCount, setLogLineCount] = useState(0);
 
   // ── Highlight from URL fragment ───────────────────────────────────────────
   const selectedLineRef = useRef(null);
+
+  // Track whether the last scroll was programmatic (so we don't unfollow on it)
+  const programmaticScrollRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Scroll helper (mirrors scrollToLog)
@@ -136,6 +140,7 @@ export default function BuildInfoPage() {
     const offsetPosition = element.getBoundingClientRect().top
       - scroll.getBoundingClientRect().top
       + scroll.scrollTop - 42;
+    programmaticScrollRef.current = true;
     scroll.scrollTo({ top: offsetPosition, behavior: 'smooth' });
   }
 
@@ -152,23 +157,23 @@ export default function BuildInfoPage() {
       if (!row) break;
       h += row.getBoundingClientRect().height;
       if (start === null && h > scroll.scrollTop) start = i;
-      if (end === null && h > viewBottom)         end   = i;
+      if (end === null   && h > viewBottom)        end   = i;
     }
     if (start !== null) {
       setVisRange({ start, end: end ?? loglinesRef.current });
-      if (end !== null) {
-        // user scrolled manually — stop following
-        if (followRef.current) {
-          followRef.current = false;
-          setFollowState(false);
-        }
-      } else {
-        // scrolled to bottom
-        if (!followRef.current) {
-          followRef.current = true;
-          setFollowState(true);
-        }
-      }
+    }
+
+    // Only update follow state for real user-initiated scrolls
+    if (programmaticScrollRef.current) {
+      programmaticScrollRef.current = false;
+      return;
+    }
+
+    const atBottom = scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4;
+    if (atBottom) {
+      if (!followRef.current) { followRef.current = true;  setFollowState(true);  }
+    } else {
+      if (followRef.current)  { followRef.current = false; setFollowState(false); }
     }
   }
 
@@ -199,6 +204,7 @@ export default function BuildInfoPage() {
 
     loglinesRef.current = nr;
     lastRowRef.current  = row;
+    setLogLineCount(nr);
   }
 
   function replaceLogLine(line) {
@@ -336,7 +342,10 @@ export default function BuildInfoPage() {
     setFollowState(newVal);
     if (newVal) {
       const endRow = document.getElementById(`row-${loglinesRef.current}`);
-      if (endRow) endRow.scrollIntoView();
+      if (endRow) {
+        programmaticScrollRef.current = true;
+        endRow.scrollIntoView();
+      }
     }
   }
 
@@ -348,6 +357,7 @@ export default function BuildInfoPage() {
     const tbody = tbodyRef.current;
     if (tbody) tbody.innerHTML = '';
     loglinesRef.current   = 0;
+    setLogLineCount(0);
     incompleteRef.current = '';
     followRef.current     = true;
     setFollowState(true);
@@ -403,7 +413,10 @@ export default function BuildInfoPage() {
 
         // scroll to end if following
         const endRow = document.getElementById(`row-${loglinesRef.current}`);
-        if (endRow && followRef.current) endRow.scrollIntoView();
+        if (endRow && followRef.current) {
+          programmaticScrollRef.current = true;
+          endRow.scrollIntoView();
+        }
 
         // count errors
         const errors = document.getElementsByClassName('build-errorline');
@@ -427,7 +440,10 @@ export default function BuildInfoPage() {
         processChunk(msg.data, buildObj.buildstate);
         const tbody2 = tbodyRef.current;
         if (lastRowRef.current && aliveRef.current && LIVE_STATES.has(buildObj.buildstate)) {
-          if (followRef.current) lastRowRef.current.scrollIntoView();
+          if (followRef.current) {
+            programmaticScrollRef.current = true;
+            lastRowRef.current.scrollIntoView();
+          }
           updateVisRange();
         }
       }
@@ -709,10 +725,30 @@ export default function BuildInfoPage() {
           </button>
         )}
 
+        {/* Top / Bottom buttons */}
+        {logLineCount > 0 && (
+          <>
+            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to top"
+              onClick={() => {
+                programmaticScrollRef.current = true;
+                logScrollRef.current?.scrollTo({ top: 0 });
+              }}>
+              <i className="bi bi-arrow-up-circle" />
+            </button>
+            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to bottom"
+              onClick={() => {
+                programmaticScrollRef.current = true;
+                logScrollRef.current?.scrollTo({ top: logScrollRef.current.scrollHeight });
+              }}>
+              <i className="bi bi-arrow-down-circle" />
+            </button>
+          </>
+        )}
+
         {/* Line range display */}
-        {loglinesRef.current > 0 && (
+        {logLineCount > 0 && (
           <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
-            {visRange.start}–{visRange.end} / {loglinesRef.current}
+            {visRange.start}–{visRange.end} / {logLineCount}
           </span>
         )}
       </div>
