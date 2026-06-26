@@ -99,6 +99,45 @@ export default function BuildTable({ projectversion, repository }) {
     }
   }, [search, searchProject, maintainer, commit, selectedStates]);
 
+  // ── WebSocket live updates ─────────────────────────────────────────────────
+  useEffect(() => {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${window.location.host}/api/websocket`);
+
+    ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+      // subject 7 = build
+      if (msg.subject !== 7) return;
+
+      if (msg.event === 2) {
+        // changed — update matching rows in-place
+        setBuilds(prev => prev.map(b =>
+          b.id === msg.data?.id ? { ...b, ...msg.data } : b
+        ));
+      } else if (msg.event === 1) {
+        // added — insert on page 1 only
+        if (page !== 1) return;
+        setBuilds(prev => {
+          const data = msg.data;
+          // if the new build has a parent, insert it right after the parent row
+          if (data.parent_id != null) {
+            const parentIdx = prev.findIndex(b => b.id === data.parent_id);
+            if (parentIdx === -1) return prev; // parent not visible, skip
+            const next = [...prev];
+            next.splice(parentIdx + 1, 0, data);
+            return next.slice(0, pageSize); // keep within page size
+          }
+          // no parent — prepend
+          return [data, ...prev].slice(0, pageSize);
+        });
+        setTotal(t => (t ?? 0) + 1);
+      }
+    };
+
+    return () => ws.close();
+  }, [page, pageSize, projectversion, repository]);
+
   // ── Runtime ticker — re-renders every second when builds are in progress ──
   useEffect(() => {
     const hasActive = builds.some(b =>

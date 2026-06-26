@@ -696,6 +696,36 @@ function ReposTab({ pv }) {
 
   function closeModal(reload) { setModal(null); if (reload) load(page); }
 
+  // ── WebSocket: update last_build / last_successful_build on build events ─────────
+  useEffect(() => {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${window.location.host}/api/websocket`);
+    ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+      if (msg.subject !== 7) return;                    // only build events
+      const d = msg.data;
+      if (!d?.sourcerepository_id) return;             // only source builds
+      setItems(prev => prev.map(repo => {
+        if (repo.id !== d.sourcerepository_id) return repo;
+        const updated = { ...repo };
+        // always update last_build with whatever we received
+        updated.last_build = {
+          id: d.id,
+          buildstate: d.buildstate,
+          version: d.version ?? repo.last_build?.version ?? '',
+          sourcename: d.sourcename ?? '',
+        };
+        // if this build just became successful, update last_successful_build too
+        if (d.buildstate === 'successful') {
+          updated.last_successful_build = { ...updated.last_build };
+        }
+        return updated;
+      }));
+    };
+    return () => ws.close();
+  }, []);
+
   function handleWheel(e) {
     if (e.ctrlKey) return;
     const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;

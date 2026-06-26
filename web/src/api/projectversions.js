@@ -160,7 +160,7 @@ export async function removeRepository(projectName, versionName, repoId) {
 }
 
 export async function buildRepository(projectName, versionName, repoId) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repository/${repoId}/build`, {
+  const res = await fetch(`/api/repositories/${repoId}/build`, {
     method: 'POST', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
