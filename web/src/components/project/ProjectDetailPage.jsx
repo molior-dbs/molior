@@ -21,6 +21,7 @@ import {
 import { deleteProject } from '../../api/projects';
 import ProjectForm from './ProjectForm';
 import ProjectVersionForm from './ProjectVersionForm';
+import CopyProjectVersionForm from './CopyProjectVersionForm';
 import ConfirmModal from '../build/ConfirmModal';
 
 const PRIMARY  = '#571845';
@@ -208,6 +209,9 @@ export default function ProjectDetailPage() {
       )}
       {modal?.type === 'edit' && (
         <ProjectVersionForm projectName={name} projectVersion={modal.pv} onClose={closeModal} />
+      )}
+      {modal?.type === 'copy' && (
+        <CopyProjectVersionForm projectName={name} projectVersion={modal.pv} onClose={closeModal} />
       )}
       {modal?.type === 'delete' && (
         <ConfirmModal

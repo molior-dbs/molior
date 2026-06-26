@@ -73,11 +73,11 @@ export async function fetchProjectVersion(projectName, versionName) {
   return res.json();
 }
 
-export async function copyProjectVersion(projectName, versionName, newName) {
+export async function copyProjectVersion(projectName, versionName, body) {
   const res = await fetch(`/api2/project/${projectName}/${versionName}/copy`, {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: newName }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
