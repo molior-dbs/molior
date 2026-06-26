@@ -10,7 +10,7 @@ spec:
   ports:
     - name: "web-ui"
       port: 8000
-      targetPort: 80
+      targetPort: 9999
       nodePort: 30080
   selector:
-    app: web
+    app: molior

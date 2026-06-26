@@ -9,6 +9,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get full-upgrad
     apt-get build-dep -y . && \
     apt-get install -y --no-install-recommends \
         lsb-base dh-autoreconf git git-lfs python3-psycopg2 sudo expect yq podman uidmap git-lfs \
-        postgresql-client binfmt-support devscripts bc xz-utils debootstrap openssh-client binfmt-support qemu-user-static && \
+        postgresql-client binfmt-support devscripts bc xz-utils debootstrap openssh-client binfmt-support qemu-user-static \
+        npm nodejs libjs-bootstrap5 node-react && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

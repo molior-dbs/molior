@@ -12,6 +12,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: web
+            name: molior
             port:
-              number: 80
+              number: 9999
