@@ -11,7 +11,6 @@ app.contact = ""
 # import api handlers
 from .auth.auth import Auth          # noqa: F401, E402
 import molior.api.build              # noqa: E402
-import molior.api.bitbucket          # noqa: E402
 import molior.api.project            # noqa: E402
 import molior.api.buildstate         # noqa: E402
 import molior.api.mirror             # noqa: E402

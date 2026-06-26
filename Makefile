@@ -94,7 +94,7 @@ restart-molior:  ## Restart molior pod
 	kubectl delete pod -l app=molior
 
 psql:  ## Run psql
-	kubectl exec -it molior-6c76b45685-ktsqv -- su molior -c psql molior
+	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- su molior -c psql molior
 
 clean: delete-cluster  ## Remove cluster and registry
 	docker rmi -f molior-base:dev
