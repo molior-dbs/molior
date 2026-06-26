@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 RUN export DEBIAN_FRONTEND=noninteractive; apt-get update -y && apt-get install -y --no-install-recommends curl gnupg apg ca-certificates apache2-utils && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN echo deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/ci trixie main > /etc/apt/sources.list.d/aptly.list
+RUN echo deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/release trixie main > /etc/apt/sources.list.d/aptly.list
 RUN curl -f https://www.aptly.info/pubkey.txt -o /etc/apt/keyrings/aptly.asc && apt-get update && \
     export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends aptly && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
