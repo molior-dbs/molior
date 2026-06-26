@@ -1,0 +1,71 @@
+/* ── Build log panel ──────────────────────────────────────── */
+.build-log-wrapper {
+  position: relative;
+  background: #1e1e1e;
+  display: flex;
+  overflow: hidden;
+}
+.build-log-scroll {
+  overflow: auto;
+  flex: 1;
+  outline: none;
+}
+.build-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  color: #d4d4d4;
+}
+.build-lognr {
+  width: 1px;
+  white-space: nowrap;
+  padding: 0 6px;
+  user-select: none;
+  color: #666;
+  vertical-align: top;
+}
+.build-lognr-link {
+  color: #666;
+  text-decoration: none;
+}
+.build-lognr-link:hover { color: #aaa; }
+.build-logline {
+  padding: 0 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  vertical-align: top;
+}
+.build-errorline > .build-lognr {
+  color: #f44 !important;
+  font-weight: bold;
+}
+.build-errorline > .build-logline {
+  border-bottom: 2px dashed #f44;
+}
+.build-searchresult {
+  background: rgba(73, 103, 162, 0.25);
+}
+.build-searchhighlight {
+  background: #4967a2;
+  color: white;
+  border-radius: 2px;
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.build-blinking-cursor {
+  animation: blink-cursor 1s step-start infinite;
+  color: #888;
+}
+
+/* ── Rotating animation for the 'building' state icon ── */
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.rotating {
+  display: inline-block;
+  animation: rotating 1.5s linear infinite;
+}

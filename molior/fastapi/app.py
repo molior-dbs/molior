@@ -9,12 +9,15 @@ later iterations.
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager, suppress
 
 from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from launchy import Launchy
 
 from ..auth.auth import Auth
@@ -132,5 +135,25 @@ def create_app() -> FastAPI:
     app.include_router(v1_router)
     app.include_router(v2_router)
     app.include_router(ws_router)
+
+    # Serve the React SPA from /usr/lib/molior/web (installed by the Debian package).
+    # Strategy:
+    #   - /assets/* → StaticFiles (Vite's hashed JS/CSS/font/image bundle)
+    #   - everything else → index.html so react-router handles client-side routing
+    # API routes registered above always win because FastAPI matches them first.
+    web_dir = os.environ.get("MOLIOR_WEB_DIR", "/usr/lib/molior/web")
+    if os.path.isdir(web_dir):
+        assets_dir = os.path.join(web_dir, "assets")
+        if os.path.isdir(assets_dir):
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+        index_path = os.path.join(web_dir, "index.html")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa(full_path: str):
+            if os.path.isfile(index_path):
+                return FileResponse(index_path)
+            raise HTTPException(status_code=404)
+    else:
+        logger.warning("web UI directory not found: %s (web UI will not be served)", web_dir)
 
     return app
