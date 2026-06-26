@@ -31,7 +31,7 @@ import {
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 // ─── Shared: project version info card + tab bar ──────────────────────────────
 function PVHeader({ pv, name, version, onAction }) {

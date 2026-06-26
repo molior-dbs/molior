@@ -27,7 +27,7 @@ import ConfirmModal from './ConfirmModal';
 
 const PRIMARY = '#571845';
 const TH = { backgroundColor: PRIMARY, color: 'white' };
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 // Indentation depths for the tree view
 const TYPE_INDENT = { build: 0, source: 1, deb: 2, mirror: 0, debootstrap: 0, chroot: 1,

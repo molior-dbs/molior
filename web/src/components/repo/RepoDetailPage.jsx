@@ -17,7 +17,7 @@ import ConfirmModal from '../build/ConfirmModal';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 // ── SSH → HTTPS URL transform ─────────────────────────────────────────────
 function transformUrl(url) {

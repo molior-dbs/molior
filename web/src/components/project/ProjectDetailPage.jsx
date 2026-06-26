@@ -25,7 +25,7 @@ import ConfirmModal from '../build/ConfirmModal';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 // ─── tiny import helper (hidden file input) ──────────────────────────────────
 function useImportInput(onImport) {
