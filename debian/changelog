@@ -1,3 +1,11 @@
+molior (1.5.0~beta34) stretch; urgency=medium
+
+  * web: fix paginator
+  * web: copy project version
+  * projectversion: fix build and repo tables updating
+
+ -- André Roth <neolynx@gmail.com>  Fri, 26 Jun 2026 18:35:20 +0200
+
 molior (1.5.0~beta33) stretch; urgency=medium
 
   * web: set table rows to 20
