@@ -4,7 +4,6 @@ targets:
   molior:
     - "1.5"
 build_after:
-  - "cirrina"
   - "launchy"
   - "async-cron"
   - "git-url-parse"

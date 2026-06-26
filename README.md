@@ -194,15 +194,10 @@ The following source respositories are needed:
 ```shell
 # molior
 git clone https://github.com/molior-dbs/molior.git
-git clone https://github.com/molior-dbs/molior-web.git
-
-# aptly
-git clone --recursive https://github.com/molior-dbs/aptlydeb.git
+git clone https://github.com/molior-dbs/molior-web2.git
 
 # optionally:
 git clone https://github.com/neolynx/launchy.git
-git clone https://github.com/neolynx/cirrina.git
-git clone https://github.com/neolynx/aiohttp_jrpc.git
 git clone https://github.com/neolynx/aiohttp-session.git
 git clone https://github.com/neolynx/aiohttp-swagger.git
 git clone https://github.com/molior-dbs/aiofile.git
