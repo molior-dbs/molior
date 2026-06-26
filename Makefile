@@ -16,7 +16,7 @@ endif
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-docker-images: docker-image-molior docker-web docker-aptly  ## Create docker images
+docker-images: docker-image-molior docker-image-web docker-image-aptly  ## Create docker images
 	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
 	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
@@ -25,10 +25,10 @@ docker-image-molior:  ## Build molior docker image
 		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
 	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
 
-docker-web:  ## Build web docker image
+docker-image-web:  ## Build web docker image
 	$(DOCKERCMD) build -f docker/web.Dockerfile -t molior-web:dev ../molior-web2
 
-docker-aptly:  ## Build aptly docker image
+docker-image-aptly:  ## Build aptly docker image
 	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
 
 create-cluster:  ## Create k3d cluster
@@ -94,6 +94,9 @@ shell-molior:  ## Open a bash shell in the molior pod
 restart-molior:  ## Restart molior pod
 	kubectl delete pod -l app=molior
 
+restart-aptly:  ## Restart aptly pod
+	kubectl delete pod -l app=aptly
+
 psql:  ## Run psql
 	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- su molior -c psql molior
 
@@ -114,4 +117,4 @@ clean: delete-cluster  ## Remove cluster and registry
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-image-molior docker-web docker-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean
+.PHONY: help docker-images docker-image-molior docker-image-web docker-image-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean
