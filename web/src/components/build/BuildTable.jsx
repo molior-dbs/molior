@@ -75,8 +75,8 @@ export default function BuildTable({ projectversion, repository }) {
       if (repository)      params.sourcerepository_id = repository.id;
 
       const data = await fetchBuilds(params);
-      setBuilds(data.results ?? data);
-      setTotal(data.total ?? (data.results ?? data).length);
+      setBuilds(data.results);
+      setTotal(data.total);
     } catch (e) {
       setError(e.message);
       setTotal(-1);
@@ -187,6 +187,8 @@ export default function BuildTable({ projectversion, repository }) {
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
+  const pageStart  = total > 0 ? (page - 1) * pageSize + 1 : 0;
+  const pageEnd    = total > 0 ? Math.min(page * pageSize, total) : 0;
 
   const showProject = !projectversion;
 
@@ -450,27 +452,35 @@ export default function BuildTable({ projectversion, repository }) {
       {/* ── Pagination ── */}
       <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
         <span className="text-muted">
-          {total > 0 ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}` : ''}
+          {total === null && 'Loading…'}
+          {total === 0   && '0 builds'}
+          {total  >  0  && (
+            <>
+              {pageStart}–{pageEnd} of <strong>{total}</strong> build{total !== 1 ? 's' : ''}
+            </>
+          )}
         </span>
-        <nav>
-          <ul className="pagination pagination-sm mb-0">
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(1)}>&laquo;</button>
-            </li>
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p - 1)}>&lsaquo;</button>
-            </li>
-            <li className="page-item disabled">
-              <span className="page-link">{page} / {totalPages}</span>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p + 1)}>&rsaquo;</button>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(totalPages)}>&raquo;</button>
-            </li>
-          </ul>
-        </nav>
+        {totalPages > 1 && (
+          <nav aria-label="Builds pagination">
+            <ul className="pagination pagination-sm mb-0">
+              <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage(1)} title="First page">&laquo;</button>
+              </li>
+              <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage(p => p - 1)} title="Previous page">&lsaquo;</button>
+              </li>
+              <li className="page-item disabled">
+                <span className="page-link">{page} / {totalPages}</span>
+              </li>
+              <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage(p => p + 1)} title="Next page">&rsaquo;</button>
+              </li>
+              <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage(totalPages)} title="Last page">&raquo;</button>
+              </li>
+            </ul>
+          </nav>
+        )}
       </div>
     </div>
   );

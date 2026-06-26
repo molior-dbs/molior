@@ -17,7 +17,11 @@ export async function fetchBuilds(params) {
 
   const res = await fetch(`/api/builds?${q}`, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
-  return res.json(); // { results: Build[], total: number }
+  const data = await res.json(); // { results: Build[], total_result_count: number }
+  return {
+    results: data.results ?? data,
+    total:   data.total_result_count ?? data.total ?? (data.results ?? data).length,
+  };
 }
 
 export async function fetchBuild(id) {
