@@ -31,11 +31,11 @@ const PAGE_SIZE = 25;
 function useImportInput(onImport) {
   const ref = useRef(null);
   function trigger() { ref.current?.click(); }
-  function handleChange(e) {
+  async function handleChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    onImport(file);
     e.target.value = '';       // reset so same file can be picked again
+    await onImport(file);
   }
   const input = (
     <input ref={ref} type="file" accept=".json"
@@ -150,7 +150,26 @@ export default function ProjectDetailPage() {
       fd.append('file', file);
       const result = await importProjectVersion(fd);
       const pv     = result.projectversion;
-      navigate(`/project/${project.name}/${pv.name}`);
+      const repos  = result.sourcerepositories || [];
+
+      // Add each source repository to the new project version (mirrors Angular's handle())
+      for (const repo of repos) {
+        const res = await fetch(`/api2/project/${pv.project_name}/${pv.name}/repositories`, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: repo.url,
+            architectures: repo.architectures?.length ? repo.architectures : pv.architectures,
+            run_lintian: repo.run_lintian ? 'true' : 'false',
+          }),
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          console.error('Error adding repository:', repo.url, e.detail || res.status);
+        }
+      }
+
+      navigate(`/project/${pv.project_name}/${pv.name}`);
     } catch (e) { alert(`Import failed: ${e.message}`); }
   });
 
