@@ -93,7 +93,7 @@ export default function UserListPage() {
         </li>
       </ul>
 
-      <div className="table-responsive">
+      <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
             <tr>

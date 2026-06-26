@@ -147,7 +147,7 @@ export default function ProjectDetailPage() {
   const { trigger: triggerImport, input: importInput } = useImportInput(async (file) => {
     try {
       const fd = new FormData();
-      fd.append('json', file);
+      fd.append('file', file);
       const result = await importProjectVersion(fd);
       const pv     = result.projectversion;
       navigate(`/project/${project.name}/${pv.name}`);
@@ -287,7 +287,7 @@ export default function ProjectDetailPage() {
       </ul>
 
       {/* ── Versions table ── */}
-      <div className="table-responsive">
+      <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
             <tr>

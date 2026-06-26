@@ -244,7 +244,7 @@ function InfoTab({ mirror, name, version }) {
     <div onWheel={handleWheel}>
       <h2 style={{ fontSize: 17, fontWeight: 600 }} className="mb-2">Mirror Dependents</h2>
 
-      <div className="table-responsive">
+      <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
             <tr>

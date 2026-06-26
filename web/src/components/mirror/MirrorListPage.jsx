@@ -93,7 +93,7 @@ export default function MirrorListPage() {
         <i className="bi bi-folder-symlink" />Mirrors
       </h1>
 
-      <div className="table-responsive">
+      <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
             <tr>

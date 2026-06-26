@@ -309,7 +309,7 @@ export default function RepoListPage() {
         <i className="bi bi-git" />Repositories
       </h1>
 
-      <div className="table-responsive">
+      <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
             <tr>
