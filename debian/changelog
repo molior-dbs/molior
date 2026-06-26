@@ -1,3 +1,28 @@
+molior (1.5.0~beta33) stretch; urgency=medium
+
+  * web: set table rows to 20
+  * web: fix projectversion import
+  * web: remove table vscroll
+  * web: debounce buttons / scrolling in logs
+  * web: server with molior
+  * web: port to rest & bootstrap
+  * aptly: use prod release
+  * cleanup Makefile
+  * remove legacy code
+  * fastapi: security improvements
+  * fastapi: fix websocket
+  * fastapi: file upload
+  * fastapi: websocket
+  * fastapi: port v1 apis
+  * fastapi: start uvicorn
+  * fastapi: port v2 apis
+  * WIP: update molior-base
+  * fastapi: add dependencies and handlers
+  * api: move files to fastapi location
+  * ...
+
+ -- André Roth <neolynx@gmail.com>  Fri, 26 Jun 2026 16:20:47 +0200
+
 molior (1.5.0~beta32) stretch; urgency=medium
 
   * molior: update project version
