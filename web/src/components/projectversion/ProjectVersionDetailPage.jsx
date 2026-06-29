@@ -865,7 +865,7 @@ function ReposTab({ pv }) {
 
   const rows = items.map(repo => (
     <tr key={repo.id} style={{ cursor: 'pointer' }}
-        onClick={() => navigate(`/project/${pv.project_name}/${pv.name}/repo/${repo.id}`)}>
+        onClick={() => navigate(`/repo/${repo.id}/info`)}>
       <td><strong>{repo.name}</strong></td>
       <td>
         {repo.last_build && (
@@ -898,7 +898,7 @@ function ReposTab({ pv }) {
           <ul className="dropdown-menu dropdown-menu-end">
             <li>
               <button className="dropdown-item"
-                      onClick={() => navigate(`/project/${pv.project_name}/${pv.name}/repo/${repo.id}`)}>
+                      onClick={() => navigate(`/repo/${repo.id}/info`)}>
                 <i className="bi bi-list me-2" />Details
               </button>
             </li>
