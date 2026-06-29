@@ -19,7 +19,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { AnsiUp } from 'ansi_up';
+import AnsiUp from 'ansi_up';
 import { fetchBuild, deleteBuild, rebuildBuild, buildLatest } from '../../api/builds';
 import { buildIcon, buildTypeLabel, formatDuration, formatStartTime } from '../../lib/buildUtils';
 import ConfirmModal from './ConfirmModal';

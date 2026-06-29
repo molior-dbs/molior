@@ -15,7 +15,8 @@ export PYBUILD_DESTDIR_python3=debian/molior-server
 override_dh_auto_build:
 	echo 'MOLIOR_VERSION = "$(DEB_VERSION)"' > molior/version.py
 	dh_auto_build
-	cd web && npm ci && npm run build
+	cd web && npm ci --legacy-peer-deps --omit=optional
+	cd web && NODE_PATH=/usr/share/nodejs webpack --mode production
 
 override_dh_auto_test:
 	flake8 molior tests

@@ -138,8 +138,8 @@ def create_app() -> FastAPI:
 
     # Serve the React SPA from /usr/lib/molior/web (installed by the Debian package).
     # Strategy:
-    #   - /assets/* → StaticFiles (Vite's hashed JS/CSS/font/image bundle)
-    #   - everything else → index.html so react-router handles client-side routing
+    #   - /assets/* → StaticFiles (webpack bundle: main.js, main.css, fonts, images)
+    #   - / and everything else → index.html so react-router handles client-side routing
     # API routes registered above always win because FastAPI matches them first.
     web_dir = os.environ.get("MOLIOR_WEB_DIR", "/usr/lib/molior/web")
     if os.path.isdir(web_dir):
@@ -148,8 +148,9 @@ def create_app() -> FastAPI:
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
         index_path = os.path.join(web_dir, "index.html")
 
+        @app.get("/", include_in_schema=False)
         @app.get("/{full_path:path}", include_in_schema=False)
-        async def serve_spa(full_path: str):
+        async def serve_spa(full_path: str = ""):
             if os.path.isfile(index_path):
                 return FileResponse(index_path)
             raise HTTPException(status_code=404)

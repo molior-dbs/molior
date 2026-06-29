@@ -1,5 +1,6 @@
 #! /usr/bin/dh-exec
 
 pkgdata/molior-server/* .
+web/index.html usr/lib/molior/web
 web/dist/* usr/lib/molior/web
 
