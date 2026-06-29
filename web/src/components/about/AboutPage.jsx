@@ -77,7 +77,7 @@ export default function AboutPage() {
         <tbody>
           <tr>
             <td style={{ paddingRight: 10, paddingBottom: 5 }}>
-              <ul style={{ marginTop: 0 }}><li style={{ marginBottom: 0 }}>Molior Server</li></ul>
+              <b>Molior Server</b>
             </td>
             <td style={{ paddingBottom: 5 }}>
               {status ? status.version_molior_server : <span className="text-muted">—</span>}
@@ -85,7 +85,7 @@ export default function AboutPage() {
           </tr>
           <tr>
             <td style={{ paddingRight: 10, paddingBottom: 5 }}>
-              <ul style={{ marginTop: 0 }}><li style={{ marginBottom: 0 }}>Aptly Server</li></ul>
+              <b>Aptly Server</b>
             </td>
             <td style={{ paddingBottom: 5 }}>
               {status ? status.version_aptly : <span className="text-muted">—</span>}
