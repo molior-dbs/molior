@@ -27,11 +27,123 @@ import {
   recloneRepository,
   fetchAptSources,
   copyProjectVersion,
+  uploadExternalBuild,
+  publishS3,
 } from '../../api/projectversions';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
 const PAGE_SIZE = 20;
+
+// ─── Build Upload modal ──────────────────────────────────────────────────────
+function BuildUploadModal({ name, version, onClose }) {
+  const [files,  setFiles]  = useState(null);
+  const [busy,   setBusy]   = useState(false);
+  const [error,  setError]  = useState('');
+
+  async function handleSave() {
+    if (!files || files.length === 0) { setError('Please select files to upload.'); return; }
+    setBusy(true); setError('');
+    try {
+      await uploadExternalBuild(name, version, files);
+      onClose(true);
+    } catch (e) { setError(e.message); setBusy(false); }
+  }
+
+  return (
+    <div className="modal fade show d-block" tabIndex="-1"
+         style={{ backgroundColor: 'rgba(0,0,0,.4)' }}>
+      <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title"><i className="bi bi-upload me-2" />Upload external build</h5>
+            <button className="btn-close" onClick={() => onClose(false)} disabled={busy} />
+          </div>
+          <div className="modal-body">
+            {error && <div className="alert alert-danger py-2">{error}</div>}
+            <p className="mb-2">Select all files produced by the <strong>debuild</strong> command:</p>
+            <ul className="mb-3" style={{ fontSize: 13 }}>
+              <li><strong>Mandatory:</strong> *.changes, *.buildinfo, *.deb</li>
+              <li><strong>Optional:</strong> *.dsc, *.tar.xz, *.tar.gz (source package)</li>
+            </ul>
+            <input
+              className="form-control" type="file" multiple
+              accept=".changes,.buildinfo,.deb,.dsc,.tar.xz,.tar.gz"
+              onChange={e => setFiles(e.target.files)}
+            />
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave}
+                    disabled={busy || !files || files.length === 0}>
+              {busy && <span className="spinner-border spinner-border-sm me-2" />}Upload
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── S3 Publish modal ─────────────────────────────────────────────────────────
+function S3Modal({ pv, name, version, onClose }) {
+  const [publishS3Enabled, setPublishS3Enabled] = useState(pv.publish_s3 ?? false);
+  const [s3Endpoint,       setS3Endpoint]       = useState(pv.s3_endpoint ?? '');
+  const [s3Path,           setS3Path]           = useState(pv.s3_path ?? '');
+  const [busy,             setBusy]             = useState(false);
+  const [error,            setError]            = useState('');
+
+  async function handleSave() {
+    setBusy(true); setError('');
+    try {
+      await publishS3(name, version, { publish_s3: publishS3Enabled, s3_endpoint: s3Endpoint, s3_path: s3Path });
+      onClose(true);
+    } catch (e) { setError(e.message); setBusy(false); }
+  }
+
+  return (
+    <div className="modal fade show d-block" tabIndex="-1"
+         style={{ backgroundColor: 'rgba(0,0,0,.4)' }}>
+      <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title"><i className="bi bi-cloud-upload me-2" />Publish to S3</h5>
+            <button className="btn-close" onClick={() => onClose(false)} disabled={busy} />
+          </div>
+          <div className="modal-body">
+            {error && <div className="alert alert-danger py-2">{error}</div>}
+            <div className="form-check mb-3">
+              <input className="form-check-input" type="checkbox" id="publish-s3"
+                     checked={publishS3Enabled}
+                     onChange={e => setPublishS3Enabled(e.target.checked)} />
+              <label className="form-check-label fw-semibold" htmlFor="publish-s3">Publish to S3</label>
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold">S3 Endpoint</label>
+              <input className="form-control" value={s3Endpoint}
+                     disabled={!publishS3Enabled}
+                     placeholder="e.g. https://s3.example.com"
+                     onChange={e => setS3Endpoint(e.target.value)} />
+            </div>
+            <div className="mb-1">
+              <label className="form-label fw-semibold">Publish Path</label>
+              <input className="form-control" value={s3Path}
+                     disabled={!publishS3Enabled}
+                     placeholder="e.g. my-bucket/packages"
+                     onChange={e => setS3Path(e.target.value)} />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={busy}>
+              {busy && <span className="spinner-border spinner-border-sm me-2" />}Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Shared: project version info card + tab bar ──────────────────────────────
 function PVHeader({ pv, name, version, onAction }) {
@@ -106,6 +218,21 @@ function PVHeader({ pv, name, version, onAction }) {
                 <button className="dropdown-item" onClick={() => onAction('delete')}>
                   <i className="bi bi-trash me-2 text-danger" />
                   <span className="text-danger">Delete</span>
+                </button>
+              </li>
+            )}
+            {!pv.is_locked && <li><hr className="dropdown-divider" /></li>}
+            {!pv.is_locked && (
+              <li>
+                <button className="dropdown-item" onClick={() => onAction('upload')}>
+                  <i className="bi bi-upload me-2" />Upload external build
+                </button>
+              </li>
+            )}
+            {!pv.is_locked && (
+              <li>
+                <button className="dropdown-item" onClick={() => onAction('s3')}>
+                  <i className="bi bi-cloud-upload me-2" />Publish to S3
                 </button>
               </li>
             )}
@@ -1122,6 +1249,12 @@ export default function ProjectVersionDetailPage() {
             if (reload) navigate(`/project/${name}`);
           }}
         />
+      )}
+      {modal?.type === 'upload' && pv && (
+        <BuildUploadModal name={name} version={version} onClose={closeModal} />
+      )}
+      {modal?.type === 's3' && pv && (
+        <S3Modal pv={pv} name={name} version={version} onClose={closeModal} />
       )}
 
       {/* ── Header (info card + actions) ── */}

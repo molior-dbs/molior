@@ -204,3 +204,30 @@ export async function fetchBaseMirrors(q = '') {
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json(); // { results: [{ name, version, architectures }, ...] }
 }
+
+
+
+// ─── External Build Upload ─────────────────────────────────────────────────────
+
+export async function uploadExternalBuild(projectName, versionName, files) {
+  const formData = new FormData();
+  Array.from(files).forEach(file => formData.append(file.name, file));
+  const res = await fetch(`/api2/project/${projectName}/${versionName}/extbuild`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    body: formData,
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `Server error ${res.status}`); }
+}
+
+// ─── S3 Publish ───────────────────────────────────────────────────────────────
+
+export async function publishS3(projectName, versionName, { publish_s3, s3_endpoint, s3_path }) {
+  const res = await fetch(`/api2/project/${projectName}/${versionName}/s3`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ publish_s3, s3_endpoint, s3_path }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `Server error ${res.status}`); }
+}
