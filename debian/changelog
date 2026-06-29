@@ -1,3 +1,11 @@
+molior (1.5.0~beta36) stretch; urgency=medium
+
+  * nginx: base on debian trixie
+  * Makefile: allow to push to different registry
+  * web: use base href
+
+ -- André Roth <neolynx@gmail.com>  Tue, 30 Jun 2026 00:22:07 +0200
+
 molior (1.5.0~beta35) stretch; urgency=medium
 
   * web: use webpack and debian dependencies
