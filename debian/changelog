@@ -1,3 +1,11 @@
+molior (1.5.0~beta37) stretch; urgency=medium
+
+  * molior: release 1.5.0~beta36
+  * nginx: base on debian trixie
+  * web: show admin page for admins
+
+ -- André Roth <neolynx@gmail.com>  Tue, 30 Jun 2026 00:23:01 +0200
+
 molior (1.5.0~beta36) stretch; urgency=medium
 
   * nginx: base on debian trixie
