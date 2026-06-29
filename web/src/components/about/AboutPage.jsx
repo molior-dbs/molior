@@ -51,7 +51,6 @@ export default function AboutPage() {
         <li>Manage Debian repositories grouped in{' '}
           <Link to="/projects" style={{ color: PRIMARY }}>projects and versions</Link></li>
         <li>Manage project dependencies between base mirrors and other projects</li>
-        <li>Provide <Link to="/nodes" style={{ color: PRIMARY }}>build nodes</Link> (amd64, arm64) on VMs or bare metal for running sbuild</li>
         <li>
           <Link to="/builds" style={{ color: PRIMARY }}>Build</Link> debianized{' '}
           <Link to="/repos" style={{ color: PRIMARY }}>git repositories</Link> for multiple projects and architectures (i386, amd64, armhf, arm64)
