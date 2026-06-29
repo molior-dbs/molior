@@ -53,7 +53,9 @@ module.exports = (env, argv) => {
     output: {
       path: path.resolve(__dirname, 'dist'),
       filename: 'assets/main.js',
-      publicPath: '/',
+      // 'auto' makes webpack derive the public path from the script's own URL
+      // at runtime, so the bundle works under any reverse-proxy prefix.
+      publicPath: 'auto',
       clean: true,
     },
 

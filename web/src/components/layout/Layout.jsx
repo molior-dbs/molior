@@ -22,6 +22,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { apiUrl, wsUrl } from '../../lib/base';
 import moliorLogo from '../../assets/moliorlogo.png';
 
 const PRIMARY = '#571845';
@@ -50,7 +51,7 @@ export default function Layout() {
 
   // Fetch server status (version + maintenance flag)
   useEffect(() => {
-    fetch('/api/status', { credentials: 'same-origin' })
+    fetch(apiUrl('/api/status'), { credentials: 'same-origin' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
@@ -65,8 +66,7 @@ export default function Layout() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${location.host}/api/websocket`);
+    const ws = new WebSocket(wsUrl('/api/websocket'));
 
     ws.onopen  = ()  => setWsColor('lightgreen');
     ws.onclose = ()  => setWsColor('red');

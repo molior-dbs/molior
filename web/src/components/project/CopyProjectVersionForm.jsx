@@ -8,11 +8,12 @@
  */
 import React, { useState, useEffect } from 'react';
 import { copyProjectVersion } from '../../api/projectversions';
+import { apiUrl } from '../../lib/base';
 
 const DEPENDENCY_POLICIES = ['strict', 'distribution', 'any'];
 
 async function fetchBaseMirrors() {
-  const res = await fetch('/api/mirrors?page_size=200&basemirror=true', { credentials: 'same-origin' });
+  const res = await fetch(apiUrl('/api/mirrors?page_size=200&basemirror=true'), { credentials: 'same-origin' });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.results ?? []).map(m => ({
@@ -22,7 +23,7 @@ async function fetchBaseMirrors() {
 }
 
 async function fetchBaseProjects() {
-  const res = await fetch('/api2/projectversions?page_size=200', { credentials: 'same-origin' });
+  const res = await fetch(apiUrl('/api2/projectversions?page_size=200'), { credentials: 'same-origin' });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.results ?? []).map(pv => ({

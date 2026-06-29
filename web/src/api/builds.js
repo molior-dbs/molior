@@ -2,6 +2,7 @@
  * Builds API — mirrors BuildService from the Angular app.
  * All endpoints match the original Angular service exactly.
  */
+import { apiUrl } from '../lib/base';
 
 export async function fetchBuilds(params) {
   const q = new URLSearchParams();
@@ -15,7 +16,7 @@ export async function fetchBuilds(params) {
   if (params.page)                  q.set('page', params.page);
   if (params.page_size)             q.set('page_size', params.page_size);
 
-  const res = await fetch(`/api/builds?${q}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api/builds?${q}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json(); // { results: Build[], total_result_count: number }
   return {
@@ -25,13 +26,13 @@ export async function fetchBuilds(params) {
 }
 
 export async function fetchBuild(id) {
-  const res = await fetch(`/api2/build/${id}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/build/${id}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
 
 export async function buildLatest(repositoryId) {
-  const res = await fetch(`/api/repositories/${repositoryId}/build`, {
+  const res = await fetch(apiUrl(`/api/repositories/${repositoryId}/build`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' }, body: '{}',
   });
@@ -39,17 +40,17 @@ export async function buildLatest(repositoryId) {
 }
 
 export async function deleteBuild(id) {
-  const res = await fetch(`/api2/build/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/build/${id}`), { method: 'DELETE', credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
 }
 
 export async function abortBuild(id) {
-  const res = await fetch(`/api2/build/${id}/abort`, { method: 'POST', credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/build/${id}/abort`), { method: 'POST', credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
 }
 
 export async function rebuildBuild(id) {
-  const res = await fetch(`/api2/build/${id}`, { method: 'PUT', credentials: 'same-origin', body: '{}',
+  const res = await fetch(apiUrl(`/api2/build/${id}`), { method: 'PUT', credentials: 'same-origin', body: '{}',
     headers: { 'Content-Type': 'application/json' } });
   if (!res.ok) throw new Error(`${res.status}`);
 }

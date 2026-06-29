@@ -1,6 +1,7 @@
 /**
  * admin.js — API calls for admin, maintenance, retention and token endpoints.
  */
+import { apiUrl } from '../lib/base';
 
 async function request(method, url, body) {
   const opts = { method, credentials: 'same-origin' };
@@ -19,11 +20,11 @@ async function request(method, url, body) {
 
 // ── Cleanup job ──────────────────────────────────────────────────────────────
 export async function fetchCleanup() {
-  return request('GET', '/api2/cleanup');
+  return request('GET', apiUrl('/api2/cleanup'));
 }
 
 export async function saveCleanup({ cleanupActive, cleanupWeekdays, cleanupTime }) {
-  return request('PUT', '/api2/cleanup', {
+  return request('PUT', apiUrl('/api2/cleanup'), {
     cleanup_active:   String(cleanupActive),
     cleanup_weekdays: cleanupWeekdays,  // comma-separated day names
     cleanup_time:     cleanupTime,      // "HH:MM"
@@ -32,11 +33,11 @@ export async function saveCleanup({ cleanupActive, cleanupWeekdays, cleanupTime 
 
 // ── Maintenance ──────────────────────────────────────────────────────────────
 export async function fetchMaintenance() {
-  return request('GET', '/api2/maintenance');
+  return request('GET', apiUrl('/api2/maintenance'));
 }
 
 export async function saveMaintenance({ maintenanceMode, maintenanceMessage }) {
-  return request('PUT', '/api2/maintenance', {
+  return request('PUT', apiUrl('/api2/maintenance'), {
     maintenance_mode:    String(maintenanceMode),
     maintenance_message: maintenanceMessage,
   });
@@ -44,11 +45,11 @@ export async function saveMaintenance({ maintenanceMode, maintenanceMessage }) {
 
 // ── Retention ────────────────────────────────────────────────────────────────
 export async function fetchRetention() {
-  return request('GET', '/api2/retention');
+  return request('GET', apiUrl('/api2/retention'));
 }
 
 export async function saveRetention({ retentionSuccessfulBuilds, retentionFailedBuilds }) {
-  return request('PUT', '/api2/retention', {
+  return request('PUT', apiUrl('/api2/retention'), {
     retention_successful_builds: retentionSuccessfulBuilds,
     retention_failed_builds:     retentionFailedBuilds,
   });
@@ -58,15 +59,15 @@ export async function saveRetention({ retentionSuccessfulBuilds, retentionFailed
 export async function fetchTokens({ description = '', page = 1, page_size = 20 } = {}) {
   const params = new URLSearchParams({ page, page_size });
   if (description) params.set('description', description);
-  return request('GET', `/api2/tokens?${params}`);
+  return request('GET', apiUrl(`/api2/tokens?${params}`));
 }
 
 export async function createToken(description) {
-  return request('POST', '/api2/tokens', { description });
+  return request('POST', apiUrl('/api2/tokens'), { description });
 }
 
 export async function deleteToken(id) {
-  const res = await fetch('/api2/tokens', {
+  const res = await fetch(apiUrl('/api2/tokens'), {
     method: 'DELETE',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },

@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { createProjectVersion, editProjectVersion } from '../../api/projectversions';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
+import { apiUrl } from '../../lib/base';
 
 const DEPENDENCY_POLICIES = ['strict', 'distribution', 'any'];
 
@@ -17,7 +18,7 @@ async function fetchBaseMirrors(q = '') {
   const params = new URLSearchParams({ page_size: 200 });
   if (q) params.set('q', q);
   params.set('basemirror', 'true');
-  const res = await fetch(`/api/mirrors?${params}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api/mirrors?${params}`), { credentials: 'same-origin' });
   if (!res.ok) return [];
   const data = await res.json();
   // results have: name, version, architectures
@@ -30,7 +31,7 @@ async function fetchBaseMirrors(q = '') {
 async function fetchMirrorArchs(mirrorStr) {
   if (!mirrorStr?.includes('/')) return [];
   const [mName, mVer] = mirrorStr.split('/');
-  const res = await fetch(`/api/mirrors/${mName}/${mVer}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api/mirrors/${mName}/${mVer}`), { credentials: 'same-origin' });
   if (!res.ok) return [];
   const data = await res.json();
   return data.architectures ?? [];

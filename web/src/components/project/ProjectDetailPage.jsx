@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, NavLink } from 'react-router-dom';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
+import { apiUrl } from '../../lib/base';
 import {
   fetchProject,
   fetchProjectVersions,
@@ -195,7 +196,7 @@ function VersionsTab({ name, project }) {
       const result = await importProjectVersion(fd);
       const pv     = result.projectversion;
       for (const repo of (result.sourcerepositories || [])) {
-        await fetch(`/api2/project/${pv.project_name}/${pv.name}/repositories`, {
+        await fetch(apiUrl(`/api2/project/${pv.project_name}/${pv.name}/repositories`), {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -242,7 +243,7 @@ function VersionsTab({ name, project }) {
         <TextInputModal title="Create Overlay" label="Overlay name" placeholder="overlay-name"
           validate={rules.version}
           onConfirm={async (overlayName) => {
-            const res = await fetch(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/overlay`, {
+            const res = await fetch(apiUrl(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/overlay`), {
               method: 'POST', credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name: overlayName }),
@@ -258,7 +259,7 @@ function VersionsTab({ name, project }) {
         <TextInputModal title="Create Release Snapshot" label="Snapshot name" placeholder="snapshot-name"
           validate={rules.version}
           onConfirm={async (snapName) => {
-            const res = await fetch(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/snapshot`, {
+            const res = await fetch(apiUrl(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/snapshot`), {
               method: 'POST', credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name: snapName }),
@@ -605,7 +606,7 @@ function ProjectTokenModal({ name, onClose }) {
   // fetch user tokens for autocomplete (existing flow)
   useEffect(() => {
     if (tokenType !== 'existing' || description.length < 1) { setSuggestions([]); return; }
-    fetch(`/api2/tokens?description=${encodeURIComponent(description)}&page_size=10`,
+    fetch(apiUrl(`/api2/tokens?description=${encodeURIComponent(description)}&page_size=10`),
           { credentials: 'same-origin' })
       .then(r => r.ok ? r.json() : { results: [] })
       .then(d => setSuggestions(d.results ?? []))

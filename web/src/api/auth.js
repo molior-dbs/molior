@@ -10,6 +10,8 @@
  * during a migration.
  */
 
+import { apiUrl } from '../lib/base';
+
 const STORAGE_KEY = 'currentUser';
 
 export function getStoredUser() {
@@ -34,7 +36,7 @@ export function clearUser() {
  * Returns the username on success, throws an Error on failure.
  */
 export async function apiLogin(username, password) {
-  const res = await fetch('/api/login', {
+  const res = await fetch(apiUrl('/api/login'), {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +61,7 @@ export async function apiLogin(username, password) {
  * Returns { username, user_id, is_admin } or throws on 401.
  */
 export async function apiGetUserInfo() {
-  const res = await fetch('/api/userinfo', { credentials: 'same-origin' });
+  const res = await fetch(apiUrl('/api/userinfo'), { credentials: 'same-origin' });
   if (!res.ok) throw new Error('Not authenticated');
   return res.json();
 }
@@ -69,6 +71,6 @@ export async function apiGetUserInfo() {
  * Server clears the cookie.
  */
 export async function apiLogout() {
-  await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+  await fetch(apiUrl('/api/logout'), { method: 'POST', credentials: 'same-origin' });
   clearUser();
 }

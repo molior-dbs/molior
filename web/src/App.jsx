@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { basePath } from './lib/base';
 import { AuthProvider } from './context/AuthContext';
 import RequireAuth from './router/RequireAuth';
 import LoginPage from './components/login/LoginPage';
@@ -27,7 +28,7 @@ import MaintenancePage from './components/maintenance/MaintenancePage';
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={basePath}>
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />

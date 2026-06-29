@@ -18,6 +18,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchBuilds, deleteBuild, abortBuild, rebuildBuild } from '../../api/builds';
+import { wsUrl } from '../../lib/base';
 import {
   buildIcon, buildTypeIcon, buildTypeLabel, buildLabel,
   rowBackground, formatDuration, formatStartTime,
@@ -101,8 +102,7 @@ export default function BuildTable({ projectversion, repository }) {
 
   // ── WebSocket live updates ─────────────────────────────────────────────────
   useEffect(() => {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/websocket`);
+    const ws = new WebSocket(wsUrl('/api/websocket'));
 
     ws.onmessage = (evt) => {
       let msg;

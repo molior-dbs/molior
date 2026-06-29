@@ -1,7 +1,8 @@
 /** Project Versions API — mirrors ProjectVersionService from the Angular app. */
+import { apiUrl } from '../lib/base';
 
 export async function fetchProject(projectName) {
-  const res = await fetch(`/api2/projectbase/${projectName}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/projectbase/${projectName}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json(); // { id, name, description }
 }
@@ -11,13 +12,13 @@ export async function fetchProjectVersions(projectName, { q = '', page = 1, page
   if (q) params.set('q', q);
   params.set('page', page);
   params.set('page_size', page_size);
-  const res = await fetch(`/api2/projectbase/${projectName}/versions?${params}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/projectbase/${projectName}/versions?${params}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json(); // { total_result_count, results }
 }
 
 export async function createProjectVersion(projectName, body) {
-  const res = await fetch(`/api2/projectbase/${projectName}/versions`, {
+  const res = await fetch(apiUrl(`/api2/projectbase/${projectName}/versions`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -28,7 +29,7 @@ export async function createProjectVersion(projectName, body) {
 
 export async function editProjectVersion(projectName, versionName, body) {
   // PUT /api2/project/{project_id}/{projectversion_id} — accepts description, dependency_policy, cibuilds, retention_*
-  const res = await fetch(`/api2/project/${projectName}/${versionName}`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}`), {
     method: 'PUT', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -37,27 +38,27 @@ export async function editProjectVersion(projectName, versionName, body) {
 }
 
 export async function deleteProjectVersion(projectName, versionName) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}`), {
     method: 'DELETE', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
 }
 
 export async function lockProjectVersion(projectName, versionName) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/lock`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/lock`), {
     method: 'POST', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
 }
 
 export async function exportProjectVersion(projectName, versionName) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/export`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/export`), { credentials: 'same-origin' });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
 export async function importProjectVersion(formData) {
-  const res = await fetch('/api2/projectbase/projectversion/import', {
+  const res = await fetch(apiUrl('/api2/projectbase/projectversion/import'), {
     method: 'POST', credentials: 'same-origin',
     body: formData,
   });
@@ -68,13 +69,13 @@ export async function importProjectVersion(formData) {
 // ─── Project version detail ─────────────────────────────────────────────────
 
 export async function fetchProjectVersion(projectName, versionName) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
 
 export async function copyProjectVersion(projectName, versionName, body) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/copy`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/copy`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -88,14 +89,14 @@ export async function copyProjectVersion(projectName, versionName, body) {
 export async function fetchDependencies(projectName, versionName, q = '', page = 1, page_size = 25) {
   const params = new URLSearchParams({ page, page_size });
   if (q) params.set('filter_name', q);
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/dependencies?${params}`,
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependencies?${params}`),
                           { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json(); // { total_result_count, results }
 }
 
 export async function addDependency(projectName, versionName, dependency, use_cibuilds = false) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/dependencies`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependencies`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dependency, use_cibuilds }),
@@ -105,7 +106,7 @@ export async function addDependency(projectName, versionName, dependency, use_ci
 
 export async function removeDependency(projectName, versionName, depProjectName, depVersionName) {
   const res = await fetch(
-    `/api2/project/${projectName}/${versionName}/dependency/${depProjectName}/${depVersionName}`,
+    apiUrl(`/api2/project/${projectName}/${versionName}/dependency/${depProjectName}/${depVersionName}`),
     { method: 'DELETE', credentials: 'same-origin' }
   );
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
@@ -116,7 +117,7 @@ export async function removeDependency(projectName, versionName, depProjectName,
 export async function fetchDependents(projectName, versionName, q = '', page = 1, page_size = 25) {
   const params = new URLSearchParams({ page, page_size });
   if (q) params.set('filter_name', q);
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/dependents?${params}`,
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependents?${params}`),
                           { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
@@ -127,14 +128,14 @@ export async function fetchDependents(projectName, versionName, q = '', page = 1
 export async function fetchRepositories(projectName, versionName, q = '', page = 1, page_size = 25) {
   const params = new URLSearchParams({ page, page_size });
   if (q) params.set('filter_url', q);
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repositories?${params}`,
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repositories?${params}`),
                           { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
 
 export async function addRepository(projectName, versionName, url, architectures, run_lintian = false) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repositories`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repositories`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, architectures, run_lintian }),
@@ -144,7 +145,7 @@ export async function addRepository(projectName, versionName, url, architectures
 }
 
 export async function editRepository(projectName, versionName, repoId, architectures, run_lintian) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repository/${repoId}`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repository/${repoId}`), {
     method: 'PUT', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ architectures, run_lintian }),
@@ -153,14 +154,14 @@ export async function editRepository(projectName, versionName, repoId, architect
 }
 
 export async function removeRepository(projectName, versionName, repoId) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repository/${repoId}`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repository/${repoId}`), {
     method: 'DELETE', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
 }
 
 export async function buildRepository(projectName, versionName, repoId) {
-  const res = await fetch(`/api/repositories/${repoId}/build`, {
+  const res = await fetch(apiUrl(`/api/repositories/${repoId}/build`), {
     method: 'POST', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
@@ -169,7 +170,7 @@ export async function buildRepository(projectName, versionName, repoId) {
 export async function triggerBuild(projectName, versionName, repoId, gitRef) {
   const body = {};
   if (gitRef) body.git_ref = gitRef;
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repository/${repoId}/trigger`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repository/${repoId}/trigger`), {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -178,7 +179,7 @@ export async function triggerBuild(projectName, versionName, repoId, gitRef) {
 }
 
 export async function recloneRepository(projectName, versionName, repoId) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/repository/${repoId}/reclone`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repository/${repoId}/reclone`), {
     method: 'POST', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
@@ -189,7 +190,7 @@ export async function recloneRepository(projectName, versionName, repoId) {
 export async function fetchAptSources(projectName, versionName, ci = false) {
   const params = new URLSearchParams();
   if (ci) params.set('ci', 'true');
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/aptsources?${params}`,
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/aptsources?${params}`),
                           { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.text();
@@ -200,7 +201,7 @@ export async function fetchAptSources(projectName, versionName, ci = false) {
 export async function fetchBaseMirrors(q = '') {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
-  const res = await fetch(`/api/mirrors?isbasemirror=true&${params}`, { credentials: 'same-origin' });
+  const res = await fetch(apiUrl(`/api/mirrors?isbasemirror=true&${params}`), { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json(); // { results: [{ name, version, architectures }, ...] }
 }
@@ -212,7 +213,7 @@ export async function fetchBaseMirrors(q = '') {
 export async function uploadExternalBuild(projectName, versionName, files) {
   const formData = new FormData();
   Array.from(files).forEach(file => formData.append(file.name, file));
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/extbuild`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/extbuild`), {
     method: 'POST',
     credentials: 'same-origin',
     body: formData,
@@ -223,7 +224,7 @@ export async function uploadExternalBuild(projectName, versionName, files) {
 // ─── S3 Publish ───────────────────────────────────────────────────────────────
 
 export async function publishS3(projectName, versionName, { publish_s3, s3_endpoint, s3_path }) {
-  const res = await fetch(`/api2/project/${projectName}/${versionName}/s3`, {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/s3`), {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },

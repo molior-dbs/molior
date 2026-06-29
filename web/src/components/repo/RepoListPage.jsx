@@ -13,6 +13,7 @@ import {
 } from '../../api/repos';
 import ConfirmModal from '../build/ConfirmModal';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
+import { apiUrl } from '../../lib/base';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -93,7 +94,7 @@ function MergeModal({ repo, onClose }) {
   useEffect(() => {
     if (!originalUrl.trim()) { setMatches([]); return; }
     const params = new URLSearchParams({ filter_url: originalUrl, page: 1, page_size: 25 });
-    fetch(`/api2/repositories?${params}`, { credentials: 'same-origin' })
+    fetch(apiUrl(`/api2/repositories?${params}`), { credentials: 'same-origin' })
       .then(r => r.json())
       .then(d => setMatches((d.results ?? []).filter(r => r.url !== repo.url)))
       .catch(() => {});

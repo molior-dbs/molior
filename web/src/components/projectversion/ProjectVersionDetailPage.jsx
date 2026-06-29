@@ -11,6 +11,7 @@ import BuildTable from '../build/BuildTable';
 import ConfirmModal from '../build/ConfirmModal';
 import ProjectVersionForm from '../project/ProjectVersionForm';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
+import { wsUrl } from '../../lib/base';
 import {
   fetchProjectVersion,
   deleteProjectVersion,
@@ -439,7 +440,7 @@ function RepoFormModal({ pv, repo, onClose }) {
   // autocomplete: search existing repos by URL fragment
   useEffect(() => {
     if (isEdit || !url || url.length < 4) { setUrlHints([]); return; }
-    fetch(`/api/repositories?url=${encodeURIComponent(url)}&projectversion_id=${pv?.id ?? ''}&page_size=10`,
+    fetch(apiUrl(`/api/repositories?url=${encodeURIComponent(url)}&projectversion_id=${pv?.id ?? ''}&page_size=10`),
           { credentials: 'same-origin' })
       .then(r => r.ok ? r.json() : { results: [] })
       .then(d => setUrlHints((d.results ?? []).map(r => r.url)))
@@ -831,8 +832,7 @@ function ReposTab({ pv }) {
 
   // ── WebSocket: update last_build / last_successful_build on build events ─────────
   useEffect(() => {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/websocket`);
+    const ws = new WebSocket(wsUrl('/api/websocket'));
     ws.onmessage = (evt) => {
       let msg;
       try { msg = JSON.parse(evt.data); } catch { return; }
@@ -1185,7 +1185,7 @@ export default function ProjectVersionDetailPage() {
 
   // ── Action handlers ────────────────────────────────────────────────────────
   async function handleOverlay(overlayName) {
-    const res = await fetch(`/api2/project/${name}/${version}/overlay`, {
+    const res = await fetch(apiUrl(`/api2/project/${name}/${version}/overlay`), {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: overlayName }),
@@ -1196,7 +1196,7 @@ export default function ProjectVersionDetailPage() {
   }
 
   async function handleSnapshot(snapName) {
-    const res = await fetch(`/api2/project/${name}/${version}/snapshot`, {
+    const res = await fetch(apiUrl(`/api2/project/${name}/${version}/snapshot`), {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: snapName }),

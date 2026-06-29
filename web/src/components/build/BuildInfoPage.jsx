@@ -22,6 +22,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import AnsiUp from 'ansi_up';
 import { fetchBuild, deleteBuild, rebuildBuild, buildLatest } from '../../api/builds';
 import { buildIcon, buildTypeLabel, formatDuration, formatStartTime } from '../../lib/buildUtils';
+import { wsUrl } from '../../lib/base';
 import ConfirmModal from './ConfirmModal';
 
 // ---------------------------------------------------------------------------
@@ -385,8 +386,7 @@ export default function BuildInfoPage() {
     }
 
     // Open WS
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/websocket`);
+    const ws = new WebSocket(wsUrl('/api/websocket'));
     wsRef.current = ws;
 
     ws.onopen = () => {
