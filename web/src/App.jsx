@@ -1,10 +1,6 @@
 /**
- * App.jsx — top-level router, mirrors oldweb/app/app-routing.module.ts
- *
- * Only the login route is fully implemented so far.
- * All other routes render a <Placeholder> until they are ported.
- *
- * The route table matches the Angular routes exactly so URLs stay compatible.
+ * App.jsx — top-level router.
+ * Mirrors oldweb/app/app-routing.module.ts — all routes ported, URLs identical.
  */
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -27,16 +23,6 @@ import Layout from './components/layout/Layout';
 import TokenListPage from './components/account/TokenListPage';
 import AdminPage from './components/admin/AdminPage';
 import MaintenancePage from './components/maintenance/MaintenancePage';
-
-// Temporary placeholder for routes not yet ported
-function Placeholder({ name }) {
-  return (
-    <div className="p-4">
-      <h2>{name}</h2>
-      <p className="text-muted">This page is being ported from the Angular UI.</p>
-    </div>
-  );
-}
 
 export default function App() {
   return (
