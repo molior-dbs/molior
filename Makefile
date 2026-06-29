@@ -69,6 +69,8 @@ reinstall-cluster: uninstall-cluster install-cluster  ## Uninstall and reinstall
 
 redeploy-cluster: uninstall-cluster deploy-cluster install-cluster watch  ## Redeploy images and reinstall helm chart
 
+reload: docker-image-molior deploy-cluster restart-molior  # Rebuild and deploy molior and restart
+
 list:  ## List pods
 	kubectl get pods
 

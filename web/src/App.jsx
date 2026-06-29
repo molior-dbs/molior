@@ -24,6 +24,9 @@ import ProjectVersionDetailPage from './components/projectversion/ProjectVersion
 import RepoListPage from './components/repo/RepoListPage';
 import RepoDetailPage from './components/repo/RepoDetailPage';
 import Layout from './components/layout/Layout';
+import TokenListPage from './components/account/TokenListPage';
+import AdminPage from './components/admin/AdminPage';
+import MaintenancePage from './components/maintenance/MaintenancePage';
 
 // Temporary placeholder for routes not yet ported
 function Placeholder({ name }) {
@@ -42,13 +45,16 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/maintenance" element={<Placeholder name="Maintenance" />} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
 
           {/* Protected — Layout wraps all authenticated pages */}
           <Route element={<RequireAuth><Layout /></RequireAuth>}>
             <Route path="/builds"                    element={<BuildListPage />} />
             <Route path="/build/:id"                 element={<BuildInfoPage />} />
             <Route path="/projects"                  element={<ProjectListPage />} />
+            <Route path="/project/:name/versions"    element={<ProjectDetailPage />} />
+            <Route path="/project/:name/permissions" element={<ProjectDetailPage />} />
+            <Route path="/project/:name/tokens"      element={<ProjectDetailPage />} />
             <Route path="/project/:name/:version/*"  element={<ProjectVersionDetailPage />} />
             <Route path="/project/:name/*"           element={<ProjectDetailPage />} />
             <Route path="/mirrors"                   element={<MirrorListPage />} />
@@ -58,11 +64,11 @@ export default function App() {
 
             <Route path="/users"                     element={<UserListPage />} />
             <Route path="/users/:username"           element={<UserInfoPage />} />
-            <Route path="/tokens"                    element={<Placeholder name="Tokens" />} />
+            <Route path="/tokens"                    element={<TokenListPage />} />
             <Route path="/about"                     element={<AboutPage />} />
-            <Route path="/admin"                     element={<Placeholder name="Admin" />} />
-            <Route path="/retention"                 element={<Placeholder name="Retention" />} />
-            <Route path="/maintenance_config"        element={<Placeholder name="Maintenance Config" />} />
+            <Route path="/admin"                     element={<AdminPage />} />
+            <Route path="/retention"                 element={<AdminPage />} />
+            <Route path="/maintenance_config"        element={<AdminPage />} />
           </Route>
 
           {/* Default redirect — same as Angular ** → /builds */}
