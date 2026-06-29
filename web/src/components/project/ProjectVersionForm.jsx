@@ -9,6 +9,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { createProjectVersion, editProjectVersion } from '../../api/projectversions';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 
 const DEPENDENCY_POLICIES = ['strict', 'distribution', 'any'];
 
@@ -79,11 +80,14 @@ export default function ProjectVersionForm({ projectName, projectVersion, onClos
     );
   }
 
-  // ── validation ────────────────────────────────────────────────────────────
-  const versionValid = isEdit || (/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(version) && version.length >= 2);
-  const canSave      = isEdit
+  // ── validation ────────────────────────────────────────────────────────────────
+  const [touched, setTouched] = useState({});
+  const touch = f => setTouched(t => ({ ...t, [f]: true }));
+
+  const errors  = { version: isEdit ? '' : rules.version(version) };
+  const canSave = isEdit
     ? true
-    : (versionValid && !!basemirror && selArchs.length > 0);
+    : (!errors.version && !!basemirror && selArchs.length > 0);
 
   // ── submit ────────────────────────────────────────────────────────────────
   async function save() {
@@ -138,12 +142,9 @@ export default function ProjectVersionForm({ projectName, projectVersion, onClos
               <div className="mb-3">
                 <label className="form-label fw-semibold">Version</label>
                 <input className="form-control" value={version} autoFocus
-                       onChange={e => setVersion(e.target.value)} />
-                {version.length > 0 && !versionValid && (
-                  <div className="form-text text-danger">
-                    Must be ≥2 chars and contain only letters, digits, dots, hyphens or underscores.
-                  </div>
-                )}
+                       onChange={e => setVersion(e.target.value)}
+                       onBlur={() => touch('version')} />
+                {touched.version && errors.version && <div className="invalid-feedback">{errors.version}</div>}
               </div>
             )}
 

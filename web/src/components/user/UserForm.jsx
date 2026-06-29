@@ -7,6 +7,7 @@
  */
 import React, { useState } from 'react';
 import { createUser, editUser } from '../../api/users';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 
 export default function UserForm({ user, onClose }) {
   const isEdit = !!user;
@@ -18,15 +19,15 @@ export default function UserForm({ user, onClose }) {
   const [busy,     setBusy]     = useState(false);
   const [error,    setError]    = useState('');
 
-  // username validation (same rules as Angular nameValidator)
-  const usernameValid = isEdit || (/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(username) && username.length >= 2);
+  const [touched, setTouched] = useState({});
+  const touch = f => setTouched(t => ({ ...t, [f]: true }));
 
-  // password: required for create, optional for edit (min 8 if provided)
-  const passwordOk = isEdit
-    ? (password === '' || password.length >= 8)
-    : password.length >= 8;
-
-  const canSave = usernameValid && passwordOk && (isEdit ? true : !!username.trim());
+  const errors = {
+    username: isEdit ? '' : rules.name(username),
+    email:    rules.email(email),
+    password: rules.password(password, isEdit),
+  };
+  const canSave = Object.values(errors).every(e => !e);
 
   async function save() {
     setBusy(true); setError('');
@@ -64,24 +65,24 @@ export default function UserForm({ user, onClose }) {
             {!isEdit && (
               <div className="mb-3">
                 <label className="form-label fw-semibold">Username</label>
-                <input className="form-control" value={username} autoFocus
-                       autoComplete="new-password"
-                       onChange={e => setUsername(e.target.value)} />
-                {username.length > 0 && !usernameValid && (
-                  <div className="form-text text-danger">
-                    Must be ≥ 2 chars and contain only letters, digits, dots, hyphens or underscores.
-                  </div>
-                )}
+                <input className={fieldClass(touched.username && errors.username)}
+                       value={username} autoFocus autoComplete="new-password"
+                       onChange={e => setUsername(e.target.value)}
+                       onBlur={() => touch('username')} />
+                {touched.username && errors.username && <div className="invalid-feedback">{errors.username}</div>}
               </div>
             )}
 
             {/* Email */}
             <div className="mb-3">
               <label className="form-label fw-semibold">Email</label>
-              <input className="form-control" type="email" value={email}
+              <input className={fieldClass(touched.email && errors.email)}
+                     type="email" value={email}
                      autoComplete="new-password"
                      autoFocus={isEdit}
-                     onChange={e => setEmail(e.target.value)} />
+                     onChange={e => setEmail(e.target.value)}
+                     onBlur={() => touch('email')} />
+              {touched.email && errors.email && <div className="invalid-feedback">{errors.email}</div>}
             </div>
 
             {/* Administrator */}
@@ -96,12 +97,12 @@ export default function UserForm({ user, onClose }) {
               <label className="form-label fw-semibold">
                 {isEdit ? 'Change Password (or leave empty)' : 'Set Password'}
               </label>
-              <input className="form-control" type="password" value={password}
+              <input className={fieldClass(touched.password && errors.password)}
+                     type="password" value={password}
                      autoComplete="new-password"
-                     onChange={e => setPassword(e.target.value)} />
-              {password.length > 0 && password.length < 8 && (
-                <div className="form-text text-danger">Password must be at least 8 characters.</div>
-              )}
+                     onChange={e => setPassword(e.target.value)}
+                     onBlur={() => touch('password')} />
+              {touched.password && errors.password && <div className="invalid-feedback">{errors.password}</div>}
             </div>
           </div>
 

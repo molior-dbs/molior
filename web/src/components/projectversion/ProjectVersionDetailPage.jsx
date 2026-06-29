@@ -10,6 +10,7 @@ import { useParams, useNavigate, NavLink, Routes, Route, Navigate } from 'react-
 import BuildTable from '../build/BuildTable';
 import ConfirmModal from '../build/ConfirmModal';
 import ProjectVersionForm from '../project/ProjectVersionForm';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 import {
   fetchProjectVersion,
   deleteProjectVersion,
@@ -300,13 +301,17 @@ function PVHeader({ pv, name, version, onAction }) {
 }
 
 // ─── simple one-field text input modal ──────────────────────────────────────
-function TextInputModal({ title, label, placeholder, initialValue = '', onConfirm, onClose }) {
-  const [value, setValue] = useState(initialValue);
-  const [busy, setBusy]   = useState(false);
-  const [error, setError] = useState('');
+function TextInputModal({ title, label, placeholder, initialValue = '', validate, onConfirm, onClose }) {
+  const [value,   setValue]   = useState(initialValue);
+  const [touched, setTouched] = useState(false);
+  const [busy,    setBusy]    = useState(false);
+  const [error,   setError]   = useState('');
+
+  const validationError = validate ? validate(value) : '';
+  const canSubmit = !validationError;
 
   async function handleOk() {
-    if (!value.trim()) return;
+    if (!canSubmit) { setTouched(true); return; }
     setBusy(true); setError('');
     try { await onConfirm(value.trim()); onClose(true); }
     catch (e) { setError(e.message); setBusy(false); }
@@ -324,14 +329,16 @@ function TextInputModal({ title, label, placeholder, initialValue = '', onConfir
           <div className="modal-body">
             {error && <div className="alert alert-danger py-2">{error}</div>}
             <label className="form-label fw-semibold">{label}</label>
-            <input className="form-control" value={value} autoFocus
-                   placeholder={placeholder}
+            <input className={fieldClass(touched && validationError)}
+                   value={value} autoFocus placeholder={placeholder}
                    onChange={e => setValue(e.target.value)}
+                   onBlur={() => setTouched(true)}
                    onKeyDown={e => e.key === 'Enter' && handleOk()} />
+            {touched && validationError && <div className="invalid-feedback">{validationError}</div>}
           </div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleOk} disabled={busy || !value.trim()}>
+            <button className="btn btn-primary" onClick={handleOk} disabled={busy || !canSubmit}>
               {busy && <span className="spinner-border spinner-border-sm me-2" />}Ok
             </button>
           </div>
@@ -422,8 +429,12 @@ function RepoFormModal({ pv, repo, onClose }) {
   const [archs,     setArchs]     = useState(repo?.architectures ?? (pvArchs.length > 0 ? [pvArchs[0]] : []));
   const [lintian,   setLintian]   = useState(repo?.run_lintian ?? false);
   const [urlHints,  setUrlHints]  = useState([]);
+  const [touched,   setTouched]   = useState({});
+  const touch = f => setTouched(t => ({ ...t, [f]: true }));
   const [busy, setBusy]           = useState(false);
   const [error, setError]         = useState('');
+
+  const urlError = isEdit ? '' : rules.gitUrl(url);
 
   // autocomplete: search existing repos by URL fragment
   useEffect(() => {
@@ -453,7 +464,7 @@ function RepoFormModal({ pv, repo, onClose }) {
 
   const canSave = isEdit
     ? archs.length > 0
-    : (url.trim().length >= 4 && archs.length > 0);
+    : (!urlError && archs.length > 0);
 
   return (
     <div className="modal fade show d-block" tabIndex="-1"
@@ -471,9 +482,12 @@ function RepoFormModal({ pv, repo, onClose }) {
             {!isEdit ? (
               <div className="mb-3">
                 <label className="form-label fw-semibold">Git Repository URL</label>
-                <input className="form-control" value={url} autoFocus
+                <input className={fieldClass(touched.url && urlError)}
+                       value={url} autoFocus
                        placeholder="https://github.com/…"
-                       onChange={e => setUrl(e.target.value)} />
+                       onChange={e => setUrl(e.target.value)}
+                       onBlur={() => touch('url')} />
+                {touched.url && urlError && <div className="invalid-feedback">{urlError}</div>}
                 {urlHints.length > 0 && (
                   <ul className="list-group mt-1" style={{ fontSize: 13 }}>
                     {urlHints.map(h => (
@@ -1206,6 +1220,7 @@ export default function ProjectVersionDetailPage() {
           title="Copy Project Version"
           label="New version name"
           placeholder="new-version-name"
+          validate={rules.version}
           onConfirm={async (newName) => {
             await copyProjectVersion(name, version, newName);
             navigate(`/project/${name}/${newName}/info`);
@@ -1218,6 +1233,7 @@ export default function ProjectVersionDetailPage() {
           title="Create Overlay"
           label="Overlay name"
           placeholder="overlay-name"
+          validate={rules.version}
           onConfirm={handleOverlay}
           onClose={closeModal}
         />
@@ -1227,6 +1243,7 @@ export default function ProjectVersionDetailPage() {
           title="Create Release Snapshot"
           label="Snapshot name"
           placeholder="snapshot-name"
+          validate={rules.version}
           onConfirm={handleSnapshot}
           onClose={closeModal}
         />

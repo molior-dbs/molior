@@ -8,6 +8,7 @@
  *           generated token (shown once, cannot be retrieved later).
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { rules } from '../../lib/validate';
 import { NavLink } from 'react-router-dom';
 import { fetchTokens, createToken, deleteToken } from '../../api/admin';
 import ConfirmModal from '../build/ConfirmModal';
@@ -23,8 +24,10 @@ function CreateTokenModal({ onClose }) {
   const [busy,        setBusy]        = useState(false);
   const [error,       setError]       = useState('');
 
+  const descError = rules.required(description, 2, 'Description');
+
   async function handleCreate() {
-    if (!description.trim()) return;
+    if (descError) return;
     setBusy(true); setError('');
     try {
       const data = await createToken(description.trim());
@@ -64,7 +67,7 @@ function CreateTokenModal({ onClose }) {
               <button
                 className="btn btn-primary"
                 onClick={handleCreate}
-                disabled={busy || created || !description.trim()}
+                disabled={busy || created || !!descError}
               >
                 {busy
                   ? <span className="spinner-border spinner-border-sm" />

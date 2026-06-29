@@ -7,6 +7,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { fetchMirrors, createMirror, editMirror } from '../../api/mirrors';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 
 const ARCHITECTURES = ['amd64', 'i386', 'arm64', 'armhf'];
 
@@ -59,8 +60,17 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
   const [mirrorUrls, setUrls]   = useState([]);
   const [urlSug, setUrlSug]     = useState(false);
   const [bmSug, setBmSug]       = useState(false);
+  const [touched, setTouched]   = useState({});
+  const touch = f => setTouched(t => ({ ...t, [f]: true }));
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const errors = {
+    mirrorurl:     rules.httpUrl(form.mirrorurl),
+    mirrorname:    isEdit ? '' : rules.name(form.mirrorname),
+    mirrorversion: isEdit ? '' : rules.version(form.mirrorversion),
+    mirrordist:    rules.required(form.mirrordist, 1, 'Distribution'),
+  };
 
   useEffect(() => {
     fetchMirrors({ basemirror: true, page_size: 200 })
@@ -146,9 +156,11 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
                 {/* URL */}
                 <div className="mb-3 position-relative">
                   <label className="form-label fw-semibold">Mirror URL</label>
-                  <input className="form-control" value={form.mirrorurl}
+                  <input className={fieldClass(touched.mirrorurl && errors.mirrorurl)}
+                    value={form.mirrorurl}
                     onChange={e => { set('mirrorurl', e.target.value); setUrlSug(true); }}
-                    onBlur={() => setTimeout(() => setUrlSug(false), 150)} />
+                    onBlur={() => { touch('mirrorurl'); setTimeout(() => setUrlSug(false), 150); }} />
+                  {touched.mirrorurl && errors.mirrorurl && <div className="invalid-feedback">{errors.mirrorurl}</div>}
                   {urlSug && mirrorUrls.filter(u => u.includes(form.mirrorurl) && u !== form.mirrorurl).length > 0 && (
                     <ul className="list-group position-absolute w-100" style={{ zIndex: 1060, top: '100%' }}>
                       {mirrorUrls.filter(u => u.includes(form.mirrorurl)).slice(0, 8).map(u => (
@@ -166,13 +178,19 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
                   <div className="row mb-3">
                     <div className="col">
                       <label className="form-label fw-semibold">Name</label>
-                      <input className="form-control" value={form.mirrorname}
-                        onChange={e => set('mirrorname', e.target.value)} />
+                      <input className={fieldClass(touched.mirrorname && errors.mirrorname)}
+                        value={form.mirrorname}
+                        onChange={e => set('mirrorname', e.target.value)}
+                        onBlur={() => touch('mirrorname')} />
+                      {touched.mirrorname && errors.mirrorname && <div className="invalid-feedback">{errors.mirrorname}</div>}
                     </div>
                     <div className="col">
                       <label className="form-label fw-semibold">Version</label>
-                      <input className="form-control" value={form.mirrorversion}
-                        onChange={e => set('mirrorversion', e.target.value)} />
+                      <input className={fieldClass(touched.mirrorversion && errors.mirrorversion)}
+                        value={form.mirrorversion}
+                        onChange={e => set('mirrorversion', e.target.value)}
+                        onBlur={() => touch('mirrorversion')} />
+                      {touched.mirrorversion && errors.mirrorversion && <div className="invalid-feedback">{errors.mirrorversion}</div>}
                     </div>
                   </div>
                 )}
@@ -254,7 +272,11 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
                 </div>
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Distribution</label>
-                  <input className="form-control" value={form.mirrordist} onChange={e => set('mirrordist', e.target.value)} />
+                  <input className={fieldClass(touched.mirrordist && errors.mirrordist)}
+                    value={form.mirrordist}
+                    onChange={e => set('mirrordist', e.target.value)}
+                    onBlur={() => touch('mirrordist')} />
+                  {touched.mirrordist && errors.mirrordist && <div className="invalid-feedback">{errors.mirrordist}</div>}
                 </div>
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Components</label>

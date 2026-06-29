@@ -12,6 +12,7 @@ import {
   editRepoUrl, deleteRepo, buildRepo, recloneRepo, mergeRepo, triggerBuild,
 } from '../../api/repos';
 import ConfirmModal from '../build/ConfirmModal';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -35,12 +36,15 @@ function stateIcon(state) {
 
 // ── Edit URL modal ────────────────────────────────────────────────────────
 function EditUrlModal({ repo, onClose }) {
-  const [url, setUrl]       = useState(repo.url);
-  const [error, setError]   = useState('');
-  const [saving, setSaving] = useState(false);
+  const [url,     setUrl]     = useState(repo.url);
+  const [touched, setTouched] = useState(false);
+  const [error,   setError]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  const urlError = rules.gitUrl(url);
 
   async function save() {
-    if (!url.trim()) return;
+    if (urlError) { setTouched(true); return; }
     setSaving(true); setError('');
     try {
       await editRepoUrl(repo.id, url.trim());
@@ -60,15 +64,17 @@ function EditUrlModal({ repo, onClose }) {
             {error && <div className="alert alert-danger py-1">{error}</div>}
             <label className="form-label fw-bold">git Repository URL</label>
             <input
-              className="form-control"
+              className={fieldClass(touched && urlError)}
               value={url}
               onChange={e => setUrl(e.target.value)}
+              onBlur={() => setTouched(true)}
               autoFocus
             />
+            {touched && urlError && <div className="invalid-feedback">{urlError}</div>}
           </div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={saving}>Cancel</button>
-            <button className="btn btn-primary" onClick={save} disabled={saving || !url.trim()}>Save</button>
+            <button className="btn btn-primary" onClick={save} disabled={saving || !!urlError}>Save</button>
           </div>
         </div>
       </div>

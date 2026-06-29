@@ -4,6 +4,7 @@
  */
 import React, { useState } from 'react';
 import { createProject, editProject } from '../../api/projects';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 
 export default function ProjectForm({ project, onClose }) {
   const isEdit = !!project;
@@ -13,9 +14,11 @@ export default function ProjectForm({ project, onClose }) {
   const [busy, setBusy]               = useState(false);
   const [error, setError]             = useState('');
 
-  // name: 2+ chars, letters/digits/hyphens only (mirrors nameValidator)
-  const nameValid = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) && name.length >= 2;
-  const canSave   = isEdit ? true : nameValid;
+  const [touched, setTouched] = useState({});
+  const touch = f => setTouched(t => ({ ...t, [f]: true }));
+
+  const errors  = { name: rules.name(name) };
+  const canSave = isEdit || !errors.name;
 
   async function save() {
     setBusy(true); setError('');
@@ -51,18 +54,15 @@ export default function ProjectForm({ project, onClose }) {
             <div className="mb-3">
               <label className="form-label fw-semibold">Project Name</label>
               <input
-                className="form-control"
+                className={isEdit ? 'form-control' : fieldClass(touched.name && errors.name)}
                 value={name}
                 readOnly={isEdit}
                 disabled={isEdit}
                 onChange={e => setName(e.target.value)}
+                onBlur={() => touch('name')}
                 autoFocus
               />
-              {!isEdit && name.length > 0 && !nameValid && (
-                <div className="form-text text-danger">
-                  Name must be ≥2 chars and contain only letters, digits, dots, hyphens or underscores.
-                </div>
-              )}
+              {!isEdit && touched.name && errors.name && <div className="invalid-feedback">{errors.name}</div>}
             </div>
 
             <div className="mb-3">

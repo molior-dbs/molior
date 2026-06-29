@@ -10,6 +10,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, NavLink } from 'react-router-dom';
+import { rules, fieldClass, fieldError } from '../../lib/validate';
 import {
   fetchProject,
   fetchProjectVersions,
@@ -58,13 +59,17 @@ function useImportInput(onImport) {
 }
 
 // ─── text input modal ─────────────────────────────────────────────────────────
-function TextInputModal({ title, label, placeholder, onConfirm, onClose }) {
-  const [value, setValue] = useState('');
-  const [busy, setBusy]   = useState(false);
-  const [error, setError] = useState('');
+function TextInputModal({ title, label, placeholder, validate, onConfirm, onClose }) {
+  const [value,   setValue]   = useState('');
+  const [touched, setTouched] = useState(false);
+  const [busy,    setBusy]    = useState(false);
+  const [error,   setError]   = useState('');
+
+  const validationError = validate ? validate(value) : '';
+  const canSubmit = !validationError;
 
   async function handleOk() {
-    if (!value.trim()) return;
+    if (!canSubmit) { setTouched(true); return; }
     setBusy(true); setError('');
     try { await onConfirm(value.trim()); onClose(true); }
     catch (e) { setError(e.message); setBusy(false); }
@@ -82,14 +87,16 @@ function TextInputModal({ title, label, placeholder, onConfirm, onClose }) {
           <div className="modal-body">
             {error && <div className="alert alert-danger py-2">{error}</div>}
             <label className="form-label fw-semibold">{label}</label>
-            <input className="form-control" value={value} autoFocus
-                   placeholder={placeholder}
+            <input className={fieldClass(touched && validationError)}
+                   value={value} autoFocus placeholder={placeholder}
                    onChange={e => setValue(e.target.value)}
+                   onBlur={() => setTouched(true)}
                    onKeyDown={e => e.key === 'Enter' && handleOk()} />
+            {touched && validationError && <div className="invalid-feedback">{validationError}</div>}
           </div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleOk} disabled={busy || !value.trim()}>
+            <button className="btn btn-primary" onClick={handleOk} disabled={busy || !canSubmit}>
               {busy && <span className="spinner-border spinner-border-sm me-2" />}Ok
             </button>
           </div>
@@ -233,6 +240,7 @@ function VersionsTab({ name, project }) {
       )}
       {modal?.type === 'overlay' && (
         <TextInputModal title="Create Overlay" label="Overlay name" placeholder="overlay-name"
+          validate={rules.version}
           onConfirm={async (overlayName) => {
             const res = await fetch(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/overlay`, {
               method: 'POST', credentials: 'same-origin',
@@ -248,6 +256,7 @@ function VersionsTab({ name, project }) {
       )}
       {modal?.type === 'snapshot' && (
         <TextInputModal title="Create Release Snapshot" label="Snapshot name" placeholder="snapshot-name"
+          validate={rules.version}
           onConfirm={async (snapName) => {
             const res = await fetch(`/api2/project/${modal.pv.project_name}/${modal.pv.name}/snapshot`, {
               method: 'POST', credentials: 'same-origin',
@@ -398,8 +407,10 @@ function PermissionModal({ name, permission, onClose }) {
       .catch(() => {});
   }, [username, isEdit, name]);
 
+  const usernameError = isEdit ? '' : rules.required(username, 2, 'Username');
+
   async function handleSave() {
-    if (!username.trim()) return;
+    if (usernameError) return;
     setBusy(true); setError('');
     try {
       if (isEdit) {
@@ -461,7 +472,7 @@ function PermissionModal({ name, permission, onClose }) {
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
             <button className="btn btn-primary" onClick={handleSave}
-                    disabled={busy || !username.trim()}>
+                    disabled={busy || !!usernameError}>
               {busy && <span className="spinner-border spinner-border-sm me-2" />}Ok
             </button>
           </div>
@@ -601,8 +612,10 @@ function ProjectTokenModal({ name, onClose }) {
       .catch(() => {});
   }, [description, tokenType]);
 
+  const descError = rules.required(description, 2, 'Description');
+
   async function handleCreate() {
-    if (!description.trim()) return;
+    if (descError) return;
     setBusy(true); setError('');
     try {
       const data = await createProjectToken(name, description.trim());
@@ -660,7 +673,7 @@ function ProjectTokenModal({ name, onClose }) {
                          onChange={e => setDescription(e.target.value)}
                          onKeyDown={e => e.key === 'Enter' && !created && handleCreate()} />
                   <button className="btn btn-primary" onClick={handleCreate}
-                          disabled={busy || created || !description.trim()}>
+                          disabled={busy || created || !!descError}>
                     {busy ? <span className="spinner-border spinner-border-sm" /> : 'Create'}
                   </button>
                 </div>
@@ -703,7 +716,7 @@ function ProjectTokenModal({ name, onClose }) {
             </button>
             {tokenType === 'existing' && (
               <button className="btn btn-primary" onClick={handleSave}
-                      disabled={busy || !description.trim()}>
+                      disabled={busy || !!descError}>
                 {busy && <span className="spinner-border spinner-border-sm me-2" />}Ok
               </button>
             )}
