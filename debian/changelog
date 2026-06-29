@@ -1,3 +1,20 @@
+molior (1.5.0~beta35) stretch; urgency=medium
+
+  * web: use webpack and debian dependencies
+  * Makefile: add docker-shell
+  * api: port s3 and extbuild
+  * web: input validation
+  * web: fix tab loading
+  * web: fix projectversion source repo click
+  * web: trigger build, upload and s3
+  * web: remove build nodes mention from about page
+  * web: port missing components
+  * web: remove scroll wheel pagination
+  * web: make about page versions look nicer
+  * cleanup obsolete deployments and packages
+
+ -- André Roth <neolynx@gmail.com>  Mon, 29 Jun 2026 16:02:12 +0200
+
 molior (1.5.0~beta34) stretch; urgency=medium
 
   * web: fix paginator
