@@ -671,7 +671,7 @@ function InfoTab({ pv }) {
     } catch (e) { setError(e.message); setTotal(-1); }
   }, [pv, page, filter]);
 
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { load(page); }, [page, pv]);
 
   const prevFilter = useRef(filter);
   useEffect(() => {
@@ -806,7 +806,7 @@ function ReposTab({ pv }) {
     } catch (e) { setError(e.message); setTotal(-1); }
   }, [pv, page, filter]);
 
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { load(page); }, [page, pv]);
 
   const prevFilter = useRef(filter);
   useEffect(() => {
@@ -1064,7 +1064,7 @@ function DependentsTab({ pv }) {
     } catch (e) { setError(e.message); setTotal(-1); }
   }, [pv, page, filter]);
 
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { load(page); }, [page, pv]);
 
   const prevFilter = useRef(filter);
   useEffect(() => {
