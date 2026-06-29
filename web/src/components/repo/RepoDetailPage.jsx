@@ -266,17 +266,10 @@ function DependentsTab({ repoId }) {
       : `/project/${dep.project_name}/${dep.name}`;
   }
 
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
-    if (e.deltaY > 0 && page < tp) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1) setPage(p => p - 1);
-  }
-
   const totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
 
   return (
-    <div onWheel={handleWheel}>
+    <div>
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>

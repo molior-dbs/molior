@@ -50,14 +50,8 @@ export default function ProjectListPage() {
 
   const totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
 
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    if (e.deltaY > 0 && page < totalPages) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1)    setPage(p => p - 1);
-  }
-
   return (
-    <div className="p-3" onWheel={handleWheel}>
+    <div className="p-3">
 
       {/* ── Modals ── */}
       {modal?.type === 'create' && <ProjectForm onClose={closeModal} />}

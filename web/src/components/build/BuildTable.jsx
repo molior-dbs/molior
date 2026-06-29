@@ -164,14 +164,6 @@ export default function BuildTable({ projectversion, repository }) {
     return `${secs}''`;
   }
 
-  // ── Wheel navigation ──────────────────────────────────────────────────────
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const totalPages = Math.ceil(total / pageSize);
-    if (e.deltaY > 0 && page < totalPages) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1)    setPage(p => p - 1);
-  }
-
   // ── Modal helpers ─────────────────────────────────────────────────────────
   function closeModal(reloadNeeded) {
     setModal(null);
@@ -193,7 +185,7 @@ export default function BuildTable({ projectversion, repository }) {
   const showProject = !projectversion;
 
   return (
-    <div onWheel={handleWheel}>
+    <div>
       {/* ── Modal overlay ── */}
       {modal?.type === 'delete' && (
         <ConfirmModal

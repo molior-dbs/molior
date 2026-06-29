@@ -225,13 +225,6 @@ function InfoTab({ mirror, name, version }) {
     }
   }, [filter]);
 
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
-    if (e.deltaY > 0 && page < tp) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1) setPage(p => p - 1);
-  }
-
   function depLink(dep) {
     return dep.is_mirror
       ? `/mirror/${dep.project_name}/${dep.name}`
@@ -241,7 +234,7 @@ function InfoTab({ mirror, name, version }) {
   const totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
 
   return (
-    <div onWheel={handleWheel}>
+    <div>
       <h2 style={{ fontSize: 17, fontWeight: 600 }} className="mb-2">Mirror Dependents</h2>
 
       <div>

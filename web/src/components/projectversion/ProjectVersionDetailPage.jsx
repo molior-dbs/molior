@@ -448,14 +448,14 @@ function TriggerBuildModal({ pv, repo, onClose }) {
 }
 
 // ─── Paginated dependency/dependent/repository table ─────────────────────────
-function PVTable({ columns, rows, total, page, onPageChange, onWheel,
+function PVTable({ columns, rows, total, page, onPageChange,
                    filterValue, onFilterChange, filterPlaceholder,
                    addButton, loading, error: errMsg }) {
   const totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
   const colSpan    = columns.length;
 
   return (
-    <div onWheel={onWheel}>
+    <div>
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
@@ -553,13 +553,6 @@ function InfoTab({ pv }) {
 
   function closeModal(reload) { setModal(null); if (reload) load(page); }
 
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
-    if (e.deltaY > 0 && page < tp) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1) setPage(p => p - 1);
-  }
-
   const isExternal = (dep) => !pv?.dependency_ids?.includes(dep.id);
 
   function depLink(dep) {
@@ -649,7 +642,6 @@ function InfoTab({ pv }) {
         total={total ?? 0}
         page={page}
         onPageChange={setPage}
-        onWheel={handleWheel}
         filterValue={filter}
         onFilterChange={setFilter}
         filterPlaceholder="Dependency"
@@ -725,13 +717,6 @@ function ReposTab({ pv }) {
     };
     return () => ws.close();
   }, []);
-
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
-    if (e.deltaY > 0 && page < tp) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1) setPage(p => p - 1);
-  }
 
   const BUILD_STATE_ICON = {
     successful: 'bi-check-circle-fill text-success',
@@ -860,7 +845,6 @@ function ReposTab({ pv }) {
         total={total ?? 0}
         page={page}
         onPageChange={setPage}
-        onWheel={handleWheel}
         filterValue={filter}
         onFilterChange={setFilter}
         filterPlaceholder="Git URL"
@@ -960,13 +944,6 @@ function DependentsTab({ pv }) {
     if (prevFilter.current !== filter) { prevFilter.current = filter; setPage(1); load(1); }
   }, [filter]);
 
-  function handleWheel(e) {
-    if (e.ctrlKey) return;
-    const tp = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
-    if (e.deltaY > 0 && page < tp) setPage(p => p + 1);
-    else if (e.deltaY < 0 && page > 1) setPage(p => p - 1);
-  }
-
   function depLink(dep) {
     return dep.is_mirror ? `/mirror/${dep.project_name}/${dep.name}` : `/project/${dep.project_name}/${dep.name}`;
   }
@@ -1029,7 +1006,6 @@ function DependentsTab({ pv }) {
         total={total ?? 0}
         page={page}
         onPageChange={setPage}
-        onWheel={handleWheel}
         filterValue={filter}
         onFilterChange={setFilter}
         filterPlaceholder="Dependent"
