@@ -16,7 +16,7 @@ endif
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-docker-images: docker-image-molior docker-image-web docker-image-aptly  ## Create docker images
+docker-images: docker-image-molior docker-image-aptly  ## Create docker images
 	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
 	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
 
@@ -24,9 +24,6 @@ docker-image-molior:  ## Build molior docker image
 	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
 		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
 	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
-
-docker-image-web:  ## Build web docker image
-	$(DOCKERCMD) build -f docker/web.Dockerfile -t molior-web:dev ../molior-web2
 
 docker-image-aptly:  ## Build aptly docker image
 	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
@@ -44,7 +41,7 @@ create-cluster:  ## Create k3d cluster
 delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
 
-deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-molior-web deploy-image-aptly  ## Import local images into k3d
+deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
 	$(DOCKERCMD) tag $*:dev localhost:$(REGISTRY_PORT)/$*:dev
@@ -100,9 +97,8 @@ restart-aptly:  ## Restart aptly pod
 psql:  ## Run psql
 	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- su molior -c psql molior
 
-clean: delete-cluster  ## Remove cluster and registry
-	docker rmi -f molior-base:dev
-	k3d registry delete $(REGISTRY)
+docker-clean:  ## Remove docker images
+	docker rmi -f molior-base:dev molior:dev molior-nginx:dev molior-postgres:dev aptly:dev
 	docker system prune
 
 
@@ -117,4 +113,4 @@ clean: delete-cluster  ## Remove cluster and registry
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-image-molior docker-image-web docker-image-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior psql clean
+.PHONY: help docker-images docker-image-molior docker-image-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior restart-aptly psql clean
