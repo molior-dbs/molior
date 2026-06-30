@@ -1,3 +1,11 @@
+molior (1.5.0~beta39) stretch; urgency=medium
+
+  * Makefile: add shell-aptly
+  * helm: allow molior and aptly configuration in values.yaml
+  * kubernetes: use values.yaml for molior config
+
+ -- André Roth <neolynx@gmail.com>  Tue, 30 Jun 2026 17:00:02 +0200
+
 molior (1.5.0~beta38) stretch; urgency=medium
 
   * web: deuglify paginator
