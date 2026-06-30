@@ -1,3 +1,17 @@
+molior (1.5.0~beta38) stretch; urgency=medium
+
+  * web: deuglify paginator
+  * web: make search fields visible and add missing icons
+  * web: support different base path
+  * web: improve build log buttons
+  * web: use common paginator
+  * web: fix load/reload subpage url
+  * web: keep websocket connection alive
+  * web: close popup menus / dropdowns
+  * Makefile: fix local push
+
+ -- André Roth <neolynx@gmail.com>  Tue, 30 Jun 2026 15:21:27 +0200
+
 molior (1.5.0~beta37) stretch; urgency=medium
 
   * molior: release 1.5.0~beta36
