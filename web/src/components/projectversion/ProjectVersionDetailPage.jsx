@@ -12,6 +12,7 @@ import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
 import Pagination from '../common/Pagination';
 import ProjectVersionForm from '../project/ProjectVersionForm';
+import CopyProjectVersionForm from '../project/CopyProjectVersionForm';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
 import { wsUrl, apiUrl } from '../../lib/base';
 import {
@@ -30,7 +31,6 @@ import {
   triggerBuild,
   recloneRepository,
   fetchAptSources,
-  copyProjectVersion,
   uploadExternalBuild,
   publishS3,
 } from '../../api/projectversions';
@@ -1206,16 +1206,10 @@ export default function ProjectVersionDetailPage() {
         <ProjectVersionForm projectName={name} projectVersion={pv} onClose={closeModal} />
       )}
       {modal?.type === 'copy' && pv && (
-        <TextInputModal
-          title="Copy Project Version"
-          label="New version name"
-          placeholder="new-version-name"
-          validate={rules.version}
-          onConfirm={async (newName) => {
-            await copyProjectVersion(name, version, newName);
-            navigate(`/project/${name}/${newName}/info`);
-          }}
-          onClose={closeModal}
+        <CopyProjectVersionForm
+          projectName={name}
+          projectVersion={pv}
+          onClose={(reload) => { closeModal(); if (reload) navigate(`/project/${name}`); }}
         />
       )}
       {modal?.type === 'overlay' && (
