@@ -212,7 +212,7 @@ export async function fetchBaseMirrors(q = '') {
 
 export async function uploadExternalBuild(projectName, versionName, files) {
   const formData = new FormData();
-  Array.from(files).forEach(file => formData.append(file.name, file));
+  Array.from(files).forEach(file => formData.append('files', file, file.name));
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/extbuild`), {
     method: 'POST',
     credentials: 'same-origin',

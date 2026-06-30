@@ -6,7 +6,6 @@ Replaces molior/api2/projectversion.py
 import json
 from typing import List, Optional
 
-import asyncio
 import shutil
 import tempfile
 from pathlib import Path
@@ -18,7 +17,9 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, aliased
 
 from ...auth import CurrentUser, authenticated, require_role
+from sqlalchemy.orm import sessionmaker as _sessionmaker
 from ...db import get_db
+from ....model.database import database
 from ...responses import PaginationParams
 from ._helpers import resolve_projectversion
 from ....logger import logger
@@ -36,6 +37,9 @@ from ....molior.configuration import Configuration
 from ....aptly.api import get_aptly_connection
 from ....molior.queues import buildlog, buildlogdone, buildlogtitle, enqueue_aptly
 from ....tools import array2db, db2array, escape_for_like, is_name_valid
+
+# Session factory for background tasks (no request context / no get_db dependency)
+_bg_session = _sessionmaker(bind=database.engine)
 
 router = APIRouter(prefix="/api2", tags=["projectversions"])
 
@@ -1120,7 +1124,7 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
     async def get_debbuild(arch, version, srcbuild_id, projectversion_id):
         if arch == "all":
             arch = "amd64"
-        with Session() as db:
+        with _bg_session() as db:
             debbuild = db.query(Build).filter(
                 Build.version == version,
                 Build.buildstate == "new",
@@ -1142,7 +1146,7 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
                 await debbuild.build_added()
             return debbuild.id
 
-    with Session() as db:
+    with _bg_session() as db:
         build = db.query(Build).filter(Build.id == build_id).first()
         if not build:
             await buildlog(build_id, "E: build not found: '%d'\n" % build_id)
@@ -1235,7 +1239,7 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
         else:
             Path(tmp_path).unlink(missing_ok=True)
 
-    with Session() as db:
+    with _bg_session() as db:
         build = db.query(Build).filter(Build.id == build_id).first()
         srcbuild = db.query(Build).filter(Build.id == srcbuild_id).first()
         debbuilds = db.query(Build).filter(Build.parent_id == srcbuild_id).all()
@@ -1394,8 +1398,7 @@ async def extbuild(
         raise HTTPException(status_code=500, detail="Upload failed")
 
     background_tasks.add_task(
-        asyncio.ensure_future,
-        _finalize_extbuild(build.id, pv.id, srcbuild.id, buffered),
+        _finalize_extbuild, build.id, pv.id, srcbuild.id, buffered
     )
 
     return {"build_id": build.id}
