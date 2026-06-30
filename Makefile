@@ -92,8 +92,11 @@ logs-aptly:  ## Show aptly logs
 	kubectl logs -l app=aptly -f
 
 
-shell-molior:  ## Open a bash shell in the molior pod
+shell-molior:  ## Open a bash shell in the molior container
 	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- bash
+
+shell-aptly:  ## Open a bash shell in the aptly container
+	kubectl exec -it $(shell kubectl get pod -l app=aptly -o jsonpath='{.items[0].metadata.name}') -- bash
 
 restart-molior:  ## Restart molior pod
 	kubectl delete pod -l app=molior
