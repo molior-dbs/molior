@@ -1,7 +1,7 @@
 REGISTRY := k3d-molior-registry
 REGISTRY_PORT := 5000
 MOLIOR_DEV ?= true
-PUSH_REGISTRY ?= localhost
+PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
 
 NAMESPACE := molior
 export HELM_NAMESPACE=$(NAMESPACE)
