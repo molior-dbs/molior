@@ -308,7 +308,7 @@ function DependentsTab({ repoId }) {
               <tr><td colSpan={6} className="text-center py-3 text-muted">No entries found</td></tr>
             )}
             {items.map(dep => (
-              <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={() => navigate(depLink(dep))}>
+              <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={e => { if (!e.target.closest('.dropdown')) navigate(depLink(dep)); }}>
                 <td>
                   <strong className="d-flex align-items-center gap-1">
                     <i className={`bi ${dep.is_mirror ? 'bi-folder2-open' : 'bi-collection'}`} />
@@ -332,9 +332,9 @@ function DependentsTab({ repoId }) {
                   <i className={`bi ${dep.is_locked ? 'bi-lock-fill' : 'bi-dash'}`} />
                 </td>
                 <td className="text-muted">{dep.description}</td>
-                <td className="text-end" onClick={e => e.stopPropagation()}>
+                <td className="text-end">
                   <div className="dropdown">
-                    <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown">
+                    <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
                       <i className="bi bi-three-dots-vertical" />
                     </button>
                     <ul className="dropdown-menu dropdown-menu-end">

@@ -18,6 +18,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchBuilds, deleteBuild, abortBuild, rebuildBuild } from '../../api/builds';
+import ContextMenu from '../common/ContextMenu';
 import { wsUrl } from '../../lib/base';
 import {
   buildIcon, buildTypeIcon, buildTypeLabel, buildLabel,
@@ -58,6 +59,7 @@ export default function BuildTable({ projectversion, repository }) {
 
   // ── Action modal ──────────────────────────────────────────────────────────
   const [modal, setModal] = useState(null); // { type, build }
+  const [ctxMenu, setCtxMenu] = useState(null); // { x, y, build }
 
   // ── Load data ─────────────────────────────────────────────────────────────
   const load = useCallback(async (pg = page) => {
@@ -212,6 +214,16 @@ export default function BuildTable({ projectversion, repository }) {
         />
       )}
 
+      {/* ── Context menu (right-click on row) ── */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/build/${ctxMenu.build.id}`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'delete', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'abort', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-slash-circle me-2" />Abort Build</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'rebuild', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-arrow-counterclockwise me-2" />Retry Build</button></li>
+        </ContextMenu>
+      )}
+
       {/* ── Table ── */}
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: '13px' }}>
@@ -332,7 +344,8 @@ export default function BuildTable({ projectversion, repository }) {
                 <tr
                   key={build.id}
                   style={{ cursor: 'pointer', backgroundColor: bg }}
-                  onClick={() => navigate(`/build/${build.id}`)}
+                  onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/build/${build.id}`); }}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, build }); }}
                 >
                   {/* Build state icon */}
                   <td className="text-center" onClick={e => e.stopPropagation()}>
@@ -402,11 +415,12 @@ export default function BuildTable({ projectversion, repository }) {
                   <td style={{ whiteSpace: 'nowrap' }}>{duration}</td>
 
                   {/* Actions dropdown */}
-                  <td className="text-end" onClick={e => e.stopPropagation()}>
+                  <td className="text-end">
                     <div className="dropdown">
                       <button
                         className="btn btn-sm btn-link p-0 text-secondary"
                         data-bs-toggle="dropdown" aria-expanded="false"
+                        onClick={e => e.stopPropagation()}
                       >
                         <i className="bi bi-three-dots-vertical" />
                       </button>

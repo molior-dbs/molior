@@ -12,6 +12,7 @@ import {
   editRepoUrl, deleteRepo, buildRepo, recloneRepo, mergeRepo, triggerBuild,
 } from '../../api/repos';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
 import { apiUrl } from '../../lib/base';
 
@@ -257,6 +258,7 @@ export default function RepoListPage() {
 
   // modal: { type: 'edit'|'delete'|'reclone'|'merge'|'trigger', repo }
   const [modal, setModal] = useState(null);
+  const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
     setError(''); setTotal(null);
@@ -306,6 +308,19 @@ export default function RepoListPage() {
         />
       )}
 
+      {/* ── Context menu (right-click on row) ── */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/repo/${ctxMenu.repo.id}`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'merge', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-diagram-2 me-2" />Merge Duplicate</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'edit', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-pencil me-2" />Edit</button></li>
+          <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'delete', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
+          <li><button className="dropdown-item" onClick={() => { buildRepo(ctxMenu.repo.id).catch(() => {}); setCtxMenu(null); }}><i className="bi bi-arrow-repeat me-2" />Check for new builds</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'trigger', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-play me-2" />Trigger build</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'reclone', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-arrow-down-up me-2" />Re-clone</button></li>
+        </ContextMenu>
+      )}
+
       <h1 className="mb-3 d-flex align-items-center gap-2" style={{ fontSize: 24, fontWeight: 500 }}>
         <i className="bi bi-git" />Repositories
       </h1>
@@ -349,7 +364,8 @@ export default function RepoListPage() {
 
             {repos.map(repo => (
               <tr key={repo.id} style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/repo/${repo.id}`)}>
+                onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/repo/${repo.id}`); }}
+                onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, repo }); }}>
 
                 <td className="text-center">
                   <i className={`bi ${stateIcon(repo.state)}`} title={repo.state} style={{ fontSize: 16 }} />
@@ -363,10 +379,10 @@ export default function RepoListPage() {
                     style={{ color: 'darkblue' }}>{repo.url}</a>
                 </td>
 
-                <td className="text-end" onClick={e => e.stopPropagation()}>
+                <td className="text-end">
                   <div className="dropdown">
                     <button className="btn btn-sm btn-link p-0 text-secondary"
-                      data-bs-toggle="dropdown"><i className="bi bi-three-dots-vertical" /></button>
+                      data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}><i className="bi bi-three-dots-vertical" /></button>
                     <ul className="dropdown-menu dropdown-menu-end">
                       <li>
                         <button className="dropdown-item" onClick={() => navigate(`/repo/${repo.id}`)}>

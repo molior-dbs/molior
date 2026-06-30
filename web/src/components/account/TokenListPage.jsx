@@ -12,6 +12,7 @@ import { rules } from '../../lib/validate';
 import { NavLink } from 'react-router-dom';
 import { fetchTokens, createToken, deleteToken } from '../../api/admin';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -113,6 +114,7 @@ export default function TokenListPage() {
   const [page,   setPage]   = useState(1);
   const [filter, setFilter] = useState('');
   const [modal,  setModal]  = useState(null); // { type: 'create' | 'delete', token? }
+  const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
     setError(''); setTotal(null);
@@ -152,6 +154,12 @@ export default function TokenListPage() {
           onConfirm={() => deleteToken(modal.token.id)}
           onClose={closeModal}
         />
+      )}
+
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'delete', token: ctxMenu.t }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
+        </ContextMenu>
       )}
 
       <h1 className="mb-2 d-flex align-items-center gap-2" style={{ fontSize: 24, fontWeight: 500 }}>
@@ -205,12 +213,13 @@ export default function TokenListPage() {
             )}
 
             {tokens.map(t => (
-              <tr key={t.id}>
+              <tr key={t.id}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, t }); }}>
                 <td><strong>{t.description}</strong></td>
                 <td className="text-end">
                   <div className="dropdown">
                     <button className="btn btn-sm btn-link p-0 text-secondary"
-                            data-bs-toggle="dropdown">
+                            data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
                       <i className="bi bi-three-dots-vertical" />
                     </button>
                     <ul className="dropdown-menu dropdown-menu-end">

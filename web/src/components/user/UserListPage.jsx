@@ -13,6 +13,7 @@ import { useNavigate, NavLink } from 'react-router-dom';
 import { fetchUsers, deleteUser } from '../../api/users';
 import UserForm from './UserForm';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -31,6 +32,7 @@ export default function UserListPage() {
   const [filterAdmin, setFilterAdmin] = useState(false);
 
   const [modal, setModal] = useState(null); // { type: 'create'|'edit'|'delete', user? }
+  const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
     setError(''); setTotal(null);
@@ -69,6 +71,14 @@ export default function UserListPage() {
           onConfirm={() => deleteUser(modal.user.id)}
           onClose={closeModal}
         />
+      )}
+
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/users/${ctxMenu.u.username}`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          {ctxMenu.u.username !== 'admin' && <li><button className="dropdown-item" onClick={() => { setModal({ type: 'edit', user: ctxMenu.u }); setCtxMenu(null); }}><i className="bi bi-pencil me-2" />Edit</button></li>}
+          {ctxMenu.u.username !== 'admin' && <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'delete', user: ctxMenu.u }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>}
+        </ContextMenu>
       )}
 
       <h1 className="mb-2 d-flex align-items-center gap-2" style={{ fontSize: 24, fontWeight: 500 }}>
@@ -151,16 +161,17 @@ export default function UserListPage() {
 
             {users.map(u => (
               <tr key={u.id} style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/users/${u.username}`)}>
+                  onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/users/${u.username}`); }}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, u }); }}>
                 <td><strong>{u.username}</strong></td>
                 <td>{u.email}</td>
                 <td className="text-center">
                   {u.is_admin && <i className="bi bi-check-lg text-success" />}
                 </td>
-                <td className="text-end" onClick={e => e.stopPropagation()}>
+                <td className="text-end">
                   <div className="dropdown">
                     <button className="btn btn-sm btn-link p-0 text-secondary"
-                            data-bs-toggle="dropdown">
+                            data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
                       <i className="bi bi-three-dots-vertical" />
                     </button>
                     <ul className="dropdown-menu dropdown-menu-end">

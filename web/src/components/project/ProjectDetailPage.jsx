@@ -36,6 +36,7 @@ import ProjectForm from './ProjectForm';
 import ProjectVersionForm from './ProjectVersionForm';
 import CopyProjectVersionForm from './CopyProjectVersionForm';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -152,6 +153,7 @@ function VersionsTab({ name, project }) {
   const [page,        setPage]        = useState(1);
   const [filterName,  setFilterName]  = useState('');
   const [modal,       setModal]       = useState(null);
+  const [ctxMenu,     setCtxMenu]     = useState(null);
 
   const load = useCallback(async (pg = page) => {
     setError(''); setTotal(null);
@@ -213,6 +215,19 @@ function VersionsTab({ name, project }) {
   return (
     <>
       {importInput}
+
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/project/${name}/${ctxMenu.pv.name}`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'edit', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-pencil me-2" />Edit</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'copy', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-copy me-2" />Copy</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'overlay', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-layers me-2" />Create Overlay</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'snapshot', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-camera me-2" />Create Release Snapshot</button></li>
+          {!ctxMenu.pv.is_locked && <li><button className="dropdown-item" onClick={() => { setModal({ type: 'lock', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-lock me-2" />Lock</button></li>}
+          <li><button className="dropdown-item" onClick={() => { handleExport(ctxMenu.pv); setCtxMenu(null); }}><i className="bi bi-download me-2" />Export Project Version</button></li>
+          <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'delete', pv: ctxMenu.pv }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
+        </ContextMenu>
+      )}
 
       {modal?.type === 'create' && (
         <ProjectVersionForm projectName={name} onClose={closeModal} />
@@ -322,7 +337,8 @@ function VersionsTab({ name, project }) {
 
             {versions.map(pv => (
               <tr key={pv.id} style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/project/${name}/${pv.name}`)}>
+                  onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/project/${name}/${pv.name}`); }}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, pv }); }}>
                 <td><strong>{pv.name}</strong></td>
                 <td className="text-center">{pv.buildCount > 0 ? pv.buildCount : ''}</td>
                 <td className="text-center">{pv.cibuildCount > 0 ? pv.cibuildCount : ''}</td>
@@ -343,9 +359,9 @@ function VersionsTab({ name, project }) {
                   <i className={`bi ${pv.ci_builds_enabled ? 'bi-check-lg' : 'bi-dash'}`} />
                 </td>
                 <td className="text-muted">{pv.description}</td>
-                <td className="text-end" onClick={e => e.stopPropagation()}>
+                <td className="text-end">
                   <div className="dropdown">
-                    <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown">
+                    <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
                       <i className="bi bi-three-dots-vertical" />
                     </button>
                     <ul className="dropdown-menu dropdown-menu-end">

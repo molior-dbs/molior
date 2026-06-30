@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchMirrors, deleteMirror, updateMirror } from '../../api/mirrors';
 import MirrorForm from './MirrorForm';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 
 const PRIMARY = '#571845';
 const TH = { backgroundColor: PRIMARY, color: 'white' };
@@ -42,6 +43,7 @@ export default function MirrorListPage() {
 
   // modals: { type: 'create'|'edit'|'copy'|'delete', mirror? }
   const [modal, setModal] = useState(null);
+  const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
     setError(''); setTotal(null);
@@ -81,6 +83,16 @@ export default function MirrorListPage() {
           onConfirm={() => deleteMirror(modal.mirror.name, modal.mirror.version)}
           onClose={closeModal}
         />
+      )}
+
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/mirror/${ctxMenu.m.name}/${ctxMenu.m.version}`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'edit', mirror: ctxMenu.m }); setCtxMenu(null); }}><i className="bi bi-pencil me-2" />Edit</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'copy', mirror: ctxMenu.m }); setCtxMenu(null); }}><i className="bi bi-copy me-2" />Copy</button></li>
+          <li><button className="dropdown-item" onClick={() => { updateMirror(ctxMenu.m.id).catch(() => {}); setCtxMenu(null); }}><i className="bi bi-arrow-clockwise me-2" />Update</button></li>
+          <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'delete', mirror: ctxMenu.m }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
+        </ContextMenu>
       )}
 
       <h1 className="mb-3 d-flex align-items-center gap-2" style={{ fontSize: 24, fontWeight: 500 }}>
@@ -130,7 +142,8 @@ export default function MirrorListPage() {
 
             {mirrors.map(m => (
               <tr key={m.id} style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/mirror/${m.name}/${m.version}`)}>
+                onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/mirror/${m.name}/${m.version}`); }}
+                onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, m }); }}>
 
                 {/* Base mirror flag */}
                 <td className="text-center">
@@ -185,10 +198,10 @@ export default function MirrorListPage() {
                 </td>
 
                 {/* Actions */}
-                <td className="text-end" onClick={e => e.stopPropagation()}>
+                <td className="text-end">
                   <div className="dropdown">
                     <button className="btn btn-sm btn-link p-0 text-secondary"
-                      data-bs-toggle="dropdown"><i className="bi bi-three-dots-vertical" /></button>
+                      data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}><i className="bi bi-three-dots-vertical" /></button>
                     <ul className="dropdown-menu dropdown-menu-end">
                       <li>
                         <button className="dropdown-item" onClick={() => navigate(`/mirror/${m.name}/${m.version}`)}>

@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import BuildTable from '../build/BuildTable';
 import ConfirmModal from '../build/ConfirmModal';
+import ContextMenu from '../common/ContextMenu';
 import ProjectVersionForm from '../project/ProjectVersionForm';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
 import { wsUrl } from '../../lib/base';
@@ -707,7 +708,7 @@ function InfoTab({ pv }) {
   ) : null;
 
   const rows = items.map(dep => (
-    <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={() => navigate(depLink(dep))}>
+    <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={e => { if (!e.target.closest('.dropdown')) navigate(depLink(dep)); }}>
       <td>
         <strong className="d-flex align-items-center gap-1">
           <i className={`bi ${dep.is_mirror ? 'bi-folder2-open' : 'bi-collection'}`} />
@@ -732,9 +733,9 @@ function InfoTab({ pv }) {
       </td>
       <td>{dep.dependency_policy}</td>
       <td className="text-muted">{dep.description}</td>
-      <td className="text-end" onClick={e => e.stopPropagation()}>
+      <td className="text-end">
         <div className="dropdown">
-          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown">
+          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
             <i className="bi bi-three-dots-vertical" />
           </button>
           <ul className="dropdown-menu dropdown-menu-end">
@@ -810,6 +811,7 @@ function ReposTab({ pv }) {
   const [page, setPage]     = useState(1);
   const [filter, setFilter] = useState('');
   const [modal, setModal]   = useState(null);
+  const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
     if (!pv) return;
@@ -879,7 +881,8 @@ function ReposTab({ pv }) {
 
   const rows = items.map(repo => (
     <tr key={repo.id} style={{ cursor: 'pointer' }}
-        onClick={() => navigate(`/repo/${repo.id}/info`)}>
+        onClick={e => { if (!e.target.closest('.dropdown')) navigate(`/repo/${repo.id}/info`); }}
+        onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, repo }); }}>
       <td><strong>{repo.name}</strong></td>
       <td>
         {repo.last_build && (
@@ -904,9 +907,9 @@ function ReposTab({ pv }) {
       <td className="text-center">
         <i className={`bi ${repo.run_lintian ? 'bi-check-lg' : 'bi-dash'}`} />
       </td>
-      <td className="text-end" onClick={e => e.stopPropagation()}>
+      <td className="text-end">
         <div className="dropdown">
-          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown">
+          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
             <i className="bi bi-three-dots-vertical" />
           </button>
           <ul className="dropdown-menu dropdown-menu-end">
@@ -951,6 +954,16 @@ function ReposTab({ pv }) {
 
   return (
     <>
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <li><button className="dropdown-item" onClick={() => { navigate(`/repo/${ctxMenu.repo.id}/info`); setCtxMenu(null); }}><i className="bi bi-list me-2" />Details</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'edit', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-pencil me-2" />Edit</button></li>
+          <li><button className="dropdown-item text-danger" onClick={() => { setModal({ type: 'remove', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Remove</button></li>
+          <li><button className="dropdown-item" onClick={() => { buildRepository(pv.project_name, pv.name, ctxMenu.repo.id).catch(() => {}); setCtxMenu(null); }}><i className="bi bi-arrow-repeat me-2" />Check for new builds</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'trigger', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-play me-2" />Trigger build</button></li>
+          <li><button className="dropdown-item" onClick={() => { setModal({ type: 'reclone', repo: ctxMenu.repo }); setCtxMenu(null); }}><i className="bi bi-arrow-down-up me-2" />Re-clone</button></li>
+        </ContextMenu>
+      )}
       {modal?.type === 'add'    && <RepoFormModal pv={pv} onClose={closeModal} />}
       {modal?.type === 'edit'   && <RepoFormModal pv={pv} repo={modal.repo} onClose={closeModal} />}
       {modal?.type === 'remove' && (
@@ -1090,7 +1103,7 @@ function DependentsTab({ pv }) {
   }
 
   const rows = items.map(dep => (
-    <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={() => navigate(depLink(dep))}>
+    <tr key={dep.id} style={{ cursor: 'pointer' }} onClick={e => { if (!e.target.closest('.dropdown')) navigate(depLink(dep)); }}>
       <td>
         <strong className="d-flex align-items-center gap-1">
           <i className={`bi ${dep.is_mirror ? 'bi-folder2-open' : 'bi-collection'}`} />
@@ -1114,9 +1127,9 @@ function DependentsTab({ pv }) {
         <i className={`bi ${dep.ci_builds_enabled ? 'bi-check-lg' : 'bi-dash'}`} />
       </td>
       <td className="text-muted">{dep.description}</td>
-      <td className="text-end" onClick={e => e.stopPropagation()}>
+      <td className="text-end">
         <div className="dropdown">
-          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown">
+          <button className="btn btn-sm btn-link p-0 text-secondary" data-bs-toggle="dropdown" onClick={e => e.stopPropagation()}>
             <i className="bi bi-three-dots-vertical" />
           </button>
           <ul className="dropdown-menu dropdown-menu-end">
