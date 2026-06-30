@@ -13,6 +13,9 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(getStoredUser);
+  // authReady is false while the session is being verified on page load.
+  // RequireAuth renders nothing until it flips to true.
+  const [authReady, setAuthReady] = useState(!getStoredUser());
 
   // On mount, if we have a stored session, refresh full user info (including is_admin)
   // in case the page was refreshed or the stored object is incomplete.

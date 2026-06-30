@@ -222,6 +222,9 @@ async def main_websocket(websocket: WebSocket):
             try:
                 raw = await asyncio.wait_for(websocket.receive_text(), timeout=30)
             except asyncio.TimeoutError:
+                # Send a keepalive ping to prevent idle connection drops.
+                with contextlib.suppress(Exception):
+                    await websocket.send_text('{"subject":1,"event":5}')
                 continue
 
             try:

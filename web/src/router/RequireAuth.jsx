@@ -26,6 +26,9 @@ export default function RequireAuth({ children, requireAdmin = false }) {
   const { currentUser } = useAuth();
   const location = useLocation();
 
+  // Wait for session verification before rendering anything.
+  if (!authReady) return null;
+
   if (!currentUser) {
     // Not logged in → redirect to login, preserving the intended destination
     return (

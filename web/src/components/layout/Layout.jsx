@@ -62,25 +62,52 @@ export default function Layout() {
       .catch(() => {});
   }, []);
 
-  // WebSocket connection + status dot
+  // WebSocket connection + status dot, with exponential-backoff reconnection.
   useEffect(() => {
     if (!currentUser) return;
 
-    const ws = new WebSocket(wsUrl('/api/websocket'));
+    let ws;
+    let retryTimer;
+    let delay = 1000;          // start at 1 s, double on each failure up to 30 s
+    let unmounted = false;
 
-    ws.onopen  = ()  => setWsColor('lightgreen');
-    ws.onclose = ()  => setWsColor('red');
-    ws.onerror = ()  => setWsColor('red');
-    ws.onmessage = (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        // subject 1 = websocket, event 4 = connected
-        if (data.subject === 1 && data.event === 4) setWsColor('lightgreen');
-        if (data.status === 401) { handleLogout(); }
-      } catch {}
+    function connect() {
+      ws = new WebSocket(wsUrl('/api/websocket'));
+
+      ws.onopen = () => {
+        setWsColor('lightgreen');
+        delay = 1000;          // reset backoff on a successful connection
+      };
+
+      ws.onclose = () => {
+        setWsColor('red');
+        if (!unmounted) {
+          retryTimer = setTimeout(connect, delay);
+          delay = Math.min(delay * 2, 30000);
+        }
+      };
+
+      ws.onerror = () => {
+        ws.close(); // triggers onclose which handles the retry
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          // subject 1 = websocket, event 4 = connected
+          if (data.subject === 1 && data.event === 4) setWsColor('lightgreen');
+          if (data.status === 401) { handleLogout(); }
+        } catch {}
+      };
+    }
+
+    connect();
+
+    return () => {
+      unmounted = true;
+      clearTimeout(retryTimer);
+      ws?.close();
     };
-
-    return () => ws.close();
   }, [currentUser]);
 
   async function handleLogout() {
