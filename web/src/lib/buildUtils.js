@@ -9,9 +9,9 @@ export function buildIcon(buildstate) {
     case 'new':
     case 'scheduled':       return 'bi-clock';
     case 'needs_build':     return 'bi-three-dots';
-    case 'building':        return 'bi-arrow-repeat rotating';
+    case 'building':        return 'bi-arrow-repeat rotating text-primary';
     case 'needs_publish':   return 'bi-git';
-    case 'publishing':      return 'bi-upload';
+    case 'publishing':      return 'bi-upload text-primary';
     case 'publish_failed':  return 'bi-upload text-danger';
     case 'successful':
     case 'already_exists':
