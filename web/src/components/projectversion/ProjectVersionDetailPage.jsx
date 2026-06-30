@@ -13,7 +13,7 @@ import ContextMenu from '../common/ContextMenu';
 import Pagination from '../common/Pagination';
 import ProjectVersionForm from '../project/ProjectVersionForm';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
-import { wsUrl } from '../../lib/base';
+import { wsUrl, apiUrl } from '../../lib/base';
 import {
   fetchProjectVersion,
   deleteProjectVersion,
