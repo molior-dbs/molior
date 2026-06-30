@@ -12,9 +12,9 @@ server {
                 autoindex on;
 
                 # Allow web apps
-                add_header 'Access-Control-Allow-Origin' '*';
-                add_header 'Access-Control-Allow-Methods' 'GET';
-                add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
-                add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, HEAD" always;
+                add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range" always;
+                add_header Access-Control-Expose-Headers "Content-Length,Content-Range" always;
         }
 }
