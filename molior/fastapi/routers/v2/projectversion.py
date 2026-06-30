@@ -153,6 +153,7 @@ def _do_overlay(name: str, projectversion_id: int, db: Session):
 def get_projectversion(
     project_name: str,
     project_version: str,
+    current_user: CurrentUser = Depends(authenticated),
     db: Session = Depends(get_db),
 ):
     pv = resolve_projectversion(project_name, project_version, db)
@@ -167,6 +168,7 @@ def get_projectversion(
 def export_projectversion(
     project_name: str,
     project_version: str,
+    current_user: CurrentUser = Depends(authenticated),
     db: Session = Depends(get_db),
 ):
     pv = resolve_projectversion(project_name, project_version, db)
@@ -1051,7 +1053,7 @@ async def publish_s3(
     project_id: str,
     projectversion_id: str,
     body: S3Body,
-    current_user: CurrentUser = Depends(require_role("admin")),
+    current_user: CurrentUser = Depends(require_role("owner")),
     db: Session = Depends(get_db),
 ):
     """Configure publishing to S3 for a project version."""

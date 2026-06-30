@@ -150,7 +150,7 @@ def get_builds(
 
 
 @router.get("/api/build/{build_id}")
-def get_build_tree(build_id: int, db: Session = Depends(get_db)):
+def get_build_tree(build_id: int, current_user: CurrentUser = Depends(authenticated), db: Session = Depends(get_db)):
     query = text("""
 WITH RECURSIVE descendants AS (
     SELECT build.id, build.parent_id, 0 AS depth FROM build WHERE build.id = :build_id

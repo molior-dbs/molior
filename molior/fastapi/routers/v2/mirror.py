@@ -41,7 +41,7 @@ def _lookup_mirror(name: str, version: str, db: Session):
 
 
 @router.get("/mirror/{name}/{version}")
-def get_mirror(name: str, version: str, db: Session = Depends(get_db)):
+def get_mirror(name: str, version: str, current_user: CurrentUser = Depends(authenticated), db: Session = Depends(get_db)):
     mirror = _lookup_mirror(name, version, db)
     if not mirror:
         raise HTTPException(status_code=404, detail="Mirror not found")
