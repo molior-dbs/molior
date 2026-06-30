@@ -706,8 +706,8 @@ export default function BuildInfoPage() {
           />
           {totalSearch > 0 && (
             <span className="d-flex align-items-center gap-1">
-              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Previous match" onClick={searchPrev}><i className="bi bi-arrow-up-circle" /></button>
               <span>{currentSearch}/{totalSearch}</span>
+              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Previous match" onClick={searchPrev}><i className="bi bi-arrow-up-circle" /></button>
               <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Next match" onClick={searchNext}><i className="bi bi-arrow-down-circle" /></button>
             </span>
           )}
@@ -729,6 +729,9 @@ export default function BuildInfoPage() {
           )}
           {logLineCount > 0 && (
             <>
+              <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
+                {visRange.start}–{visRange.end} / {logLineCount}
+              </span>
               <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to top"
                 onClick={() => {
                   programmaticScrollRef.current = true;
@@ -743,9 +746,6 @@ export default function BuildInfoPage() {
                 }}>
                 <i className="bi bi-arrow-bar-down" />
               </button>
-              <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
-                {visRange.start}–{visRange.end} / {logLineCount}
-              </span>
             </>
           )}
         </div>
