@@ -29,6 +29,21 @@ aptly:
   user: "molior"
   password: "molior-dev"
   gpgKey: "reposign@molior"
+  downloadConcurrency: 4
+  downloadRetries: 0
+  downloader: "default"
+  logLevel: "info"
+  # S3 publishing endpoints — keyed by endpoint name, using aptly field names verbatim.
+  # See charts/templates/configmap-aptly.yaml for all supported fields.
+  # Example:
+  # s3PublishEndpoints:
+  #   myrepo:
+  #     region: us-east-1
+  #     bucket: my-bucket
+  #     acl: private
+  #     access_key_id: ""
+  #     secret_access_key: ""
+  s3PublishEndpoints: {}
 
 builder:
   amd64:

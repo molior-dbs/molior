@@ -38,6 +38,9 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/aptly
               name: aptly
+            - mountPath: /etc/aptly.conf
+              name: aptly-conf
+              subPath: aptly.conf
 
         - name: aptly-nginx
           image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-nginx:{{ .Values.molior.version }}
@@ -66,3 +69,6 @@ spec:
         - name: aptly
           persistentVolumeClaim:
             claimName: aptly
+        - name: aptly-conf
+          configMap:
+            name: aptly-cm
