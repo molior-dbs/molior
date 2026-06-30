@@ -37,6 +37,7 @@ import ProjectVersionForm from './ProjectVersionForm';
 import CopyProjectVersionForm from './CopyProjectVersionForm';
 import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
+import Pagination from '../common/Pagination';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -109,37 +110,6 @@ function TextInputModal({ title, label, placeholder, validate, onConfirm, onClos
 }
 
 // ─── shared pagination bar ────────────────────────────────────────────────────
-function PaginationBar({ page, total, pageSize, onChange }) {
-  const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
-  return (
-    <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
-      <span className="text-muted">
-        {total > 0
-          ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
-          : ''}
-      </span>
-      <nav>
-        <ul className="pagination pagination-sm mb-0">
-          <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => onChange(1)}>&laquo;</button>
-          </li>
-          <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => onChange(page - 1)}>&lsaquo;</button>
-          </li>
-          <li className="page-item disabled">
-            <span className="page-link">{page} / {totalPages}</span>
-          </li>
-          <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => onChange(page + 1)}>&rsaquo;</button>
-          </li>
-          <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => onChange(totalPages)}>&raquo;</button>
-          </li>
-        </ul>
-      </nav>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab: Versions
@@ -399,7 +369,7 @@ function VersionsTab({ name, project }) {
           </tbody>
         </table>
       </div>
-      <PaginationBar page={page} total={total ?? 0} pageSize={PAGE_SIZE} onChange={setPage} />
+
     </>
   );
 }
@@ -602,7 +572,7 @@ function PermissionsTab({ name }) {
           </tbody>
         </table>
       </div>
-      <PaginationBar page={page} total={total ?? 0} pageSize={PAGE_SIZE} onChange={setPage} />
+
     </>
   );
 }
@@ -832,7 +802,7 @@ function TokensTab({ name }) {
           </tbody>
         </table>
       </div>
-      <PaginationBar page={page} total={total ?? 0} pageSize={PAGE_SIZE} onChange={setPage} />
+
     </>
   );
 }

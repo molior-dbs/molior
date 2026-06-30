@@ -11,6 +11,7 @@ import { fetchProjects, deleteProject } from '../../api/projects';
 import ProjectForm from './ProjectForm';
 import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
+import Pagination from '../common/Pagination';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -78,6 +79,9 @@ export default function ProjectListPage() {
       <h1 className="mb-3 d-flex align-items-center gap-2" style={{ fontSize: 24, fontWeight: 500 }}>
         <i className="bi bi-collection" />Projects
       </h1>
+
+      <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE}
+                  onPageChange={setPage} label="projects" />
 
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
@@ -173,31 +177,7 @@ export default function ProjectListPage() {
         </table>
       </div>
 
-      {/* ── Pagination ── */}
-      <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
-        <span className="text-muted">
-          {total > 0 ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}` : ''}
-        </span>
-        <nav>
-          <ul className="pagination pagination-sm mb-0">
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(1)}>&laquo;</button>
-            </li>
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p - 1)}>&lsaquo;</button>
-            </li>
-            <li className="page-item disabled">
-              <span className="page-link">{page} / {totalPages}</span>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p + 1)}>&rsaquo;</button>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(totalPages)}>&raquo;</button>
-            </li>
-          </ul>
-        </nav>
-      </div>
+
     </div>
   );
 }

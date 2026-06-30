@@ -19,6 +19,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchBuilds, deleteBuild, abortBuild, rebuildBuild } from '../../api/builds';
 import ContextMenu from '../common/ContextMenu';
+import Pagination from '../common/Pagination';
 import { wsUrl } from '../../lib/base';
 import {
   buildIcon, buildTypeIcon, buildTypeLabel, buildLabel,
@@ -223,6 +224,10 @@ export default function BuildTable({ projectversion, repository }) {
           <li><button className="dropdown-item" onClick={() => { setModal({ type: 'rebuild', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-arrow-counterclockwise me-2" />Retry Build</button></li>
         </ContextMenu>
       )}
+
+      {/* ── Pagination (above table) ── */}
+      <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize}
+                  onPageChange={setPage} label={`build${total !== 1 ? 's' : ''}`} />
 
       {/* ── Table ── */}
       <div>
@@ -455,39 +460,7 @@ export default function BuildTable({ projectversion, repository }) {
         </table>
       </div>
 
-      {/* ── Pagination ── */}
-      <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
-        <span className="text-muted">
-          {total === null && 'Loading…'}
-          {total === 0   && '0 builds'}
-          {total  >  0  && (
-            <>
-              {pageStart}–{pageEnd} of <strong>{total}</strong> build{total !== 1 ? 's' : ''}
-            </>
-          )}
-        </span>
-        {totalPages > 1 && (
-          <nav aria-label="Builds pagination">
-            <ul className="pagination pagination-sm mb-0">
-              <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-                <button className="page-link" onClick={() => setPage(1)} title="First page">&laquo;</button>
-              </li>
-              <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-                <button className="page-link" onClick={() => setPage(p => p - 1)} title="Previous page">&lsaquo;</button>
-              </li>
-              <li className="page-item disabled">
-                <span className="page-link">{page} / {totalPages}</span>
-              </li>
-              <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-                <button className="page-link" onClick={() => setPage(p => p + 1)} title="Next page">&rsaquo;</button>
-              </li>
-              <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-                <button className="page-link" onClick={() => setPage(totalPages)} title="Last page">&raquo;</button>
-              </li>
-            </ul>
-          </nav>
-        )}
-      </div>
+
     </div>
   );
 }

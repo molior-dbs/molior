@@ -10,6 +10,7 @@ import { useParams, useNavigate, NavLink, Routes, Route, Navigate } from 'react-
 import BuildTable from '../build/BuildTable';
 import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
+import Pagination from '../common/Pagination';
 import ProjectVersionForm from '../project/ProjectVersionForm';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
 import { wsUrl } from '../../lib/base';
@@ -599,6 +600,9 @@ function PVTable({ columns, rows, total, page, onPageChange,
 
   return (
     <div>
+      <Pagination page={page} totalPages={totalPages} total={loading ? null : total}
+                  pageSize={PAGE_SIZE} onPageChange={onPageChange} label="entries" />
+
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
@@ -636,33 +640,6 @@ function PVTable({ columns, rows, total, page, onPageChange,
         </table>
       </div>
 
-      {/* Pagination */}
-      <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
-        <span className="text-muted">
-          {total > 0
-            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`
-            : ''}
-        </span>
-        <nav>
-          <ul className="pagination pagination-sm mb-0">
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => onPageChange(1)}>&laquo;</button>
-            </li>
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => onPageChange(page - 1)}>&lsaquo;</button>
-            </li>
-            <li className="page-item disabled">
-              <span className="page-link">{page} / {totalPages}</span>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => onPageChange(page + 1)}>&rsaquo;</button>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => onPageChange(totalPages)}>&raquo;</button>
-            </li>
-          </ul>
-        </nav>
-      </div>
     </div>
   );
 }

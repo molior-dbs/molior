@@ -676,81 +676,80 @@ export default function BuildInfoPage() {
       </div>
 
       {/* ── Log toolbar ── */}
-      <div className="px-3 d-flex align-items-center gap-2 mb-1" style={{ flexShrink: 0, fontSize: 13 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, flex: 1 }}>Build Log</h2>
+      <div className="px-3 d-flex align-items-center mb-1" style={{ flexShrink: 0, fontSize: 13, gap: 0 }}>
 
-        {/* Jump links */}
-        {buildstartLineRef.current >= 0 && (
-          <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }}
-            onClick={() => highlightLine(buildstartLineRef.current)}>
-            buildstart
-          </button>
-        )}
-        {lintianLineRef.current >= 0 && (
-          <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }}
-            onClick={() => highlightLine(lintianLineRef.current)}>
-            lintian
-          </button>
-        )}
-
-        {/* Search */}
-        <input
-          className="form-control form-control-sm"
-          placeholder="Search…"
-          value={searchQuery}
-          style={{ width: 130 }}
-          onChange={e => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
-        />
-        {totalSearch > 0 && (
-          <span className="d-flex align-items-center gap-1">
-            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} onClick={searchPrev}>prev</button>
-            <span>{currentSearch}/{totalSearch}</span>
-            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} onClick={searchNext}>next</button>
-          </span>
-        )}
-
-        {/* Follow checkbox (only while building) */}
-        {ACTIVE_STATES.has(build.buildstate) && (
-          <div className="form-check mb-0 d-flex align-items-center gap-1">
-            <input className="form-check-input mt-0" type="checkbox" id="followChk"
-              checked={follow} onChange={toggleFollow} />
-            <label className="form-check-label" htmlFor="followChk">follow</label>
-          </div>
-        )}
-
-        {/* Find Error button */}
-        {build.buildstate === 'build_failed' && totalErr > 0 && (
-          <button className="btn btn-sm btn-outline-danger" onClick={findError}>
-            Find Error ({currentErr}/{totalErr})
-          </button>
-        )}
-
-        {/* Top / Bottom buttons */}
-        {logLineCount > 0 && (
-          <>
-            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to top"
-              onClick={() => {
-                programmaticScrollRef.current = true;
-                logScrollRef.current?.scrollTo({ top: 0 });
-              }}>
-              <i className="bi bi-arrow-up-circle" />
+        {/* Left: title + jump links */}
+        <div className="d-flex align-items-center gap-2" style={{ flex: 1 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Build Log</h2>
+          {buildstartLineRef.current >= 0 && (
+            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }}
+              onClick={() => highlightLine(buildstartLineRef.current)}>
+              buildstart
             </button>
-            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to bottom"
-              onClick={() => {
-                programmaticScrollRef.current = true;
-                logScrollRef.current?.scrollTo({ top: logScrollRef.current.scrollHeight });
-              }}>
-              <i className="bi bi-arrow-down-circle" />
+          )}
+          {lintianLineRef.current >= 0 && (
+            <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }}
+              onClick={() => highlightLine(lintianLineRef.current)}>
+              lintian
             </button>
-          </>
-        )}
+          )}
+        </div>
 
-        {/* Line range display */}
-        {logLineCount > 0 && (
-          <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
-            {visRange.start}–{visRange.end} / {logLineCount}
-          </span>
-        )}
+        {/* Centre: search */}
+        <div className="d-flex align-items-center gap-1">
+          <input
+            className="form-control form-control-sm"
+            placeholder="Search…"
+            value={searchQuery}
+            style={{ width: 160 }}
+            onChange={e => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
+          />
+          {totalSearch > 0 && (
+            <span className="d-flex align-items-center gap-1">
+              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Previous match" onClick={searchPrev}><i className="bi bi-arrow-up-circle" /></button>
+              <span>{currentSearch}/{totalSearch}</span>
+              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Next match" onClick={searchNext}><i className="bi bi-arrow-down-circle" /></button>
+            </span>
+          )}
+        </div>
+
+        {/* Right: follow, find error, scroll, line range */}
+        <div className="d-flex align-items-center gap-2" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {ACTIVE_STATES.has(build.buildstate) && (
+            <div className="form-check mb-0 d-flex align-items-center gap-1">
+              <input className="form-check-input mt-0" type="checkbox" id="followChk"
+                checked={follow} onChange={toggleFollow} />
+              <label className="form-check-label" htmlFor="followChk">follow</label>
+            </div>
+          )}
+          {build.buildstate === 'build_failed' && totalErr > 0 && (
+            <button className="btn btn-sm btn-outline-danger" onClick={findError}>
+              Find Error ({currentErr}/{totalErr})
+            </button>
+          )}
+          {logLineCount > 0 && (
+            <>
+              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to top"
+                onClick={() => {
+                  programmaticScrollRef.current = true;
+                  logScrollRef.current?.scrollTo({ top: 0 });
+                }}>
+                <i className="bi bi-arrow-bar-up" />
+              </button>
+              <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to bottom"
+                onClick={() => {
+                  programmaticScrollRef.current = true;
+                  logScrollRef.current?.scrollTo({ top: logScrollRef.current.scrollHeight });
+                }}>
+                <i className="bi bi-arrow-bar-down" />
+              </button>
+              <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
+                {visRange.start}–{visRange.end} / {logLineCount}
+              </span>
+            </>
+          )}
+        </div>
+
       </div>
 
       {/* ── Log panel ── */}

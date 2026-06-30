@@ -13,6 +13,7 @@ import { NavLink } from 'react-router-dom';
 import { fetchTokens, createToken, deleteToken } from '../../api/admin';
 import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
+import Pagination from '../common/Pagination';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -178,6 +179,9 @@ export default function TokenListPage() {
         </li>
       </ul>
 
+      <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE}
+                  onPageChange={setPage} label="tokens" />
+
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
@@ -238,33 +242,6 @@ export default function TokenListPage() {
         </table>
       </div>
 
-      {/* ── Pagination ── */}
-      <div className="d-flex justify-content-between align-items-center mt-2 px-1" style={{ fontSize: 13 }}>
-        <span className="text-muted">
-          {total > 0
-            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`
-            : ''}
-        </span>
-        <nav>
-          <ul className="pagination pagination-sm mb-0">
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(1)}>&laquo;</button>
-            </li>
-            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p - 1)}>&lsaquo;</button>
-            </li>
-            <li className="page-item disabled">
-              <span className="page-link">{page} / {totalPages}</span>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(p => p + 1)}>&rsaquo;</button>
-            </li>
-            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPage(totalPages)}>&raquo;</button>
-            </li>
-          </ul>
-        </nav>
-      </div>
     </div>
   );
 }
