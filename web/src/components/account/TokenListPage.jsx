@@ -118,7 +118,7 @@ export default function TokenListPage() {
   const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchTokens({ description: filter, page: pg, page_size: PAGE_SIZE });
       setTokens(data.results ?? []);

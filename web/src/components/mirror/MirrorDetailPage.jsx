@@ -209,7 +209,7 @@ function InfoTab({ mirror, name, version }) {
   const [filter, setFilter] = useState('');
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchMirrorDependents(name, version, filter, pg, PAGE_SIZE);
       setItems(data.results ?? []);

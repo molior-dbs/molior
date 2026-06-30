@@ -65,7 +65,6 @@ export default function BuildTable({ projectversion, repository }) {
   // ── Load data ─────────────────────────────────────────────────────────────
   const load = useCallback(async (pg = page) => {
     setError('');
-    setTotal(null);
     try {
       const expandedStates = selectedStates.flatMap(expandBuildStateGroup);
       const params = {

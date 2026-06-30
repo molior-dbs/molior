@@ -262,7 +262,7 @@ export default function RepoListPage() {
   const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchRepos({ q: filterName, filter_url: filterUrl, page: pg, page_size: PAGE_SIZE });
       setRepos(data.results ?? []);

@@ -250,7 +250,7 @@ function DependentsTab({ repoId }) {
   const [filter, setFilter] = useState('');
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchRepoDependents(repoId, { q: filter, page: pg, page_size: PAGE_SIZE });
       setItems(data.results ?? []);

@@ -126,7 +126,7 @@ function VersionsTab({ name, project }) {
   const [ctxMenu,     setCtxMenu]     = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchProjectVersions(name, { q: filterName, page: pg, page_size: PAGE_SIZE });
       setVersions(data.results ?? []);
@@ -479,7 +479,7 @@ function PermissionsTab({ name }) {
   const [modal,      setModal]      = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchProjectPermissions(name, { q: filterName, role: filterRole, page: pg, page_size: PAGE_SIZE });
       setItems(data.results ?? []);
@@ -723,7 +723,7 @@ function TokensTab({ name }) {
   const [modal,  setModal]  = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchProjectTokens(name, { q: filter, page: pg, page_size: PAGE_SIZE });
       setItems(data.results ?? []);

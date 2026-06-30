@@ -656,7 +656,7 @@ function InfoTab({ pv }) {
 
   const load = useCallback(async (pg = page) => {
     if (!pv) return;
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchDependencies(pv.project_name, pv.name, filter, pg, PAGE_SIZE);
       setItems(data.results ?? []);
@@ -792,7 +792,7 @@ function ReposTab({ pv }) {
 
   const load = useCallback(async (pg = page) => {
     if (!pv) return;
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchRepositories(pv.project_name, pv.name, filter, pg, PAGE_SIZE);
       setItems(data.results ?? []);
@@ -1060,7 +1060,7 @@ function DependentsTab({ pv }) {
 
   const load = useCallback(async (pg = page) => {
     if (!pv) return;
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchDependents(pv.project_name, pv.name, filter, pg, PAGE_SIZE);
       setItems(data.results ?? []);

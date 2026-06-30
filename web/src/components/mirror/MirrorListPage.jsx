@@ -48,7 +48,7 @@ export default function MirrorListPage() {
   const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchMirrors({ q: filterName, q_basemirror: filterBase, page: pg, page_size: PAGE_SIZE });
       setMirrors(data.results ?? []);

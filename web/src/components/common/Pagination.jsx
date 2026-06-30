@@ -3,8 +3,12 @@
  *
  * Renders above the table (caller places it before <table>).
  * All controls right-aligned: "x–y of N label" · first · prev · p/N · next · last
+ * Scroll wheel over the bar navigates pages.
  */
-const PRIMARY = '#571845';
+import { useCallback } from 'react';
+
+const PRIMARY    = '#571845';
+const NO_SELECT  = { userSelect: 'none' };
 
 export default function Pagination({ page, totalPages, total, pageSize, onPageChange, label = 'entries' }) {
   const start = total > 0 ? (page - 1) * pageSize + 1 : 0;
@@ -12,8 +16,16 @@ export default function Pagination({ page, totalPages, total, pageSize, onPageCh
   const atFirst = page <= 1;
   const atLast  = page >= totalPages;
 
+  const onWheel = useCallback(e => {
+    e.preventDefault();
+    if (e.deltaY < 0 && !atFirst) onPageChange(page - 1);
+    if (e.deltaY > 0 && !atLast)  onPageChange(page + 1);
+  }, [page, atFirst, atLast, onPageChange]);
+
   return (
-    <div className="d-flex justify-content-end align-items-center gap-2 mb-1 px-1" style={{ fontSize: 13 }}>
+    <div className="d-flex justify-content-end align-items-center gap-2 mb-1 px-1"
+         style={{ fontSize: 13, ...NO_SELECT }}
+         onWheel={onWheel}>
       <span className="text-muted">
         {total === null && 'Loading…'}
         {total === 0   && `0 ${label}`}

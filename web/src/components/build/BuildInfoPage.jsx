@@ -729,7 +729,18 @@ export default function BuildInfoPage() {
           )}
           {logLineCount > 0 && (
             <>
-              <span className="text-muted" style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
+              <span
+                className="text-muted"
+                style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap', userSelect: 'none' }}
+                title="Scroll wheel to page through log"
+                onWheel={e => {
+                  e.preventDefault();
+                  const el = logScrollRef.current;
+                  if (!el) return;
+                  programmaticScrollRef.current = true;
+                  el.scrollBy({ top: e.deltaY > 0 ? el.clientHeight : -el.clientHeight });
+                }}
+              >
                 {visRange.start}–{visRange.end} / {logLineCount}
               </span>
               <button className="btn btn-sm btn-link p-0" style={{ color: PRIMARY }} title="Scroll to top"

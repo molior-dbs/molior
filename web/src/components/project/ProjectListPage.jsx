@@ -31,7 +31,7 @@ export default function ProjectListPage() {
   const [ctxMenu, setCtxMenu] = useState(null);
 
   const load = useCallback(async (pg = page) => {
-    setError(''); setTotal(null);
+    setError('');
     try {
       const data = await fetchProjects({ q: filterName, page: pg, page_size: PAGE_SIZE });
       setProjects(data.results ?? []);
