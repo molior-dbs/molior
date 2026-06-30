@@ -9,7 +9,7 @@ molior:
   # Set to true on dev clusters: allows plain-HTTP session cookies and
   # treats a missing admin_password as a warning rather than a hard error.
   dev: false
-  # Base path when molior is served under a reverse-proxy sub-path (e.g. /molior/).
+  # Base path when molior is served
   # Must end with a slash. Leave as "/" for root deployments.
   basePath: "/"
   serverUrl: "http://molior:9999"
@@ -33,17 +33,21 @@ aptly:
   downloadRetries: 0
   downloader: "default"
   logLevel: "info"
-  # S3 publishing endpoints — keyed by endpoint name, using aptly field names verbatim.
-  # See charts/templates/configmap-aptly.yaml for all supported fields.
-  # Example:
-  # s3PublishEndpoints:
+  # Aptly Publishing endpoints
+  # See charts/templates/configmap-aptly.yaml for all supported fields
+  filesystemPublishEndpoints: {}
+  jfrogPublishEndpoints: {}
+  s3PublishEndpoints: {}
+  # S3 Example
   #   myrepo:
   #     region: us-east-1
   #     bucket: my-bucket
   #     acl: private
   #     access_key_id: ""
   #     secret_access_key: ""
-  s3PublishEndpoints: {}
+  gcsPublishEndpoints: {}
+  swiftPublishEndpoints: {}
+  azurePublishEndpoints: {}
 
 builder:
   amd64:

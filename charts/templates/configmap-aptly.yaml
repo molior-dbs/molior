@@ -192,6 +192,10 @@ data:
         #     # * md5 (default: compare md5 sum)
         #     # * size (compare file size)
         #     verify_method: md5
+{{- range $name, $ep := .Values.aptly.filesystemPublishEndpoints }}
+        {{ $name }}:
+{{ $ep | toYaml | indent 12 }}
+{{- end }}
 
     # JFrog Artifactory Endpoint Support
     #
@@ -220,6 +224,10 @@ data:
         #     password: password
         #     api_key: api_key
         #     access_token: access_token
+{{- range $name, $ep := .Values.aptly.jfrogPublishEndpoints }}
+        {{ $name }}:
+{{ $ep | toYaml | indent 12 }}
+{{- end }}
 
     # S3 Endpoint Support
     #
@@ -347,6 +355,10 @@ data:
         #     # Debug (optional)
         #     # Enables detailed logs for each GCS operation
         #     debug: false
+{{- range $name, $ep := .Values.aptly.gcsPublishEndpoints }}
+        {{ $name }}:
+{{ $ep | toYaml | indent 12 }}
+{{- end }}
 
     # Swift Endpoint Support
     #
@@ -384,6 +396,10 @@ data:
         #     # Full url of Keystone server (including port, and version).
         #     # Example `http://identity.example.com:5000/v2.0`
         #     auth_url: ""
+{{- range $name, $ep := .Values.aptly.swiftPublishEndpoints }}
+        {{ $name }}:
+{{ $ep | toYaml | indent 12 }}
+{{- end }}
 
     # Azure Endpoint Support
     #
@@ -406,6 +422,10 @@ data:
         #     # See: Azure documentation https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string
         #     # defaults to "https://<accountName>.blob.core.windows.net"
         #     endpoint: ""
+{{- range $name, $ep := .Values.aptly.azurePublishEndpoints }}
+        {{ $name }}:
+{{ $ep | toYaml | indent 12 }}
+{{- end }}
 
     # Package Pool
     #
