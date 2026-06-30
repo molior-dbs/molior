@@ -17,7 +17,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchBuilds, deleteBuild, abortBuild, rebuildBuild } from '../../api/builds';
+import { fetchBuilds, deleteBuild, abortBuild, rebuildBuild, buildLatest } from '../../api/builds';
 import ContextMenu from '../common/ContextMenu';
 import Pagination from '../common/Pagination';
 import { wsUrl } from '../../lib/base';
@@ -214,6 +214,14 @@ export default function BuildTable({ projectversion, repository }) {
           onClose={closeModal}
         />
       )}
+      {modal?.type === 'trigger' && (
+        <ConfirmModal
+          title="Trigger Build"
+          body={<span>Trigger a new build for <strong>{modal.build.sourcename}</strong>?</span>}
+          onConfirm={() => buildLatest(modal.build.sourcerepository_id)}
+          onClose={closeModal}
+        />
+      )}
 
       {/* ── Context menu (right-click on row) ── */}
       {ctxMenu && (
@@ -222,6 +230,9 @@ export default function BuildTable({ projectversion, repository }) {
           <li><button className="dropdown-item" onClick={() => { setModal({ type: 'delete', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-trash me-2" />Delete</button></li>
           <li><button className="dropdown-item" onClick={() => { setModal({ type: 'abort', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-slash-circle me-2" />Abort Build</button></li>
           <li><button className="dropdown-item" onClick={() => { setModal({ type: 'rebuild', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-arrow-counterclockwise me-2" />Retry Build</button></li>
+          {ctxMenu.build.sourcerepository_id && <li><hr className="dropdown-divider" /></li>}
+          {ctxMenu.build.sourcerepository_id && <li><button className="dropdown-item" onClick={() => { buildLatest(ctxMenu.build.sourcerepository_id); setCtxMenu(null); }}><i className="bi bi-arrow-repeat me-2" />Check for new builds</button></li>}
+          {ctxMenu.build.sourcerepository_id && <li><button className="dropdown-item" onClick={() => { setModal({ type: 'trigger', build: ctxMenu.build }); setCtxMenu(null); }}><i className="bi bi-play me-2" />Trigger build</button></li>}
         </ContextMenu>
       )}
 
@@ -278,7 +289,7 @@ export default function BuildTable({ projectversion, repository }) {
               {/* Name / Version */}
               <th style={TH}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Name / Version"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
@@ -290,7 +301,7 @@ export default function BuildTable({ projectversion, repository }) {
               {showProject && (
                 <th style={TH}>
                   <input
-                    className="form-control form-control-sm bg-transparent border-0 text-white"
+                    className="form-control form-control-sm"
                     placeholder="Project"
                     value={searchProject}
                     onChange={e => setSearchProject(e.target.value)}
@@ -302,7 +313,7 @@ export default function BuildTable({ projectversion, repository }) {
               {/* Maintainer */}
               <th style={TH}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Maintainer"
                   value={maintainer}
                   onChange={e => setMaintainer(e.target.value)}
@@ -313,7 +324,7 @@ export default function BuildTable({ projectversion, repository }) {
               {/* Commit */}
               <th style={TH}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Commit"
                   value={commit}
                   onChange={e => setCommit(e.target.value)}
@@ -450,6 +461,21 @@ export default function BuildTable({ projectversion, repository }) {
                             <i className="bi bi-arrow-counterclockwise me-2" />Retry Build
                           </button>
                         </li>
+                        {build.sourcerepository_id && <li><hr className="dropdown-divider" /></li>}
+                        {build.sourcerepository_id && (
+                          <li>
+                            <button className="dropdown-item" onClick={() => buildLatest(build.sourcerepository_id)}>
+                              <i className="bi bi-arrow-repeat me-2" />Check for new builds
+                            </button>
+                          </li>
+                        )}
+                        {build.sourcerepository_id && (
+                          <li>
+                            <button className="dropdown-item" onClick={() => setModal({ type: 'trigger', build })}>
+                              <i className="bi bi-play me-2" />Trigger build
+                            </button>
+                          </li>
+                        )}
                       </ul>
                     </div>
                   </td>

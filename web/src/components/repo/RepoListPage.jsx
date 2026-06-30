@@ -336,7 +336,7 @@ export default function RepoListPage() {
               <th style={{ ...TH, width: 44 }} title="State">State</th>
               <th style={TH}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Name"
                   value={filterName}
                   onChange={e => setFilterName(e.target.value)}
@@ -345,7 +345,7 @@ export default function RepoListPage() {
               </th>
               <th style={TH}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Source URL"
                   value={filterUrl}
                   onChange={e => setFilterUrl(e.target.value)}

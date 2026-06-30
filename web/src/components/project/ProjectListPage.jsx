@@ -90,7 +90,7 @@ export default function ProjectListPage() {
               {/* Name / filter */}
               <th style={{ ...TH, minWidth: 220 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Name"
                   value={filterName}
                   onChange={e => setFilterName(e.target.value)}

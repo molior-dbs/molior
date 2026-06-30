@@ -11,6 +11,7 @@ import { fetchMirror, fetchMirrorDependents, fetchMirrorAptSources, deleteMirror
 import MirrorForm from './MirrorForm';
 import ConfirmModal from '../build/ConfirmModal';
 import Pagination from '../common/Pagination';
+import debianLogo from '../../assets/debian.svg';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
@@ -54,7 +55,7 @@ function MirrorHeader({ mirror, name, version, onAction }) {
           <span className="text-muted fw-normal">/</span>
           <span>{mirror.version}</span>
           {mirror.is_basemirror && (
-            <i className="bi bi-debian text-primary ms-1" title="Debian Base Mirror" />
+            <img src={debianLogo} alt="Debian" title="Debian Base Mirror" style={{ width: 16, height: 16, marginLeft: 4 }} />
           )}
         </h1>
 
@@ -247,7 +248,7 @@ function InfoTab({ mirror, name, version }) {
             <tr>
               <th style={{ ...TH, minWidth: 220 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Dependent"
                   value={filter}
                   onChange={e => setFilter(e.target.value)}

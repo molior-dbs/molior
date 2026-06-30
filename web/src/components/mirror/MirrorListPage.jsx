@@ -13,6 +13,7 @@ import { fetchMirrors, deleteMirror, updateMirror } from '../../api/mirrors';
 import MirrorForm from './MirrorForm';
 import ConfirmModal from '../build/ConfirmModal';
 import ContextMenu from '../common/ContextMenu';
+import debianLogo from '../../assets/debian.svg';
 import Pagination from '../common/Pagination';
 
 const PRIMARY = '#571845';
@@ -110,7 +111,7 @@ export default function MirrorListPage() {
               <th style={{ ...TH, width: 44 }} title="Type">Type</th>
               <th style={{ ...TH, width: 44 }} title="State">State</th>
               <th style={TH}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                   placeholder="Name / Version / Distribution"
                   value={filterName} onChange={e => setFilterName(e.target.value)}
                   style={{ minWidth: 200 }} />
@@ -118,7 +119,7 @@ export default function MirrorListPage() {
               <th style={TH}>Components</th>
               <th style={TH}>Architectures</th>
               <th style={TH}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                   placeholder="Basemirror"
                   value={filterBase} onChange={e => setFilterBase(e.target.value)}
                   style={{ minWidth: 140 }} />
@@ -151,7 +152,7 @@ export default function MirrorListPage() {
 
                 {/* Base mirror flag */}
                 <td className="text-center">
-                  {m.is_basemirror && <i className="bi bi-debian text-primary" title="Debian Base Mirror" />}
+                  {m.is_basemirror && <img src={debianLogo} alt="Debian" title="Debian Base Mirror" style={{ width: 16, height: 16 }} />}
                 </td>
 
                 {/* State icon */}

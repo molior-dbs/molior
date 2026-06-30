@@ -262,7 +262,7 @@ function VersionsTab({ name, project }) {
           <thead>
             <tr>
               <th style={{ ...TH, minWidth: 180 }}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                        placeholder="Version" value={filterName}
                        onChange={e => setFilterName(e.target.value)} style={{ minWidth: 140 }} />
               </th>
@@ -522,12 +522,12 @@ function PermissionsTab({ name }) {
           <thead>
             <tr>
               <th style={{ ...TH, minWidth: 200 }}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                        placeholder="Username" value={filterName}
                        onChange={e => setFilterName(e.target.value)} style={{ minWidth: 160 }} />
               </th>
               <th style={{ ...TH, minWidth: 160 }}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                        placeholder="Role" value={filterRole}
                        onChange={e => setFilterRole(e.target.value)} style={{ minWidth: 120 }} />
               </th>
@@ -760,7 +760,7 @@ function TokensTab({ name }) {
           <thead>
             <tr>
               <th style={{ ...TH, minWidth: 260 }}>
-                <input className="form-control form-control-sm bg-transparent border-0 text-white"
+                <input className="form-control form-control-sm"
                        placeholder="Description" value={filter}
                        onChange={e => setFilter(e.target.value)} style={{ minWidth: 200 }} />
               </th>

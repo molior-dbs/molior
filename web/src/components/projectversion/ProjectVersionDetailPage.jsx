@@ -610,7 +610,7 @@ function PVTable({ columns, rows, total, page, onPageChange,
               {/* First column always has the filter input */}
               <th style={{ ...TH, minWidth: 200 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder={filterPlaceholder}
                   value={filterValue}
                   onChange={e => onFilterChange(e.target.value)}

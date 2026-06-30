@@ -287,7 +287,7 @@ function DependentsTab({ repoId }) {
             <tr>
               <th style={{ ...TH, minWidth: 220 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Dependent"
                   value={filter}
                   onChange={e => setFilter(e.target.value)}

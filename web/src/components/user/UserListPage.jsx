@@ -108,7 +108,7 @@ export default function UserListPage() {
               {/* Username filter */}
               <th style={{ ...TH, minWidth: 180 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Username"
                   value={filterName}
                   onChange={e => setFilterName(e.target.value)}
@@ -118,7 +118,7 @@ export default function UserListPage() {
               {/* Email filter */}
               <th style={{ ...TH, minWidth: 220 }}>
                 <input
-                  className="form-control form-control-sm bg-transparent border-0 text-white"
+                  className="form-control form-control-sm"
                   placeholder="Email"
                   value={filterEmail}
                   onChange={e => setFilterEmail(e.target.value)}
