@@ -1,4 +1,9 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: molior-cm3
+  labels:
+    app: molior
 data:
   aptly.conf: |
     {
@@ -33,61 +38,50 @@ data:
       "logFormat": "default",
       "serveInAPIMode": false
     }
+
   backend-kubernetes.yml: |
     registry:
         server: "{{ .Values.registry.host }}:{{ .Values.registry.port }}"
-        user: ""
-        password: ""
+        user: "{{ .Values.registry.user }}"
+        password: "{{ .Values.registry.password }}"
 
     builder:
         amd64:
-            parallel: 10
-    #    arm64:
-    #        remote_cmd: "ssh -o StrictHostKeyChecking=no builder@10.0.2.123"
-    #        parallel: 2
+            parallel: {{ .Values.builder.amd64.parallel }}
+
   molior.yml: |
     # Molior configuration
 
     server:
-        url: 'http://molior:9999'
+        url: '{{ .Values.molior.serverUrl }}'
 
-    hostname: '127.0.0.1'
+    hostname: '{{ .Values.molior.hostname }}'
     working_dir: '/var/lib/molior'
     database: '/molior'
 
-    # GPG email for signing the source packages
-    debsign_gpg_email: 'debsign@molior'
+    debsign_gpg_email: '{{ .Values.molior.debsignEmail }}'
 
     builds:
-        # git tags to be built in stable need to start with the prefix:
-        version_prefix: "v"
+        version_prefix: "{{ .Values.molior.versionPrefix }}"
 
     ci_builds:
-        enabled: True
-        # Remove ci packages which are older than <ci_packages_ttl> days
-        packages_ttl: 7
+        enabled: {{ .Values.molior.ciBuildsEnabled }}
+        packages_ttl: {{ .Values.molior.ciPackagesTtl }}
 
     admin:
-        admin_password: 'molior-dev'
+        admin_password: '{{ .Values.molior.adminPassword }}'
 
     auth_backend: 'db'
 
-    backend: 'kubernetes'
+    backend: '{{ .Values.molior.backend }}'
 
-    # Molior server settings
-    max_parallel_chroots: 2
+    max_parallel_chroots: {{ .Values.molior.maxParallelChroots }}
 
-    # Aptly settings
     aptly:
-        apt_url_public: 'http://localhost:8080'
-        apt_url: 'http://aptly:8000'
-        api_url: 'http://aptly:3143/api'
-        api_user: 'molior'
-        api_pass: 'molior-dev'
-        gpg_key: 'reposign@molior'
+        apt_url_public: '{{ .Values.aptly.publicUrl }}'
+        apt_url: '{{ .Values.aptly.internalUrl }}'
+        api_url: '{{ .Values.aptly.apiUrl }}'
+        api_user: '{{ .Values.aptly.user }}'
+        api_pass: '{{ .Values.aptly.password }}'
+        gpg_key: '{{ .Values.aptly.gpgKey }}'
         key: 'archive-keyring.asc'
-kind: ConfigMap
-metadata:
-  labels:
-    app: molior
-  name: molior-cm3

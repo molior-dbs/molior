@@ -1,6 +1,8 @@
 registry:
   host: k3d-molior-registry
   port: 5000
+  user: ""
+  password: ""
 
 molior:
   version: dev
@@ -10,3 +12,24 @@ molior:
   # Base path when molior is served under a reverse-proxy sub-path (e.g. /molior/).
   # Must end with a slash. Leave as "/" for root deployments.
   basePath: "/"
+  serverUrl: "http://molior:9999"
+  hostname: "127.0.0.1"
+  debsignEmail: "debsign@molior"
+  versionPrefix: "v"
+  ciBuildsEnabled: true
+  ciPackagesTtl: 7
+  adminPassword: "molior-dev"
+  backend: "kubernetes"
+  maxParallelChroots: 2
+
+aptly:
+  publicUrl: "http://localhost:8080"
+  internalUrl: "http://aptly:8000"
+  apiUrl: "http://aptly:3143/api"
+  user: "molior"
+  password: "molior-dev"
+  gpgKey: "reposign@molior"
+
+builder:
+  amd64:
+    parallel: 10
