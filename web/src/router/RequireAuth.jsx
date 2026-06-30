@@ -23,7 +23,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function RequireAuth({ children, requireAdmin = false }) {
-  const { currentUser } = useAuth();
+  const { currentUser, authReady } = useAuth();
   const location = useLocation();
 
   // Wait for session verification before rendering anything.

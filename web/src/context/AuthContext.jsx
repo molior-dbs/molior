@@ -13,25 +13,24 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(getStoredUser);
-  // authReady is false while the session is being verified on page load.
+  // Always false on page load — resolved only after the session check completes.
   // RequireAuth renders nothing until it flips to true.
-  const [authReady, setAuthReady] = useState(!getStoredUser());
+  const [authReady, setAuthReady] = useState(false);
 
-  // On mount, if we have a stored session, refresh full user info (including is_admin)
-  // in case the page was refreshed or the stored object is incomplete.
+  // On every page load, verify the session cookie with the server.
+  // This is the ground truth — localStorage is only a render cache.
   useEffect(() => {
-    if (getStoredUser()) {
-      apiGetUserInfo()
-        .then(info => {
-          storeUser(info);
-          setCurrentUser(info);
-        })
-        .catch(() => {
-          // Session expired — clear stale local state
-          clearUser();
-          setCurrentUser(null);
-        });
-    }
+    apiGetUserInfo()
+      .then(info => {
+        storeUser(info);
+        setCurrentUser(info);
+      })
+      .catch(() => {
+        // No valid session — clear any stale local state.
+        clearUser();
+        setCurrentUser(null);
+      })
+      .finally(() => setAuthReady(true));
   }, []);
 
   const login = useCallback(async (username, password) => {
@@ -50,7 +49,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout }}>
+    <AuthContext.Provider value={{ currentUser, authReady, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -215,7 +215,7 @@ function InfoTab({ mirror, name, version }) {
     } catch (e) { setError(e.message); setTotal(-1); }
   }, [name, version, page, filter]);
 
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { load(page); }, [page, mirror]); // mirror in deps: re-fire when parent data arrives (issue #2)
 
   const prevFilter = useRef(filter);
   useEffect(() => {
