@@ -136,8 +136,8 @@ export default function Layout() {
         <img
           src={moliorLogo}
           alt="Molior"
-          style={{ height: 32, cursor: 'pointer' }}
-          onClick={() => navigate('/builds')}
+          draggable={false}
+          style={{ height: 32 }}
         />
 
         {/* Right side: username + dot */}
@@ -181,6 +181,7 @@ export default function Layout() {
               <li key={item.path} className="nav-item">
                 <NavLink
                   to={item.path}
+                  draggable={false}
                   className={({ isActive }) =>
                     `nav-link d-flex align-items-center gap-2 px-3 py-2${isActive ? ' active-nav' : ''}`
                   }
@@ -202,6 +203,7 @@ export default function Layout() {
               <li key={item.path} className="nav-item">
                 <NavLink
                   to={item.path}
+                  draggable={false}
                   className={({ isActive }) =>
                     `nav-link d-flex align-items-center gap-2 px-3 py-2${isActive ? ' active-nav' : ''}`
                   }
