@@ -1,3 +1,15 @@
+molior (1.5.0~beta41) stretch; urgency=medium
+
+  * web: make menus undraggable
+  * web: fix building icons
+  * web: support copy projectversion on details page
+  * web: fix external build upload
+  * web: fix overlay and snapshot apiUrl
+  * api: add missing auth and roles to endpoints
+  * helm: allow aptly endpoints config via values.yaml
+
+ -- André Roth <neolynx@gmail.com>  Tue, 30 Jun 2026 21:39:59 +0200
+
 molior (1.5.0~beta40) stretch; urgency=medium
 
   * web: improve paginator and flickering
