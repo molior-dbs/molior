@@ -7,7 +7,8 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
-from ...auth import CurrentUser, authenticated, create_session_cookie
+from typing import Optional
+from ...auth import CurrentUser, get_current_user, create_session_cookie
 from ...db import get_db
 from ....auth.auth import Auth
 from ....model.user import User
@@ -59,9 +60,12 @@ def logout(response: Response):
 
 @router.get("/api/userinfo")
 def get_userinfo(
-    current_user: CurrentUser = Depends(authenticated),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Returns null when unauthenticated so the login page avoids a noisy 401.
+    if not current_user:
+        return None
     if current_user.username == "admin":
         return {"username": "admin", "user_id": -1, "is_admin": True}
     user = db.query(User).filter_by(username=current_user.username).first()

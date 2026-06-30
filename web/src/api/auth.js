@@ -63,7 +63,9 @@ export async function apiLogin(username, password) {
 export async function apiGetUserInfo() {
   const res = await fetch(apiUrl('/api/userinfo'), { credentials: 'same-origin' });
   if (!res.ok) throw new Error('Not authenticated');
-  return res.json();
+  const data = await res.json();
+  if (!data) throw new Error('Not authenticated');
+  return data;
 }
 
 /**
