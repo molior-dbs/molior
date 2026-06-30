@@ -54,6 +54,8 @@ spec:
             - name: MOLIOR_DEV
               value: "1"
             {{- end }}
+            - name: MOLIOR_BASE_PATH
+              value: {{ .Values.molior.basePath | quote }}
             - name: APTLY_PASSWORD
               valueFrom:
                 configMapKeyRef:

@@ -16,7 +16,7 @@ from async_cron.job import CronJob
 from async_cron.schedule import Scheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from starlette.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from launchy import Launchy
 
@@ -148,11 +148,19 @@ def create_app() -> FastAPI:
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
         index_path = os.path.join(web_dir, "index.html")
 
+        # Pre-render index.html once: replace `./` with an absolute base path so
+        # assets resolve correctly at any URL depth (e.g. /project/foo/1.0/repos).
+        base_path = os.environ.get("MOLIOR_BASE_PATH", "/")
+        _index_html = ""
+        if os.path.isfile(index_path):
+            with open(index_path, encoding="utf-8") as fh:
+                _index_html = fh.read().replace('href="./"', f'href="{base_path}"', 1)
+
         @app.get("/", include_in_schema=False)
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str = ""):
-            if os.path.isfile(index_path):
-                return FileResponse(index_path)
+            if _index_html:
+                return HTMLResponse(_index_html)
             raise HTTPException(status_code=404)
     else:
         logger.warning("web UI directory not found: %s (web UI will not be served)", web_dir)

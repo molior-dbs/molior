@@ -7,3 +7,6 @@ molior:
   # Set to true on dev clusters: allows plain-HTTP session cookies and
   # treats a missing admin_password as a warning rather than a hard error.
   dev: false
+  # Base path when molior is served under a reverse-proxy sub-path (e.g. /molior/).
+  # Must end with a slash. Leave as "/" for root deployments.
+  basePath: "/"
