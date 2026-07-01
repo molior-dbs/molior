@@ -2,6 +2,7 @@ REGISTRY := k3d-molior-registry
 REGISTRY_PORT := 5000
 MOLIOR_DEV ?= true
 PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
+MOLIOR_VERSION ?= dev
 
 NAMESPACE := molior
 export HELM_NAMESPACE=$(NAMESPACE)
@@ -18,17 +19,23 @@ endif
 help:  ## Print this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-docker-images: docker-image-molior docker-image-aptly  ## Create docker images
-	$(DOCKERCMD) build -f docker/common/postgres.Dockerfile -t molior-postgres:dev .
-	$(DOCKERCMD) build -f docker/common/nginx.Dockerfile -t molior-nginx:dev .
+docker-images: docker-images-molior docker-images-aptly  ## Create docker images
 
-docker-image-molior:  ## Build molior docker image
+docker-images-molior:  ## Build molior docker images (moior, postgres)
 	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
-		$(DOCKERCMD) build -f docker/molior-base.Dockerfile -t molior-base:dev .)
-	$(DOCKERCMD) build -f docker/molior.Dockerfile -t molior:dev .
+		$(DOCKERCMD) build -f docker/molior/molior-base.Dockerfile -t molior-base:dev .)
+	$(DOCKERCMD) build -f docker/molior/molior-dev.Dockerfile -t molior:dev .
+	$(DOCKERCMD) build -f docker/molior/postgres.Dockerfile -t molior-postgres:dev .
 
-docker-image-aptly:  ## Build aptly docker image
-	$(DOCKERCMD) build -f docker/aptly.Dockerfile -t aptly:dev .
+docker-images-aptly:  ## Build aptly docker images (aptly, nginx)
+	$(DOCKERCMD) build -f docker/aptly/aptly.Dockerfile -t aptly:dev .
+	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:dev .
+
+docker-images-prod:
+	$(DOCKERCMD) build -f docker/aptly/aptly.Dockerfile -t aptly:prod .
+	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:prod .
+	$(DOCKERCMD) build -f docker/molior/postgres.Dockerfile -t molior-postgres:prod .
+	$(DOCKERCMD) build -f docker/molior/molior.Dockerfile -t molior:prod .
 
 docker-shell:  ## Start a shell in a new molior container
 	$(DOCKERCMD) run -it --rm -v $(PWD):/work/src molior:dev bash
@@ -49,9 +56,9 @@ delete-cluster:  ## Delete k3d cluster
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
-	$(DOCKERCMD) tag $*:dev $(PUSH_REGISTRY)/$*:dev
-	$(DOCKERCMD) push $(PUSH_REGISTRY)/$*:dev
-	$(DOCKERCMD) rmi $(PUSH_REGISTRY)/$*:dev
+	$(DOCKERCMD) tag $*:$(MOLIOR_VERSION) $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
+	$(DOCKERCMD) push $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
+	$(DOCKERCMD) rmi $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
 
 install-k3d:  ## Download and install k3d binary
 	@if ! which k3d 2>/dev/null; then echo Downloading https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64 to ~/.local/bin/k3d; \
@@ -63,7 +70,7 @@ install-k3d:  ## Download and install k3d binary
 
 
 
-install-cluster:  ## Install molior helm chart into k3d
+install-cluster:  ## Install molior dev into cluster
 	printf 'registry:\n  host: %s\n  port: %s\nmolior:\n  dev: %s\n' $(REGISTRY) $(REGISTRY_PORT) $(MOLIOR_DEV) > /tmp/molior-registry-values.yaml
 	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml; rm -f /tmp/molior-registry-values.yaml
 
@@ -123,4 +130,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-image-molior docker-image-aptly create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster list watch logs logs-molior logs-aptly shell-molior restart-molior restart-aptly psql clean
+.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
