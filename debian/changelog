@@ -1,3 +1,10 @@
+molior (1.5.0~beta45) stretch; urgency=medium
+
+  * web: fix blinking cursor for running builds
+  * postgres: shutdown gracefully
+
+ -- André Roth <neolynx@gmail.com>  Wed, 01 Jul 2026 14:14:13 +0200
+
 molior (1.5.0~beta44) stretch; urgency=medium
 
   * docker: do not use cache for prod builds
