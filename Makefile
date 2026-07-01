@@ -17,8 +17,12 @@ export HELM_NAMESPACE=$(NAMESPACE)
 ifneq ($(shell which podman 2>/dev/null),)
   DOCKERCMD := podman
   PODMAN_K3D_REGISTRY_ARGS := --default-network podman
+  # The k3d registry serves plain HTTP. podman (unlike docker) does not treat
+  # localhost as insecure automatically, so disable TLS verification on push.
+  PUSH_TLS_ARGS := --tls-verify=false
 else ifneq ($(shell which docker 2>/dev/null),)
   DOCKERCMD := docker
+  PUSH_TLS_ARGS :=
 else
   $(error Neither podman nor docker found in PATH)
 endif
@@ -70,7 +74,7 @@ deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-moli
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
 	$(DOCKERCMD) tag $*:$(MOLIOR_VERSION) $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
-	$(DOCKERCMD) push $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
+	$(DOCKERCMD) push $(PUSH_TLS_ARGS) $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
 	$(DOCKERCMD) rmi $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
 
 install-k3d:  ## Download and install k3d binary
