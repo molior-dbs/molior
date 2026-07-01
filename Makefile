@@ -32,10 +32,10 @@ docker-images-aptly:  ## Build aptly docker images (aptly, nginx)
 	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:dev .
 
 docker-images-prod:
-	$(DOCKERCMD) build -f docker/aptly/aptly.Dockerfile -t aptly:prod .
-	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:prod .
-	$(DOCKERCMD) build -f docker/molior/postgres.Dockerfile -t molior-postgres:prod .
-	$(DOCKERCMD) build -f docker/molior/molior.Dockerfile -t molior:prod .
+	$(DOCKERCMD) build --no-cache -f docker/aptly/aptly.Dockerfile -t aptly:prod .
+	$(DOCKERCMD) build --no-cache -f docker/aptly/nginx.Dockerfile -t molior-nginx:prod .
+	$(DOCKERCMD) build --no-cache -f docker/molior/postgres.Dockerfile -t molior-postgres:prod .
+	$(DOCKERCMD) build --no-cache -f docker/molior/molior.Dockerfile -t molior:prod .
 
 docker-shell:  ## Start a shell in a new molior container
 	$(DOCKERCMD) run -it --rm -v $(PWD):/work/src molior:dev bash
