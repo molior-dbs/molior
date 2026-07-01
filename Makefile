@@ -40,6 +40,12 @@ docker-images-prod:
 docker-shell:  ## Start a shell in a new molior container
 	$(DOCKERCMD) run -it --rm -v $(PWD):/work/src molior:dev bash
 
+helm-push: helm-package  ## Push helm chart to local OCI registry
+	helm push molior-$(MOLIOR_VERSION).tgz oci://$(PUSH_REGISTRY)/charts
+
+helm-package:  ## Build helm package
+	helm package charts/
+
 create-cluster:  ## Create k3d cluster
 	k3d registry list molior-registry >/dev/null 2>&1 || k3d registry create molior-registry --port 0.0.0.0:$(REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
 	k3d cluster create molior \
