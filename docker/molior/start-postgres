@@ -1,16 +1,22 @@
 #!/bin/sh
 
+pg_version=17
+pg_data=/var/lib/postgresql/$pg_version/main
+pg_ctl=/usr/lib/postgresql/$pg_version/bin/pg_ctl
+
 sig() {
-    pid=`cat /tmp/postgres.pid`
-    kill $pid
+    echo "postgres: stopping gracefully..."
+    su postgres -c "$pg_ctl stop -D $pg_data -m smart -w"
     wait $suppid
+    echo "postgres: stopped cleanly"
     exit 0
 }
-trap 'sig TERM' TERM
+trap 'sig' TERM
 
-pg_version=17
-
-echo Starting postgres ...
-su postgres -c "/usr/lib/postgresql/$pg_version/bin/postgres -D /var/lib/postgresql/$pg_version/main -c config_file=/etc/postgresql/$pg_version/main/postgresql.conf & pid=\$!; echo -n \$pid >/tmp/postgres.pid; wait \$pid" &
+echo "Starting postgres ..."
+su postgres -c "/usr/lib/postgresql/$pg_version/bin/postgres \
+    -D $pg_data \
+    -c config_file=/etc/postgresql/$pg_version/main/postgresql.conf &
+    pid=\$!; echo -n \$pid >/tmp/postgres.pid; wait \$pid" &
 suppid=$!
-wait $supid
+wait $suppid

@@ -42,6 +42,19 @@ spec:
         - name: molior-server
           image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior:{{ .Values.molior.version }}
           imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c",
+                  "echo 'preStop: signaling molior to shut down';
+
+                  kill -TERM $(cat /var/run/molior.pid);
+
+                  echo 'preStop: waiting for molior to finish';
+
+                  while [ -f /var/run/molior.pid ]; do sleep 1; done;
+
+                  echo 'preStop: molior done'"]
           securityContext:
             capabilities:
               add:
@@ -96,16 +109,28 @@ spec:
               name: molior
             - mountPath: /config
               name: molior-cm3
+            - mountPath: /shutdown
+              name: shutdown-sync
 
         - name: molior-postgres
           image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-postgres:{{ .Values.molior.version }}
           imagePullPolicy: Never
+          lifecycle:
+            preStop:
+              exec:
+                # wait for molior to finish, then stop postgres directly
+                command: ["/bin/sh", "-c",
+                  "echo 'preStop: waiting for molior to shut down...';
+                  until [ -f /shutdown/molior-done ]; do echo 'preStop: molior not done yet...'; sleep 1; done;
+                  echo 'preStop: molior done, stopping postgres...';
+                  su postgres -c '/usr/lib/postgresql/17/bin/pg_ctl stop -D /var/lib/postgresql/17/main -m smart -w';
+                  echo 'preStop: postgres stopped'"]
           ports:
             - containerPort: 5432
               protocol: TCP
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "postgres", "-h", "/var/run/postgresql"]
+              command: ["su", "postgres", "-c", "pg_isready -h /var/run/postgresql"]
             initialDelaySeconds: 3
             periodSeconds: 2
             failureThreshold: 30
@@ -114,7 +139,9 @@ spec:
               name: pgsock
             - mountPath: /var/lib/postgresql/17/main
               name: postgres
-      terminationGracePeriodSeconds: 60
+            - mountPath: /shutdown
+              name: shutdown-sync
+      terminationGracePeriodSeconds: {{ .Values.molior.terminationGracePeriodSeconds }}
       restartPolicy: Always
       volumes:
         - name: molior
@@ -129,3 +156,6 @@ spec:
         - configMap:
             name: molior-cm3
           name: molior-cm3
+        - name: shutdown-sync
+          emptyDir: {}
+

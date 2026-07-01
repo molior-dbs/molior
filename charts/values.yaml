@@ -21,6 +21,7 @@ molior:
   adminPassword: "molior-dev"
   backend: "kubernetes"
   maxParallelChroots: 2
+  terminationGracePeriodSeconds: 300
 
 aptly:
   publicUrl: "http://localhost:8080"
