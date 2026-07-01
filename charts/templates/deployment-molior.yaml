@@ -103,11 +103,18 @@ spec:
           ports:
             - containerPort: 5432
               protocol: TCP
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-h", "/var/run/postgresql"]
+            initialDelaySeconds: 3
+            periodSeconds: 2
+            failureThreshold: 30
           volumeMounts:
             - mountPath: /var/run/postgresql
               name: pgsock
             - mountPath: /var/lib/postgresql/17/main
               name: postgres
+      terminationGracePeriodSeconds: 60
       restartPolicy: Always
       volumes:
         - name: molior

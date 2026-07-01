@@ -3,7 +3,7 @@
 sig() {
     pid=`cat /tmp/postgres.pid`
     kill $pid
-    wait $supid
+    wait $suppid
     exit 0
 }
 trap 'sig TERM' TERM
