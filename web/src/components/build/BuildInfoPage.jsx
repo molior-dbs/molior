@@ -185,7 +185,11 @@ export default function BuildInfoPage() {
     const tbody = tbodyRef.current;
     if (!tbody) return;
     const nr  = loglinesRef.current + 1;
-    const row = tbody.insertRow(loglinesRef.current);
+    // insert before the cursor row if present, otherwise append
+    const cursorRow = document.getElementById('row-cursor');
+    const row = cursorRow
+      ? tbody.insertBefore(document.createElement('tr'), cursorRow)
+      : tbody.insertRow(loglinesRef.current);
     row.id    = `row-${nr}`;
 
     const linenrCell = row.insertCell(0);
@@ -206,6 +210,7 @@ export default function BuildInfoPage() {
     loglinesRef.current = nr;
     lastRowRef.current  = row;
     setLogLineCount(nr);
+
   }
 
   function replaceLogLine(line) {
@@ -375,15 +380,18 @@ export default function BuildInfoPage() {
       wsRef.current = null;
     }
 
-    // Add blinking cursor if build is in active state
+    // Add blinking cursor immediately if build is active
     if (tbody && ACTIVE_STATES.has(buildObj.buildstate)) {
-      const cursor = tbody.insertRow(0);
+      const cursor = document.createElement('tr');
       cursor.id = 'row-cursor';
-      const nr = cursor.insertCell(0);
-      nr.className  = 'build-lognr build-blinking-cursor';
-      nr.innerHTML  = '▁';
-      cursor.insertCell(1).className = 'build-logline';
+      cursor.insertCell(0).className = 'build-lognr';
+      const logCell = cursor.insertCell(1);
+      logCell.className = 'build-logline build-blinking-cursor';
+      logCell.innerHTML = '█';
+      tbody.appendChild(cursor);
     }
+
+
 
     // Open WS
     const ws = new WebSocket(wsUrl('/api/websocket'));
@@ -411,11 +419,10 @@ export default function BuildInfoPage() {
         const cursor = document.getElementById('row-cursor');
         if (cursor) cursor.parentNode?.removeChild(cursor);
 
-        // scroll to end if following
-        const endRow = document.getElementById(`row-${loglinesRef.current}`);
-        if (endRow && followRef.current) {
-          programmaticScrollRef.current = true;
-          endRow.scrollIntoView();
+        // scroll to last line if following
+        if (followRef.current) {
+          const endRow = document.getElementById(`row-${loglinesRef.current}`);
+          if (endRow) scrollToLog(endRow);
         }
 
         // count errors
@@ -441,8 +448,12 @@ export default function BuildInfoPage() {
         const tbody2 = tbodyRef.current;
         if (lastRowRef.current && aliveRef.current && LIVE_STATES.has(buildObj.buildstate)) {
           if (followRef.current) {
-            programmaticScrollRef.current = true;
-            lastRowRef.current.scrollIntoView();
+            // scroll container to bottom so cursor stays fully visible
+            const scroll = logScrollRef.current;
+            if (scroll) {
+              programmaticScrollRef.current = true;
+              scroll.scrollTop = scroll.scrollHeight;
+            }
           }
           updateVisRange();
         }
@@ -479,12 +490,28 @@ export default function BuildInfoPage() {
     };
   }, [buildId]);
 
-  // Keep fetchLogs in sync when build state changes via WS
+  // Add/remove blinking cursor as build state changes
   const prevBuildstateRef = useRef('');
   useEffect(() => {
     if (!build) return;
-    if (build.buildstate !== prevBuildstateRef.current) {
-      prevBuildstateRef.current = build.buildstate;
+    const state = build.buildstate;
+    if (state === prevBuildstateRef.current) return;
+    prevBuildstateRef.current = state;
+    const tbody = tbodyRef.current;
+    if (!tbody) return;
+    const existing = document.getElementById('row-cursor');
+    if (ACTIVE_STATES.has(state)) {
+      if (!existing) {
+        const cursor = document.createElement('tr');
+        cursor.id = 'row-cursor';
+        cursor.insertCell(0).className = 'build-lognr';
+        const logCell = cursor.insertCell(1);
+        logCell.className = 'build-logline build-blinking-cursor';
+        logCell.innerHTML = '█';
+        tbody.appendChild(cursor);
+      }
+    } else {
+      if (existing) existing.parentNode?.removeChild(existing);
     }
   }, [build?.buildstate]);
 
@@ -543,7 +570,12 @@ export default function BuildInfoPage() {
           onClose={ok => {
             setModal(null);
             if (ok) {
-              fetchBuild(buildId).then(b => { setBuild(b); fetchLogs(buildId, b); }).catch(() => {});
+              // fetch build then stream — treat as active so cursor appears immediately
+              fetchBuild(buildId).then(b => {
+                const active = { ...b, buildstate: 'building' };
+                setBuild(active);
+                fetchLogs(buildId, active);
+              }).catch(() => {});
             }
           }}
         />

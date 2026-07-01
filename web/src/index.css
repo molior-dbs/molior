@@ -64,7 +64,6 @@
 }
 .build-blinking-cursor {
   animation: blink-cursor 1s step-start infinite;
-  color: #888;
 }
 
 /* ── Rotating animation for the 'building' state icon ── */
