@@ -1,3 +1,12 @@
+molior (1.5.0~beta43) stretch; urgency=medium
+
+  * molior: release 1.5.0~beta42
+  * docker: dev and prod images
+  * aptly: allow CORS to show key in web
+  * web: prevent 401 errors on login page
+
+ -- André Roth <neolynx@gmail.com>  Wed, 01 Jul 2026 12:44:55 +0200
+
 molior (1.5.0~beta42) stretch; urgency=medium
 
   * docker: dev and prod images
