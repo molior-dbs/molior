@@ -1,5 +1,12 @@
 REGISTRY := k3d-molior-registry
-REGISTRY_PORT := 5000
+# Registry host port: default 5000, but on macOS the AirPlay Receiver
+# (ControlCenter) occupies port 5000, so fall back to 5001 there.
+# Override explicitly with REGISTRY_PORT=... if needed.
+ifeq ($(shell uname -s),Darwin)
+  REGISTRY_PORT ?= 5001
+else
+  REGISTRY_PORT ?= 5000
+endif
 MOLIOR_DEV ?= true
 PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
 MOLIOR_VERSION ?= dev
