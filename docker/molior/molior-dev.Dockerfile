@@ -5,7 +5,7 @@ RUN useradd --uid 5432 --system --home-dir /var/lib/postgresql --no-create-home 
 
 RUN useradd --uid 7777 -m --shell /bin/sh --home-dir /var/lib/molior molior
 
-ADD scripts/start-molior /usr/local/sbin/start-molior
+ADD docker/molior/start-molior /usr/local/sbin/start-molior
 
 COPY . /work/src
 WORKDIR /work/src
@@ -20,4 +20,4 @@ RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
 WORKDIR /
-CMD ["start-molior"]
+CMD start-molior
