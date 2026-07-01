@@ -1,3 +1,10 @@
+molior (1.5.0~beta42) stretch; urgency=medium
+
+  * docker: dev and prod images
+  * aptly: allow CORS to show key in web
+
+ -- André Roth <neolynx@gmail.com>  Wed, 01 Jul 2026 12:44:26 +0200
+
 molior (1.5.0~beta41) stretch; urgency=medium
 
   * web: make menus undraggable
