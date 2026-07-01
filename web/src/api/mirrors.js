@@ -9,7 +9,7 @@ export async function fetchMirrors({ q = '', q_basemirror = '', page = 1, page_s
   params.set('page', page);
   params.set('page_size', page_size);
   const res = await fetch(apiUrl(`/api/mirrors?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
@@ -43,7 +43,7 @@ export async function updateMirror(id) {
 
 export async function fetchMirror(name, version) {
   const res = await fetch(apiUrl(`/api2/mirror/${name}/${version}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
@@ -51,12 +51,12 @@ export async function fetchMirrorDependents(name, version, q = '', page = 1, pag
   const params = new URLSearchParams({ page, page_size });
   if (q) params.set('filter_name', q);
   const res = await fetch(apiUrl(`/api2/mirror/${name}/${version}/dependents?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
 export async function fetchMirrorAptSources(name, version) {
   const res = await fetch(apiUrl(`/api2/mirror/${name}/${version}/aptsources`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.text();
 }

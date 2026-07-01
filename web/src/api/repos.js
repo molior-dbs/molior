@@ -6,13 +6,13 @@ export async function fetchRepos({ q = '', filter_url = '', page = 1, page_size 
   if (q)          params.set('q', q);
   if (filter_url) params.set('filter_url', filter_url);
   const res = await fetch(apiUrl(`/api2/repositories?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
 export async function fetchRepo(id) {
   const res = await fetch(apiUrl(`/api2/repository/${id}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
@@ -20,7 +20,7 @@ export async function fetchRepoDependents(id, { q = '', page = 1, page_size = 25
   const params = new URLSearchParams({ page, page_size });
   if (q) params.set('filter_name', q);
   const res = await fetch(apiUrl(`/api2/repository/${id}/dependents?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
@@ -28,7 +28,7 @@ export async function fetchRepoDependentProjectVersions(id, { unlocked = false }
   const params = new URLSearchParams();
   if (unlocked) params.set('unlocked', 'true');
   const res = await fetch(apiUrl(`/api2/repository/${id}/dependents?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 

@@ -7,13 +7,13 @@ export async function fetchUsers({ name = '', email = '', admin = false, page = 
   if (email) params.set('email', email);
   if (admin) params.set('admin', 'true');
   const res = await fetch(apiUrl(`/api/users?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results: [{ id, username, email, is_admin }] }
 }
 
 export async function fetchUser(username) {
   const res = await fetch(apiUrl(`/api2/user/${username}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { id, username, email, is_admin }
 }
 
@@ -45,6 +45,6 @@ export async function deleteUser(id) {
 
 export async function fetchStatus() {
   const res = await fetch(apiUrl('/api/status'), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { version_molior_server, version_aptly, sshkey, gpgurl, ... }
 }

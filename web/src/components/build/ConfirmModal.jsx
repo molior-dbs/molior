@@ -30,15 +30,17 @@ export default function ConfirmModal({ id, title, body, onConfirm, onClose }) {
             <button type="button" className="btn-close" onClick={() => onClose(false)} disabled={busy} />
           </div>
           <div className="modal-body">
-            {error && <div className="alert alert-danger py-1 mb-2">{error}</div>}
             {body}
+            {error && <div className="alert alert-danger py-1 mt-3 mb-0">{error}</div>}
           </div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={busy}>Cancel</button>
-            <button className="btn btn-primary"   onClick={handleConfirm}        disabled={busy}>
-              {busy && <span className="spinner-border spinner-border-sm me-2" />}
-              Ok
-            </button>
+            {!error && (
+              <button className="btn btn-primary" onClick={handleConfirm} disabled={busy}>
+                {busy && <span className="spinner-border spinner-border-sm me-2" />}
+                Ok
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ export async function fetchProjects({ q = '', page = 1, page_size = 25 } = {}) {
   params.set('page', page);
   params.set('page_size', page_size);
   const res = await fetch(apiUrl(`/api/projects?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 

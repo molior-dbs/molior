@@ -3,7 +3,7 @@ import { apiUrl } from '../lib/base';
 
 export async function fetchProject(projectName) {
   const res = await fetch(apiUrl(`/api2/projectbase/${projectName}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { id, name, description }
 }
 
@@ -13,7 +13,7 @@ export async function fetchProjectVersions(projectName, { q = '', page = 1, page
   params.set('page', page);
   params.set('page_size', page_size);
   const res = await fetch(apiUrl(`/api2/projectbase/${projectName}/versions?${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
@@ -70,7 +70,7 @@ export async function importProjectVersion(formData) {
 
 export async function fetchProjectVersion(projectName, versionName) {
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
@@ -91,7 +91,7 @@ export async function fetchDependencies(projectName, versionName, q = '', page =
   if (q) params.set('filter_name', q);
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependencies?${params}`),
                           { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { total_result_count, results }
 }
 
@@ -119,7 +119,7 @@ export async function fetchDependents(projectName, versionName, q = '', page = 1
   if (q) params.set('filter_name', q);
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependents?${params}`),
                           { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
@@ -130,7 +130,7 @@ export async function fetchRepositories(projectName, versionName, q = '', page =
   if (q) params.set('filter_url', q);
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/repositories?${params}`),
                           { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json();
 }
 
@@ -192,7 +192,7 @@ export async function fetchAptSources(projectName, versionName, ci = false) {
   if (ci) params.set('ci', 'true');
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/aptsources?${params}`),
                           { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.text();
 }
 
@@ -202,7 +202,7 @@ export async function fetchBaseMirrors(q = '') {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   const res = await fetch(apiUrl(`/api/mirrors?isbasemirror=true&${params}`), { credentials: 'same-origin' });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.json(); // { results: [{ name, version, architectures }, ...] }
 }
 
