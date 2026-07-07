@@ -1453,6 +1453,9 @@ class AptlyWorker:
                 session.delete(build)
             session.commit()
 
+        for bid in build_ids:
+            await notify(Subject.build.value, Event.removed.value, {"id": bid})
+
         logger.info("aptly worker: build %d deleted" % build_id)
 
     async def _delete_deb_build(self, args):

@@ -659,6 +659,7 @@ async def CreateBuilds(session, parent, repo, info, git_ref, ci_branch, custom_t
         return
 
     build.projectversions = array2db([str(p) for p in projectversion_ids])
+    session.flush()
     await parent.build_changed()
     await build.build_added()
     for deb_build in debbuilds:

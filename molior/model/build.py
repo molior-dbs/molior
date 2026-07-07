@@ -266,6 +266,14 @@ class Build(Base):
         if self.sourcerepository:
             data.update({"sourcerepository_id": self.sourcerepository.id})
 
+        if self.projectversion_id:
+            data.update({"projectversion_id": self.projectversion_id})
+        if self.buildtype in ("build", "source") and self.projectversions:
+            pvs = self.projectversions
+            if isinstance(pvs, str):
+                pvs = db2array(pvs)
+            data.update({"projectversion_ids": [int(p) for p in pvs if p]})
+
         return data
 
     async def build_added(self):

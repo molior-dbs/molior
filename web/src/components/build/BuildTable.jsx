@@ -86,6 +86,9 @@ export default function BuildTable({ projectversion, repository }) {
     }
   }, [page, pageSize, search, searchProject, maintainer, commit, selectedStates, projectversion, repository]);
 
+  const buildsRef = useRef(builds);
+  buildsRef.current = builds;
+
   useEffect(() => { load(page); }, [page]);
 
   // Re-load from page 1 whenever any filter changes (reset page)
@@ -104,37 +107,64 @@ export default function BuildTable({ projectversion, repository }) {
 
   // ── WebSocket live updates ─────────────────────────────────────────────────
   useEffect(() => {
+    const scoped = !!(projectversion || repository);
+
+    const inScope = (data) => {
+      if (projectversion) {
+        const pid = projectversion.id;
+        if (data.projectversion_id != null) return data.projectversion_id === pid;      // deb/chroot
+        if (Array.isArray(data.projectversion_ids)) return data.projectversion_ids.includes(pid); // build/source
+        // fallback for deb rows when no id is available in the payload
+        return !!data.project &&
+          data.project.name === projectversion.project_name &&
+          data.project.version === projectversion.name;
+      }
+      if (repository) return data.sourcerepository_id === repository.id;
+      return true; // global table — everything is in scope
+    };
+
+    const insertRow = (prev, data) => {
+      if (prev.some(b => b.id === data.id)) return prev; // already shown
+      if (data.parent_id != null) {
+        const parentIdx = prev.findIndex(b => b.id === data.parent_id);
+        if (parentIdx === -1) return prev; // parent not visible — skip
+        const next = [...prev];
+        next.splice(parentIdx + 1, 0, data);
+        return next.slice(0, pageSize);
+      }
+      return [data, ...prev].slice(0, pageSize);
+    };
+
     const ws = new WebSocket(wsUrl('/api/websocket'));
 
     ws.onmessage = (evt) => {
       let msg;
       try { msg = JSON.parse(evt.data); } catch { return; }
-      // subject 7 = build
-      if (msg.subject !== 7) return;
+      if (msg.subject !== 7) return; // subject 7 = build
+      const data = msg.data || {};
+      if (data.id == null) return;
 
-      if (msg.event === 2) {
-        // changed — update matching rows in-place
-        setBuilds(prev => prev.map(b =>
-          b.id === msg.data?.id ? { ...b, ...msg.data } : b
-        ));
-      } else if (msg.event === 1) {
-        // added — insert on page 1 only
-        if (page !== 1) return;
-        setBuilds(prev => {
-          const data = msg.data;
-          // if the new build has a parent, insert it right after the parent row
-          if (data.parent_id != null) {
-            const parentIdx = prev.findIndex(b => b.id === data.parent_id);
-            if (parentIdx === -1) return prev; // parent not visible, skip
-            const next = [...prev];
-            next.splice(parentIdx + 1, 0, data);
-            return next.slice(0, pageSize); // keep within page size
-          }
-          // no parent — prepend
-          return [data, ...prev].slice(0, pageSize);
-        });
-        setTotal(t => (t ?? 0) + 1);
+      const rows = buildsRef.current;
+      const known = rows.some(b => b.id === data.id);
+
+      if (msg.event === 3) {
+        if (!known) return;
+        setBuilds(prev => prev.filter(b => b.id !== data.id));
+        setTotal(t => (t != null && t > 0 ? t - 1 : t));
+        return;
       }
+
+      if (msg.event === 2 && known) {
+        setBuilds(prev => prev.map(b => b.id === data.id ? { ...b, ...data } : b));
+        return;
+      }
+
+      if (page !== 1 || known || !inScope(data)) return;
+      if (msg.event === 2 && !scoped) return;
+      if (data.parent_id != null && !rows.some(b => b.id === data.parent_id)) return;
+
+      setBuilds(prev => insertRow(prev, data));
+      setTotal(t => (t ?? 0) + 1);
     };
 
     return () => ws.close();
