@@ -42,6 +42,13 @@ doc/validation/report.pdf
 *.debhelper.*
 *.substvars
 
+# Node / web
+node_modules/
+web/dist/
+
+# macOS
+.DS_Store
+
 # Editor
 .vscode
 /.dir-locals.el
