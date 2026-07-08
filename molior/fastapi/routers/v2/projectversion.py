@@ -58,6 +58,7 @@ def _latest_project_builds(db, projectversion_id):
         Build.sourcerepository_id.isnot(None),
         Build.buildtype == "deb",
         Build.buildstate == "successful",
+        Build.is_deleted.is_(False),
     ).group_by(Build.sourcerepository_id)
 
     SourceBuild = aliased(Build)
@@ -69,6 +70,7 @@ def _latest_project_builds(db, projectversion_id):
         Build.sourcerepository_id.is_(None),
         Build.buildtype == "deb",
         Build.buildstate == "successful",
+        Build.is_deleted.is_(False),
     ).group_by(SourceBuild.sourcename)
 
     union_subq = latest_builds_subq.union_all(latest_upload_subq).subquery()
@@ -797,6 +799,7 @@ def list_repositories(
         b = db.query(Build).filter(
             Build.sourcerepository_id == repo.id,
             Build.buildtype == "source",
+            Build.is_deleted.is_(False),
         ).order_by(Build.id.desc()).first()
         return b.git_ref if b else None
 
@@ -805,6 +808,7 @@ def list_repositories(
             Build.sourcerepository_id == repo.id,
             Build.projectversion_id == pv.id,
             Build.buildtype == "deb",
+            Build.is_deleted.is_(False),
         ).order_by(Build.id.desc()).first()
 
     def _last_successful_build(repo):
@@ -813,6 +817,7 @@ def list_repositories(
             Build.projectversion_id == pv.id,
             Build.buildtype == "deb",
             Build.buildstate == "successful",
+            Build.is_deleted.is_(False),
         ).order_by(Build.id.desc()).first()
 
     results = []

@@ -817,7 +817,8 @@ function ReposTab({ pv }) {
       try { msg = JSON.parse(evt.data); } catch { return; }
       if (msg.subject !== 7) return;                    // only build events
       const d = msg.data;
-      if (!d?.sourcerepository_id) return;             // only source builds
+      if (!d?.sourcerepository_id) return;
+      if (d.buildtype && d.buildtype !== 'deb') return; // only deb builds drive last_build (match the server)
       setItems(prev => prev.map(repo => {
         if (repo.id !== d.sourcerepository_id) return repo;
         const updated = { ...repo };
@@ -867,7 +868,9 @@ function ReposTab({ pv }) {
             <i className={`bi ${buildStateIcon(repo.last_build.buildstate)}`}
                title={repo.last_build.buildstate} />
             {repo.last_build.version}
-            {repo.last_successful_build && (
+            {repo.last_build.buildstate !== 'successful' &&
+             repo.last_successful_build &&
+             repo.last_successful_build.id !== repo.last_build.id && (
               <span className="ms-3 d-flex align-items-center gap-1">
                 <i className={`bi ${buildStateIcon(repo.last_successful_build.buildstate)}`}
                    title={repo.last_successful_build.buildstate} />
