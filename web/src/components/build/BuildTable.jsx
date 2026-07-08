@@ -89,6 +89,15 @@ export default function BuildTable({ projectversion, repository }) {
   const buildsRef = useRef(builds);
   buildsRef.current = builds;
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const refetchTimer = useRef(null);
+  const scheduleRefetch = useCallback(() => {
+    clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => loadRef.current(), 300);
+  }, []);
+  useEffect(() => () => clearTimeout(refetchTimer.current), []);
+
   useEffect(() => { load(page); }, [page]);
 
   // Re-load from page 1 whenever any filter changes (reset page)
@@ -123,18 +132,6 @@ export default function BuildTable({ projectversion, repository }) {
       return true; // global table — everything is in scope
     };
 
-    const insertRow = (prev, data) => {
-      if (prev.some(b => b.id === data.id)) return prev; // already shown
-      if (data.parent_id != null) {
-        const parentIdx = prev.findIndex(b => b.id === data.parent_id);
-        if (parentIdx === -1) return prev; // parent not visible — skip
-        const next = [...prev];
-        next.splice(parentIdx + 1, 0, data);
-        return next.slice(0, pageSize);
-      }
-      return [data, ...prev].slice(0, pageSize);
-    };
-
     const ws = new WebSocket(wsUrl('/api/websocket'));
 
     ws.onmessage = (evt) => {
@@ -151,6 +148,7 @@ export default function BuildTable({ projectversion, repository }) {
         if (!known) return;
         setBuilds(prev => prev.filter(b => b.id !== data.id));
         setTotal(t => (t != null && t > 0 ? t - 1 : t));
+        scheduleRefetch();
         return;
       }
 
@@ -161,14 +159,11 @@ export default function BuildTable({ projectversion, repository }) {
 
       if (page !== 1 || known || !inScope(data)) return;
       if (msg.event === 2 && !scoped) return;
-      if (data.parent_id != null && !rows.some(b => b.id === data.parent_id)) return;
-
-      setBuilds(prev => insertRow(prev, data));
-      setTotal(t => (t ?? 0) + 1);
+      scheduleRefetch();
     };
 
     return () => ws.close();
-  }, [page, pageSize, projectversion, repository]);
+  }, [page, pageSize, projectversion, repository, scheduleRefetch]);
 
   // ── Runtime ticker — re-renders every second when builds are in progress ──
   useEffect(() => {

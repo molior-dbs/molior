@@ -830,6 +830,7 @@ class AptlyWorker:
                 await loop.run_in_executor(self.threadexc, remove_buildout)
 
                 # remove obsolete builds from db
+                removed_ids = []
                 for del_id in builds_to_delete:
                     del_build = session.query(Build).filter(Build.id == del_id).first()
                     if not del_build:
@@ -839,6 +840,11 @@ class AptlyWorker:
                     if del_build.buildtask:
                         session.delete(del_build.buildtask)
                     session.delete(del_build)
+                    removed_ids.append(del_id)
+                session.commit()
+
+                for del_id in removed_ids:
+                    await notify(Subject.build.value, Event.removed.value, {"id": del_id})
 
                 await build.set_successful()
             else:
@@ -1535,12 +1541,18 @@ class AptlyWorker:
                 to_delete.append(src)
             to_delete.append(top)
 
+            removed_ids = [build.id for build in to_delete]
             for build in to_delete:
                 build.debianpackages = []
                 if build.buildtask:
                     session.delete(build.buildtask)
                 session.delete(build)
             session.commit()
+
+        # notify web clients so cleanup-deleted builds disappear from open build
+        # lists live instead of only on a page refresh
+        for del_id in removed_ids:
+            await notify(Subject.build.value, Event.removed.value, {"id": del_id})
 
         logger.info("aptly worker: Debian packages for build %d deleted" % build_id)
 
