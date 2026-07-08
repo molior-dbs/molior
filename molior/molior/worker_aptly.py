@@ -1565,7 +1565,7 @@ class AptlyWorker:
                 if deb.buildstate in ["building", "scheduled"]:
                     await enqueue_backend({"abort": deb.id})
 
-                if deb.buildstate in ["new", "needs_build", "scheduled"]:
+                if deb.buildstate in ["new", "needs_build", "scheduled", "building"]:
                     await deb.set_failed()
 
                 if deb.buildtask:

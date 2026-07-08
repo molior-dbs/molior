@@ -12,7 +12,7 @@ from ...db import get_db
 from ....logger import logger
 from ....model.build import Build, DATETIME_FORMAT
 from ....model.projectversion import ProjectVersion
-from ....molior.queues import enqueue_aptly, enqueue_task
+from ....molior.queues import enqueue_aptly, enqueue_backend, enqueue_task
 
 router = APIRouter(prefix="/api2", tags=["builds"])
 
@@ -206,6 +206,9 @@ async def abort_build(
         raise HTTPException(status_code=404, detail="No running deb builds found")
 
     logger.info("aborting build %d", topbuild.id)
+    for deb in srcbuild.children:
+        if deb.buildstate in ("building", "scheduled"):
+            await enqueue_backend({"abort": deb.id})
     await enqueue_aptly({"abort": [topbuild.id]})
     return "Abort initiated"
 

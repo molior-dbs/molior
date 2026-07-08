@@ -63,7 +63,39 @@ class KubernetesBackend:
                                              "run_lintian": run_lintian})
 
     async def abort(self, build_id):
-        logger.error(f"aborting build {build_id}: NOT IMPLEMENTED")
+        logger.info("kubernetes backend: aborting build %d", build_id)
+        namespace = "molior"
+        selector = "molior-build-id=%d" % build_id
+
+        def _delete():
+            batch_v1 = client.BatchV1Api()
+            core_v1 = client.CoreV1Api()
+            ok = False
+            try:
+                jobs = batch_v1.list_namespaced_job(namespace=namespace, label_selector=selector)
+                for job in jobs.items:
+                    batch_v1.delete_namespaced_job(
+                        name=job.metadata.name, namespace=namespace,
+                        body=client.V1DeleteOptions(propagation_policy="Background"),
+                    )
+                    ok = True
+            except ApiException as e:
+                logger.error("kubernetes backend: error deleting job for build %d: %s", build_id, e)
+            try:
+                pods = core_v1.list_namespaced_pod(namespace=namespace, label_selector=selector)
+                for pod in pods.items:
+                    core_v1.delete_namespaced_pod(
+                        name=pod.metadata.name, namespace=namespace, grace_period_seconds=0,
+                        body=client.V1DeleteOptions(grace_period_seconds=0),
+                    )
+                    ok = True
+            except ApiException as e:
+                logger.error("kubernetes backend: error deleting pod for build %d: %s", build_id, e)
+            return ok
+
+        loop = asyncio.get_event_loop()
+        executor = concurrent.futures.ThreadPoolExecutor()
+        return await loop.run_in_executor(executor, _delete)
 
     def get_nodes_info(self):
         return []
@@ -76,7 +108,9 @@ class KubernetesBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
-    def create_kubernetes_job(self, namespace, job_name, image, envvars):
+    def create_kubernetes_job(self, namespace, job_name, image, envvars, build_id):
+        labels = {"molior-build-id": str(build_id)}
+
         container = client.V1Container(
             name=job_name,
             image=image,
@@ -85,7 +119,7 @@ class KubernetesBackend:
         )
 
         template = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels={"job-name": job_name}),
+            metadata=client.V1ObjectMeta(labels={"job-name": job_name, **labels}),
             spec=client.V1PodSpec(restart_policy="Never", containers=[container])
         )
 
@@ -94,7 +128,7 @@ class KubernetesBackend:
         job = client.V1Job(
             api_version="batch/v1",
             kind="Job",
-            metadata=client.V1ObjectMeta(name=job_name),
+            metadata=client.V1ObjectMeta(name=job_name, labels=labels),
             spec=job_spec
         )
 
@@ -112,23 +146,33 @@ class KubernetesBackend:
         for event in w.stream(batch_v1.list_namespaced_job, namespace=namespace):
             job = event["object"]
             if job.metadata.name == job_name:
+                if event.get("type") == "DELETED":
+                    w.stop()
+                    return None
                 status = job.status
                 if status.succeeded:
                     w.stop()
                     return True
                 elif status.failed:
                     w.stop()
+                    return False
         return False
 
     def stream_pod_logs(self, loop, build_id, job_name, namespace):
         core_v1 = client.CoreV1Api()
+        batch_v1 = client.BatchV1Api()
         pod_name = None
         for i in range(300):
             pod_list = core_v1.list_namespaced_pod(namespace=namespace, label_selector=f"job-name={job_name}")
-            if not pod_list.items:
-                time.sleep(1)
-                continue
-            pod_name = pod_list.items[0].metadata.name
+            if pod_list.items:
+                pod_name = pod_list.items[0].metadata.name
+                break
+            try:
+                batch_v1.read_namespaced_job(name=job_name, namespace=namespace)
+            except ApiException:
+                logger.info(f"job {job_name} gone while waiting for its pod (aborted?)")
+                return False
+            time.sleep(1)
 
         if not pod_name:
             logger.error(f"No pods found for Job {job_name}")
@@ -136,7 +180,11 @@ class KubernetesBackend:
 
         phase = None
         for i in range(300):
-            pod_status = core_v1.read_namespaced_pod_status(name=pod_name, namespace=namespace)
+            try:
+                pod_status = core_v1.read_namespaced_pod_status(name=pod_name, namespace=namespace)
+            except ApiException:
+                logger.info(f"pod {pod_name} gone while waiting to start (aborted?)")
+                return False
             phase = pod_status.status.phase
             if phase == "Running":
                 break
@@ -230,22 +278,27 @@ class KubernetesBackend:
 
                 executor = concurrent.futures.ThreadPoolExecutor()
                 loop = asyncio.get_event_loop()
+                aborted = False
                 ret = await loop.run_in_executor(executor, lambda:
-                                                 self.create_kubernetes_job(namespace, job_name, image, envvars))
+                                                 self.create_kubernetes_job(namespace, job_name, image, envvars, build_id))
                 if not ret:
                     await enqueue_backend({"failed": build_id})
                 else:
                     future = loop.run_in_executor(executor, lambda: self.stream_pod_logs(loop, build_id, job_name, namespace))
 
                     ret = await loop.run_in_executor(executor, lambda: self.monitor_job_status(job_name, namespace))
-                    if ret is True:
+                    await future
+
+                    if ret is None:
+                        aborted = True
+                        logger.info("kubernetes backend: build %d aborted, skipping outcome", build_id)
+                    elif ret is True:
                         await enqueue_backend({"succeeded": build_id})
                     else:
                         await enqueue_backend({"failed": build_id})
 
-                    await future
-
-                await buildlog(build_id, None)  # signal end of logs
+                if not aborted:
+                    await buildlog(build_id, None)  # signal end of logs
 
                 ret = await loop.run_in_executor(executor, lambda: self.delete_job(job_name, namespace))
 
