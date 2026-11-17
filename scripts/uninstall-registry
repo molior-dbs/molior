@@ -1,0 +1,35 @@
+#!/bin/sh
+# Remove what install-registry created: nginx location, docker-registry package and its data directory.
+# Run on the target host as root: make uninstall-registry
+# nginx, the certificate and the 443 server block (install-nginx) are not touched.
+#
+#   REGISTRY_DIR  data directory to remove (default /data/registry, must be below /data)
+#   FORCE=1       remove the data even if it holds image blobs or manifests
+set -eu
+
+REGISTRY_DIR=${REGISTRY_DIR:-/data/registry}
+
+case "$REGISTRY_DIR" in
+    /data/?*) ;;
+    *) echo "refusing: REGISTRY_DIR must be below /data, got '$REGISTRY_DIR'"; exit 1 ;;
+esac
+
+if [ -d "$REGISTRY_DIR" ] && [ "${FORCE:-}" != 1 ] &&
+   [ -n "$(find "$REGISTRY_DIR" -type f \( -path '*/blobs/*' -o -path '*/_manifests/*' \) 2>/dev/null | head -1)" ]; then
+    echo "refusing: $REGISTRY_DIR holds image data (FORCE=1 to remove it anyway)"
+    exit 1
+fi
+
+systemctl disable --now docker-registry 2>/dev/null || true
+
+rm -f /etc/nginx/locations.d/registry.conf /etc/nginx/conf.d/registry.conf
+if [ -x /usr/sbin/nginx ]; then
+    nginx -t
+    systemctl reload nginx
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get purge -y docker-registry
+
+rm -rf "$REGISTRY_DIR"
+echo "registry removed (package, config, nginx location, $REGISTRY_DIR)"

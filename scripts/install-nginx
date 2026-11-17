@@ -9,6 +9,7 @@
 #   CERT_SAN   subjectAltName list                   (default: DNS:<CN>,DNS:localhost,IP:127.0.0.1,IP:<primary ip>)
 #   CERT_DAYS  validity in days                      (default 3650)
 #   FORCE=1    regenerate an existing certificate
+#   MOLIOR_UPSTREAM  proxy target for https :443     (default http://127.0.0.1:30080)
 set -eu
 
 CERT_DIR=${CERT_DIR:-/etc/nginx/ssl}
@@ -46,6 +47,41 @@ cat > "/etc/nginx/snippets/$CERT_NAME-ssl.conf" <<CONF
 ssl_certificate     $CERT_DIR/$CERT_NAME.crt;
 ssl_certificate_key $CERT_DIR/$CERT_NAME.key;
 ssl_protocols       TLSv1.2 TLSv1.3;
+CONF
+
+mkdir -p /etc/nginx/locations.d
+
+# HTTPS front end for molior: 443 -> web NodePort (molior serves plain HTTP on 9999 behind it)
+MOLIOR_UPSTREAM=${MOLIOR_UPSTREAM:-http://127.0.0.1:30080}
+cat > /etc/nginx/conf.d/molior.conf <<CONF
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 443 ssl;
+    server_name _;
+    include snippets/$CERT_NAME-ssl.conf;
+
+    client_max_body_size 0;
+
+    # extra locations (for example /registry/ from install-registry)
+    include /etc/nginx/locations.d/*.conf;
+
+    location / {
+        proxy_pass $MOLIOR_UPSTREAM;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_read_timeout 3600;
+        proxy_send_timeout 3600;
+    }
+}
 CONF
 
 nginx -t

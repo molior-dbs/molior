@@ -70,8 +70,11 @@ rsync:  ## Copy this source tree to ~/molior on a host (usage: make rsync IP=<ho
 	rsync -a $(RSYNC_OPTS) --exclude .git --exclude node_modules --exclude __pycache__ --exclude '*.pyc' --exclude .env \
 		-e "ssh $(SSH_OPTS)" $(CURDIR)/ $(SSH_USER)@$(IP):molior/
 
-install-registry:  ## Install docker-registry + nginx (:5000) on this host (run on the host: make rsync IP=..., then ssh <host> 'make -C molior install-registry')
+install-registry:  ## Install docker-registry behind nginx at https://<host>/registry/ on this host (after install-nginx) (run on the host: make rsync IP=..., then ssh <host> 'make -C molior install-registry')
 	sudo sh scripts/install-registry
+
+uninstall-registry:  ## Remove docker-registry, its nginx location and /data/registry on this host (FORCE=1 if it holds images)
+	sudo env FORCE="$(FORCE)" sh scripts/uninstall-registry
 
 install-nginx:  ## Install nginx + self-signed certificate on this host (run on the host; CERT_CN, CERT_SAN, FORCE=1 optional)
 	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" FORCE="$(FORCE)" sh scripts/install-nginx
@@ -180,4 +183,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster rsync install-registry install-nginx configure-cluster install-local-path-provisioner deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster rsync install-registry uninstall-registry install-nginx configure-cluster install-local-path-provisioner deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
