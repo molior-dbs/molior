@@ -1,0 +1,56 @@
+#!/bin/sh
+# Install the Debian nginx package and create a self-signed certificate.
+# Run on the target host as root: make install-nginx
+#
+# Variables (all optional):
+#   CERT_DIR   where key and certificate go          (default /etc/nginx/ssl)
+#   CERT_NAME  file name prefix                      (default molior)
+#   CERT_CN    certificate common name               (default: host FQDN)
+#   CERT_SAN   subjectAltName list                   (default: DNS:<CN>,DNS:localhost,IP:127.0.0.1,IP:<primary ip>)
+#   CERT_DAYS  validity in days                      (default 3650)
+#   FORCE=1    regenerate an existing certificate
+set -eu
+
+CERT_DIR=${CERT_DIR:-/etc/nginx/ssl}
+CERT_NAME=${CERT_NAME:-molior}
+CERT_DAYS=${CERT_DAYS:-3650}
+CERT_CN=${CERT_CN:-$(hostname -f 2>/dev/null || hostname)}
+
+if [ -z "${CERT_SAN:-}" ]; then
+    CERT_SAN="DNS:$CERT_CN,DNS:localhost,IP:127.0.0.1"
+    primary=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}' | head -1)
+    [ -n "$primary" ] && CERT_SAN="$CERT_SAN,IP:$primary"
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y nginx openssl
+
+mkdir -p "$CERT_DIR"
+chmod 755 "$CERT_DIR"
+
+if [ -e "$CERT_DIR/$CERT_NAME.crt" ] && [ -e "$CERT_DIR/$CERT_NAME.key" ] && [ "${FORCE:-}" != 1 ]; then
+    echo "Certificate $CERT_DIR/$CERT_NAME.crt exists, keeping it (FORCE=1 to regenerate)"
+else
+    echo "Creating self-signed certificate CN=$CERT_CN SAN=$CERT_SAN"
+    openssl req -x509 -newkey rsa:4096 -sha256 -nodes -days "$CERT_DAYS" \
+        -subj "/CN=$CERT_CN" -addext "subjectAltName=$CERT_SAN" \
+        -keyout "$CERT_DIR/$CERT_NAME.key" -out "$CERT_DIR/$CERT_NAME.crt"
+    chmod 600 "$CERT_DIR/$CERT_NAME.key"
+    chmod 644 "$CERT_DIR/$CERT_NAME.crt"
+fi
+
+# snippet to include from a server block: include snippets/molior-ssl.conf;
+mkdir -p /etc/nginx/snippets
+cat > "/etc/nginx/snippets/$CERT_NAME-ssl.conf" <<CONF
+ssl_certificate     $CERT_DIR/$CERT_NAME.crt;
+ssl_certificate_key $CERT_DIR/$CERT_NAME.key;
+ssl_protocols       TLSv1.2 TLSv1.3;
+CONF
+
+nginx -t
+systemctl enable nginx
+systemctl reload nginx || systemctl restart nginx
+
+openssl x509 -in "$CERT_DIR/$CERT_NAME.crt" -noout -subject -enddate -ext subjectAltName
+echo "nginx installed, certificate in $CERT_DIR/$CERT_NAME.crt, snippet /etc/nginx/snippets/$CERT_NAME-ssl.conf"

@@ -1,0 +1,68 @@
+#!/bin/sh
+# Install the Debian docker-registry package and put nginx in front of it.
+# Run on the target host as root, e.g. from the dev machine:
+#   make install-registry IP=<node-ip>
+# Registry: 127.0.0.1:5001, storage under $REGISTRY_DIR. nginx: :5000 (plain HTTP, no auth).
+set -eu
+
+REGISTRY_DIR=${REGISTRY_DIR:-/data/registry}
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y docker-registry nginx
+
+# new directory only, existing data under /data is not touched
+mkdir -p "$REGISTRY_DIR"
+chown docker-registry:docker-registry "$REGISTRY_DIR"
+
+cat > /etc/docker/registry/config.yml <<CONF
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+  filesystem:
+    rootdirectory: $REGISTRY_DIR
+  delete:
+    enabled: true
+  cache:
+    blobdescriptor: inmemory
+http:
+  addr: 127.0.0.1:5001
+  headers:
+    X-Content-Type-Options: [nosniff]
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+CONF
+systemctl enable docker-registry
+systemctl restart docker-registry
+
+cat > /etc/nginx/conf.d/registry.conf <<'CONF'
+server {
+    listen 5000;
+    server_name _;
+
+    client_max_body_size 0;
+    chunked_transfer_encoding on;
+
+    location /v2/ {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 900;
+    }
+}
+CONF
+nginx -t
+systemctl enable nginx
+systemctl reload nginx || systemctl restart nginx
+
+curl -fsS http://127.0.0.1:5000/v2/ && echo
+echo "registry ready on port 5000, data in $REGISTRY_DIR"

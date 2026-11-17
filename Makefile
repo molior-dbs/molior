@@ -5,6 +5,8 @@ PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
 MOLIOR_VERSION ?= dev
 
 NAMESPACE := molior
+LOCAL_PATH_VERSION ?= v0.0.32
+LOCAL_PATH_DIR ?= /data/local-path-provisioner
 SSH_USER ?= debian
 SSH_OPTS ?= -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
 KUBE_CONTEXT = molior-$(IP)
@@ -16,7 +18,8 @@ ifneq ($(shell which podman 2>/dev/null),)
 else ifneq ($(shell which docker 2>/dev/null),)
   DOCKERCMD := docker
 else
-  $(error Neither podman nor docker found in PATH)
+  # lazy: only fails when a docker target is used (the registry host has neither)
+  DOCKERCMD = $(error Neither podman nor docker found in PATH)
 endif
 
 help:  ## Print this help
@@ -62,6 +65,17 @@ create-cluster:  ## Create k3d cluster
 delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
 
+rsync:  ## Copy this source tree to ~/molior on a host (usage: make rsync IP=<host>; RSYNC_OPTS=--delete to mirror)
+	@test -n "$(IP)" || (echo "Usage: make rsync IP=<node-ip>"; exit 1)
+	rsync -a $(RSYNC_OPTS) --exclude .git --exclude node_modules --exclude __pycache__ --exclude '*.pyc' --exclude .env \
+		-e "ssh $(SSH_OPTS)" $(CURDIR)/ $(SSH_USER)@$(IP):molior/
+
+install-registry:  ## Install docker-registry + nginx (:5000) on this host (run on the host: make rsync IP=..., then ssh <host> 'make -C molior install-registry')
+	sudo sh scripts/install-registry
+
+install-nginx:  ## Install nginx + self-signed certificate on this host (run on the host; CERT_CN, CERT_SAN, FORCE=1 optional)
+	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" FORCE="$(FORCE)" sh scripts/install-nginx
+
 configure-cluster:  ## Configure kubectl for a remote kubeadm cluster (usage: make configure-cluster IP=<host>)
 	@test -n "$(IP)" || (echo "Usage: make configure-cluster IP=<node-ip>"; exit 1)
 	@set -e; umask 077; tmp=$$(mktemp); trap 'rm -f $$tmp $$tmp.new' EXIT; \
@@ -79,6 +93,15 @@ configure-cluster:  ## Configure kubectl for a remote kubeadm cluster (usage: ma
 	KUBECONFIG=$$tmp:$$HOME/.kube/config kubectl config view --flatten > $$tmp.new; \
 	cat $$tmp.new > $$HOME/.kube/config
 	kubectl get nodes
+
+install-local-path-provisioner:  ## Install local-path-provisioner as default StorageClass (usage: make install-local-path-provisioner IP=<host>)
+	@test -n "$(IP)" || (echo "Usage: make install-local-path-provisioner IP=<node-ip>"; exit 1)
+	curl -fsSL https://raw.githubusercontent.com/rancher/local-path-provisioner/$(LOCAL_PATH_VERSION)/deploy/local-path-storage.yaml \
+		| sed -e 's|/opt/local-path-provisioner|$(LOCAL_PATH_DIR)|' -e 's|reclaimPolicy: Delete|reclaimPolicy: Retain|' \
+		| kubectl --context $(KUBE_CONTEXT) apply -f -
+	kubectl --context $(KUBE_CONTEXT) -n local-path-storage rollout status deployment/local-path-provisioner --timeout=120s
+	kubectl --context $(KUBE_CONTEXT) patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	kubectl --context $(KUBE_CONTEXT) get storageclass
 
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
 
@@ -157,4 +180,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster configure-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster rsync install-registry install-nginx configure-cluster install-local-path-provisioner deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
