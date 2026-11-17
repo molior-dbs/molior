@@ -10,6 +10,8 @@
 #   CERT_DAYS  validity in days                      (default 3650)
 #   FORCE=1    regenerate an existing certificate
 #   MOLIOR_UPSTREAM  proxy target for https :443     (default http://127.0.0.1:30080)
+#   REGISTRY_HOST    registry name (see install-registry): added to the certificate names, and an existing
+#                    certificate that does not cover it is an error (FORCE=1 replaces it)
 set -eu
 
 CERT_DIR=${CERT_DIR:-/etc/nginx/ssl}
@@ -21,6 +23,7 @@ if [ -z "${CERT_SAN:-}" ]; then
     CERT_SAN="DNS:$CERT_CN,DNS:localhost,IP:127.0.0.1"
     primary=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}' | head -1)
     [ -n "$primary" ] && CERT_SAN="$CERT_SAN,IP:$primary"
+    [ -n "${REGISTRY_HOST:-}" ] && CERT_SAN="$CERT_SAN,DNS:$REGISTRY_HOST"
 fi
 
 export DEBIAN_FRONTEND=noninteractive
@@ -31,6 +34,10 @@ mkdir -p "$CERT_DIR"
 chmod 755 "$CERT_DIR"
 
 if [ -e "$CERT_DIR/$CERT_NAME.crt" ] && [ -e "$CERT_DIR/$CERT_NAME.key" ] && [ "${FORCE:-}" != 1 ]; then
+    if [ -n "${REGISTRY_HOST:-}" ] && ! openssl x509 -in "$CERT_DIR/$CERT_NAME.crt" -noout -checkhost "$REGISTRY_HOST" | grep -q "does match"; then
+        echo "Certificate $CERT_DIR/$CERT_NAME.crt does not cover $REGISTRY_HOST, run with FORCE=1 to replace it"
+        exit 1
+    fi
     echo "Certificate $CERT_DIR/$CERT_NAME.crt exists, keeping it (FORCE=1 to regenerate)"
 else
     echo "Creating self-signed certificate CN=$CERT_CN SAN=$CERT_SAN"
@@ -60,13 +67,13 @@ map \$http_upgrade \$connection_upgrade {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl default_server;
     server_name _;
     include snippets/$CERT_NAME-ssl.conf;
 
     client_max_body_size 0;
 
-    # extra locations (for example /registry/ from install-registry)
+    # extra locations for this server
     include /etc/nginx/locations.d/*.conf;
 
     location / {

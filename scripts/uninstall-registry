@@ -22,7 +22,7 @@ fi
 
 systemctl disable --now docker-registry 2>/dev/null || true
 
-rm -f /etc/nginx/locations.d/registry.conf /etc/nginx/conf.d/registry.conf
+rm -f /etc/nginx/locations.d/registry.conf /etc/nginx/conf.d/registry.conf /etc/nginx/snippets/molior-registry-proxy.conf /etc/nginx/registry.htpasswd
 if [ -x /usr/sbin/nginx ]; then
     nginx -t
     systemctl reload nginx

@@ -8,6 +8,9 @@ NAMESPACE := molior
 LOCAL_PATH_VERSION ?= v0.0.32
 LOCAL_PATH_DIR ?= /data/local-path-provisioner
 SSH_USER ?= debian
+# name clients use for the registry (no default, set per machine, see AGENTS.md); used by the install targets on the host
+REGISTRY_HOST ?=
+TRUST_PORT ?= 443
 SSH_OPTS ?= -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
 KUBE_CONTEXT = molior-$(IP)
 export HELM_NAMESPACE=$(NAMESPACE)
@@ -70,14 +73,23 @@ rsync:  ## Copy this source tree to ~/molior on a host (usage: make rsync IP=<ho
 	rsync -a $(RSYNC_OPTS) --exclude .git --exclude node_modules --exclude __pycache__ --exclude '*.pyc' --exclude .env \
 		-e "ssh $(SSH_OPTS)" $(CURDIR)/ $(SSH_USER)@$(IP):molior/
 
-install-registry:  ## Install docker-registry behind nginx at https://<host>/registry/ on this host (after install-nginx) (run on the host: make rsync IP=..., then ssh <host> 'make -C molior install-registry')
-	sudo sh scripts/install-registry
+install-registry:  ## Install docker-registry and an nginx server block for REGISTRY_HOST=<name> (after install-nginx). Push password on stdin, see scripts/install-registry
+	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" sh scripts/install-registry
 
-uninstall-registry:  ## Remove docker-registry, its nginx location and /data/registry on this host (FORCE=1 if it holds images)
+passwd-registry:  ## Ask for a new registry push password on this host (run with a terminal: ssh -t <host> 'cd ~/molior && make passwd-registry')
+	sudo sh scripts/passwd-registry
+
+uninstall-registry:  ## Remove docker-registry, its nginx server block and /data/registry on this host (FORCE=1 if it holds images)
 	sudo env FORCE="$(FORCE)" sh scripts/uninstall-registry
 
-install-nginx:  ## Install nginx + self-signed certificate on this host (run on the host; CERT_CN, CERT_SAN, FORCE=1 optional)
-	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" FORCE="$(FORCE)" sh scripts/install-nginx
+install-docker:  ## Install docker.io + docker-cli and trust the registry certificate for REGISTRY_HOST=<name> on this host (after install-nginx)
+	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" sh scripts/install-docker
+
+install-containerd-trust:  ## Make containerd trust the registry certificate for REGISTRY_HOST=<name> [TRUST_PORT=443] on this host, restarts containerd once (after install-nginx)
+	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" REGISTRY_PORT="$(TRUST_PORT)" sh scripts/install-containerd-trust
+
+install-nginx:  ## Install nginx + self-signed certificate on this host (CERT_CN, CERT_SAN, REGISTRY_HOST=<name> adds its name, FORCE=1 replaces the certificate)
+	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" REGISTRY_HOST="$(REGISTRY_HOST)" FORCE="$(FORCE)" sh scripts/install-nginx
 
 configure-cluster:  ## Configure kubectl for a remote kubeadm cluster (usage: make configure-cluster IP=<host>)
 	@test -n "$(IP)" || (echo "Usage: make configure-cluster IP=<node-ip>"; exit 1)
@@ -107,6 +119,18 @@ install-local-path-provisioner:  ## Install local-path-provisioner as default St
 	kubectl --context $(KUBE_CONTEXT) get storageclass
 
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
+
+# REGISTRY is the k3d registry name by default, so only a REGISTRY given on the command line or in the environment counts here
+PUSH_TO = $(if $(filter file,$(origin REGISTRY)),$(REGISTRY_HOST),$(REGISTRY))
+
+push:  ## Tag the local <image>:dev images as $(MOLIOR_VERSION) and push them: make push REGISTRY=<name> [MOLIOR_VERSION=<tag>] [DOCKERCMD=...]
+	@test -n "$(PUSH_TO)" || { echo "usage: make push REGISTRY=<registry name> [MOLIOR_VERSION=<tag>]"; exit 1; }
+	@for i in molior molior-postgres aptly molior-nginx; do \
+		echo "== $$i:dev -> $(PUSH_TO)/$$i:$(MOLIOR_VERSION)"; \
+		$(DOCKERCMD) tag $$i:dev $(PUSH_TO)/$$i:$(MOLIOR_VERSION) && \
+		$(DOCKERCMD) push $(PUSH_TO)/$$i:$(MOLIOR_VERSION) && \
+		$(DOCKERCMD) rmi $(PUSH_TO)/$$i:$(MOLIOR_VERSION) || exit 1; \
+	done
 
 deploy-image-%:  ## Import a local <image>:dev into k3d (e.g. make deploy-image-molior)
 	$(DOCKERCMD) tag $*:$(MOLIOR_VERSION) $(PUSH_REGISTRY)/$*:$(MOLIOR_VERSION)
@@ -183,4 +207,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster rsync install-registry uninstall-registry install-nginx configure-cluster install-local-path-provisioner deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help push docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean

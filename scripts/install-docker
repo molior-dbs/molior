@@ -1,0 +1,42 @@
+#!/bin/sh
+# Install Docker (Debian docker.io + docker-cli) for building and pushing images on this host,
+# and trust the self-signed registry certificate from install-nginx.
+# Run on the target host as root: make install-docker
+#
+# This host is a Kubernetes node, so:
+#  - the existing containerd and runc packages are not changed (checked with apt-get -s before the first run)
+#  - recommended packages (needrestart, git, ...) are not installed
+#  - the iptables FORWARD policy is pinned to ACCEPT after dockerd starts, as it is on this node with Cilium and kube-proxy
+#    (dockerd would otherwise set it to DROP)
+#
+#   REGISTRY_HOST  registry name for certs.d, required, no default (the name from install-registry)
+#   CERT           certificate to trust                   (default /etc/nginx/ssl/molior.crt, from install-nginx)
+set -eu
+
+CERT=${CERT:-/etc/nginx/ssl/molior.crt}
+REGISTRY_HOST=${REGISTRY_HOST:-}
+
+case "$REGISTRY_HOST" in
+    ""|*[!A-Za-z0-9.-]*) echo "REGISTRY_HOST is required and may only contain letters, digits, dots and dashes (got '$REGISTRY_HOST')"; exit 1 ;;
+esac
+[ -r "$CERT" ] || { echo "$CERT not found, run make install-nginx first"; exit 1; }
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends docker.io docker-cli ca-certificates
+
+mkdir -p /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/forward-accept.conf <<'CONF'
+[Service]
+ExecStartPost=/usr/sbin/iptables -P FORWARD ACCEPT
+CONF
+
+mkdir -p "/etc/docker/certs.d/$REGISTRY_HOST"
+cp "$CERT" "/etc/docker/certs.d/$REGISTRY_HOST/ca.crt"
+
+systemctl daemon-reload
+systemctl enable docker
+systemctl restart docker
+docker version --format 'docker {{.Server.Version}}'
+iptables -S FORWARD | head -1
+echo "docker installed, registry certificate trusted for $REGISTRY_HOST"

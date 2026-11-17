@@ -1,0 +1,77 @@
+#!/bin/sh
+# Make containerd (the kubelet's runtime) trust the self-signed registry certificate from install-nginx,
+# so pods can pull <REGISTRY_HOST>:<REGISTRY_PORT>/<image>:<tag>.
+# Run on the target host as root: make install-containerd-trust REGISTRY_HOST=<name>
+#
+#  - writes <CERTS_DIR>/<host>:<port>/hosts.toml and ca.crt (read on every pull, no restart needed for these)
+#  - sets config_path in the CRI registry section of the containerd config, only if it is empty
+#    (the other config_path in the file, in the transfer plugin, is left alone). The old file is kept as
+#    config.toml.before-registry-trust, once. containerd reads config_path only at start, so it is restarted,
+#    but only when the config changed.
+#
+#   REGISTRY_HOST  registry name, required, no default (same as for install-registry)
+#   REGISTRY_PORT  registry port as written in the image reference (default 443)
+#   CERT           certificate to trust                   (default /etc/nginx/ssl/molior.crt, from install-nginx)
+#   CONFIG         containerd config                      (default /etc/containerd/config.toml)
+#   CERTS_DIR      hosts directory                        (default /etc/containerd/certs.d)
+#   NO_RESTART=1   edit files only, do not restart containerd (for tests)
+set -eu
+
+CERT=${CERT:-/etc/nginx/ssl/molior.crt}
+CONFIG=${CONFIG:-/etc/containerd/config.toml}
+CERTS_DIR=${CERTS_DIR:-/etc/containerd/certs.d}
+REGISTRY_HOST=${REGISTRY_HOST:-}
+REGISTRY_PORT=${REGISTRY_PORT:-443}
+
+case "$REGISTRY_HOST" in
+    ""|*[!A-Za-z0-9.-]*) echo "REGISTRY_HOST is required and may only contain letters, digits, dots and dashes (got '$REGISTRY_HOST')"; exit 1 ;;
+esac
+case "$REGISTRY_PORT" in
+    ""|*[!0-9]*) echo "REGISTRY_PORT must be a number (got '$REGISTRY_PORT')"; exit 1 ;;
+esac
+[ -r "$CERT" ] || { echo "$CERT not found, run make install-nginx first"; exit 1; }
+[ -r "$CONFIG" ] || { echo "$CONFIG not found"; exit 1; }
+
+D="$CERTS_DIR/$REGISTRY_HOST:$REGISTRY_PORT"
+mkdir -p "$D"
+cp "$CERT" "$D/ca.crt"
+cat > "$D/hosts.toml" <<TOML
+server = "https://$REGISTRY_HOST:$REGISTRY_PORT"
+
+[host."https://$REGISTRY_HOST:$REGISTRY_PORT"]
+  capabilities = ["pull", "resolve"]
+  ca = "ca.crt"
+TOML
+echo "wrote $D/hosts.toml and ca.crt"
+
+SECTION='[plugins."io.containerd.grpc.v1.cri".registry]'
+if awk -v s="$SECTION" '$0 ~ /^[ \t]*\[/ { in_s = ($1 == s) } in_s && $1 == "config_path" { print $3; exit }' "$CONFIG" | grep -qx "\"$CERTS_DIR\""; then
+    echo "config_path already set to $CERTS_DIR in $CONFIG, nothing to change"
+    exit 0
+fi
+if ! awk -v s="$SECTION" '$0 ~ /^[ \t]*\[/ { in_s = ($1 == s) } in_s && $1 == "config_path" && $3 == "\"\"" { found = 1 } END { exit !found }' "$CONFIG"; then
+    echo "config_path in the CRI registry section of $CONFIG is not empty or not found, not changing it"; exit 1
+fi
+
+NEW=$(mktemp)
+trap 'rm -f "$NEW"' EXIT
+awk -v s="$SECTION" -v d="$CERTS_DIR" '
+    $0 ~ /^[ \t]*\[/ { in_s = ($1 == s) }
+    in_s && !done && $1 == "config_path" && $3 == "\"\"" { sub(/config_path = ""/, "config_path = \"" d "\""); done = 1 }
+    { print }' "$CONFIG" > "$NEW"
+if command -v containerd >/dev/null; then
+    containerd --config "$NEW" config dump >/dev/null || { echo "the edited config does not parse, $CONFIG not changed"; exit 1; }
+else
+    echo "containerd not found, skipping the parse check"
+fi
+[ -e "$CONFIG.before-registry-trust" ] || cp -p "$CONFIG" "$CONFIG.before-registry-trust"
+cat "$NEW" > "$CONFIG"
+echo "set config_path = \"$CERTS_DIR\" in $CONFIG (old file: $CONFIG.before-registry-trust)"
+
+if [ "${NO_RESTART:-}" = 1 ]; then
+    echo "NO_RESTART=1, containerd not restarted"
+    exit 0
+fi
+systemctl restart containerd
+systemctl is-active containerd
+echo "containerd restarted, registry certificate trusted for $REGISTRY_HOST:$REGISTRY_PORT"

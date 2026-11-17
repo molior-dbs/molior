@@ -1,0 +1,40 @@
+#!/bin/sh
+# Set the registry push password (nginx basic auth, see install-registry).
+# Run on the target host as root, from a terminal so it can ask for the password:
+#   ssh -t <host> 'cd ~/molior && make passwd-registry'
+# Without a terminal the password is read from the first line of stdin.
+#
+#   REGISTRY_USER  user name   (default molior)
+#   HTPASSWD       file        (default /etc/nginx/registry.htpasswd)
+set -eu
+
+REGISTRY_USER=${REGISTRY_USER:-molior}
+HTPASSWD=${HTPASSWD:-/etc/nginx/registry.htpasswd}
+
+command -v openssl >/dev/null || { echo "openssl not found"; exit 1; }
+
+if [ -t 0 ]; then
+    trap 'stty echo' EXIT
+    printf 'New password for registry user %s: ' "$REGISTRY_USER" >&2
+    stty -echo; IFS= read -r password; stty echo; echo >&2
+    printf 'Repeat password: ' >&2
+    stty -echo; IFS= read -r again; stty echo; echo >&2
+    [ "$password" = "$again" ] || { echo "passwords differ, nothing changed"; exit 1; }
+else
+    IFS= read -r password || true
+fi
+[ -n "$password" ] || { echo "empty password, nothing changed"; exit 1; }
+
+umask 077
+printf '%s:%s\n' "$REGISTRY_USER" "$(printf '%s' "$password" | openssl passwd -apr1 -stdin)" > "$HTPASSWD"
+if [ "$(id -u)" = 0 ]; then
+    chown root:www-data "$HTPASSWD"
+fi
+chmod 640 "$HTPASSWD"
+
+# nginx reads the file when it loads its configuration
+if command -v nginx >/dev/null && systemctl is-active --quiet nginx; then
+    nginx -t
+    systemctl reload nginx
+fi
+echo "password for $REGISTRY_USER set in $HTPASSWD"
