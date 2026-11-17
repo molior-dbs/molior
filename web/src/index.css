@@ -73,5 +73,18 @@
 }
 .rotating {
   display: inline-block;
+  transform-origin: center;
   animation: rotating 1.5s linear infinite;
+}
+.build-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 0.15em solid currentColor;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform-origin: center;
+  animation: rotating 1.8s linear infinite;
+  vertical-align: -0.1em;
 }

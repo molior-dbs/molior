@@ -9,7 +9,7 @@ export function buildIcon(buildstate) {
     case 'new':
     case 'scheduled':       return 'bi-clock';
     case 'needs_build':     return 'bi-three-dots';
-    case 'building':        return 'bi-arrow-repeat rotating text-primary';
+    case 'building':        return 'build-spinner text-primary';
     case 'needs_publish':   return 'bi-git';
     case 'publishing':      return 'bi-upload text-primary';
     case 'publish_failed':  return 'bi-upload text-danger';
@@ -129,7 +129,7 @@ export const BUILD_STATE_GROUPS = [
   { label: 'Publishing',  value: 'publishing/publish_failed',               icon: 'bi-upload' },
   { label: 'Pending',     value: 'new/scheduled',                           icon: 'bi-clock' },
   { label: 'Failed',      value: 'build_failed/already_failed',             icon: 'bi-x-lg text-danger' },
-  { label: 'Building',    value: 'building',                                icon: 'bi-arrow-repeat rotating' },
+  { label: 'Building',    value: 'building',                                icon: 'build-spinner' },
   { label: 'Needs build', value: 'needs_build',                             icon: 'bi-three-dots' },
 ];
 

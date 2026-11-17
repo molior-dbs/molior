@@ -32,7 +32,7 @@ function transformUrl(url) {
 function stateIcon(state) {
   switch (state) {
     case 'ready': return 'bi-check-lg text-success';
-    case 'busy':  return 'bi-arrow-repeat rotating text-primary';
+    case 'busy':  return 'bi-gear-wide-connected rotating text-primary';
     case 'error': return 'bi-x-lg text-danger';
     default:      return 'bi-three-dots text-muted';
   }

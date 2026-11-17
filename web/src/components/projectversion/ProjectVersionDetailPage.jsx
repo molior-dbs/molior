@@ -842,8 +842,8 @@ function ReposTab({ pv }) {
     successful: 'bi-check-circle-fill text-success',
     build_failed: 'bi-x-circle-fill text-danger',
     publish_failed: 'bi-exclamation-circle-fill text-warning',
-    building: 'bi-arrow-repeat text-primary',
-    publishing: 'bi-arrow-repeat text-primary',
+    building: 'bi-gear-wide-connected rotating text-primary',
+    publishing: 'bi-gear-wide-connected rotating text-primary',
     new: 'bi-circle text-muted',
   };
 

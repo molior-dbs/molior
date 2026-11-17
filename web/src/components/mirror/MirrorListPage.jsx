@@ -23,7 +23,7 @@ const PAGE_SIZE = 20;
 function mirrorIcon(state) {
   switch (state) {
     case 'ready':      return 'bi-check-lg text-success';
-    case 'updating':   return 'bi-arrow-repeat rotating text-primary';
+    case 'updating':   return 'bi-gear-wide-connected rotating text-primary';
     case 'publishing': return 'bi-upload text-primary';
     case 'created':    return 'bi-clock text-muted';
     case 'init_error':
