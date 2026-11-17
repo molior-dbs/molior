@@ -5,6 +5,9 @@ PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
 MOLIOR_VERSION ?= dev
 
 NAMESPACE := molior
+SSH_USER ?= debian
+SSH_OPTS ?= -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
+KUBE_CONTEXT = molior-$(IP)
 export HELM_NAMESPACE=$(NAMESPACE)
 
 ifneq ($(shell which podman 2>/dev/null),)
@@ -58,6 +61,24 @@ create-cluster:  ## Create k3d cluster
 
 delete-cluster:  ## Delete k3d cluster
 	k3d cluster delete molior
+
+configure-cluster:  ## Configure kubectl for a remote kubeadm cluster (usage: make configure-cluster IP=<host>)
+	@test -n "$(IP)" || (echo "Usage: make configure-cluster IP=<node-ip>"; exit 1)
+	@set -e; umask 077; tmp=$$(mktemp); trap 'rm -f $$tmp $$tmp.new' EXIT; \
+	ssh $(SSH_OPTS) $(SSH_USER)@$(IP) 'sudo cat /etc/kubernetes/admin.conf' > $$tmp; \
+	test -s $$tmp || (echo "Error: could not read /etc/kubernetes/admin.conf from $(IP)"; exit 1); \
+	sed -i \
+		-e 's|server: https://.*|server: https://$(IP):6443|' \
+		-e 's|kubernetes-admin@kubernetes|$(KUBE_CONTEXT)|g' \
+		-e 's|^\([[:space:]-]*\)name: kubernetes-admin$$|\1name: $(KUBE_CONTEXT)-admin|' \
+		-e 's|user: kubernetes-admin$$|user: $(KUBE_CONTEXT)-admin|' \
+		-e 's|cluster: kubernetes$$|cluster: $(KUBE_CONTEXT)|' \
+		-e 's|^\([[:space:]-]*\)name: kubernetes$$|\1name: $(KUBE_CONTEXT)|' $$tmp; \
+	KUBECONFIG=$$tmp kubectl config set-context $(KUBE_CONTEXT) --namespace=$(NAMESPACE) >/dev/null; \
+	mkdir -p $$HOME/.kube; \
+	KUBECONFIG=$$tmp:$$HOME/.kube/config kubectl config view --flatten > $$tmp.new; \
+	cat $$tmp.new > $$HOME/.kube/config
+	kubectl get nodes
 
 deploy-cluster:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
 
@@ -136,4 +157,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help docker-images docker-images-molior docker-images-aptly docker-shell create-cluster delete-cluster configure-cluster deploy-cluster install-cluster uninstall-cluster reinstall-cluster redeploy-cluster reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
