@@ -49,6 +49,8 @@ doc/validation/report.pdf
 **_minted-input
 *_minted-report
 test2pdf-*
+oldweb/
+.pi/
 
 # database dumps (user data)
 *.dump.gz
