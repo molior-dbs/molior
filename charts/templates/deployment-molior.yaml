@@ -60,6 +60,10 @@ spec:
 
                   echo 'preStop: molior done'"]
           securityContext:
+            # the default AppArmor profile of containerd denies user namespaces, which
+            # rootless podman needs to create the build images (create-docker.sh)
+            appArmorProfile:
+              type: Unconfined
             capabilities:
               add:
                 - "SYS_ADMIN"
