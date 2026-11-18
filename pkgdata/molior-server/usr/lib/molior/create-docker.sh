@@ -203,6 +203,10 @@ publish_docker()
       REGISTRY=`yq -r .registry.server /etc/molior/backend-kubernetes.yml`
       DOCKER_USER=`yq -r .registry.user /etc/molior/backend-kubernetes.yml`
       DOCKER_PASSWORD=`yq -r .registry.password /etc/molior/backend-kubernetes.yml`
+      # in Kubernetes the password is not in the config file but in the mounted Secret
+      if [ -f /secrets/registry-password ]; then
+          DOCKER_PASSWORD=`cat /secrets/registry-password`
+      fi
   fi
 
   container_tool=docker

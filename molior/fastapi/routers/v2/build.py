@@ -101,7 +101,12 @@ async def rebuild_build(
     if not build:
         raise HTTPException(status_code=404, detail="Build not found")
 
-    if not build.can_rebuild(None, db):
+    # a successful chroot build (build images of a base mirror) can be rebuilt by an admin
+    admin_chroot_rebuild = build.buildtype == "chroot" and build.buildstate == "successful"
+    if admin_chroot_rebuild and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    if not admin_chroot_rebuild and not build.can_rebuild(None, db):
         raise HTTPException(status_code=400, detail="This build cannot be rebuilt")
 
     logger.info("rebuilding build %d", build_id)

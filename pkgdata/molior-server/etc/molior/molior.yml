@@ -32,7 +32,7 @@ backend_http:
     ping_timeout: 5
 
 # Molior server settings
-max_parallel_chroots: 2
+max_parallel_chroots: 4
 
 # Aptly settings
 aptly:

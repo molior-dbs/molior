@@ -7,7 +7,8 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
-import { fetchMirror, fetchMirrorDependents, fetchMirrorAptSources, deleteMirror, updateMirror } from '../../api/mirrors';
+import { fetchMirror, fetchMirrorDependents, fetchMirrorAptSources, deleteMirror, updateMirror, rebuildBuildImages } from '../../api/mirrors';
+import { useAuth } from '../../context/AuthContext';
 import MirrorForm from './MirrorForm';
 import ConfirmModal from '../build/ConfirmModal';
 import Pagination from '../common/Pagination';
@@ -31,7 +32,7 @@ function mirrorStateIcon(state) {
 }
 
 // ── Shared header (info card + actions menu) ───────────────────────────────
-function MirrorHeader({ mirror, name, version, onAction }) {
+function MirrorHeader({ mirror, name, version, onAction, isAdmin }) {
   if (!mirror) {
     return (
       <h1 className="mb-3" style={{ fontSize: 24, fontWeight: 500 }}>
@@ -80,6 +81,13 @@ function MirrorHeader({ mirror, name, version, onAction }) {
                 <i className="bi bi-arrow-clockwise me-2" />Update
               </button>
             </li>
+            {isAdmin && mirror.is_basemirror && (
+              <li>
+                <button className="dropdown-item" onClick={() => onAction('rebuildimages')}>
+                  <i className="bi bi-hammer me-2" />Rebuild Build Images
+                </button>
+              </li>
+            )}
             <li>
               <button className="dropdown-item text-danger" onClick={() => onAction('delete')}>
                 <i className="bi bi-trash me-2" />Delete
@@ -366,6 +374,7 @@ function AptSourcesTab({ name, version }) {
 export default function MirrorDetailPage() {
   const { name, version } = useParams();
   const navigate           = useNavigate();
+  const { currentUser }    = useAuth();
 
   const [mirror,    setMirror]    = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -411,6 +420,14 @@ export default function MirrorDetailPage() {
           if (didChange) navigate('/mirrors');
         }} />
       )}
+      {modal?.type === 'rebuildimages' && mirror && (
+        <ConfirmModal
+          title="Rebuild Build Images"
+          body={`The build images (chroot builds) of ${mirror.name}/${mirror.version} will be rebuilt for all architectures.`}
+          onConfirm={() => rebuildBuildImages(mirror.id)}
+          onClose={closeModal}
+        />
+      )}
       {modal?.type === 'delete' && mirror && (
         <ConfirmModal
           title="Delete Mirror"
@@ -427,7 +444,7 @@ export default function MirrorDetailPage() {
       {loadError && (
         <div className="alert alert-danger py-2">Failed to load mirror: {loadError}</div>
       )}
-      <MirrorHeader mirror={mirror} name={name} version={version} onAction={onAction} />
+      <MirrorHeader mirror={mirror} name={name} version={version} onAction={onAction} isAdmin={!!currentUser?.is_admin} />
 
       {/* ── Tab bar ── */}
       <ul className="nav nav-tabs mb-3">

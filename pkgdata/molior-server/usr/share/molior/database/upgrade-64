@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# mirror_slash_workaround: the mirror was published in aptly with '/' in the distribution
+# replaced by '_-' (aptly did not support '/' in the past). New mirrors are published as is.
+
+psql molior <<EOSQL
+
+ALTER TABLE projectversion ADD COLUMN mirror_slash_workaround boolean DEFAULT false NOT NULL;
+
+UPDATE projectversion SET mirror_slash_workaround = true WHERE mirror_distribution LIKE '%/%';
+
+EOSQL

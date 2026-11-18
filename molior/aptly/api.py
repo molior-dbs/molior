@@ -295,7 +295,8 @@ class AptlyApi:
             tasks.append(task["ID"])
         return tasks
 
-    async def mirror_delete(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components):
+    async def mirror_delete(self, base_mirror, base_mirror_version, mirror, version, mirror_distribution, components,
+                            slash_workaround=False):
         """
         Delete a mirror from aptly and DB.
 
@@ -311,7 +312,11 @@ class AptlyApi:
 
         # remove publish (may fail)
         try:
-            dist = mirror_distribution.replace("/", "_")
+            # in the url aptly takes '_' as '/' and '__' as '_'
+            if slash_workaround:
+                dist = mirror_distribution.replace("/", "_-").replace("_", "__")
+            else:
+                dist = mirror_distribution.replace("_", "__").replace("/", "_")
             task = await self.DELETE(f"/publish/{publish_name}/{dist}")
             await self.wait_task(task["ID"])
         except Exception:
@@ -415,13 +420,14 @@ class AptlyApi:
         return state
 
     async def mirror_publish(self, base_mirror, base_mirror_version, mirror, version,
-                             mirror_distribution, components, architectures):
+                             mirror_distribution, components, architectures, slash_workaround=False):
         """
         Publish a previously created snapshot from a debian archive mirror.
 
         Args:
             mirror (str): Name of the mirror-snapshot to get published.
             components (str): Name of components. (Only main accepted for now)
+            slash_workaround (bool): Publish with '/' in the distribution replaced by '_-' (old format).
 
         Raises:
             molior.aptly.errors.AptlyError: If a known error occurs while
@@ -429,7 +435,7 @@ class AptlyApi:
         """
         name, publish_name = self.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
         data = {
-            "Distribution": mirror_distribution,
+            "Distribution": mirror_distribution.replace("/", "_-") if slash_workaround else mirror_distribution,
             "SourceKind": "snapshot",
             "Sources": [],
             "Architectures": architectures,
@@ -445,7 +451,7 @@ class AptlyApi:
                 mirrorname = f"{name}-{component}" if component else name
                 data["Sources"].append({"Component": component, "Name": mirrorname})
         else:  # flat mirrors
-            data["Sources"].append({"Name": mirrorname})
+            data["Sources"].append({"Name": name})
 
         task = await self.POST(f"/publish/{publish_name}", data=data)
         return task["ID"]

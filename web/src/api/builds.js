@@ -12,6 +12,7 @@ export async function fetchBuilds(params) {
   if (params.maintainer)            q.set('maintainer', params.maintainer);
   if (params.project)               q.set('project', params.project);
   if (params.sourcerepository_id)   q.set('sourcerepository_id', params.sourcerepository_id);
+  if (params.project_version_id)    q.set('project_version_id', params.project_version_id);
   if (params.commit)                q.set('commit', params.commit);
   if (params.page)                  q.set('page', params.page);
   if (params.page_size)             q.set('page_size', params.page_size);

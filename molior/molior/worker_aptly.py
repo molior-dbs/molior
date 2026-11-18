@@ -317,14 +317,15 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                 logger.debug("publishing snapshot: %s", mirrorname)
                 try:
                     task_id = await aptly.mirror_publish(base_mirror, base_mirror_version, mirror_project, mirror_version,
-                                                         mirror.mirror_distribution, components, architectures)
+                                                         mirror.mirror_distribution, components, architectures,
+                                                         mirror.mirror_slash_workaround)
                 except Exception as exc:
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
                     await mirror.set_mirror_state("error")
                     await build.set_publish_failed()
                     session.commit()
                     await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_project, mirror_version,
-                                              mirror.mirror_distribution, components)
+                                              mirror.mirror_distribution, components, mirror.mirror_slash_workaround)
                     return
 
             if mirror.mirror_state == "publishing":
@@ -1290,12 +1291,13 @@ class AptlyWorker:
             mirror_version = mirror.name
             mirror_architectures = mirror.mirror_architectures
             mirror_distribution = mirror.mirror_distribution
+            mirror_slash_workaround = mirror.mirror_slash_workaround
             mirror_components = mirror.mirror_components.split(",") if mirror.mirror_components else []
 
         try:
             # FIXME: use altpy queue !
             await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_name,
-                                      mirror_version, mirror_distribution, mirror_components)
+                                      mirror_version, mirror_distribution, mirror_components, mirror_slash_workaround)
         except Exception as exc:
             # mirror did not exist
             # FIXME: handle mirror has snapshots and cannot be deleted?

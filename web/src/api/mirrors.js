@@ -1,5 +1,6 @@
 /** Mirrors API — mirrors MirrorService from the Angular app. */
 import { apiUrl } from '../lib/base';
+import { fetchBuilds, rebuildBuild } from './builds';
 
 export async function fetchMirrors({ q = '', q_basemirror = '', page = 1, page_size = 25, basemirror = false } = {}) {
   const params = new URLSearchParams();
@@ -59,4 +60,19 @@ export async function fetchMirrorAptSources(name, version) {
   const res = await fetch(apiUrl(`/api2/mirror/${name}/${version}/aptsources`), { credentials: 'same-origin' });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
   return res.text();
+}
+
+/**
+ * Rebuild the build images (chroot builds) of a base mirror.
+ * Uses the existing rebuild of a build (PUT /api2/build/{id}), which accepts successful
+ * chroot builds for admins. Chroot builds that are still running are skipped.
+ */
+export async function rebuildBuildImages(mirrorId) {
+  const { results } = await fetchBuilds({ project_version_id: mirrorId, page_size: 100 });
+  const chroots = results.filter(b => b.buildtype === 'chroot');
+  if (chroots.length === 0) throw new Error('No build images found for this mirror');
+  const rebuildable = chroots.filter(b =>
+    ['successful', 'build_failed', 'publish_failed'].includes(b.buildstate));
+  if (rebuildable.length === 0) throw new Error('The build images are already being built');
+  for (const b of rebuildable) await rebuildBuild(b.id);
 }

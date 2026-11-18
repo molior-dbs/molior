@@ -92,3 +92,73 @@ def test_repo_create_returns_task_id():
     api = AptlyApi("http://aptly:3143", "gpg@key", username="user", password="pass")
     api.POST = post
     assert asyncio.run(api.repo_create("repo-1")) == 7
+
+
+def _mirror_api():
+    from molior.aptly.api import AptlyApi
+
+    calls = []
+
+    async def post(path, data=None):
+        calls.append(("POST", path, data))
+        return {"ID": 1}
+
+    async def delete(path, data=None):
+        calls.append(("DELETE", path, data))
+        return {"ID": 2}
+
+    async def wait_task(task_id):
+        return True
+
+    api = AptlyApi("http://aptly:3143", "gpg@key", username="user", password="pass")
+    api.POST = post
+    api.DELETE = delete
+    api.wait_task = wait_task
+    return api, calls
+
+
+def test_mirror_publish_slash_workaround():
+    """
+    Test mirror_publish: '/' in the distribution is published as '_-' only with the workaround (old mirrors)
+    """
+    import asyncio
+
+    for workaround, dist in ((True, "bookworm_-current"), (False, "bookworm/current")):
+        api, calls = _mirror_api()
+        asyncio.run(api.mirror_publish("bookworm", "12.8", "mcp", "1", "bookworm/current", ["non-free"],
+                                       ["amd64"], workaround))
+        assert calls[0][1] == "/publish/bookworm_12.8_mirrors_mcp_1"
+        assert calls[0][2]["Distribution"] == dist
+        assert calls[0][2]["Sources"] == [{"Component": "non-free", "Name": "bookworm-12.8-mcp-1-non-free"}]
+
+
+def test_mirror_publish_flat_without_components():
+    """
+    Test mirror_publish of a flat mirror without components uses the mirror name
+    """
+    import asyncio
+
+    api, calls = _mirror_api()
+    asyncio.run(api.mirror_publish("bookworm", "12.8", "kube", "1", "./", [], ["amd64"]))
+    assert calls[0][2]["Distribution"] == "./"
+    assert calls[0][2]["Sources"] == [{"Name": "bookworm-12.8-kube-1"}]
+
+
+def test_mirror_delete_publish_url():
+    """
+    Test mirror_delete: in the url aptly takes '_' as '/' and '__' as '_', the old format is published with '_-'
+    """
+    import asyncio
+
+    expected = (
+        (True, "bookworm/current", "bookworm__-current"),
+        (True, "./", ".__-"),
+        (True, "bookworm-security/updates", "bookworm-security__-updates"),
+        (False, "bookworm/current", "bookworm_current"),
+        (False, "./", "._"),
+        (False, "bookworm", "bookworm"),
+    )
+    for workaround, dist, url in expected:
+        api, calls = _mirror_api()
+        asyncio.run(api.mirror_delete("bookworm", "12.8", "mcp", "1", dist, [], workaround))
+        assert calls[0] == ("DELETE", "/publish/bookworm_12.8_mirrors_mcp_1/" + url, None)

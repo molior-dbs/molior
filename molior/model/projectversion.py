@@ -50,6 +50,8 @@ class ProjectVersion(Base):
     mirror_url = Column(String)
     mirror_distribution = Column(String)
     mirror_components = Column(String)
+    # published in aptly with '/' in the distribution replaced by '_-' (set by the db upgrade for old mirrors)
+    mirror_slash_workaround = Column(Boolean, default=False)
     mirror_architectures = Column(String)
     mirror_state = Column(Enum(*MIRROR_STATES, name="mirror_stateenum"), default=None)
     mirror_with_sources = Column(Boolean, default=False)
@@ -108,10 +110,11 @@ class ProjectVersion(Base):
 
         if self.project.is_basemirror:
             url = "{0}/{1}/{2}".format(apt_url, self.project.name, self.name)
-            # FIXME: Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
                 dist = self.mirror_distribution
+                if self.mirror_slash_workaround:
+                    dist = dist.replace("/", "_-")
             comp = ""
             if self.mirror_components:
                 comp = self.mirror_components.replace(",", " ")
@@ -126,17 +129,19 @@ class ProjectVersion(Base):
 
         if self.project.is_mirror:
             url = "{0}/{1}/mirrors/{2}/{3}".format(apt_url, base_mirror, self.project.name, self.name)
-            # Workaround for aptly ('/' not supported as mirror dist)
             dist = "missing"
             if self.mirror_distribution:
                 dist = self.mirror_distribution
-            if dist == "./":  # if flat repo originally
-                dist = "."
-                comp = "main"
-            else:
-                comp = "main"
+            comp = "main"
+            if self.mirror_slash_workaround:
+                # old format: '/' in the distribution is '_-' in aptly, a flat repo is '._-' with its components
+                dist = dist.replace("/", "_-")
                 if self.mirror_components:
                     comp = self.mirror_components.replace(",", " ")
+            elif dist == "./":  # flat repo, published as '.' with component main
+                dist = "."
+            elif self.mirror_components:
+                comp = self.mirror_components.replace(",", " ")
             full = "deb {0} {1} {2}".format(url, dist, comp)
             return url if url_only else full
 

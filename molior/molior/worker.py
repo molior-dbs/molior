@@ -299,7 +299,7 @@ class Worker:
                 ok = True
 
         if build.buildtype == "chroot":
-            if oldstate == "build_failed" or oldstate == "publish_failed":
+            if oldstate in ("build_failed", "publish_failed", "successful"):
                 buildout = "/var/lib/molior/buildout/%d" % build_id
                 if Path(f"{buildout}/build.log").exists():
                     try:
