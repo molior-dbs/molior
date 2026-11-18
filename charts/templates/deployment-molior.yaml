@@ -18,6 +18,10 @@ spec:
 
     spec:
       serviceAccountName: molior-serviceaccount
+{{- with .Values.molior.fsGroup }}
+      securityContext:
+        fsGroup: {{ . | int64 }}
+{{- end }}
 
       initContainers:
 

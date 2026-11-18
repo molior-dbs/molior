@@ -6,6 +6,8 @@ registry:
 
 molior:
   version: dev
+  # Group id of the data volume (pod securityContext.fsGroup), unset by default
+  fsGroup: ""
   # Set to true on dev clusters: allows plain-HTTP session cookies and
   # treats a missing admin_password as a warning rather than a hard error.
   dev: false
@@ -24,6 +26,8 @@ molior:
   terminationGracePeriodSeconds: 300
 
 aptly:
+  # Group id of the data volume (pod securityContext.fsGroup), unset by default
+  fsGroup: ""
   publicUrl: "http://localhost:8080"
   internalUrl: "http://aptly:8000"
   apiUrl: "http://aptly:3143/api"
@@ -49,6 +53,12 @@ aptly:
   gcsPublishEndpoints: {}
   swiftPublishEndpoints: {}
   azurePublishEndpoints: {}
+
+# Size requested by the PVCs. 100Mi is enough for a test cluster, set real sizes per instance.
+storage:
+  molior: 100Mi
+  aptly: 100Mi
+  postgres: 100Mi
 
 builder:
   amd64:

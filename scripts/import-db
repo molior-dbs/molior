@@ -1,0 +1,70 @@
+#!/bin/sh
+# Import a plain SQL dump of the molior database (pg_dump -C, optionally gzipped) into the
+# molior-postgres container of the release. Runs on the dev machine, the dump is streamed
+# through kubectl and is not copied anywhere.
+# Usage: make import-db IP=<node-ip> DUMP=<file>
+#
+#   KUBE_CONTEXT  kubectl context   (required)
+#   NAMESPACE     namespace         (required)
+#   DUMP          dump file, .gz or plain SQL (required)
+#   FORCE=1       import even if the current database already holds builds, projects or project versions
+#
+# What it does:
+#  1. checks the file (gzip -t) and reads db_version from the dump,
+#     stops if it is higher than the schema of the molior-server image
+#  2. stops if the current database holds builds, projects or project versions (unless FORCE=1)
+#  3. DROP DATABASE molior WITH (FORCE), then restores the dump (it has CREATE DATABASE and \connect),
+#     psql stops at the first error
+#  4. prints row counts
+# It does not touch the pod. Delete the molior pod afterwards so start-molior runs db-upgrade.sh.
+set -eu
+
+KUBE_CONTEXT=${KUBE_CONTEXT:-}
+NAMESPACE=${NAMESPACE:-}
+DUMP=${DUMP:-}
+FORCE=${FORCE:-}
+
+[ -n "$KUBE_CONTEXT" ] && [ -n "$NAMESPACE" ] && [ -n "$DUMP" ] || { echo "Usage: make import-db IP=<node-ip> DUMP=<file>" >&2; exit 1; }
+[ -f "$DUMP" ] || { echo "Error: file not found: $DUMP" >&2; exit 1; }
+
+case "$DUMP" in
+    *.gz) gzip -t "$DUMP" || { echo "Error: $DUMP is not a valid gzip file" >&2; exit 1; }; CAT="gzip -dc" ;;
+    *) CAT=cat ;;
+esac
+
+k() { kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" "$@"; }
+POD=$(k get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')
+[ -n "$POD" ] || { echo "Error: no pod with label app=molior in $NAMESPACE" >&2; exit 1; }
+# sql <database> <query>: run as postgres in the molior-postgres container
+sql() { k exec "$POD" -c molior-postgres -- su postgres -c "psql -q -At -d $1 -c \"$2\""; }
+
+echo "Pod: $POD"
+echo "Dump: $DUMP"
+$CAT "$DUMP" | head -n 6 | grep -E "Dumped from" || true
+
+DUMP_VERSION=$($CAT "$DUMP" | awk -F'\t' '/^COPY public.metadata /{f=1;next} f&&/^\\\./{exit} f&&$2=="db_version"{print $3}')
+[ -n "$DUMP_VERSION" ] || { echo "Error: no db_version found in the dump" >&2; exit 1; }
+LAST_UPGRADE=$(k exec "$POD" -c molior-server -- ls /usr/share/molior/database/ | sed -n 's/^upgrade-\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)
+IMAGE_VERSION=$((LAST_UPGRADE + 1))
+echo "db_version: dump $DUMP_VERSION, molior-server image $IMAGE_VERSION"
+[ "$DUMP_VERSION" -le "$IMAGE_VERSION" ] || { echo "Error: the dump is newer than the image (the image only migrates upwards)" >&2; exit 1; }
+
+if [ -n "$(sql postgres "select 1 from pg_database where datname='molior'")" ]; then
+    BUSY=$(sql molior "select (select count(*) from build) + (select count(*) from project) + (select count(*) from projectversion)")
+    echo "Current database: builds + projects + project versions = $BUSY"
+    if [ "$BUSY" != 0 ] && [ -z "$FORCE" ]; then
+        echo "Error: the current database holds data, it would be dropped. Use FORCE=1 to import anyway." >&2
+        exit 1
+    fi
+fi
+
+echo "Dropping database molior and restoring the dump ..."
+sql postgres "DROP DATABASE IF EXISTS molior WITH (FORCE)"
+$CAT "$DUMP" | k exec -i "$POD" -c molior-postgres -- su postgres -c "psql -q -v ON_ERROR_STOP=1 -d postgres" >/dev/null
+
+echo "Restored. Counts:"
+for t in build project projectversion molioruser; do
+    echo "  $t: $(sql molior "select count(*) from $t")"
+done
+echo "  db_version: $(sql molior "select value from metadata where name='db_version'")"
+echo "Next: delete the molior pod so db-upgrade.sh migrates the database to $IMAGE_VERSION."

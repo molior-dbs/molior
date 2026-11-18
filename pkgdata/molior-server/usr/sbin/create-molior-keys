@@ -16,7 +16,9 @@ HOME_DIR=/var/lib/molior
 GPG_BINARY=gpg
 export GPG_TTY=`tty`
 
-if ! su - $MOLIOR_USER -c "$GPG_BINARY -K | grep -q $GPG_EMAIL"; then
+# Only generate keys if there is no gpg home at all (gpg creates it itself, so this must be checked first).
+# An existing .gnupg may hold keys with another e-mail, it must be left alone.
+if [ ! -e "$HOME_DIR/.gnupg" ]; then
   echo 'Generating GPG keys ...'
   su - $MOLIOR_USER -c "$GPG_BINARY --no-tty --batch --gen-key" <<EOF
 %no-protection
@@ -33,7 +35,7 @@ Expire-Date: 0
 %commit
 EOF
 else
-  echo 'gpg key for molior already exists'
+  echo '.gnupg for molior already exists, not generating a gpg key'
 fi
 
 # create ssh key

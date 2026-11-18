@@ -17,6 +17,10 @@ spec:
       labels:
         app: aptly
     spec:
+{{- with .Values.aptly.fsGroup }}
+      securityContext:
+        fsGroup: {{ . | int64 }}
+{{- end }}
       containers:
         - name: aptly-server
           image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/aptly:{{ .Values.molior.version }}

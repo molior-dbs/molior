@@ -41,7 +41,7 @@ git clone https://github.com/molior-dbs/molior-tools
 - `k3d`, install it with:
 
 ```sh
-make install-k3d
+make download-k3d
 ```
 
 > This downloads the k3d binary to `~/.local/bin/k3d`. Make sure `~/.local/bin` is in your `PATH`.
@@ -53,7 +53,7 @@ make install-k3d
 Creates a local k3d registry and Kubernetes cluster with the required port mappings:
 
 ```sh
-make create-cluster
+make create-k3d
 ```
 
 This sets up:
@@ -89,7 +89,7 @@ make docker-aptly
 Tag and push the local images into the k3d registry so the cluster can use them:
 
 ```sh
-make deploy-cluster
+make deploy-k3d
 ```
 
 Individual images can be pushed separately, e.g.:
@@ -106,7 +106,7 @@ make deploy-image-aptly
 Deploy Molior into the cluster:
 
 ```sh
-make install-cluster
+make install-k3d
 ```
 
 Installs the `charts/` Helm chart into the cluster.
@@ -129,13 +129,13 @@ Once all pods are running, Molior is available at **http://localhost:8000** and 
 
 ```sh
 make docker-images
-make redeploy-cluster
+make redeploy-k3d
 ```
 
 ### Reinstall the Helm chart only (no image rebuild)
 
 ```sh
-make reinstall-cluster
+make reinstall-k3d
 ```
 
 ### View logs
