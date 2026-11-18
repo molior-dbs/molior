@@ -22,7 +22,7 @@ molior:
   ciBuildsEnabled: true
   ciPackagesTtl: 7
   backend: "kubernetes"
-  maxParallelChroots: 2
+  maxParallelChroots: 4
   terminationGracePeriodSeconds: 300
 
 aptly:
