@@ -13,6 +13,8 @@ data:
     builder:
         amd64:
             parallel: {{ .Values.builder.amd64.parallel }}
+        arm64:
+            parallel: {{ .Values.builder.arm64.parallel }}
 
   molior.yml: |
     # Molior configuration

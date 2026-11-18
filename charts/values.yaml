@@ -62,3 +62,6 @@ storage:
 builder:
   amd64:
     parallel: 10
+  # armhf builds use the arm64 queue
+  arm64:
+    parallel: 1
