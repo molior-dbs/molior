@@ -109,7 +109,7 @@ Deploy Molior into the cluster:
 make install-k3d
 ```
 
-Installs the `charts/` Helm chart into the cluster.
+Installs the `charts/` Helm chart into the cluster. The passwords are not chart values: they are read from the Secret `molior-passwords` (keys `molior-password`, `aptly-password`, `registry-password`). `make install-k3d` creates it with the dev password `molior-dev` if it does not exist. On a remote cluster run `make set-passwords` before `helm install`: it asks for the passwords (an empty answer keeps the current one).
 
 ---
 

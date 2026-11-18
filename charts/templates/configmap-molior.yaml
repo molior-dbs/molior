@@ -9,7 +9,6 @@ data:
     registry:
         server: "{{ .Values.registry.host }}:{{ .Values.registry.port }}"
         user: "{{ .Values.registry.user }}"
-        password: "{{ .Values.registry.password }}"
 
     builder:
         amd64:
@@ -34,8 +33,7 @@ data:
         enabled: {{ .Values.molior.ciBuildsEnabled }}
         packages_ttl: {{ .Values.molior.ciPackagesTtl }}
 
-    admin:
-        admin_password: '{{ .Values.molior.adminPassword }}'
+    admin: {}
 
     auth_backend: 'db'
 
@@ -48,6 +46,5 @@ data:
         apt_url: '{{ .Values.aptly.internalUrl }}'
         api_url: '{{ .Values.aptly.apiUrl }}'
         api_user: '{{ .Values.aptly.user }}'
-        api_pass: '{{ .Values.aptly.password }}'
         gpg_key: '{{ .Values.aptly.gpgKey }}'
         key: 'archive-keyring.asc'

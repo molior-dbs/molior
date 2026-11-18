@@ -6,6 +6,17 @@ from ..logger import logger
 
 CONFIGURATION_PATH = "/etc/molior/molior.yml"
 
+# Directory where the Kubernetes Secret with the passwords is mounted (one file per password).
+SECRETS_PATH = "/secrets"
+# file name in SECRETS_PATH -> (section, key) in the configuration file.
+# A password is only set if its section exists in the loaded file, so molior.yml gets the admin and
+# aptly passwords and backend-kubernetes.yml the registry password.
+SECRETS = {
+    "molior-password": ("admin", "admin_password"),
+    "aptly-password": ("aptly", "api_pass"),
+    "registry-password": ("registry", "password"),
+}
+
 
 class Configuration(object):
     def __init__(self, config_file=CONFIGURATION_PATH):
@@ -29,6 +40,19 @@ class Configuration(object):
         config = yaml.safe_load(config_file)
         self._config = config if config else {}
         config_file.close()
+        self._merge_secrets()
+
+    def _merge_secrets(self):
+        """
+        Sets the passwords from the files in SECRETS_PATH. They replace the values of the config file.
+        """
+        for filename, (section, key) in SECRETS.items():
+            path = Path(SECRETS_PATH) / filename
+            if section not in self._config or not path.is_file():
+                continue
+            if self._config[section] is None:
+                self._config[section] = {}
+            self._config[section][key] = path.read_text().rstrip("\r\n")
 
     def config(self):
         """

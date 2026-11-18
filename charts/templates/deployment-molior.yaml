@@ -73,11 +73,6 @@ spec:
             {{- end }}
             - name: MOLIOR_BASE_PATH
               value: {{ .Values.molior.basePath | quote }}
-            - name: APTLY_PASSWORD
-              valueFrom:
-                configMapKeyRef:
-                  key: APTLY_PASSWORD
-                  name: env
             - name: APTLY_USER
               valueFrom:
                 configMapKeyRef:
@@ -113,6 +108,9 @@ spec:
               name: molior
             - mountPath: /config
               name: molior-cm3
+            - mountPath: /secrets
+              name: molior-passwords
+              readOnly: true
             - mountPath: /shutdown
               name: shutdown-sync
 
@@ -160,6 +158,9 @@ spec:
         - configMap:
             name: molior-cm3
           name: molior-cm3
+        - name: molior-passwords
+          secret:
+            secretName: molior-passwords
         - name: shutdown-sync
           emptyDir: {}
 

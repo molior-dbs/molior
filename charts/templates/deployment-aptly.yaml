@@ -52,9 +52,9 @@ spec:
           env:
             - name: APTLY_PASSWORD
               valueFrom:
-                configMapKeyRef:
-                  key: APTLY_PASSWORD
-                  name: env
+                secretKeyRef:
+                  key: aptly-password
+                  name: molior-passwords
             - name: APTLY_USER
               valueFrom:
                 configMapKeyRef:

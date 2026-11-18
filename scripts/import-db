@@ -2,9 +2,9 @@
 # Import a plain SQL dump of the molior database (pg_dump -C, optionally gzipped) into the
 # molior-postgres container of the release. Runs on the dev machine, the dump is streamed
 # through kubectl and is not copied anywhere.
-# Usage: make import-db IP=<node-ip> DUMP=<file>
+# Usage: make import-db DUMP=<file>
 #
-#   KUBE_CONTEXT  kubectl context   (required)
+# It uses the current kubectl context (kubectl config current-context) and prints it.
 #   NAMESPACE     namespace         (required)
 #   DUMP          dump file, .gz or plain SQL (required)
 #   FORCE=1       import even if the current database already holds builds, projects or project versions
@@ -19,12 +19,13 @@
 # It does not touch the pod. Delete the molior pod afterwards so start-molior runs db-upgrade.sh.
 set -eu
 
-KUBE_CONTEXT=${KUBE_CONTEXT:-}
 NAMESPACE=${NAMESPACE:-}
 DUMP=${DUMP:-}
 FORCE=${FORCE:-}
 
-[ -n "$KUBE_CONTEXT" ] && [ -n "$NAMESPACE" ] && [ -n "$DUMP" ] || { echo "Usage: make import-db IP=<node-ip> DUMP=<file>" >&2; exit 1; }
+[ -n "$NAMESPACE" ] && [ -n "$DUMP" ] || { echo "Usage: make import-db DUMP=<file>" >&2; exit 1; }
+CONTEXT=$(kubectl config current-context) || { echo "Error: no current kubectl context" >&2; exit 1; }
+echo "kubectl context: $CONTEXT, namespace: $NAMESPACE" >&2
 [ -f "$DUMP" ] || { echo "Error: file not found: $DUMP" >&2; exit 1; }
 
 case "$DUMP" in
@@ -32,7 +33,7 @@ case "$DUMP" in
     *) CAT=cat ;;
 esac
 
-k() { kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" "$@"; }
+k() { kubectl -n "$NAMESPACE" "$@"; }
 POD=$(k get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')
 [ -n "$POD" ] || { echo "Error: no pod with label app=molior in $NAMESPACE" >&2; exit 1; }
 # sql <database> <query>: run as postgres in the molior-postgres container

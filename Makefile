@@ -114,11 +114,11 @@ install-local-path-provisioner:  ## Install local-path-provisioner as default St
 	@test -f "$(PV)" || (echo "PV file '$(PV)' not found (usage: PV=<file>)"; exit 1)
 	curl -fsSL https://raw.githubusercontent.com/rancher/local-path-provisioner/$(LOCAL_PATH_VERSION)/deploy/local-path-storage.yaml \
 		| sed -e 's|/opt/local-path-provisioner|$(LOCAL_PATH_DIR)|' -e 's|reclaimPolicy: Delete|reclaimPolicy: Retain|' \
-		| kubectl --context $(KUBE_CONTEXT) apply -f -
-	kubectl --context $(KUBE_CONTEXT) -n local-path-storage rollout status deployment/local-path-provisioner --timeout=120s
-	kubectl --context $(KUBE_CONTEXT) patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-	kubectl --context $(KUBE_CONTEXT) apply -f $(PV)
-	kubectl --context $(KUBE_CONTEXT) get storageclass,pv
+		| kubectl apply -f -
+	kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=120s
+	kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	kubectl apply -f $(PV)
+	kubectl get storageclass,pv
 
 deploy-k3d:  deploy-image-molior deploy-image-molior-nginx deploy-image-molior-postgres deploy-image-aptly  ## Import local images into k3d
 
@@ -149,7 +149,10 @@ download-k3d:  ## Download and install k3d binary
 
 
 
-install-k3d:  ## Install molior dev into cluster
+install-k3d:  ## Install molior dev into cluster (creates the Secret molior-passwords with the dev password molior-dev if it does not exist)
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl -n $(NAMESPACE) get secret molior-passwords >/dev/null 2>&1 || kubectl -n $(NAMESPACE) create secret generic molior-passwords \
+		--from-literal=molior-password=molior-dev --from-literal=aptly-password=molior-dev --from-literal=registry-password=molior-dev
 	printf 'registry:\n  host: %s\n  port: %s\nmolior:\n  dev: %s\n' $(REGISTRY) $(REGISTRY_PORT) $(MOLIOR_DEV) > /tmp/molior-registry-values.yaml
 	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml; rm -f /tmp/molior-registry-values.yaml
 
@@ -193,9 +196,12 @@ restart-aptly:  ## Restart aptly pod
 psql:  ## Run psql
 	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- su molior -c psql molior
 
-import-db:  ## Import a molior database dump (pg_dump -C, .sql or .sql.gz) into the molior-postgres container, streamed from this machine (usage: make import-db IP=<host> DUMP=<file>; FORCE=1 if the database holds data)
-	@test -n "$(IP)" && test -n "$(DUMP)" || (echo "Usage: make import-db IP=<node-ip> DUMP=<file>"; exit 1)
-	KUBE_CONTEXT="$(KUBE_CONTEXT)" NAMESPACE="$(NAMESPACE)" DUMP="$(DUMP)" FORCE="$(FORCE)" sh scripts/import-db
+import-db:  ## Import a molior database dump (pg_dump -C, .sql or .sql.gz) into the molior-postgres container, streamed from this machine (usage: make import-db DUMP=<file>; FORCE=1 if the database holds data)
+	@test -n "$(DUMP)" || (echo "Usage: make import-db DUMP=<file>"; exit 1)
+	NAMESPACE="$(NAMESPACE)" DUMP="$(DUMP)" FORCE="$(FORCE)" sh scripts/import-db
+
+set-passwords:  ## Ask for the molior, aptly and registry passwords and store them in the Secret molior-passwords, empty keeps the current one (needs a terminal; usage: make set-passwords)
+	@NAMESPACE="$(NAMESPACE)" sh scripts/set-passwords
 
 docker-clean:  ## Remove docker images
 	docker rmi -f molior-base:dev molior:dev molior-nginx:dev molior-postgres:dev aptly:dev
@@ -213,4 +219,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help import-db push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help import-db set-passwords push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean

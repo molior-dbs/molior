@@ -1,8 +1,9 @@
+# The passwords (molior-password, aptly-password, registry-password) are not values: they are read from the
+# Secret molior-passwords, which must exist in the namespace before the install (see INSTALL.md).
 registry:
   host: k3d-molior-registry
   port: 5000
   user: ""
-  password: ""
 
 molior:
   version: dev
@@ -20,7 +21,6 @@ molior:
   versionPrefix: "v"
   ciBuildsEnabled: true
   ciPackagesTtl: 7
-  adminPassword: "molior-dev"
   backend: "kubernetes"
   maxParallelChroots: 2
   terminationGracePeriodSeconds: 300
@@ -32,7 +32,6 @@ aptly:
   internalUrl: "http://aptly:8000"
   apiUrl: "http://aptly:3143/api"
   user: "molior"
-  password: "molior-dev"
   gpgKey: "reposign@molior"
   downloadConcurrency: 4
   downloadRetries: 0
