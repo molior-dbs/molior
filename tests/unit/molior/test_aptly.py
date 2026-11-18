@@ -76,3 +76,19 @@ def test_get_aptly_names_basemirror():
 
     assert name == "jessie-8.10"
     assert publish_name == "jessie_8.10"
+
+
+def test_repo_create_returns_task_id():
+    """
+    Test repo_create returns the id of the aptly task, so that the caller can wait for it
+    """
+    import asyncio
+    from molior.aptly.api import AptlyApi
+
+    async def post(path, data=None):
+        assert path == "/repos" and data == {"Name": "repo-1"}
+        return {"ID": 7, "Name": "Create repository repo-1"}
+
+    api = AptlyApi("http://aptly:3143", "gpg@key", username="user", password="pass")
+    api.POST = post
+    assert asyncio.run(api.repo_create("repo-1")) == 7

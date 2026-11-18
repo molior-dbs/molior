@@ -76,7 +76,9 @@ class DebianRepository:
         for dist in self.DISTS:
             repo_name = self.name + "-%s" % dist
             logger.info("creating repository '%s'", repo_name)
-            await self.aptly.repo_create(repo_name)  # not a background task
+            task_id = await self.aptly.repo_create(repo_name)
+            if not await self.aptly.wait_task(task_id):
+                raise Exception(f"aptly: creating repository '{repo_name}' failed")
 
             snapshot_name = get_snapshot_name(self.publish_name, dist)
 
@@ -84,14 +86,16 @@ class DebianRepository:
 
             # package_refs = await self.__get_packages(dist == "unstable")
             task_id = await self.aptly.snapshot_create(repo_name, snapshot_name)
-            await self.aptly.wait_task(task_id)
+            if not await self.aptly.wait_task(task_id):
+                raise Exception(f"aptly: creating snapshot '{snapshot_name}' failed")
 
             # Add source and all archs per default
             archs = self.archs + ["source", "all"]
 
             logger.debug("publishing snapshot: '%s' archs: '%s'", snapshot_name, str(archs))
             task_id = await self.aptly.snapshot_publish(snapshot_name, "main", archs, dist, self.publish_name)
-            await self.aptly.wait_task(task_id)
+            if not await self.aptly.wait_task(task_id):
+                raise Exception(f"aptly: publishing snapshot '{snapshot_name}' failed")
         return True
 
     async def snapshot(self, snapshot_version, packages):

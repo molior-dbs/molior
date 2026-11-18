@@ -860,14 +860,31 @@ class AptlyWorker:
         if len(args) > 6:
             build_id = args[6]  # build id for copying projectversions
 
-        await DebianRepository(basemirror_name, basemirror_version, project_name, project_version, architectures).init()
+        error = None
+        try:
+            if not await DebianRepository(
+                    basemirror_name, basemirror_version, project_name, project_version, architectures).init():
+                error = f"repository of {project_name}/{project_version} already exists"
+        except Exception as exc:
+            if not build_id:
+                raise
+            logger.exception(exc)
+            error = str(exc)
 
         if build_id:
             with Session() as session:
                 build = session.query(Build).filter(Build.id == build_id).first()
                 if build:
-                    await build.set_successful()
+                    if error:
+                        logger.error("init repository %s/%s: %s", project_name, project_version, error)
+                        await build.log(f"E: {error}\n")
+                        await build.set_failed()
+                        await build.logdone()
+                    else:
+                        await build.set_successful()
                     session.commit()
+            if error:
+                return
 
         if len(trigger_builds) > 0:
             targets = [f"{project_name}/{project_version}"]

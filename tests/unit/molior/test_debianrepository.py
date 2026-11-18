@@ -374,3 +374,75 @@ def test_init_exists():
 
         aptly_connection.repo_create.assert_not_called()
         aptly_connection.snapshot_publish.assert_not_called()
+
+
+def _init_repo(aptly_connection):
+    """
+    Returns a DebianRepository with one dist and the given aptly connection
+    """
+    with patch("molior.molior.debianrepository.Configuration"), patch(
+            "molior.molior.debianrepository.get_aptly_connection", return_value=aptly_connection):
+        repo = DebianRepository("stretch", "9.2", "testproject", "1", [])
+    repo.DISTS = ["stable"]
+    return repo
+
+
+def _aptly_connection(calls, repo_task_ok=True):
+    """
+    Aptly connection mock which records the order of the calls
+    """
+    aptly = MagicMock()
+
+    async def snapshot_get():
+        return []
+
+    async def repo_get():
+        return []
+
+    async def repo_create(name):
+        calls.append("repo_create")
+        return 1
+
+    async def snapshot_create(repo_name, snapshot_name):
+        calls.append("snapshot_create")
+        return 2
+
+    async def snapshot_publish(*args):
+        calls.append("snapshot_publish")
+        return 3
+
+    async def wait_task(task_id):
+        calls.append(f"wait_task {task_id}")
+        return repo_task_ok if task_id == 1 else True
+
+    aptly.snapshot_get = snapshot_get
+    aptly.repo_get = repo_get
+    aptly.repo_create = repo_create
+    aptly.snapshot_create = snapshot_create
+    aptly.snapshot_publish = snapshot_publish
+    aptly.wait_task = wait_task
+    return aptly
+
+
+def test_init_waits_for_repo_create():
+    """
+    Test init waits for the aptly task which creates the repository before it creates the snapshot
+    """
+    calls = []
+    repo = _init_repo(_aptly_connection(calls))
+    assert asyncio.run(repo.init()) is True
+    assert calls == ["repo_create", "wait_task 1", "snapshot_create", "wait_task 2", "snapshot_publish", "wait_task 3"]
+
+
+def test_init_repo_create_fails():
+    """
+    Test init raises and does not go on if the aptly task which creates the repository failed
+    """
+    calls = []
+    repo = _init_repo(_aptly_connection(calls, repo_task_ok=False))
+    try:
+        asyncio.run(repo.init())
+        assert False, "init must raise"
+    except Exception as exc:
+        assert "creating repository" in str(exc) and "failed" in str(exc)
+    assert calls == ["repo_create", "wait_task 1"]

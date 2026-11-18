@@ -632,14 +632,16 @@ class AptlyApi:
             name (str): The repository's name.
 
         Returns:
-            bool: True if creation was successful, otherwise False.
+            int: The id of the aptly task that creates the repository (the api runs
+                asynchronously, wait for it with wait_task).
 
         Raises:
             molior.aptly.errors.AptlyError: If a known error occurs while
                 communicating with the aptly api.
         """
         data = {"Name": name}
-        return await self.POST("/repos", data=data)
+        task = await self.POST("/repos", data=data)
+        return task["ID"]
 
     async def repo_delete(self, name):
         """
