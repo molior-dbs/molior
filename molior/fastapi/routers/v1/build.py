@@ -9,7 +9,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, text
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import or_
 
 from ...auth import CurrentUser, authenticated
@@ -127,8 +127,11 @@ def get_builds(
         builds = builds.filter(
             func.to_char(Build.startstamp, "YYYY-MM-DD HH24:MI:SS").contains(startstamp)
         )
-    if buildstate and set(buildstate).issubset(set(BUILD_STATES)):
-        builds = builds.filter(or_(*[Build.buildstate == s for s in buildstate]))
+    if buildstate:
+        # the web UI sends a group of states as one comma-separated value
+        buildstate = [s for value in buildstate for s in value.split(",")]
+        if set(buildstate).issubset(set(BUILD_STATES)):
+            builds = builds.filter(or_(*[Build.buildstate == s for s in buildstate]))
 
     if search or search_project or project:
         child_cte = builds.cte("childs")
