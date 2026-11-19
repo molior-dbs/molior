@@ -155,9 +155,9 @@ spec:
         - name: molior
           persistentVolumeClaim:
             claimName: molior
+        # unix socket of postgres, shared by molior-server and molior-postgres, only needed while the pod runs
         - name: pgsock
-          persistentVolumeClaim:
-            claimName: pgsock
+          emptyDir: {}
         - name: postgres
           persistentVolumeClaim:
             claimName: postgres
