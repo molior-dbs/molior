@@ -147,6 +147,8 @@ spec:
               name: postgres
             - mountPath: /shutdown
               name: shutdown-sync
+            - mountPath: /dev/shm
+              name: postgres-shm
       terminationGracePeriodSeconds: {{ .Values.molior.terminationGracePeriodSeconds }}
       restartPolicy: Always
       volumes:
@@ -167,4 +169,8 @@ spec:
             secretName: molior-passwords
         - name: shutdown-sync
           emptyDir: {}
+        - name: postgres-shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
 
