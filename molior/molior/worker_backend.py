@@ -60,6 +60,7 @@ class BackendWorker:
 
             if outcome:  # build successful
                 await build.set_needs_publish()
+                session.commit()
                 await enqueue_aptly({"publish": [build_id]})
             else:        # build failed
                 await build.parent.parent.log("I: build for %s %s failed\n" % (build.projectversion.fullname, build.sourcename))

@@ -463,6 +463,8 @@ async def retention_cleanup(session, build):
         Build.version != build.version,
         Build.is_ci.is_(False),
         Build.sourcename == build.sourcename,
+        # different source repositories can build the same source name (None: uploaded builds)
+        Build.sourcerepository_id == build.sourcerepository_id,
         Build.projectversion_id == build.projectversion_id).order_by(desc(Build.id)).all()
     past_versions = []
     for debbuild in past_debbuilds:
