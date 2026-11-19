@@ -257,6 +257,9 @@ function VersionsTab({ name, project }) {
         />
       )}
 
+      <Pagination page={page} totalPages={total > 0 ? Math.ceil(total / PAGE_SIZE) : 1} total={total}
+                  pageSize={PAGE_SIZE} onPageChange={setPage} label="entries" />
+
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
@@ -517,6 +520,9 @@ function PermissionsTab({ name }) {
         />
       )}
 
+      <Pagination page={page} totalPages={total > 0 ? Math.ceil(total / PAGE_SIZE) : 1} total={total}
+                  pageSize={PAGE_SIZE} onPageChange={setPage} label="entries" />
+
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
           <thead>
@@ -754,6 +760,9 @@ function TokensTab({ name }) {
           onClose={closeModal}
         />
       )}
+
+      <Pagination page={page} totalPages={total > 0 ? Math.ceil(total / PAGE_SIZE) : 1} total={total}
+                  pageSize={PAGE_SIZE} onPageChange={setPage} label="entries" />
 
       <div>
         <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
