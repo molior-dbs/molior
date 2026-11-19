@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# build.toplevel_id: id of the top level build (a build without parent is its own top level).
+# The builds list sorts and groups by it, with an index instead of a self join and a sort of the whole table.
+# parent_id is only set when a build is created, so the trigger runs on INSERT only.
+
+psql molior <<EOSQL
+
+ALTER TABLE build ADD COLUMN toplevel_id integer;
+
+UPDATE build SET toplevel_id = id WHERE parent_id IS NULL;
+UPDATE build b SET toplevel_id = p.id FROM build p WHERE b.parent_id = p.id AND p.parent_id IS NULL;
+UPDATE build b SET toplevel_id = p.parent_id FROM build p WHERE b.parent_id = p.id AND p.parent_id IS NOT NULL;
+
+CREATE FUNCTION build_set_toplevel_id() RETURNS trigger AS \$\$
+BEGIN
+    IF NEW.parent_id IS NULL THEN
+        NEW.toplevel_id := NEW.id;
+    ELSE
+        SELECT toplevel_id INTO NEW.toplevel_id FROM build WHERE id = NEW.parent_id;
+    END IF;
+    RETURN NEW;
+END
+\$\$ LANGUAGE plpgsql;
+
+CREATE TRIGGER build_toplevel_id BEFORE INSERT ON build
+    FOR EACH ROW EXECUTE FUNCTION build_set_toplevel_id();
+
+CREATE INDEX ix_build_toplevel_id ON build USING btree (toplevel_id DESC, id);
+
+EOSQL

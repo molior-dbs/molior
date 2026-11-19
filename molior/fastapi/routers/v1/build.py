@@ -139,11 +139,7 @@ def get_builds(
 
     nb_builds = builds.count()
 
-    parent = aliased(Build)
-    builds = builds.outerjoin(parent, parent.id == Build.parent_id)
-    builds = builds.order_by(
-        func.coalesce(parent.parent_id, Build.parent_id, Build.id).desc(), Build.id
-    )
+    builds = builds.order_by(Build.toplevel_id.desc(), Build.id)
 
     results = pagination.apply(builds).all()
     return {"total_result_count": nb_builds, "results": [b.data() for b in results]}

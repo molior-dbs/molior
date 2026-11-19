@@ -56,6 +56,7 @@ class Build(Base):
     projectversion = relationship("ProjectVersion", back_populates="builds")
     projectversions = Column(String)
     parent_id = Column(ForeignKey("build.id"))
+    toplevel_id = Column(Integer)  # id of the top level build, set by a DB trigger on INSERT (upgrade-65)
     children = relationship("Build", backref=backref("parent", remote_side=[id]), remote_side=[parent_id])
     is_ci = Column(Boolean, default=False)
     builddeps = Column(String)
