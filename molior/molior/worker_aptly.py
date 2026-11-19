@@ -6,7 +6,7 @@ from os import mkdir
 from shutil import rmtree
 from shutil import copy2
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import func, or_, desc
+from sqlalchemy import func, or_, desc, text
 
 from ..logger import logger
 from ..tools import db2array, array2db
@@ -701,6 +701,10 @@ class AptlyWorker:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return False
 
+            if build.buildstate == "build_failed":
+                logger.info("aptly worker: build %d was aborted, not publishing", build_id)
+                return False
+
             await build.set_publishing()
             session.commit()
             repo_id = build.sourcerepository_id
@@ -772,6 +776,10 @@ class AptlyWorker:
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("aptly worker: build with id %d not found", build_id)
+                return
+
+            if build.buildstate == "build_failed":
+                logger.info("aptly worker: build %d was aborted, not publishing", build_id)
                 return
 
             await build.set_publishing()
@@ -1592,6 +1600,50 @@ class AptlyWorker:
             await topbuild.set_failed()
             session.commit()
 
+    async def _abort_projectversion(self, args):
+        """Abort all unfinished builds of a projectversion (admin action)."""
+        projectversion_id = args[0]
+        logger.info("aptly worker: aborting all builds of projectversion %d", projectversion_id)
+
+        with Session() as session:
+            debs = session.query(Build).filter(
+                Build.projectversion_id == projectversion_id,
+                Build.buildtype == "deb",
+                Build.buildstate.in_(["new", "needs_build", "scheduled", "building", "needs_publish", "publishing"]),
+            ).all()
+            for deb in debs:
+                # FIXME: the kubernetes backend does not implement abort, running pods are left behind
+                if deb.buildstate in ["building", "scheduled"]:
+                    await enqueue_backend({"abort": deb.id})
+                if deb.buildtask:
+                    session.delete(deb.buildtask)
+                topbuild = deb.parent.parent if deb.parent else None
+                if topbuild:
+                    await topbuild.log("E: aborting build on user request\n")
+                await deb.set_failed()
+                session.commit()
+
+            # source builds only belonging to this projectversion
+            # (a source build which is building runs inside molior and cannot be aborted)
+            sources = session.query(Build).filter(
+                Build.buildtype == "source",
+                text("build.projectversions = ARRAY[%d]" % int(projectversion_id)),
+                Build.buildstate.in_(["new", "needs_build", "needs_publish", "publishing"]),
+            ).all()
+            for source in sources:
+                if source.parent:
+                    await source.parent.log("E: aborting build on user request\n")
+                await source.set_failed()
+                session.commit()
+
+            building = session.query(Build).filter(
+                Build.buildtype == "source",
+                text("build.projectversions = ARRAY[%d]" % int(projectversion_id)),
+                Build.buildstate == "building",
+            ).count()
+            logger.info("aptly worker: aborted %d deb and %d source builds, %d source builds still building",
+                        len(debs), len(sources), building)
+
     async def _remove_s3(self, args):
         projectversion_id = args[0]
         s3_endpoint = args[1]
@@ -1718,6 +1770,12 @@ class AptlyWorker:
                     if args:
                         handled = True
                         await self._abort(args)
+
+                if not handled:
+                    args = task.get("abort_projectversion")
+                    if args:
+                        handled = True
+                        await self._abort_projectversion(args)
 
                 if not handled:
                     args = task.get("remove_s3")

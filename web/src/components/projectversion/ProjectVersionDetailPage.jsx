@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import BuildTable from '../build/BuildTable';
 import ConfirmModal from '../build/ConfirmModal';
+import { useAuth } from '../../context/AuthContext';
 import ContextMenu from '../common/ContextMenu';
 import Pagination from '../common/Pagination';
 import ProjectVersionForm from '../project/ProjectVersionForm';
@@ -18,6 +19,8 @@ import { wsUrl, apiUrl } from '../../lib/base';
 import {
   fetchProjectVersion,
   deleteProjectVersion,
+  abortProjectVersionBuilds,
+  retryProjectVersionBuilds,
   lockProjectVersion,
   fetchDependencies,
   addDependency,
@@ -151,6 +154,9 @@ function S3Modal({ pv, name, version, onClose }) {
 
 // ─── Shared: project version info card + tab bar ──────────────────────────────
 function PVHeader({ pv, name, version, onAction }) {
+  const { currentUser } = useAuth();
+  const isAdmin = !!currentUser?.is_admin;
+
   if (!pv) {
     return (
       <div className="mb-3">
@@ -214,6 +220,20 @@ function PVHeader({ pv, name, version, onAction }) {
               <li>
                 <button className="dropdown-item" onClick={() => onAction('lock')}>
                   <i className="bi bi-lock me-2" />Lock
+                </button>
+              </li>
+            )}
+            {isAdmin && (
+              <li>
+                <button className="dropdown-item" onClick={() => onAction('abortall')}>
+                  <i className="bi bi-x-octagon me-2" />Abort All Builds
+                </button>
+              </li>
+            )}
+            {isAdmin && !pv.is_locked && (
+              <li>
+                <button className="dropdown-item" onClick={() => onAction('retryall')}>
+                  <i className="bi bi-arrow-repeat me-2" />Retry Failed Builds
                 </button>
               </li>
             )}
@@ -1152,10 +1172,12 @@ function DependentsTab({ pv }) {
 export default function ProjectVersionDetailPage() {
   const { name, version } = useParams();
   const navigate           = useNavigate();
+  const { currentUser }    = useAuth();
 
   const [pv, setPv]       = useState(null);
   const [pvError, setPvError] = useState('');
   const [modal, setModal] = useState(null);
+  const [forceDelete, setForceDelete] = useState(false);
 
   const base = `/project/${name}/${version}`;
 
@@ -1240,13 +1262,41 @@ export default function ProjectVersionDetailPage() {
           onClose={closeModal}
         />
       )}
+      {modal?.type === 'abortall' && pv && (
+        <ConfirmModal
+          title="Abort All Builds"
+          body={<>Abort all unfinished builds of <strong>{pv.name}</strong>?</>}
+          onConfirm={() => abortProjectVersionBuilds(name, version)}
+          onClose={closeModal}
+        />
+      )}
+      {modal?.type === 'retryall' && pv && (
+        <ConfirmModal
+          title="Retry Failed Builds"
+          body={<>Retry all failed builds of <strong>{pv.name}</strong>?</>}
+          onConfirm={() => retryProjectVersionBuilds(name, version)}
+          onClose={closeModal}
+        />
+      )}
       {modal?.type === 'delete' && pv && (
         <ConfirmModal
           title="Delete Project Version"
-          body={<>Delete project version <strong>{pv.name}</strong>? This cannot be undone.</>}
-          onConfirm={() => deleteProjectVersion(name, version)}
+          body={<>
+            Delete project version <strong>{pv.name}</strong>? This cannot be undone.
+            {currentUser?.is_admin && (
+              <div className="form-check mt-3">
+                <input className="form-check-input" type="checkbox" id="forceDelete"
+                       checked={forceDelete} onChange={e => setForceDelete(e.target.checked)} />
+                <label className="form-check-label" htmlFor="forceDelete">
+                  Force: abort running builds
+                </label>
+              </div>
+            )}
+          </>}
+          onConfirm={() => deleteProjectVersion(name, version, forceDelete)}
           onClose={reload => {
             setModal(null);
+            setForceDelete(false);
             if (reload) navigate(`/project/${name}`);
           }}
         />

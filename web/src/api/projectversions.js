@@ -37,8 +37,8 @@ export async function editProjectVersion(projectName, versionName, body) {
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
 }
 
-export async function deleteProjectVersion(projectName, versionName) {
-  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}`), {
+export async function deleteProjectVersion(projectName, versionName, force = false) {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}${force ? '?forceremoval=true' : ''}`), {
     method: 'DELETE', credentials: 'same-origin',
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
@@ -231,4 +231,19 @@ export async function publishS3(projectName, versionName, { publish_s3, s3_endpo
     body: JSON.stringify({ publish_s3, s3_endpoint, s3_path }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `Server error ${res.status}`); }
+}
+
+export async function abortProjectVersionBuilds(projectName, versionName) {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/abort`), {
+    method: 'POST', credentials: 'same-origin',
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
+}
+
+export async function retryProjectVersionBuilds(projectName, versionName) {
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/retry`), {
+    method: 'POST', credentials: 'same-origin',
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
+  return res.json();
 }

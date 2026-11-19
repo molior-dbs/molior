@@ -13,10 +13,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, BackgroundTasks
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, aliased
 
-from ...auth import CurrentUser, authenticated, require_role
+from ...auth import CurrentUser, authenticated, require_admin, require_role
 from sqlalchemy.orm import sessionmaker as _sessionmaker
 from ...db import get_db
 from ....model.database import database
@@ -35,7 +35,7 @@ from ....model.sourcerepository import SourceRepository
 from ....model.sourepprover import SouRepProVer
 from ....molior.configuration import Configuration
 from ....aptly.api import get_aptly_connection
-from ....molior.queues import buildlog, buildlogdone, buildlogtitle, enqueue_aptly
+from ....molior.queues import buildlog, buildlogdone, buildlogtitle, enqueue_aptly, enqueue_task
 from ....tools import array2db, db2array, escape_for_like, is_name_valid
 
 # Session factory for background tasks (no request context / no get_db dependency)
@@ -672,7 +672,12 @@ async def delete_projectversion(
             ),
         )
 
-    if not forceremoval:
+    if forceremoval:
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin privileges required")
+        # abort all unfinished builds first, handled in order by the aptly worker
+        await enqueue_aptly({"abort_projectversion": [pv.id]})
+    else:
         active = db.query(Build).filter(
             Build.projectversion_id == pv.id,
             Build.buildtype == "deb",
@@ -705,6 +710,68 @@ async def delete_projectversion(
 
     await enqueue_aptly({"delete_repository": [pv.id, delete_build.id]})
     return {"build_id": delete_build.id}
+
+
+# ---------------------------------------------------------------------------
+# Abort / retry all builds (admin)
+# ---------------------------------------------------------------------------
+
+@router.post("/project/{project_id}/{projectversion_id}/abort")
+async def abort_projectversion_builds(
+    project_id: str,
+    projectversion_id: str,
+    current_user: CurrentUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    pv = resolve_projectversion(project_id, projectversion_id, db)
+    if not pv:
+        raise HTTPException(status_code=400, detail="Projectversion not found")
+    logger.info("aborting all builds of projectversion %d", pv.id)
+    await enqueue_aptly({"abort_projectversion": [pv.id]})
+    return "Abort initiated"
+
+
+@router.post("/project/{project_id}/{projectversion_id}/retry")
+async def retry_projectversion_builds(
+    project_id: str,
+    projectversion_id: str,
+    current_user: CurrentUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    pv = resolve_projectversion(project_id, projectversion_id, db)
+    if not pv:
+        raise HTTPException(status_code=400, detail="Projectversion not found")
+    if pv.is_locked:
+        raise HTTPException(status_code=400, detail="Projectversion is locked")
+
+    failed = ["build_failed", "publish_failed"]
+    debs = db.query(Build).filter(
+        Build.projectversion_id == pv.id,
+        Build.buildtype == "deb",
+        Build.buildstate.in_(failed),
+        or_(Build.is_deleted.is_(None), Build.is_deleted.is_(False)),
+    ).all()
+    # source builds of this projectversion (the array may contain several projectversions)
+    sources = db.query(Build).filter(
+        Build.buildtype == "source",
+        Build.buildstate.in_(failed),
+        or_(Build.is_deleted.is_(None), Build.is_deleted.is_(False)),
+        text("%d = ANY(build.projectversions)" % pv.id),
+    ).all()
+
+    tasks = []
+    for build in debs + sources:
+        oldstate = build.buildstate
+        await build.set_needs_build()
+        tasks.append([build.id, oldstate, False])
+    db.commit()
+
+    for task in tasks:
+        await enqueue_task({"rebuild": task})
+    if debs:
+        await enqueue_task({"schedule": []})
+    logger.info("retrying %d deb and %d source builds of projectversion %d", len(debs), len(sources), pv.id)
+    return {"deb_builds": len(debs), "source_builds": len(sources)}
 
 
 # ---------------------------------------------------------------------------

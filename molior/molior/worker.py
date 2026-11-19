@@ -253,6 +253,7 @@ class Worker:
         logger.debug("worker: got rebuild task")
         build_id = args[0]
         oldstate = args[1]
+        schedule = len(args) < 3 or args[2]  # bulk retries schedule once at the end
         build = session.query(Build).filter(Build.id == build_id).first()
         if not build:
             logger.error("rebuild: build %d not found", build_id)
@@ -273,8 +274,8 @@ class Worker:
                 await build.set_needs_build()
                 session.commit()
 
-                args = {"schedule": []}
-                await enqueue_task(args)
+                if schedule:
+                    await enqueue_task({"schedule": []})
 
         if build.buildtype == "source":
             if oldstate == "publish_failed":
