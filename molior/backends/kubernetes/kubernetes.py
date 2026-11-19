@@ -207,6 +207,8 @@ class KubernetesBackend:
                 job_name = f"build-{task['build_id']}-{task['repository_name']}-{jobversion}-" \
                            f"{distrelease}-{distversion}-{arch}"
                 job_name = job_name.replace(".", "-")
+                # the job name is also a label value: max 63 bytes (the build id at the front keeps it unique)
+                job_name = job_name[:63].rstrip("-")
                 image = f"{registry}/molior/{distrelease}-{arch}:{distversion}"
 
                 envvars = [
