@@ -109,12 +109,62 @@ async def rebuild_build(
     if not admin_chroot_rebuild and not build.can_rebuild(None, db):
         raise HTTPException(status_code=400, detail="This build cannot be rebuilt")
 
+    if build.buildtype == "build":
+        return await _retry_top_build(build, db)
+
+    if build.buildtype == "deb" and (not build.parent or build.parent.buildstate != "successful"):
+        raise HTTPException(status_code=400, detail="The source package of this build is not built, retry the source build")
+
     logger.info("rebuilding build %d", build_id)
     oldstate = build.buildstate
     await build.set_needs_build()
     db.commit()
 
     await enqueue_task({"rebuild": [build_id, oldstate]})
+    return "Rebuild triggered"
+
+
+def _top_retry_plan(top):
+    """
+    Returns (sources, debs) of a top level build to retry, each a list of builds:
+    - sources in build_failed or publish_failed (their debs are still new, they follow the source)
+    - failed debs below a successful source package
+    """
+    failed = ("build_failed", "publish_failed")
+    sources = []
+    debs = []
+    for src in top.children:
+        if src.buildstate in failed:
+            sources.append(src)
+        elif src.buildstate == "successful":
+            debs.extend(deb for deb in src.children if deb.buildstate in failed)
+    return sources, debs
+
+
+async def _retry_top_build(top, db):
+    sources, debs = _top_retry_plan(top)
+    if not sources and not debs:
+        raise HTTPException(status_code=400, detail="No failed source or deb builds to retry")
+    for deb in debs:
+        if deb.projectversion and deb.projectversion.is_locked:
+            raise HTTPException(status_code=400, detail="Build from locked projectversion cannot be rebuilt")
+
+    logger.info("rebuilding %d source and %d deb builds of top build %d", len(sources), len(debs), top.id)
+    tasks = []
+    for build in sources + debs:
+        oldstate = build.buildstate
+        await build.set_needs_build()
+        tasks.append([build.id, oldstate, False])
+
+    # the top build is running again (a source retry does not do this by itself)
+    top.endstamp = None
+    await top.set_building()
+    db.commit()
+
+    for task in tasks:
+        await enqueue_task({"rebuild": task})
+    if debs:
+        await enqueue_task({"schedule": []})
     return "Rebuild triggered"
 
 
