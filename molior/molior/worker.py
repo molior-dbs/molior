@@ -41,12 +41,12 @@ async def cleanup_builds():
                 session.delete(build.buildtask)
             cleaned_up = True
 
-        builds = session.query(Build).filter(Build.buildstate == "scheduled" and Build.buildtype == "deb").all()
+        builds = session.query(Build).filter(Build.buildstate == "scheduled", Build.buildtype == "deb").all()
         for build in builds:
             await build.set_needs_build()
             cleaned_up = True
 
-        builds = session.query(Build).filter(Build.buildstate == "needs_build" and Build.buildtype == "chroot").all()
+        builds = session.query(Build).filter(Build.buildstate == "needs_build", Build.buildtype == "chroot").all()
         for build in builds:
             await build.set_failed()
             cleaned_up = True
