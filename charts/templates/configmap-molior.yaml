@@ -13,8 +13,10 @@ data:
     builder:
         amd64:
             parallel: {{ .Values.builder.amd64.parallel }}
+            nodeLabel: "{{ .Values.builder.amd64.nodeLabel }}"
         arm64:
             parallel: {{ .Values.builder.arm64.parallel }}
+            nodeLabel: "{{ .Values.builder.arm64.nodeLabel }}"
 
   molior.yml: |
     # Molior configuration

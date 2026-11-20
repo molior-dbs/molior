@@ -76,7 +76,7 @@ class KubernetesBackend:
                 with suppress(asyncio.CancelledError):
                     await sched
 
-    def create_kubernetes_job(self, namespace, job_name, image, envvars, node_arch):
+    def create_kubernetes_job(self, namespace, job_name, image, envvars, node_label):
         container = client.V1Container(
             name=job_name,
             image=image,
@@ -87,7 +87,7 @@ class KubernetesBackend:
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"job-name": job_name}),
             spec=client.V1PodSpec(restart_policy="Never", containers=[container],
-                                  node_selector={"kubernetes.io/arch": node_arch})
+                                  node_selector=dict([node_label.split("=", 1)]))
         )
 
         job_spec = client.V1JobSpec(template=template)
@@ -202,6 +202,8 @@ class KubernetesBackend:
                     continue
 
                 registry = cfg.registry.get("server")
+                # the one node label build pods of this queue need (key=value), default: the architecture label
+                node_label = (cfg.builder.get(queue_arch) or {}).get("nodeLabel") or f"kubernetes.io/arch={queue_arch}"
 
                 namespace = "molior"
                 jobversion = task['version'].replace("~", "-")
@@ -234,7 +236,7 @@ class KubernetesBackend:
                 executor = concurrent.futures.ThreadPoolExecutor()
                 loop = asyncio.get_event_loop()
                 ret = await loop.run_in_executor(executor, lambda:
-                                                 self.create_kubernetes_job(namespace, job_name, image, envvars, queue_arch))
+                                                 self.create_kubernetes_job(namespace, job_name, image, envvars, node_label))
                 if not ret:
                     await enqueue_backend({"failed": build_id})
                 else:

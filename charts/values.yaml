@@ -59,9 +59,14 @@ storage:
   aptly: 100Mi
   postgres: 100Mi
 
+# nodeLabel: the one node label (key=value) a build pod needs, so it only runs on matching nodes.
+# The standard architecture label is the default. Nodes without it must be labeled, for example:
+#   kubectl label node <node> molior/builder=arm64
 builder:
   amd64:
     parallel: 10
+    nodeLabel: kubernetes.io/arch=amd64
   # armhf builds use the arm64 queue
   arm64:
     parallel: 1
+    nodeLabel: kubernetes.io/arch=arm64
