@@ -38,6 +38,12 @@
     - [11.2 Local development setup](#112-local-development-setup)
     - [11.3 Production deployment](#113-production-deployment)
     - [11.4 Upgrades and data](#114-upgrades-and-data)
+12. [Software testing](#12-software-testing)
+    - [12.1 Test levels](#121-test-levels)
+    - [12.2 System test environment](#122-system-test-environment)
+    - [12.3 System test layers](#123-system-test-layers)
+    - [12.4 Rules for tests](#124-rules-for-tests)
+    - [12.5 Validation tests from molior 1.4](#125-validation-tests-from-molior-14)
 - [Appendix A: API endpoints](#appendix-a-api-endpoints)
 
 ---
@@ -526,6 +532,82 @@ Network access needed: from the cluster to the upstream mirrors (downloads), to 
 - **Database upgrade:** applied automatically by the new molior version at start.
 - **Data import or restore:** molior can be held back at start, so that only the database runs; the data is imported, and molior is released.
 - **Maintenance mode** is used to stop new work before an upgrade (see [3](#3-roles-and-access)).
+
+---
+
+## 12. Software testing
+
+### 12.1 Test levels
+
+| Level | Tests | Runs against |
+|---|---|---|
+| **Unit tests** | single modules and functions: state changes, error handling, retries | test doubles instead of the database, aptly and Kubernetes; no deployment needed |
+| **System tests** | molior as a whole, through its interfaces: REST API, web UI, APT repositories | a complete molior deployment, built from the working copy |
+
+Unit tests are fast and show exactly which function is wrong, but they cannot find errors between the parts: an API that reads a different header than the clients send, or a database query that only fails on a real database. System tests find these. Both levels are kept separate and are run separately.
+
+### 12.2 System test environment
+
+Each system test run creates its **own throwaway environment** and removes it afterwards:
+
+```
+┌──────────────────── test host (developer machine or CI runner) ─────────────────────┐
+│                                                                                     │
+│  test registry (per run)          k3d cluster (per run)                             │
+│  ┌──────────────────────┐         ┌──────────────────────────────────────────────┐  │
+│  │ molior images, built │────────►│ molior pod      aptly pod                    │  │
+│  │ from the working copy│         │      ▲              ▲                        │  │
+│  │ test runner image    │         │      │ REST API, web UI, APT repositories    │  │
+│  └──────────────────────┘         │ test runner pod: tests, headless browser     │  │
+│                                   └──────────────────────────────────────────────┘  │
+│  results: test report, screenshots, server logs, server code coverage               │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Part | Design decision |
+|---|---|
+| **cluster per run** | a new k3d cluster with its own image registry for every run. Runs never share state, several runs can run side by side, and the developer's own cluster and settings are not touched |
+| **same chart** | molior is installed with the production Helm chart (see [11](#11-deploying-molior)) and a test settings file. The images have their normal names, in the test registry |
+| **images from the working copy** | the molior images are built from the working copy, so the tests check the code as it is. The molior image used for tests additionally measures which server code the tests run (code coverage) |
+| **tests inside the cluster** | the tests run in a separate test runner pod, with the test tools and a headless browser. They reach molior through its cluster services, the way other clients do; no ports are opened on the host. The molior images contain no test tools |
+| **random passwords** | admin and aptly passwords are generated per run |
+| **results** | the test report (JUnit XML), screenshots of failed web UI tests, the logs of the molior server, database and aptly, and the server code coverage are copied out before the cluster is removed |
+| **nothing left behind** | the cluster, the registry and their volumes are removed after every run, also after a failure or an interrupt. Leftovers of runs that were killed are removed by the next run. For debugging, a run can keep its cluster on request |
+| **same for CI** | one script does all of this, and the same script runs on a developer machine and in CI. It needs docker, k3d, Helm and kubectl on the host |
+
+### 12.3 System test layers
+
+The system tests are built up in layers. Each layer needs more of the environment and takes longer:
+
+| Layer | Tests | Needs | State |
+|---|---|---|---|
+| **Smoke** | login and logout, permissions, users, projects, tokens, error responses, every page of the web UI renders | molior only, no mirror, no builds | done |
+| **Mirror** | creating a small base mirror, build environments, project versions, dependencies, copy | a small filtered upstream mirror and the build environment images | planned |
+| **Build** | release and CI builds from a git repository, publishing, the APT repositories, retention, retrying, a restart during a build; the validation tests from molior 1.4 (see [12.5](#125-validation-tests-from-molior-14)) | the test packages (see [12.5](#125-validation-tests-from-molior-14)) | planned |
+| **CI** | the system tests run for every change | docker and k3d on the CI runners | planned |
+
+### 12.4 Rules for tests
+
+- **Public interfaces only:** system tests use what clients use (REST API, web UI, APT repositories). They do not read or change the database or aptly directly.
+- **Existing clients:** API behaviour that existing clients rely on is tested as the clients use it, so that a change that breaks them fails a test. Example: token authentication with the header that molior-tools and CI systems send.
+- **Independent tests:** each test creates its own data with unique names, so the tests do not depend on each other or on their order.
+- **A failing test is a bug:** a test that finds a bug stays failing until the bug is fixed; it is not changed to match the wrong behaviour.
+
+### 12.5 Validation tests from molior 1.4
+
+Molior 1.4 was validated with a set of system tests against an installed molior. Their test cases are linked to user requirements (package building, CI builds, build order, parallel builds, short tests during the build, build logs, mirrors, project versions, dependencies, role based access) and were the basis of the 1.4 validation report.
+
+These tests are taken over into the 1.5 system tests, so that 1.5 is checked against the same requirements:
+
+| Aspect | Design decision |
+|---|---|
+| **Traceability** | each taken over test keeps its name, description, test id and requirement references, so the link to the requirements and to the 1.4 report stays |
+| **Same steps, current interfaces** | the steps and checks stay the same. They are written in the same way as the other system tests, instead of the REST test tool used in 1.4, and use the 1.5 interfaces where the old ones are gone: mirrors are created with the current API, build logs are read as live logs, users are local instead of LDAP |
+| **Current distribution** | the tests run on a Debian trixie base mirror instead of stretch |
+| **Only what applies** | tests of functionality that molior 1.5 no longer has are not taken over, instead of being copied and disabled: build notification hooks, access to the hosts by SSH (chroots, aptly service), and mirrors of old third party software. Product deployments are tested with the deployment tools (see [7](#7-product-deployments)) |
+| **Later** | the arm build tests are taken over when the test environment can build arm packages |
+
+The tests build a set of small **test packages**, each covering one case: a successful build with a passing short test, a build failing in its short test, build order between packages, several binary packages from one source, a package without molior configuration (never built), CI builds, one source for two project versions, files stored with git LFS, git submodules, and an architecture dependent package for arm. They come from the 1.4 tests and were cleaned up and updated for trixie. They are kept as public git repositories (one per package, named `test-<name>`) in the molior organisation on GitHub, from where the system tests build them.
 
 ---
 
