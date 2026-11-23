@@ -29,6 +29,11 @@ from ..model.sourepprover import SouRepProVer
 from ..model.metadata import MetaData
 
 
+# startup_mirror: aptly may start after molior
+STARTUP_APTLY_ATTEMPTS = 6
+STARTUP_APTLY_WAIT = 10
+
+
 def mirror_architectures(mirror):
     '''Return the mirror architectures to use on aptly for a given mirror.
     Add "source" as architecture when updating mirror on aptly to trigger source downloading/snapshotting/publishing.
@@ -97,25 +102,36 @@ def mirror_pending_tasks(tasks, names):
 
 async def startup_mirror():
     """
-    Starts a finalize_mirror task in the asyncio event loop
-    for all mirrors which have the state 'updating'
+    Continues the mirrors after a molior restart: starts a finalize_mirror task for each mirror (state updating,
+    publishing or error) whose update or publish tasks are still on aptly (aptly keeps running when molior restarts).
+
+    Mirror builds left in building or publishing without tasks on aptly are failed here (cleanup_builds()
+    skips mirror builds, so that a running mirror is not failed at startup).
     """
     loop = asyncio.get_event_loop()
     aptly = get_aptly_connection()
-    tasks = await aptly.get_tasks()
 
+    tasks = None
+    for attempt in range(STARTUP_APTLY_ATTEMPTS):
+        try:
+            tasks = await aptly.get_tasks() or []
+            break
+        except Exception as exc:
+            logger.warning("startup mirror: aptly tasks not available (%s), attempt %d/%d",
+                           exc, attempt + 1, STARTUP_APTLY_ATTEMPTS)
+            await asyncio.sleep(STARTUP_APTLY_WAIT)
+    if tasks is None:
+        logger.error("startup mirror: aptly not available, running mirrors are not continued")
+        tasks = []
+
+    continued = []
     with Session() as session:
-        # get mirrors in updating state
         query = session.query(ProjectVersion)
         query = query.join(Project, Project.id == ProjectVersion.project_id)
         query = query.filter(Project.is_mirror.is_(True))
         query = query.filter(or_(ProjectVersion.mirror_state == "updating",
                                  ProjectVersion.mirror_state == "publishing",
                                  ProjectVersion.mirror_state == "error"))
-
-        if not query.count():
-            return
-
         mirrors = query.all()
 
         for mirror in mirrors:
@@ -128,30 +144,34 @@ async def startup_mirror():
             mirrorname = "{}-{}".format(mirror.project.name, mirror.name)
 
             names = mirror_aptly_names(base_mirror, base_mirror_version, mirror.project.name, mirror.name, components)
-            mirror_state, task_ids = mirror_resume_state(tasks or [], names)
+            mirror_state, task_ids = mirror_resume_state(tasks, names)
 
             if not mirror_state:
                 # No task on aptly found
-                logger.info("no mirroring tasks found on aptly for %s", mirrorname)
-                await mirror.set_mirror_state("error")
-                session.commit()
+                if mirror.mirror_state != "error":
+                    logger.info("no mirroring tasks found on aptly for %s", mirrorname)
+                    await mirror.set_mirror_state("error")
+                    session.commit()
                 continue
-
-            build_state = "building" if mirror_state == "updating" else "publishing"
-            logger.info("mirror %s: continuing %s, aptly tasks %s", mirrorname, mirror_state, task_ids)
 
             build = session.query(Build).filter(Build.buildtype == "mirror", Build.projectversion_id == mirror.id).first()
             if not build:
-                logger.info("no build found for mirror")
+                logger.info("no build found for mirror %s", mirrorname)
                 await mirror.set_mirror_state("error")
                 session.commit()
                 continue
+
+            logger.info("mirror %s: continuing %s, aptly tasks %s", mirrorname, mirror_state, task_ids)
 
             # FIXME: do not allow db cleanup while mirroring
 
             await mirror.set_mirror_state(mirror_state)
-            build.buildstate = build_state
+            if mirror_state == "updating":
+                await build.set_building()
+            else:
+                await build.set_publishing()
             session.commit()
+            continued.append(build.id)
 
             await build.log("W: continuing active mirroring\n")
 
@@ -167,6 +187,21 @@ async def startup_mirror():
                     task_ids,
                 )
             )
+
+        # mirror builds interrupted by the restart, with nothing left on aptly
+        builds = session.query(Build).filter(Build.buildtype == "mirror",
+                                             Build.buildstate.in_(["building", "publishing"])).all()
+        for build in builds:
+            if build.id in continued:
+                continue
+            logger.warning("startup mirror: build %d was %s, no aptly task left", build.id, build.buildstate)
+            await build.log("E: mirroring interrupted by a molior restart, no task left on aptly\n")
+            if build.buildstate == "publishing":
+                await build.set_publish_failed()
+            else:
+                await build.set_failed()
+            await build.logdone()
+            session.commit()
 
 
 async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, version, components, architectures):
@@ -235,7 +270,15 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
             fields = ["TotalNumberOfPackages", "RemainingNumberOfPackages",
                       "TotalDownloadSize", "RemainingDownloadSize"]
 
-            if mirror.mirror_state == "updating":
+            # The download can take many hours, the publish too: do not keep a transaction (and its connection)
+            # open while waiting for aptly. A connection would be lost when postgres restarts, and an open
+            # transaction holds back vacuum. After a commit the objects are loaded again on the next access,
+            # with a new connection from the pool (pool_pre_ping).
+            mirror_id = mirror.id
+            mirror_state = mirror.mirror_state
+            session.commit()
+
+            if mirror_state == "updating":
                 while True:
                     # 0: init (queued on aptly), 1: running, 2: success, 3: failed
                     # after a restart some tasks may be done already, others still queued: poll until done
@@ -305,9 +348,9 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                                     )
 
                         await notify(Subject.build.value, Event.changed.value,
-                                     {"id": build.id, "progress": total_progress["PercentSize"]})
+                                     {"id": build_id, "progress": total_progress["PercentSize"]})
                         await notify(Subject.mirror.value, Event.changed.value,
-                                     {"id": mirror.id, "progress": total_progress["PercentSize"]})
+                                     {"id": mirror_id, "progress": total_progress["PercentSize"]})
                     await asyncio.sleep(5)
 
                 await build.log("I: creating snapshot\n")
@@ -388,10 +431,13 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                     session.commit()
                     return
 
-            elif mirror.mirror_state == "publishing":
+                mirror_state = "publishing"
+                session.commit()  # no transaction open while waiting for the publish
+
+            elif mirror_state == "publishing":
                 task_id = task_ids[0]  # continued after a restart: the publish task found by startup_mirror
 
-            if mirror.mirror_state == "publishing":
+            if mirror_state == "publishing":
                 while True:
                     upd_progress = None
                     try:
@@ -439,9 +485,9 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                                 upd_progress["TotalNumberOfPackages"], upd_progress["PercentPackages"])
 
                     await notify(Subject.build.value, Event.changed.value,
-                                 {"id": build.id, "progress": upd_progress["PercentPackages"]})
+                                 {"id": build_id, "progress": upd_progress["PercentPackages"]})
                     await notify(Subject.mirror.value, Event.changed.value,
-                                 {"id": mirror.id, "progress": upd_progress["PercentPackages"]})
+                                 {"id": mirror_id, "progress": upd_progress["PercentPackages"]})
                     await asyncio.sleep(5)
 
             if mirror.project.is_basemirror:

@@ -480,3 +480,13 @@ def test_retried_source_waits_for_a_slot_too():
     peak, started = run_slots(1, builds)
     assert peak == 1
     assert sorted(started) == [1, 2, 3]
+
+
+def test_mirror_builds_are_left_to_startup_mirror():
+    """a mirror keeps downloading on aptly while molior restarts: startup_mirror continues or fails it"""
+    building = FakeBuild(1, "building", "mirror")
+    publishing = FakeBuild(2, "publishing", "mirror")
+    session = run_cleanup([building, publishing])
+    assert building.buildstate == "building"
+    assert publishing.buildstate == "publishing"
+    assert session.commits == 0

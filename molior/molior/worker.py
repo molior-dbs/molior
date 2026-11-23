@@ -91,6 +91,9 @@ async def cleanup_builds():
         # FIXME: set schedules to needs build and delete buildtask
         builds = session.query(Build).filter(Build.buildstate == "building").all()
         for build in builds:
+            if build.buildtype == "mirror":
+                # the aptly worker continues it if its tasks still run on aptly, or fails it (startup_mirror)
+                continue
             if build.buildtype == "build" and has_pending_work(build):
                 # its needs_build and needs_publish builds are queued by queue_pending_builds()
                 continue
@@ -104,6 +107,8 @@ async def cleanup_builds():
         # "publishing" was interrupted by the restart: the result in aptly is unknown.
         builds = session.query(Build).filter(Build.buildstate == "publishing").all()
         for build in builds:
+            if build.buildtype == "mirror":
+                continue  # see above, startup_mirror
             logger.warning("cleanup: build %d was publishing at startup, setting publish_failed", build.id)
             await build.set_publish_failed()
             if build.buildtask:

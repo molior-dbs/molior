@@ -90,6 +90,7 @@ class FakeSession:
     def __init__(self, build, mirror):
         self.build = build
         self.mirror = mirror
+        self.commits = 0
 
     def __call__(self):
         return self
@@ -104,13 +105,15 @@ class FakeSession:
         return Query(self.build if model is worker_aptly.Build else self.mirror)
 
     def commit(self):
-        pass
+        self.commits += 1
 
 
 class FakeAptly:
     """aptly with the tasks of RESTART_TASKS: the downloads 1 and 3 run for `polls` polls, then succeed."""
 
     def __init__(self, polls=2, snapshots=(), publish_error=None):
+        self.session = None
+        self.commits_at_first_poll = None
         self.polls = {1: polls, 3: polls}
         self.snapshots = set(snapshots)
         self.publish_error = publish_error
@@ -123,6 +126,8 @@ class FakeAptly:
         return next(t for t in self.tasks if t["ID"] == task_id)
 
     async def mirror_get_progress(self, task_id):
+        if self.commits_at_first_poll is None:
+            self.commits_at_first_poll = self.session.commits
         if task_id in self.polls:
             self.polls[task_id] -= 1
             if self.polls[task_id] <= 0:
@@ -188,7 +193,8 @@ def make_build_and_mirror(mirror_state):
 
 def run_finalize(aptly, mirror_state, task_ids):
     build, mirror = make_build_and_mirror(mirror_state)
-    with patch.object(worker_aptly, "Session", FakeSession(build, mirror)), \
+    aptly.session = FakeSession(build, mirror)
+    with patch.object(worker_aptly, "Session", aptly.session), \
             patch.object(worker_aptly, "get_aptly_connection", return_value=aptly), \
             patch.object(worker_aptly, "notify", AsyncMock()), \
             patch.object(worker_aptly.asyncio, "sleep", AsyncMock()):
@@ -247,3 +253,110 @@ def test_finalize_continues_publishing(state):
 
     build.set_successful.assert_awaited_once()
     assert mirror.mirror_state == "ready"
+
+
+@pytest.mark.parametrize("state,task_ids", [("updating", [1, 2, 3, 4]), ("publishing", [20])])
+def test_finalize_no_transaction_open_while_waiting(state, task_ids):
+    """the session reads build and mirror, then commits before polling aptly (postgres may restart meanwhile)"""
+    aptly = FakeAptly(polls=1)
+    if state == "publishing":
+        aptly.tasks.append({"ID": 20, "State": 1, "Name": "Publish snapshot: " + ", ".join(NAMES)})
+    run_finalize(aptly, state, task_ids)
+    assert aptly.commits_at_first_poll == 1
+
+
+class ListQuery:
+    """query(...).join/filter(...).all()/first(): returns the next result of the list given for the model"""
+
+    def __init__(self, results):
+        self.results = results
+
+    def join(self, *args):
+        return self
+
+    def filter(self, *args):
+        return self
+
+    def all(self):
+        return self.results.pop(0)
+
+    def first(self):
+        found = self.results.pop(0)
+        return found[0] if found else None
+
+
+class StartupSession(FakeSession):
+    def __init__(self, results):
+        super().__init__(None, None)
+        self.results = results
+
+    def query(self, model):
+        return ListQuery(self.results["build" if model is worker_aptly.Build else "mirror"])
+
+
+def make_mirror_build(build_id, buildstate):
+    build = MagicMock()
+    build.id = build_id
+    build.buildstate = buildstate
+    for method in ("log", "logdone", "set_building", "set_publishing", "set_failed", "set_publish_failed"):
+        setattr(build, method, AsyncMock())
+    return build
+
+
+def run_startup(tasks, mirrors, builds):
+    """mirrors: [(mirror, its build or None if it has no task on aptly: then its build is not looked up)],
+    builds: the mirror builds in building/publishing"""
+    results = {"mirror": [[m for m, _ in mirrors]], "build": [[b] for _, b in mirrors if b] + [builds]}
+    aptly = MagicMock()
+    aptly.get_tasks = AsyncMock(side_effect=tasks)
+    loop = MagicMock()
+    with patch.object(worker_aptly, "Session", StartupSession(results)), \
+            patch.object(worker_aptly, "get_aptly_connection", return_value=aptly), \
+            patch.object(worker_aptly, "finalize_mirror", MagicMock()) as finalize, \
+            patch.object(worker_aptly.asyncio, "get_event_loop", return_value=loop), \
+            patch.object(worker_aptly.asyncio, "sleep", AsyncMock()):
+        asyncio.run(worker_aptly.startup_mirror())
+    return finalize, loop
+
+
+def make_mirror(name, version, state):
+    _, mirror = make_build_and_mirror(state)
+    mirror.project.name = name
+    mirror.project.is_basemirror = True
+    mirror.name = version
+    mirror.id = 30879
+    mirror.mirror_components = ",".join(COMPONENTS)
+    mirror.mirror_architectures = "{amd64}"
+    mirror.mirror_with_sources = True
+    return mirror
+
+
+def test_startup_continues_running_mirror_and_fails_orphans():
+    trixie = make_mirror("trixie", "13.8", "updating")
+    trixie_build = make_mirror_build(100, "building")
+    old = make_mirror("jessie", "8.11", "error")
+    orphan = make_mirror_build(17, "publishing")
+
+    # aptly answers on the second attempt
+    finalize, loop = run_startup([Exception("aptly not up"), RESTART_TASKS],
+                                 [(trixie, trixie_build), (old, None)], [trixie_build, orphan])
+
+    assert finalize.call_args.args[0] == 100
+    assert finalize.call_args.args[-1] == [1, 2, 3, 4]
+    assert loop.create_task.call_count == 1
+    trixie_build.set_building.assert_awaited_once()
+    trixie_build.set_failed.assert_not_called()
+    assert trixie.mirror_state == "updating"
+    old.set_mirror_state.assert_not_called()  # error without tasks stays error, no log line
+    orphan.set_publish_failed.assert_awaited_once()
+    orphan.logdone.assert_awaited_once()
+
+
+def test_startup_without_tasks_fails_the_mirror_build():
+    trixie = make_mirror("trixie", "13.8", "updating")
+    build = make_mirror_build(100, "building")
+    finalize, loop = run_startup([[]], [(trixie, None)], [build])
+
+    finalize.assert_not_called()
+    assert trixie.mirror_state == "error"
+    build.set_failed.assert_awaited_once()
