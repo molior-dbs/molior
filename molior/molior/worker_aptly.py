@@ -11,7 +11,7 @@ from sqlalchemy import func, or_, desc, text
 from ..logger import logger
 from ..tools import db2array, array2db
 from ..ops import DebSrcPublish, DebPublish, DeleteBuildEnv
-from ..aptly import get_aptly_connection, get_snapshot_name
+from ..aptly import AptlyApi, TaskState, get_aptly_connection, get_snapshot_name
 from ..aptly.errors import AptlyError, NotFoundError
 from .debianrepository import DebianRepository
 from .notifier import Subject, Event, notify
@@ -37,6 +37,62 @@ def mirror_architectures(mirror):
     if mirror.mirror_with_sources:
         mirror_architectures.append('source')
     return mirror_architectures
+
+
+def mirror_aptly_names(base_mirror, base_mirror_version, mirror, version, components):
+    '''Return the aptly names of a mirror: one per component ("trixie-13.8-main"), or one for a flat mirror.
+    The aptly mirrors and their snapshots have these names.
+    '''
+    name, _ = AptlyApi.get_aptly_names(base_mirror, base_mirror_version, mirror, version, is_mirror=True)
+    components = [c for c in components if c]
+    if not components:
+        return [name]
+    return [f"{name}-{component}" for component in components]
+
+
+def mirror_resume_state(tasks, names):
+    '''Decide how to continue a mirror after a molior restart, from the aptly task list.
+
+    Args:
+        tasks (list): aptly tasks (GET /api/tasks), dicts with "ID", "Name" and "State".
+        names (list): aptly names of the mirror, see mirror_aptly_names().
+
+    Returns:
+        ("updating", ids): the update tasks of the latest update run, one per component, in any state.
+            finalize_mirror() follows all of them and then snapshots and publishes.
+        ("publishing", [id]): the latest publish task, if it is newer than the update tasks.
+        (None, []): no task of this mirror on aptly.
+    '''
+    updates = {}
+    for task in tasks:
+        for name in names:
+            if task["Name"] == f"Update mirror {name}":
+                # a mirror updated twice: keep the latest task per component
+                if name not in updates or task["ID"] > updates[name]["ID"]:
+                    updates[name] = task
+
+    publish_name = "Publish snapshot: " + ", ".join(names)
+    publishes = [task for task in tasks if task["Name"] == publish_name]
+
+    last_update = max([t["ID"] for t in updates.values()], default=-1)
+    if publishes:
+        publish = max(publishes, key=operator.itemgetter("ID"))
+        if publish["ID"] > last_update:
+            return "publishing", [publish["ID"]]
+
+    if updates:
+        return "updating", sorted(t["ID"] for t in updates.values())
+
+    return None, []
+
+
+def mirror_pending_tasks(tasks, names):
+    '''Return the ids of aptly tasks still queued or running on the mirror (e.g. a snapshot or delete queued
+    before a molior restart). aptly runs tasks on the same mirror one after the other.
+    '''
+    pending = (TaskState.INIT.value, TaskState.RUNNING.value)
+    return sorted(task["ID"] for task in tasks
+                  if task.get("State") in pending and any(task["Name"].endswith(f" {name}") for name in names))
 
 
 async def startup_mirror():
@@ -65,43 +121,24 @@ async def startup_mirror():
         for mirror in mirrors:
             base_mirror = ""
             base_mirror_version = ""
-            tasknames = ["Update mirror", "Publish snapshot:"]
+            if not mirror.project.is_basemirror:
+                base_mirror = mirror.basemirror.project.name
+                base_mirror_version = mirror.basemirror.name
+            components = mirror.mirror_components.split(",")
+            mirrorname = "{}-{}".format(mirror.project.name, mirror.name)
 
-            m_tasks = None
-            build_state = None
-            mirror_state = None
-            if tasks:
-                for i in range(len(tasknames)):
-                    taskname = tasknames[i]
-                    if not mirror.project.is_basemirror:
-                        base_mirror = mirror.basemirror.project.name
-                        base_mirror_version = mirror.basemirror.name
-                        task_name = "{} {}-{}-{}-{}-".format(taskname, base_mirror, base_mirror_version,
-                                                             mirror.project.name, mirror.name)
-                    else:
-                        task_name = "{} {}-{}-".format(taskname, mirror.project.name, mirror.name)
-                    # FIXME: search for each component
-                    #  "Publish snapshot: buster-10.4-cmps-main, buster-10.4-cmps-non-free",
+            names = mirror_aptly_names(base_mirror, base_mirror_version, mirror.project.name, mirror.name, components)
+            mirror_state, task_ids = mirror_resume_state(tasks or [], names)
 
-                    tmp_tasks = [task for task in tasks if task["Name"].startswith(task_name)]
-                    if tmp_tasks:
-                        m_tasks = tmp_tasks
-                        if i == 0:
-                            build_state = "building"
-                            mirror_state = "updating"
-                        elif i == 1:
-                            build_state = "publishing"
-                            mirror_state = "publishing"
-                        # do not break here, use last task in the list
-
-            if not m_tasks:
+            if not mirror_state:
                 # No task on aptly found
-                logger.info("no mirroring tasks found on aptly")
+                logger.info("no mirroring tasks found on aptly for %s", mirrorname)
                 await mirror.set_mirror_state("error")
                 session.commit()
                 continue
 
-            m_task = max(m_tasks, key=operator.itemgetter("ID"))
+            build_state = "building" if mirror_state == "updating" else "publishing"
+            logger.info("mirror %s: continuing %s, aptly tasks %s", mirrorname, mirror_state, task_ids)
 
             build = session.query(Build).filter(Build.buildtype == "mirror", Build.projectversion_id == mirror.id).first()
             if not build:
@@ -118,7 +155,6 @@ async def startup_mirror():
 
             await build.log("W: continuing active mirroring\n")
 
-            components = mirror.mirror_components.split(",")
             loop.create_task(
                 finalize_mirror(
                     build.id,
@@ -128,8 +164,7 @@ async def startup_mirror():
                     mirror.name,
                     components,
                     mirror_architectures(mirror),
-                    # FIXME: add all running tasks
-                    [m_task.get("ID")],
+                    task_ids,
                 )
             )
 
@@ -146,6 +181,16 @@ async def update_mirror(build_id, base_mirror, base_mirror_version, mirror, vers
     """
 
     aptly = get_aptly_connection()
+
+    # snapshots left from an earlier (failed) run would hide the new download, finalize_mirror() reuses existing ones
+    for name in mirror_aptly_names(base_mirror, base_mirror_version, mirror, version, components):
+        try:
+            if await aptly.snapshot_exists(name):
+                task = await aptly.DELETE(f"/snapshots/{name}")
+                await aptly.wait_task(task["ID"])
+        except Exception as exc:
+            logger.warning("mirror update: could not delete old snapshot %s: %s", name, exc)
+
     # FIXME: do not allow db cleanup while mirroring
     task_ids = await aptly.mirror_update(base_mirror, base_mirror_version, mirror, version, components)
 
@@ -192,20 +237,22 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
 
             if mirror.mirror_state == "updating":
                 while True:
+                    # 0: init (queued on aptly), 1: running, 2: success, 3: failed
+                    # after a restart some tasks may be done already, others still queued: poll until done
+                    pending = (TaskState.INIT.value, TaskState.RUNNING.value)
                     for task_id in task_ids:
-                        if progress[task_id]["State"] == 1:  # task is running
+                        if progress[task_id]["State"] in pending:
                             upd_progress = await aptly.mirror_get_progress(task_id)
                             if upd_progress:
                                 progress[task_id].update(upd_progress)
                             else:
                                 progress[task_id]["State"] = 3  # mark failed
 
-                    # check if at least 1 is running
-                    # 0: init, 1: running, 2: success, 3: failed
+                    # check if at least 1 is queued or running
                     running = False
                     failed = False
                     for task_id in task_ids:
-                        if progress[task_id]["State"] == 1:
+                        if progress[task_id]["State"] in pending:
                             running = True
                         if progress[task_id]["State"] == 3:
                             failed = True
@@ -270,9 +317,20 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
 
                 # snapshot after initial download
                 logger.debug("creating snapshot for: %s", mirrorname)
+                names = mirror_aptly_names(base_mirror, base_mirror_version, mirror_project, mirror_version, components)
                 try:
-                    task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version,
-                                                           mirror_project, mirror_version, components)
+                    # tasks queued on this mirror before a molior restart (e.g. a snapshot) run first on aptly
+                    while mirror_pending_tasks(await aptly.get_tasks() or [], names):
+                        await asyncio.sleep(5)
+
+                    # a snapshot made after the download (e.g. queued before a restart) is used as is
+                    missing = [component for component, name in zip(components, names)
+                               if not await aptly.snapshot_exists(name)]
+                    if missing:
+                        task_ids = await aptly.mirror_snapshot(base_mirror, base_mirror_version,
+                                                               mirror_project, mirror_version, missing)
+                    else:
+                        task_ids = []
                 except AptlyError as exc:
                     logger.error("error creating mirror %s snapshot: %s", mirrorname, exc)
                     await mirror.set_mirror_state("error")
@@ -288,9 +346,10 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                             task_state = await aptly.get_task_state(task_id)
                         except Exception:
                             failed = True
+                            continue
 
-                        # 0: init, 1: running, 2: success, 3: failed
-                        if task_state["State"] == 1:
+                        # 0: init (queued on aptly), 1: running, 2: success, 3: failed
+                        if task_state["State"] in (TaskState.INIT.value, TaskState.RUNNING.value):
                             running = True
                         if task_state["State"] == 3:
                             failed = True
@@ -320,13 +379,17 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                                                          mirror.mirror_distribution, components, architectures,
                                                          mirror.mirror_slash_workaround)
                 except Exception as exc:
+                    # keep the aptly mirror and its snapshots: the download may be hundreds of GB
                     logger.error("error publishing mirror %s snapshot: %s", mirrorname, str(exc))
+                    await build.log("E: error publishing mirror: {}\n".format(exc))
                     await mirror.set_mirror_state("error")
                     await build.set_publish_failed()
+                    await build.logdone()
                     session.commit()
-                    await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_project, mirror_version,
-                                              mirror.mirror_distribution, components, mirror.mirror_slash_workaround)
                     return
+
+            elif mirror.mirror_state == "publishing":
+                task_id = task_ids[0]  # continued after a restart: the publish task found by startup_mirror
 
             if mirror.mirror_state == "publishing":
                 while True:
