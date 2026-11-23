@@ -19,6 +19,20 @@ from ..model.sourcerepository import SourceRepository
 from ..model.sourepprover import SouRepProVer
 
 
+def has_pending_work(topbuild):
+    """
+    Returns True if a top level build has work which is continued after a start:
+    a source build waiting for its publish, or a deb build which is waiting to be built or published.
+    """
+    for source in topbuild.children:
+        if source.buildstate == "needs_publish":
+            return True
+        for deb in source.children:
+            if deb.buildstate in ["needs_build", "scheduled", "needs_publish"]:
+                return True
+    return False
+
+
 async def cleanup_builds():
     """
     Cleanup existing builds on startup
@@ -29,13 +43,16 @@ async def cleanup_builds():
         # FIXME: set schedules to needs build and delete buildtask
         builds = session.query(Build).filter(Build.buildstate == "building").all()
         for build in builds:
+            if build.buildtype == "build" and has_pending_work(build):
+                # its needs_build and needs_publish builds are queued by queue_pending_builds()
+                continue
             await build.set_failed()
             if build.buildtask:
                 session.delete(build.buildtask)
             cleaned_up = True
 
-        # "needs_publish" builds are kept on purpose, they are not lost (they stay in the DB, but are not
-        # re-queued: the aptly queue is in memory). Only an abort sets them to publish_failed.
+        # "needs_publish" builds are kept on purpose, they are not lost: they stay in the DB and are queued
+        # again by queue_pending_builds() (the aptly queue is in memory). Only an abort sets them to publish_failed.
         # "publishing" was interrupted by the restart: the result in aptly is unknown.
         builds = session.query(Build).filter(Build.buildstate == "publishing").all()
         for build in builds:
@@ -57,6 +74,25 @@ async def cleanup_builds():
 
         if cleaned_up:
             session.commit()
+
+
+async def queue_pending_builds():
+    """
+    Queues the builds which wait for the (in memory) queues, which are empty after a start:
+    publishes all builds in needs_publish (in id order, no age limit), then runs the scheduler once
+    (for the builds in needs_build and the scheduled ones which cleanup_builds set back to needs_build).
+    """
+
+    with Session() as session:
+        builds = session.query(Build).filter(
+            Build.buildstate == "needs_publish",
+            Build.buildtype.in_(["source", "deb"])).order_by(Build.id).all()
+        pending = [(build.buildtype, build.id) for build in builds]
+
+    for buildtype, build_id in pending:
+        await enqueue_aptly({"src_publish" if buildtype == "source" else "publish": [build_id]})
+    logger.info("startup: queued %d builds waiting for publishing, running the scheduler", len(pending))
+    await enqueue_task({"schedule": []})
 
 
 def cleanup_repos():
@@ -490,6 +526,11 @@ class Worker:
         # Cleanup
         try:
             await cleanup_builds()
+        except Exception as exc:
+            logger.exception(exc)
+
+        try:
+            await queue_pending_builds()
         except Exception as exc:
             logger.exception(exc)
 
