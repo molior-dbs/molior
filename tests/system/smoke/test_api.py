@@ -87,6 +87,11 @@ def test_project_version_needs_a_base_mirror(admin, unique):
     r = admin.post(f"/api2/projectbase/{project}/versions",
                    json={"name": "1.0", "architectures": ["amd64"], "basemirror": "nomirror/1"})
     assert r.status_code == 400
+    assert r.json()["detail"] == "Base mirror not found: nomirror/1"
+    r = admin.post(f"/api2/projectbase/{project}/versions",
+                   json={"name": "1.0", "architectures": ["amd64"], "baseproject": "noproject/1"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Base project not found: noproject/1"
 
 
 def test_global_token(admin, unique):

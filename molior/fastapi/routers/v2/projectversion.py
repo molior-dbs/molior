@@ -458,7 +458,7 @@ async def copy_projectversion(
 
     err, bpv, bm = find_basemirror_or_baseproject(db, body.basemirror, body.baseproject)
     if err:
-        raise HTTPException(status_code=400, detail=err.text)
+        raise HTTPException(status_code=400, detail=err)
 
     new_pv = pv.copy(db, body.name, body.description, body.dependency_policy,
                      bm.id, body.architectures, body.cibuilds, retention_ok, retention_fail)

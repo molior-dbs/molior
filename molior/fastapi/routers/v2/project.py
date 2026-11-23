@@ -161,7 +161,7 @@ async def create_project_version(
 
     err, pv, bm = find_basemirror_or_baseproject(db, body.basemirror, body.baseproject)
     if err:
-        raise HTTPException(status_code=400, detail=err.text)
+        raise HTTPException(status_code=400, detail=err)
 
     for arch in body.architectures:
         if arch not in db2array(bm.mirror_architectures):

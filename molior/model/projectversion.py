@@ -4,7 +4,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..logger import logger
 from ..molior.configuration import Configuration
-from ..tools import ErrorResponse, db2array, array2db
+from ..tools import db2array, array2db
 from ..molior.notifier import Subject, Event, notify
 
 from .database import Base
@@ -362,6 +362,11 @@ def get_mirror(request):
 
 
 def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
+    """
+    Finds the base mirror of a new project version, given as basemirror or baseproject ("name/version").
+
+    Returns (error, baseproject, basemirror). error is None on success, else the error message (str).
+    """
     if baseproject:
         baseproject_name, baseproject_version = baseproject.split("/")
         pv = db.query(ProjectVersion).join(Project).filter(
@@ -369,7 +374,7 @@ def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
                 func.lower(Project.name) == baseproject_name.lower(),
                 func.lower(ProjectVersion.name) == baseproject_version.lower()).first()
         if not pv:
-            return ErrorResponse(400, "Base project not found: {}/{}".format(baseproject_name, baseproject_version)), None, None
+            return "Base project not found: {}/{}".format(baseproject_name, baseproject_version), None, None
         bm = pv.basemirror
         return None, pv, bm
     else:
@@ -379,7 +384,7 @@ def find_basemirror_or_baseproject(db, basemirror=None, baseproject=None):
                 func.lower(Project.name) == basemirror_name.lower(),
                 func.lower(ProjectVersion.name) == basemirror_version.lower()).first()
         if not bm:
-            return ErrorResponse(400, "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version)), None, None
+            return "Base mirror not found: {}/{}".format(basemirror_name, basemirror_version), None, None
         return None, None, bm
 
 
