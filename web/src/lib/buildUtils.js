@@ -123,10 +123,12 @@ export function formatStartTime(build, showFull = false) {
   return `${ts.getFullYear()}-${mm} ${hm}`;
 }
 
-// Build state filter groups — mirrors mergeBuildStates()
+// Build state filter groups. needs_publish, publishing and publish_failed are separate filters.
 export const BUILD_STATE_GROUPS = [
   { label: 'Successful',  value: 'successful/already_exists/nothing_done',  icon: 'bi-check-lg text-success' },
-  { label: 'Publishing',  value: 'publishing/publish_failed',               icon: 'bi-upload' },
+  { label: 'Needs publish', value: 'needs_publish',                         icon: 'bi-upload' },
+  { label: 'Publishing',  value: 'publishing',                              icon: 'bi-upload text-primary' },
+  { label: 'Publish failed', value: 'publish_failed',                       icon: 'bi-upload text-danger' },
   { label: 'Pending',     value: 'new/scheduled',                           icon: 'bi-clock' },
   { label: 'Failed',      value: 'build_failed/already_failed',             icon: 'bi-x-lg text-danger' },
   { label: 'Building',    value: 'building',                                icon: 'build-spinner' },
@@ -136,7 +138,6 @@ export const BUILD_STATE_GROUPS = [
 export function expandBuildStateGroup(value) {
   switch (value) {
     case 'successful/already_exists/nothing_done': return ['successful', 'already_exists', 'nothing_done'];
-    case 'publishing/publish_failed':              return ['publishing', 'publish_failed'];
     case 'new/scheduled':                          return ['new', 'scheduled'];
     case 'build_failed/already_failed':            return ['build_failed', 'already_failed'];
     default:                                       return [value];
