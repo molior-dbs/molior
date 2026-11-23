@@ -250,8 +250,8 @@ class DebianRepository:
 
     async def remove_packages(self, remove_packages, ci_build=False):
         if not remove_packages:
-            logger.error("remove_packages: empty file list")
-            return False
+            # nothing to remove (every publish without retention work), not an error
+            return True
         delete_files = []
         repo_name = self.name + "-stable"
         # convert remove_packages to delete_files
@@ -262,7 +262,14 @@ class DebianRepository:
                                                                                     package[2]))  # arch
             delete_files.extend(pkg)
 
-        await self.aptly.repo_packages_delete(repo_name, delete_files)
+        if not delete_files:
+            # the packages are not in the repository (anymore)
+            return True
+
+        task_id = await self.aptly.repo_packages_delete(repo_name, delete_files)
+        if not await self.aptly.wait_task(task_id):
+            logger.error("remove_packages: error removing packages from %s", repo_name)
+            return False
 
         return True
 

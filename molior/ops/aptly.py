@@ -89,7 +89,10 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
 
     add_files(build_id, buildtype, version, srcfiles)
 
-    ret = False
+    # The source is published to every projectversion. All of them must succeed,
+    # an error in one must not be hidden by the result of another.
+    published = False
+    failed = False
     for projectversion_id in projectversions:
         fullname = None
         with Session() as session:
@@ -119,20 +122,29 @@ async def DebSrcPublish(build_id, repo_id, sourcename, version, projectversions,
         try:
             ret = await debian_repo.add_packages(publish_files, ci_build=is_ci)
         except Exception as exc:
-            await buildlog(build_id, "E: error adding files\n")
             logger.exception(exc)
             ret = False
+        if not ret:
+            await buildlog(build_id, "E: error adding files\n")
+            failed = True
+            continue  # do not republish a repository without the new files
 
         try:
             ret = await debian_repo.republish(ci_build=is_ci)
         except Exception as exc:
-            await buildlog(build_id, "E: error republishing repository\n")
             logger.exception(exc)
             ret = False
+        if not ret:
+            await buildlog(build_id, "E: error republishing repository\n")
+            failed = True
+            continue
+
+        published = True
 
     await buildlog(build_id, "\n")
 
-    if ret:  # only delete if published, allow republish
+    ret = published and not failed
+    if ret:  # only delete if published everywhere, allow republish
         files2delete = publish_files
         changes_file = get_debchanges_filename(sourcepath, sourcename, version, "source")
         if Path(changes_file).exists():
@@ -204,28 +216,40 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
 
     debian_repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version,
                                    archs, publish_s3=publish_s3)
-    ret = False
+    # Every step must succeed. Stop at the first error: the result of an earlier step
+    # must not be hidden by a later one, and obsolete packages must not be removed
+    # when the new package was not added.
+
     # publish new packages to aptly
     try:
         ret = await debian_repo.add_packages(files2upload, ci_build=is_ci)
     except Exception as exc:
-        await buildlog(build_id, "E: error uploading files to repository\n")
         logger.exception(exc)
+        ret = False
+    if not ret:
+        await buildlog(build_id, "E: error uploading files to repository\n")
+        return False
 
     # remove obsolete packages from aptly
     try:
         ret = await debian_repo.remove_packages(remove_packages, ci_build=is_ci)
     except Exception as exc:
-        await buildlog(build_id, "E: error adding files\n")
         logger.exception(exc)
+        ret = False
+    if not ret:
+        await buildlog(build_id, "E: error removing obsolete packages from repository\n")
+        return False
 
     try:
         ret = await debian_repo.republish(ci_build=is_ci)
     except Exception as exc:
-        await buildlog(build_id, "E: error republishing repository\n")
         logger.exception(exc)
         ret = False
+    if not ret:
+        await buildlog(build_id, "E: error republishing repository\n")
+        return False
 
+    # published, delete the files (kept on errors to allow a retry and to see what failed)
     files2delete = files2upload
     files2delete.append("{}/{}".format(out_path, changes_file))
     for f in files2delete:
@@ -234,7 +258,7 @@ async def publish_packages(build_id, buildtype, sourcename, version, architectur
         except Exception as exc:
             logger.exception(exc)
 
-    return ret
+    return True
 
 
 async def DebPublish(build_id, buildtype, sourcename, version, architecture,
