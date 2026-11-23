@@ -1,4 +1,6 @@
-REGISTRY := k3d-molior-registry
+# k3d cluster name (make create-k3d K3D_CLUSTER=local); the registry is <name>-registry, k3d names its container k3d-<name>-registry
+K3D_CLUSTER ?= molior
+REGISTRY := k3d-$(K3D_CLUSTER)-registry
 REGISTRY_PORT := 5000
 MOLIOR_DEV ?= true
 PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
@@ -55,9 +57,9 @@ helm-push: helm-package  ## Push helm chart to local OCI registry
 helm-package:  ## Build helm package
 	helm package charts/
 
-create-k3d:  ## Create k3d cluster
-	k3d registry list molior-registry >/dev/null 2>&1 || k3d registry create molior-registry --port 0.0.0.0:$(REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
-	k3d cluster create molior \
+create-k3d:  ## Create k3d cluster $(K3D_CLUSTER) and its registry (default molior; make create-k3d K3D_CLUSTER=local)
+	k3d registry list $(K3D_CLUSTER)-registry >/dev/null 2>&1 || k3d registry create $(K3D_CLUSTER)-registry --port 0.0.0.0:$(REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
+	k3d cluster create $(K3D_CLUSTER) \
 		--registry-use $(REGISTRY):$(REGISTRY_PORT) \
 		--port "8000:30080@server:0" \
 		--port "8080:30088@server:0" \
@@ -65,8 +67,8 @@ create-k3d:  ## Create k3d cluster
 		--k3s-arg "--disable=metrics-server@server:0"
 	kubectl config set-context --current --namespace=$(NAMESPACE)
 
-delete-k3d:  ## Delete k3d cluster
-	k3d cluster delete molior
+delete-k3d:  ## Delete k3d cluster $(K3D_CLUSTER) (the registry stays)
+	k3d cluster delete $(K3D_CLUSTER)
 
 rsync:  ## Copy this source tree to ~/molior on a host (usage: make rsync IP=<host>; RSYNC_OPTS=--delete to mirror)
 	@test -n "$(IP)" || (echo "Usage: make rsync IP=<node-ip>"; exit 1)
@@ -149,12 +151,14 @@ download-k3d:  ## Download and install k3d binary
 
 
 
-install-k3d:  ## Install molior dev into cluster (creates the Secret molior-passwords with the dev password molior-dev if it does not exist)
+# VALUES=<file> adds a values file; registry and molior.dev still come from K3D_CLUSTER and MOLIOR_DEV (the later -f wins)
+install-k3d:  ## Install molior dev into cluster (Secret molior-passwords with molior-dev if missing; optional VALUES=<values file>)
+	@test -z "$(VALUES)" || test -f "$(VALUES)" || { echo "VALUES file $(VALUES) not found"; exit 1; }
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	kubectl -n $(NAMESPACE) get secret molior-passwords >/dev/null 2>&1 || kubectl -n $(NAMESPACE) create secret generic molior-passwords \
 		--from-literal=molior-password=molior-dev --from-literal=aptly-password=molior-dev --from-literal=registry-password=molior-dev
 	printf 'registry:\n  host: %s\n  port: %s\nmolior:\n  dev: %s\n' $(REGISTRY) $(REGISTRY_PORT) $(MOLIOR_DEV) > /tmp/molior-registry-values.yaml
-	helm install --create-namespace molior charts/ -f /tmp/molior-registry-values.yaml; rm -f /tmp/molior-registry-values.yaml
+	helm install --create-namespace molior charts/ $(if $(VALUES),-f $(VALUES)) -f /tmp/molior-registry-values.yaml; rm -f /tmp/molior-registry-values.yaml
 
 uninstall-k3d:  ## Uninstall molior helm chart from k3d
 	helm uninstall --wait molior || true

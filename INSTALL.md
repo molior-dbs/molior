@@ -59,6 +59,9 @@ make create-k3d
 This sets up:
 - A local image registry at `k3d-molior-registry:5000`
 - A k3d cluster named `molior`
+
+Another name: `make create-k3d K3D_CLUSTER=local` creates the cluster `local` and the registry `k3d-local-registry:5000`.
+Pass the same `K3D_CLUSTER` to `delete-k3d` and `install-k3d`.
 - Port `8000` → Molior web UI
 - Port `8080` → Aptly repository
 
@@ -108,6 +111,9 @@ Deploy Molior into the cluster:
 ```sh
 make install-k3d
 ```
+
+`VALUES=<file>` adds a values file of a machine, for example
+`make install-k3d K3D_CLUSTER=local VALUES=values-local.yaml`.
 
 Installs the `charts/` Helm chart into the cluster. The passwords are not chart values: they are read from the Secret `molior-passwords` (keys `molior-password`, `aptly-password`, `registry-password`). `make install-k3d` creates it with the dev password `molior-dev` if it does not exist. On a remote cluster run `make set-passwords` before `helm install`: it asks for the passwords (an empty answer keeps the current one).
 
