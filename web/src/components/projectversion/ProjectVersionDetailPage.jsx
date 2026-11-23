@@ -23,6 +23,7 @@ import {
   retryProjectVersionBuilds,
   lockProjectVersion,
   fetchDependencies,
+  fetchDependencyCandidates,
   addDependency,
   removeDependency,
   fetchDependents,
@@ -382,9 +383,9 @@ function AddDependencyModal({ pv, onClose }) {
 
   useEffect(() => {
     if (!pv) return;
-    fetchDependencies(pv.project_name, pv.name, query)
-      .then(setOptions)
-      .catch(() => {});
+    fetchDependencyCandidates(pv.project_name, pv.name, query)
+      .then(data => setOptions(data.results ?? []))
+      .catch(() => setOptions([]));
   }, [query, pv]);
 
   async function handleSave() {

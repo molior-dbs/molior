@@ -95,6 +95,14 @@ export async function fetchDependencies(projectName, versionName, q = '', page =
   return res.json(); // { total_result_count, results }
 }
 
+export async function fetchDependencyCandidates(projectName, versionName, q = '') {
+  const params = new URLSearchParams({ candidates: 'true', q });
+  const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependencies?${params}`),
+                          { credentials: 'same-origin' });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
+  return res.json(); // { total_result_count, results }
+}
+
 export async function addDependency(projectName, versionName, dependency, use_cibuilds = false) {
   const res = await fetch(apiUrl(`/api2/project/${projectName}/${versionName}/dependencies`), {
     method: 'POST', credentials: 'same-origin',

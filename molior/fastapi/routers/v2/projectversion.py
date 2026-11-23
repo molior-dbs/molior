@@ -263,7 +263,9 @@ def _projectversion_page(db, ids, q, page, page_size):
     """
     query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.id.in_(set(ids)))
     if q:
-        query = query.filter(ProjectVersion.fullname.ilike(f"%{escape_for_like(q)}%"))
+        # Project is joined: match "project/version" directly (ProjectVersion.fullname is a correlated subquery
+        # on project, which SQLAlchemy correlates away here: "returned no FROM clauses")
+        query = query.filter(func.concat(Project.name, "/", ProjectVersion.name).ilike(f"%{escape_for_like(q)}%"))
     query = query.order_by(Project.is_mirror, func.lower(Project.name), func.lower(ProjectVersion.name))
     total = query.count()
     if page or page_size:
