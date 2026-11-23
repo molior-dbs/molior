@@ -1,0 +1,19 @@
+# Helm values for the system tests (tests/system/system-tests.sh). The script adds the registry
+# (host and port of the test cluster's own registry) on the command line.
+molior:
+  version: dev
+  dev: true                 # plain HTTP session cookies, no TLS in the test cluster
+  ciBuildsEnabled: true
+  maxParallelChroots: 1
+  maxParallelSourceBuilds: 1
+  terminationGracePeriodSeconds: 60
+
+builder:
+  amd64:
+    parallel: 1
+  arm64:
+    parallel: 1
+
+aptly:
+  # the APT URL shown to users (About page, sources lists): reachable from the test runner pod
+  publicUrl: "http://aptly:8000"
