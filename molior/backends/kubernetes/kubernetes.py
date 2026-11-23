@@ -90,7 +90,9 @@ class KubernetesBackend:
                                   node_selector=dict([node_label.split("=", 1)]))
         )
 
-        job_spec = client.V1JobSpec(template=template)
+        # no retries: molior treats the first failed pod as a failed build (a Job left behind by a molior restart
+        # would otherwise build up to 6 times); finished Jobs and their pods are removed by Kubernetes after 1 hour
+        job_spec = client.V1JobSpec(template=template, backoff_limit=0, ttl_seconds_after_finished=3600)
 
         job = client.V1Job(
             api_version="batch/v1",
