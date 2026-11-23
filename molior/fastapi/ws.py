@@ -261,6 +261,11 @@ async def main_websocket(websocket: WebSocket):
     finally:
         _ws_queues.discard(notify_q)
         push_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await push_task
-        await _stop_logger()
+        try:
+            with contextlib.suppress(asyncio.CancelledError):
+                await push_task
+        except WebSocketDisconnect:
+            # the push task ended because sending to the closed connection failed
+            logger.warning("ws: client disconnected")
+        finally:
+            await _stop_logger()
