@@ -34,8 +34,12 @@ async def cleanup_builds():
                 session.delete(build.buildtask)
             cleaned_up = True
 
-        builds = session.query(Build).filter(Build.buildstate == "publishing").all()
+        # "needs_publish" means "waiting in the in-memory aptly queue", which is empty after a restart.
+        # Nothing would ever publish these builds, so mark them failed (they can be retried in the UI).
+        builds = session.query(Build).filter(Build.buildstate.in_(["needs_publish", "publishing"])).all()
         for build in builds:
+            logger.warning("cleanup: build %d was in state %s at startup, setting publish_failed",
+                           build.id, build.buildstate)
             await build.set_publish_failed()
             if build.buildtask:
                 session.delete(build.buildtask)
