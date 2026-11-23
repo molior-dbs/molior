@@ -521,6 +521,18 @@ class AptlyWorker:
 
     def __init__(self):
         self.threadexc = ThreadPoolExecutor(max_workers=5)
+        # build logs closed during the current publish (the worker handles one task at a time)
+        self._logs_done = set()
+
+    async def _log_done(self, build_id, no_header_newline):
+        """
+        Writes the "Done" footer and closes the build log. The footer is written only once
+        per publish, but the log is always closed (a message written to a closed log opens a new writer).
+        """
+        if build_id not in self._logs_done:
+            self._logs_done.add(build_id)
+            await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=no_header_newline)
+        await buildlogdone(build_id)
 
     async def _init_mirror(self, args):
         mirror_id = args[0]
@@ -692,7 +704,43 @@ class AptlyWorker:
                 await build.logtitle("Done", no_footer_newline=True)
                 await build.logdone()
 
+    async def _publish_error(self, build_id, exc):
+        """
+        Called when an exception escaped from _publish or _src_publish.
+        Without it the build would stay in "publishing" (or "needs_publish") and all
+        builds depending on it would wait for it until the next start of molior.
+        """
+        try:
+            with Session() as session:
+                build = session.query(Build).filter(Build.id == build_id).first()
+                if not build:
+                    return
+                if build.buildstate not in ["needs_publish", "publishing"]:
+                    return  # the build was already finished or aborted
+
+                buildtype = build.buildtype
+                parent_id = build.parent_id
+                await buildlog(build_id, "E: internal error while publishing: %s\n" % repr(exc))
+                await build.set_publish_failed()  # sets the top build to failed
+                session.commit()
+
+            await self._log_done(build_id, no_header_newline=(buildtype == "source"))
+            if buildtype == "source":
+                await self._log_done(parent_id, no_header_newline=True)
+            else:
+                await enqueue_task({"schedule": []})
+        except Exception as exc2:
+            logger.exception(exc2)
+
     async def _src_publish(self, args):
+        self._logs_done = set()
+        try:
+            await self._do_src_publish(args)
+        except Exception as exc:
+            logger.exception(exc)
+            await self._publish_error(args[0], exc)
+
+    async def _do_src_publish(self, args):
         build_id = args[0]
 
         with Session() as session:
@@ -701,7 +749,7 @@ class AptlyWorker:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return False
 
-            if build.buildstate == "build_failed":
+            if build.buildstate in ["build_failed", "publish_failed"]:
                 logger.info("aptly worker: build %d was aborted, not publishing", build_id)
                 return False
 
@@ -721,11 +769,9 @@ class AptlyWorker:
             logger.exception(exc)
 
         if not ret:  # src publish failed, no more logs for parent
-            await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlogdone(parent_id)
+            await self._log_done(parent_id, no_header_newline=True)
 
-        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=True)
-        await buildlogdone(build_id)
+        await self._log_done(build_id, no_header_newline=True)
 
         found_childs = False
         with Session() as session:
@@ -756,8 +802,7 @@ class AptlyWorker:
 
         if not found_childs:
             await buildlog(parent_id, "E: no deb builds found\n")
-            await buildlogtitle(parent_id, "Done", no_footer_newline=True, no_header_newline=True)
-            await buildlogdone(parent_id)
+            await self._log_done(parent_id, no_header_newline=True)
             return False
 
         # Schedule builds
@@ -766,19 +811,28 @@ class AptlyWorker:
         return True
 
     async def _publish(self, args):
+        self._logs_done = set()
+        try:
+            await self._do_publish(args)
+        except Exception as exc:
+            logger.exception(exc)
+            await self._publish_error(args[0], exc)
+
+    async def _do_publish(self, args):
         build_id = args[0]
 
         # builds to delete from db and remove buildlogs
         builds_to_delete = []
         # remove src and deb packages from aptly
-        remove_packages = {}
+        remove_packages = []
+        retention_error = None
         with Session() as session:
             build = session.query(Build).filter(Build.id == build_id).first()
             if not build:
                 logger.error("aptly worker: build with id %d not found", build_id)
                 return
 
-            if build.buildstate == "build_failed":
+            if build.buildstate in ["build_failed", "publish_failed"]:
                 logger.info("aptly worker: build %d was aborted, not publishing", build_id)
                 return
 
@@ -803,8 +857,18 @@ class AptlyWorker:
                 publish_s3 = f"{s3_endpoint}:{s3_path.replace('/', '_')}"  # on aptly, directory separatos is _ for publishing
 
             if not is_ci:
-                builds_to_delete, remove_packages = await retention_cleanup(session, build)
+                # Retention is housekeeping: an error must not fail the publish. Log it and
+                # publish without removing anything, the next publish does the cleanup.
+                try:
+                    builds_to_delete, remove_packages = await retention_cleanup(session, build)
+                except Exception as exc:
+                    logger.exception(exc)
+                    builds_to_delete, remove_packages = [], []
+                    retention_error = repr(exc)
 
+        if retention_error:
+            await buildlog(build_id, "E: retention cleanup failed, obsolete packages are not removed: %s\n"
+                           % retention_error)
         await buildlog(parent_parent_id, "I: publishing debian packages for %s\n" % architecture)
 
         ret = False
@@ -816,11 +880,10 @@ class AptlyWorker:
             logger.exception(exc)
 
         if not ret:
-            await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build.id)
+            await buildlog(parent_parent_id, "E: publishing build %d failed\n" % build_id)
             await buildlog(build_id, "E: publishing build failed\n")
 
-        await buildlogtitle(build_id, "Done", no_footer_newline=True, no_header_newline=False)
-        await buildlogdone(build_id)
+        await self._log_done(build_id, no_header_newline=False)
 
         with Session() as session:
             # set current buildstate
@@ -1586,13 +1649,22 @@ class AptlyWorker:
 
             await buildlog(build_id, "E: aborting build on user request\n")
 
-            for deb in topbuild.children[0].children:
+            # a source package waiting for its publish is not published
+            srcbuild = topbuild.children[0]
+            if srcbuild.buildstate == "needs_publish":
+                await srcbuild.set_publish_failed()
+
+            for deb in srcbuild.children:
                 # abort on build node
                 if deb.buildstate in ["building", "scheduled"]:
                     await enqueue_backend({"abort": deb.id})
 
                 if deb.buildstate in ["new", "needs_build", "scheduled"]:
                     await deb.set_failed()
+
+                # a build waiting for its publish is not published
+                if deb.buildstate == "needs_publish":
+                    await deb.set_publish_failed()
 
                 if deb.buildtask:
                     session.delete(deb.buildtask)
@@ -1620,7 +1692,10 @@ class AptlyWorker:
                 topbuild = deb.parent.parent if deb.parent else None
                 if topbuild:
                     await topbuild.log("E: aborting build on user request\n")
-                await deb.set_failed()
+                if deb.buildstate == "needs_publish":
+                    await deb.set_publish_failed()  # it is built, only the publish is aborted
+                else:
+                    await deb.set_failed()
                 session.commit()
 
             # source builds only belonging to this projectversion
@@ -1633,7 +1708,10 @@ class AptlyWorker:
             for source in sources:
                 if source.parent:
                     await source.parent.log("E: aborting build on user request\n")
-                await source.set_failed()
+                if source.buildstate == "needs_publish":
+                    await source.set_publish_failed()
+                else:
+                    await source.set_failed()
                 session.commit()
 
             building = session.query(Build).filter(

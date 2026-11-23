@@ -102,14 +102,16 @@ def run_cleanup(builds):
     return session
 
 
-def test_needs_publish_becomes_publish_failed():
-    """The aptly queue is in memory, so builds waiting in it are lost at a restart."""
-    src = FakeBuild(1, "needs_publish", "source")
+def test_needs_publish_is_kept():
+    """Builds waiting for their publish are not lost: they keep their state and their buildtask."""
+    task = object()
+    src = FakeBuild(1, "needs_publish", "source", buildtask=task)
     deb = FakeBuild(2, "needs_publish", "deb")
     session = run_cleanup([src, deb])
-    assert src.buildstate == "publish_failed"
-    assert deb.buildstate == "publish_failed"
-    assert session.commits == 1
+    assert src.buildstate == "needs_publish"
+    assert deb.buildstate == "needs_publish"
+    assert session.deleted == []
+    assert session.commits == 0
 
 
 def test_publishing_becomes_publish_failed():
@@ -118,9 +120,9 @@ def test_publishing_becomes_publish_failed():
     assert build.buildstate == "publish_failed"
 
 
-def test_buildtask_of_publish_builds_is_deleted():
+def test_buildtask_of_publishing_build_is_deleted():
     task = object()
-    build = FakeBuild(1, "needs_publish", buildtask=task)
+    build = FakeBuild(1, "publishing", buildtask=task)
     session = run_cleanup([build])
     assert session.deleted == [task]
 

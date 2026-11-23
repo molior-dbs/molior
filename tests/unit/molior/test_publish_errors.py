@@ -96,7 +96,8 @@ def ops(tmp_path):
         "molior.tools": MagicMock(strip_epoch_version=lambda v: v.split(":")[-1], db2array=lambda a: a),
         "molior.molior.debianrepository": MagicMock(DebianRepository=FakeRepo),
         "molior.molior.configuration": MagicMock(Configuration=lambda: configuration),
-        "molior.molior.queues": MagicMock(buildlog=buildlog, buildlogtitle=MagicMock(side_effect=lambda *a, **k: asyncio.sleep(0))),
+        "molior.molior.queues": MagicMock(
+            buildlog=buildlog, buildlogtitle=MagicMock(side_effect=lambda *a, **k: asyncio.sleep(0))),
         "molior.model.database": MagicMock(),
         "molior.model.build": MagicMock(),
         "molior.model.buildtask": MagicMock(),
