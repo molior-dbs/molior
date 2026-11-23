@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# mirror_filter_with_deps: with a package filter, aptly also mirrors the dependencies of the
+# matching packages (aptly FilterWithDeps). Existing mirrors keep the old behaviour (false).
+
+psql molior <<EOSQL
+
+ALTER TABLE projectversion ADD COLUMN mirror_filter_with_deps boolean DEFAULT false NOT NULL;
+
+EOSQL

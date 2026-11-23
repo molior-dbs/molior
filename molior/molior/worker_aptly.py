@@ -699,7 +699,8 @@ class AptlyWorker:
 
                 await build.log("I: creating mirror\n")
                 if mirror.mirror_filter:
-                    await build.log("I: using filter %s\n" % mirror.mirror_filter)
+                    await build.log("I: using filter %s%s\n" % (mirror.mirror_filter,
+                                    " (with dependencies)" if mirror.mirror_filter_with_deps else ""))
                 try:
                     await aptly.mirror_create(
                         mirror.project.name,
@@ -718,6 +719,7 @@ class AptlyWorker:
                         download_sources=mirror.mirror_with_sources,
                         download_udebs=mirror.mirror_with_installer,
                         download_installer=mirror.mirror_with_installer,
+                        filter_with_deps=bool(mirror.mirror_filter_with_deps),
                     )
 
                 except NotFoundError as exc:

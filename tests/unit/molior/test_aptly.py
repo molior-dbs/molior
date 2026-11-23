@@ -162,3 +162,38 @@ def test_mirror_delete_publish_url():
         api, calls = _mirror_api()
         asyncio.run(api.mirror_delete("bookworm", "12.8", "mcp", "1", dist, [], workaround))
         assert calls[0] == ("DELETE", "/publish/bookworm_12.8_mirrors_mcp_1/" + url, None)
+
+
+def test_mirror_create_filter_with_deps():
+    """
+    Test mirror_create passes FilterWithDeps to aptly only together with a filter
+    """
+    import asyncio
+
+    cases = (
+        # filter, filter_with_deps, expected FilterWithDeps
+        ("Priority (required) | debhelper", True, True),
+        ("Priority (required) | debhelper", False, False),
+        ("", True, False),
+        (None, True, False),
+    )
+    for mirror_filter, with_deps, expected in cases:
+        api, calls = _mirror_api()
+        asyncio.run(api.mirror_create("trixie", "13.8", "", "", "http://deb.debian.org/debian", "trixie",
+                                      ["main"], ["amd64"], mirror_filter, filter_with_deps=with_deps))
+        assert calls[0][1] == "/mirrors"
+        assert calls[0][2]["Filter"] == mirror_filter
+        assert calls[0][2]["FilterWithDeps"] is expected
+
+
+def test_mirror_create_filter_with_deps_default_off():
+    """
+    Test mirror_create keeps FilterWithDeps off by default (existing callers, existing mirrors)
+    """
+    import asyncio
+
+    api, calls = _mirror_api()
+    asyncio.run(api.mirror_create("trixie", "13.8", "", "", "http://deb.debian.org/debian", "trixie",
+                                  ["main", "contrib"], ["amd64"], "Name (% python3*)"))
+    assert [c[2]["Name"] for c in calls] == ["trixie-13.8-main", "trixie-13.8-contrib"]
+    assert all(c[2]["FilterWithDeps"] is False for c in calls)

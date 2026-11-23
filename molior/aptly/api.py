@@ -236,7 +236,7 @@ class AptlyApi:
 
     async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
                             components, architectures, mirror_filter, download_sources=True,
-                            download_udebs=True, download_installer=True):
+                            download_udebs=True, download_installer=True, filter_with_deps=False):
         """
         Creates a debian archive mirror.
 
@@ -264,7 +264,7 @@ class AptlyApi:
                 "DownloadUdebs": download_udebs,
                 "DownloadInstaller": download_installer,
                 "Filter": mirror_filter,
-                "FilterWithDeps": False,
+                "FilterWithDeps": bool(mirror_filter) and filter_with_deps,
             }
 
             await self.POST("/mirrors", data=data)

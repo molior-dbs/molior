@@ -147,7 +147,11 @@ function MirrorHeader({ mirror, name, version, onAction, isAdmin }) {
               <tr>
                 <td className="pe-4 py-1"><strong>Filter</strong></td>
                 <td className="pe-5 py-1" colSpan={3}
-                    style={{ fontFamily: 'monospace', fontSize: 12 }}>{mirror.mirrorfilter}</td>
+                    style={{ fontFamily: 'monospace', fontSize: 12 }}>{mirror.mirrorfilter}
+                  {mirror.mirrorfilterwithdeps && (
+                    <span className="text-muted"> (with dependencies)</span>
+                  )}
+                </td>
               </tr>
             )}
             <tr>

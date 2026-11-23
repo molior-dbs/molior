@@ -86,6 +86,7 @@ def get_mirror(name: str, version: str, current_user: CurrentUser = Depends(auth
         "external_repo": mirror.external_repo,
         "dependency_policy": mirror.dependency_policy,
         "mirrorfilter": mirror.mirror_filter,
+        "mirrorfilterwithdeps": bool(mirror.mirror_filter_with_deps),
     }
 
 
@@ -162,6 +163,7 @@ class CreateMirrorBody(BaseModel):
     mirrorkeyserver: Optional[str] = ""
     dependencylevel: Optional[str] = "strict"
     mirrorfilter: Optional[str] = ""
+    mirrorfilterwithdeps: Optional[bool] = False
 
 
 @router.post("/mirror")
@@ -186,6 +188,7 @@ async def create_mirror(
     mirrorkeyserver = body.mirrorkeyserver.strip()
     dependency_policy = body.dependencylevel.strip()
     mirrorfilter = body.mirrorfilter.strip()
+    mirrorfilterwithdeps = bool(body.mirrorfilterwithdeps) and bool(mirrorfilter)
 
     existing = db.query(ProjectVersion).join(Project).filter(
         func.lower(ProjectVersion.name) == mirrorversion.lower(),
@@ -254,6 +257,7 @@ async def create_mirror(
         external_repo=external_repo,
         dependency_policy=dependency_policy,
         mirror_filter=mirrorfilter,
+        mirror_filter_with_deps=mirrorfilterwithdeps,
     )
     db.add(mirror)
     db.commit()
@@ -301,6 +305,7 @@ class EditMirrorBody(BaseModel):
     mirrorkeyserver: Optional[str] = ""
     dependencylevel: Optional[str] = "strict"
     mirrorfilter: Optional[str] = ""
+    mirrorfilterwithdeps: Optional[bool] = False
 
 
 @router.put("/mirror/{name}/{version}")
@@ -360,6 +365,7 @@ async def update_mirror(
     mirror.mirror_with_installer = mirrorinst
     mirror.is_basemirror = mirrortype == "1"
     mirror.mirror_filter = mirrorfilter
+    mirror.mirror_filter_with_deps = bool(body.mirrorfilterwithdeps) and bool(mirrorfilter)
     if mirrortype == "2":
         mirror.dependency_policy = dependency_policy
 

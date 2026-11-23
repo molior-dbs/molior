@@ -21,7 +21,7 @@ const EMPTY = {
   // step 2
   mirrorkeytype: '1', mirrorkeyurl: '', mirrorkeyids: '', mirrorkeyserver: 'hkp://keyserver.ubuntu.com:80',
   // step 3
-  mirrorfilter: '',
+  mirrorfilter: '', mirrorfilterwithdeps: false,
 };
 
 function mirrorToForm(m, isCopy = false) {
@@ -42,6 +42,7 @@ function mirrorToForm(m, isCopy = false) {
     mirrorkeyids: (m.mirrorkeyids || '').split(/[, ]/).join(' '),
     mirrorkeyserver: m.mirrorkeyserver || 'hkp://keyserver.ubuntu.com:80',
     mirrorfilter: m.mirrorfilter || '',
+    mirrorfilterwithdeps: !!m.mirrorfilterwithdeps,
   };
 }
 
@@ -110,6 +111,7 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
       mirrorkeyids: form.mirrorkeytype === '2' ? form.mirrorkeyids.trim() : '',
       mirrorkeyserver: form.mirrorkeytype === '2' ? form.mirrorkeyserver.trim() : '',
       mirrorfilter: form.mirrorfilter.trim(),
+      mirrorfilterwithdeps: form.mirrorfilter.trim() !== '' && form.mirrorfilterwithdeps,
     };
   }
 
@@ -343,6 +345,12 @@ export default function MirrorForm({ mirror, copyFrom, onClose }) {
                     onChange={e => set('mirrorfilter', e.target.value)} />
                 </div>
                 <small className="text-muted">Example: !(Name (= dotnet-sdk-5.0), Version (= 5.0.202-1))</small>
+                <div className="form-check mt-3">
+                  <input className="form-check-input" type="checkbox" id="mirrorfilterwithdeps"
+                    checked={form.mirrorfilterwithdeps} disabled={form.mirrorfilter.trim() === ''}
+                    onChange={e => set('mirrorfilterwithdeps', e.target.checked)} />
+                  <label className="form-check-label" htmlFor="mirrorfilterwithdeps">Include dependencies of the filtered packages</label>
+                </div>
               </div>
             )}
           </div>

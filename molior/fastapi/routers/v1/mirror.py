@@ -61,6 +61,7 @@ def _mirror_data(mirror, db):
         "external_repo": mirror.external_repo,
         "dependency_policy": mirror.dependency_policy,
         "mirrorfilter": mirror.mirror_filter,
+        "mirrorfilterwithdeps": bool(mirror.mirror_filter_with_deps),
     }
 
 
