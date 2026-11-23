@@ -93,7 +93,7 @@ class CurrentUser:
 
 def get_current_user(
     molior_session: Optional[str] = Cookie(default=None),
-    x_molior_token: Optional[str] = Header(default=None),
+    x_molior_token: Optional[str] = Header(default=None, alias="X-MoliorToken"),
     db: Session = Depends(get_db),
 ) -> Optional[CurrentUser]:
     """
