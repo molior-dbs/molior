@@ -27,6 +27,10 @@ class AptlyApi:
     # GPG passphrase file on aptly server machine
     PASSPHRASE_FILE = "/var/lib/aptly/gpg-pass"
 
+    # wait_task: first poll after this many seconds, doubled after each poll up to TASK_POLL_MAX
+    TASK_POLL_FIRST = 0.1
+    TASK_POLL_MAX = 2
+
     def __init__(self, api_url, gpg_key, username=None, password=None):
         self.url = api_url
         self.gpg_key = gpg_key
@@ -495,6 +499,24 @@ class AptlyApi:
         """
         return await self.GET("/snapshots")
 
+    async def snapshot_exists(self, name):
+        """
+        Checks if a snapshot exists, by name (one small request instead of the list of all snapshots).
+
+        Returns:
+            bool: True if aptly has the snapshot, False if aptly answers 404.
+
+        Raises:
+            AptlyError: on any other answer (e.g. 502 from a proxy, 401), so that an error is not taken for "missing".
+        """
+        async with aiohttp.ClientSession() as http:
+            async with http.get(f"{self.url}/snapshots/{name}", auth=self.auth) as resp:
+                if resp.status in self.SUCCESS:
+                    return True
+                if resp.status == 404:
+                    return False
+                raise AptlyError(f"snapshot lookup '{name}' failed: HTTP {resp.status}", await resp.text())
+
     async def snapshot_publish(self, name, component, archs, dist, destination):
         """
         Publishes a snapshot.
@@ -745,35 +767,34 @@ class AptlyApi:
         # package_refs = await self.__get_packages(ci_build)
         # logger.warning("creating snapshot with name '%s' and the packages: '%s'", snapshot_name_tmp, str(package_refs))
 
+        # look up only the tmp snapshot by name: the list of all snapshots took about 10 s per publish
         try:
-            snapshots = await self.GET("/snapshots")
+            tmp_exists = await self.snapshot_exists(snapshot_name_tmp)
         except Exception as exc:
             logger.error("Error loading snapshots")
             logger.exception(exc)
             return
 
-        for snapshot in snapshots:
-            if snapshot["Name"] == snapshot_name_tmp:
-                # delete leftover tmp snapshot
-                logger.warning("deleting existing tmp snapshot")
-                try:
-                    task_id = await self.snapshot_delete(snapshot_name_tmp)
-                except Exception:
-                    logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
+        if tmp_exists:
+            # delete leftover tmp snapshot
+            logger.warning("deleting existing tmp snapshot")
+            try:
+                task_id = await self.snapshot_delete(snapshot_name_tmp)
+            except Exception:
+                logger.error(f"Error deleting existing tmp snapshot, trying to republish non-tmp: {snapshot_name_tmp}")
+            if not await self.wait_task(task_id):
+                logger.warning("republishing non-tmp snapshot")
+                task_id = await self.snapshot_publish_update(snapshot_name, "main", dist, publish_name)
                 if not await self.wait_task(task_id):
-                    logger.warning("republishing non-tmp snapshot")
-                    task_id = await self.snapshot_publish_update(snapshot_name, "main", dist, publish_name)
+                    logger.error(f"Error republishing non-tmp snapshot: {snapshot_name}")
+                else:
+                    logger.warning("retrying to delete tmp snapshot")
+                    try:
+                        task_id = await self.snapshot_delete(snapshot_name_tmp)
+                    except Exception:
+                        logger.error(f"Error deleting existing tmp snapshot after republish: {snapshot_name_tmp}")
                     if not await self.wait_task(task_id):
-                        logger.error(f"Error republishing non-tmp snapshot: {snapshot_name}")
-                    else:
-                        logger.warning("retrying to delete tmp snapshot")
-                        try:
-                            task_id = await self.snapshot_delete(snapshot_name_tmp)
-                        except Exception:
-                            logger.error(f"Error deleting existing tmp snapshot after republish: {snapshot_name_tmp}")
-                        if not await self.wait_task(task_id):
-                            return False
-                break
+                        return False
 
         logger.info(f"Creating tmp snapshot {snapshot_name_tmp}")
         task_id = await self.snapshot_create(repo_name, snapshot_name_tmp)
@@ -826,8 +847,11 @@ class AptlyApi:
         if type(task_id) is not int:
             raise Exception("task_id '%s' must be int" % str(task_id))
 
+        # most tasks are done within a fraction of a second: poll early, then back off to every 2 s
+        delay = self.TASK_POLL_FIRST
         while True:
-            await asyncio.sleep(2)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, self.TASK_POLL_MAX)
             try:
                 task_state = await self.get_task_state(task_id)
             except Exception as exc:
