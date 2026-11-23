@@ -60,7 +60,7 @@ def get_repository_dependents(
     query = query.order_by(ProjectVersion.fullname)
     total = query.count()
     results = pagination.apply(query).all()
-    return {"total_result_count": total, "results": [pv.data() for pv in results]}
+    return {"total_result_count": total, "results": ProjectVersion.data_list(db, results)}
 
 
 @router.get("/repositories")

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, Enum, Boolean, func, select, text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, object_session
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from ..logger import logger
@@ -11,6 +11,7 @@ from .database import Base
 from .project import Project
 from .projectversiondependency import ProjectVersionDependency
 from .sourepprover import SouRepProVer
+from .buildcounts import projectversion_build_counts
 # reeded for relations:
 from . import sourcerepository    # noqa: F401
 from . import mirrorkey    # noqa: F401
@@ -149,15 +150,15 @@ class ProjectVersion(Base):
         full = "deb {0} {1} {2}".format(url, dist, "main")
         return url if url_only else full
 
-    def data(self):
+    def data(self, build_counts=None):
         """
         Returns the given projectversion object
         as dist, which can be processed by
         json_response
         ---
         Args:
-            projectversion (object): The projectversion from the database
-                provided by SQLAlchemy.
+            build_counts: (top level builds, top level CI builds) of this version, see buildcounts.py.
+                Lists pass the counts of their page (ProjectVersion.data_list); None: one query for this version.
         Returns:
             dict: The dict which can be processed by json_response
 
@@ -172,12 +173,9 @@ class ProjectVersion(Base):
         buildCount = 0
         cibuildCount = 0
         if not self.project.is_mirror:
-            for build in self.builds:
-                if build.buildtype == "deb":
-                    if build.is_ci:
-                        cibuildCount += 1
-                    else:
-                        buildCount += 1
+            if build_counts is None:
+                build_counts = projectversion_build_counts(object_session(self), [self.id])[self.id]
+            buildCount, cibuildCount = build_counts
 
         data = {
             "id": self.id,
@@ -213,6 +211,12 @@ class ProjectVersion(Base):
             data.update({"basemirror": self.basemirror.fullname})
 
         return data
+
+    @staticmethod
+    def data_list(db, projectversions):
+        """data() of each projectversion, with the build counts of all of them in one query."""
+        counts = projectversion_build_counts(db, [pv.id for pv in projectversions if not pv.project.is_mirror])
+        return [pv.data(counts.get(pv.id)) for pv in projectversions]
 
     def copy(self, db, version, description, dependency_policy, basemirror_id, architectures,
              cibuilds, retention_successful_builds, retention_failed_builds):

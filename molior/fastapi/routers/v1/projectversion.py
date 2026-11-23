@@ -73,7 +73,7 @@ def get_projectversions(
     query = query.order_by(func.lower(Project.name), func.lower(ProjectVersion.name))
     total = query.count()
     results = pagination.apply(query).all()
-    return {"total_result_count": total, "results": [pv.data() for pv in results]}
+    return {"total_result_count": total, "results": ProjectVersion.data_list(db, results)}
 
 
 @router.post("/api/projectversions/{projectversion_id}/toggleci")

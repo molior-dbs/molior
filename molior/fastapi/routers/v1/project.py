@@ -16,7 +16,7 @@ from ...responses import PaginationParams
 from ....logger import logger
 from ....model.authtoken import Authtoken
 from ....model.authtoken_project import Authtoken_Project
-from ....model.build import Build
+from ....model.buildcounts import project_build_counts
 from ....model.project import Project
 from ....model.projectversion import ProjectVersion, get_projectversion_deps
 from ....model.user import User
@@ -41,14 +41,11 @@ def get_projects(
     total = query.count()
     results = pagination.apply(query).all()
 
+    # top level builds of each project, see buildcounts.py
+    counts = project_build_counts(db, [project.id for project in results])
     data = []
     for project in results:
-        build_count = db.query(Build).join(ProjectVersion).join(Project).filter(
-            Project.id == project.id, Build.is_ci.is_(False)
-        ).count()
-        ci_count = db.query(Build).join(ProjectVersion).join(Project).filter(
-            Project.id == project.id, Build.is_ci.is_(True)
-        ).count()
+        build_count, ci_count = counts[project.id]
         data.append({
             "id": project.id, "name": project.name, "description": project.description,
             "projectversionCount": len(project.projectversions),

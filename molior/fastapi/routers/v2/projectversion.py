@@ -254,12 +254,32 @@ def get_aptsources(
 # Dependencies
 # ---------------------------------------------------------------------------
 
+def _projectversion_page(db, ids, q, page, page_size):
+    """
+    The dependencies or dependents with the given ids in one query (sorted like the candidates: projects before
+    mirrors, then by name), with the build counts of the page in one query. Pages only if page or page_size is
+    given (the web UI sends both; other callers get the whole list as before). total_result_count is the number
+    of all matches.
+    """
+    query = db.query(ProjectVersion).join(Project).filter(ProjectVersion.id.in_(set(ids)))
+    if q:
+        query = query.filter(ProjectVersion.fullname.ilike(f"%{escape_for_like(q)}%"))
+    query = query.order_by(Project.is_mirror, func.lower(Project.name), func.lower(ProjectVersion.name))
+    total = query.count()
+    if page or page_size:
+        query = PaginationParams(page=page, page_size=page_size, per_page=None).apply(query)
+    return {"total_result_count": total, "results": ProjectVersion.data_list(db, query.all())}
+
+
 @router.get("/project/{project_id}/{projectversion_id}/dependencies")
 def list_dependencies(
     project_id: str,
     projectversion_id: str,
     candidates: Optional[bool] = Query(default=None),
     q: Optional[str] = Query(default=None),
+    filter_name: Optional[str] = Query(default=None),
+    page: Optional[int] = Query(default=None, ge=1),
+    page_size: Optional[int] = Query(default=None, ge=1),
     current_user: CurrentUser = Depends(authenticated),
     db: Session = Depends(get_db),
 ):
@@ -293,25 +313,11 @@ def list_dependencies(
             cands = cands.filter(ProjectVersion.fullname.ilike(f"%{escape_for_like(q)}%"))
             dist_q = dist_q.filter(ProjectVersion.fullname.ilike(f"%{escape_for_like(q)}%"))
             any_q = any_q.filter(ProjectVersion.fullname.ilike(f"%{escape_for_like(q)}%"))
-        results = [c.data() for c in cands.all()] + \
-                  [c.data() for c in dist_q.all()] + \
-                  [c.data() for c in any_q.all()]
+        results = ProjectVersion.data_list(db, cands.all() + dist_q.all() + any_q.all())
         return {"total_result_count": len(results), "results": results}
 
-    # existing dependencies, de-duplicated
-    seen = set()
-    results = []
-    for d in pv.dependencies:
-        if d.id in seen:
-            continue
-        seen.add(d.id)
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
-        if q:
-            dep = dep.filter(ProjectVersion.fullname.ilike(f"%{q}%"))
-        dep = dep.first()
-        if dep:
-            results.append(dep.data())
-    return {"total_result_count": len(results), "results": results}
+    # existing dependencies (de-duplicated by the query); the web UI sends the filter as filter_name
+    return _projectversion_page(db, dep_ids, q or filter_name, page, page_size)
 
 
 class AddDependencyBody(BaseModel):
@@ -784,6 +790,9 @@ def list_dependents(
     projectversion_id: str,
     candidates: Optional[bool] = Query(default=None),
     q: Optional[str] = Query(default=None),
+    filter_name: Optional[str] = Query(default=None),
+    page: Optional[int] = Query(default=None, ge=1),
+    page_size: Optional[int] = Query(default=None, ge=1),
     current_user: CurrentUser = Depends(authenticated),
     db: Session = Depends(get_db),
 ):
@@ -818,18 +827,11 @@ def list_dependents(
         )
         if q:
             union = union.filter(ProjectVersion.fullname.ilike(f"%{q}%"))
-        results = [c.data() for c in union.all()]
+        results = ProjectVersion.data_list(db, union.all())
         return {"total_result_count": len(results), "results": results}
 
-    results = []
-    for d in pv.dependents:
-        dep = db.query(ProjectVersion).filter(ProjectVersion.id == d.id)
-        if q:
-            dep = dep.filter(ProjectVersion.fullname.ilike(f"%{q}%"))
-        dep = dep.first()
-        if dep:
-            results.append(dep.data())
-    return {"total_result_count": len(results), "results": results}
+    # the web UI sends the filter as filter_name
+    return _projectversion_page(db, dep_ids, q or filter_name, page, page_size)
 
 
 # ---------------------------------------------------------------------------

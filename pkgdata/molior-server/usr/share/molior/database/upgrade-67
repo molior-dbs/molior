@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Indexes for the build counts and the last builds of a repository (project and project version pages).
+# build had no index on projectversion_id and sourcerepository_id, so each count or lookup read the whole table
+# (measured on the prod data copy, 631656 builds: ~35 ms each; with these indexes 1 to 2 ms for a whole page).
+#   (projectversion_id, id):  top level build counts per project version (molior/model/buildcounts.py),
+#                             last deb build of a repository in a version (ORDER BY id DESC)
+#   (sourcerepository_id, id): last source build of a repository (ORDER BY id DESC)
+
+psql molior <<EOSQL
+
+CREATE INDEX ix_build_projectversion_id_id ON build USING btree (projectversion_id, id);
+CREATE INDEX ix_build_sourcerepository_id_id ON build USING btree (sourcerepository_id, id);
+
+EOSQL

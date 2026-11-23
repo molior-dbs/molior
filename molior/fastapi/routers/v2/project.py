@@ -97,7 +97,7 @@ def list_project_versions(
     query = query.order_by(ProjectVersion.id.desc())
     total = query.count()
     results = pagination.apply(query).all()
-    return {"total_result_count": total, "results": [pv.data() for pv in results]}
+    return {"total_result_count": total, "results": ProjectVersion.data_list(db, results)}
 
 
 # ---------------------------------------------------------------------------
