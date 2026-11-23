@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# No old build is continued after an import of a database dump.
+# The queues are in memory, and at every start molior queues the builds in needs_publish again
+# and schedules the builds in needs_build. Builds of an imported (older) database must not be
+# triggered, so all unfinished builds are set to failed here:
+#   needs_build, scheduled, building   -> build_failed
+#   needs_publish, publishing          -> publish_failed
+# Their buildtask rows are deleted (as cleanup_builds() does). Builds in new, and finished ones, stay as they are.
+
+psql -v ON_ERROR_STOP=1 molior <<EOSQL
+
+BEGIN;
+
+DELETE FROM buildtask WHERE build_id IN (
+    SELECT id FROM build WHERE buildstate IN ('needs_build', 'scheduled', 'building', 'needs_publish', 'publishing'));
+
+UPDATE build SET buildstate = 'build_failed', endstamp = now(), buildendstamp = now()
+    WHERE buildstate IN ('needs_build', 'scheduled', 'building');
+
+UPDATE build SET buildstate = 'publish_failed', endstamp = now()
+    WHERE buildstate IN ('needs_publish', 'publishing');
+
+COMMIT;
+
+EOSQL
