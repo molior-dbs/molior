@@ -4,6 +4,11 @@ set -e
 
 sig() {
     set +e
+    if [ -z "$suppid" ]; then  # molior is not started yet (waiting for the hold file): nothing to terminate
+        echo "SIGTERM received, molior was not started."
+        touch /shutdown/molior-done
+        exit 0
+    fi
     echo "SIGTERM received, terminatig pid $suppid ..."
     kill $suppid
 }
@@ -42,6 +47,17 @@ while true; do
     echo start: waiting for database connection ...
     sleep 1
 done
+
+# Hold file: molior does not start (and db-upgrade.sh does not run) while it exists, only postgres runs.
+# For work on the database, i.e. an import (make hold-molior, make import-db, make release-molior).
+HOLD=/var/lib/molior/molior-hold
+if [ -e $HOLD ]; then
+    echo "start: $HOLD exists, molior is on hold, only postgres runs. Remove the file to continue (make release-molior)."
+    while [ -e $HOLD ]; do
+        sleep 1
+    done
+    echo "start: hold file removed, starting molior"
+fi
 
 /usr/lib/molior/db-upgrade.sh
 

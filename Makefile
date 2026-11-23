@@ -196,6 +196,12 @@ restart-aptly:  ## Restart aptly pod
 psql:  ## Run psql
 	kubectl exec -it $(shell kubectl get pod -l app=molior -o jsonpath='{.items[0].metadata.name}') -- su molior -c psql molior
 
+hold-molior:  ## Create the hold file on the molior volume: after the next pod start only postgres runs, molior waits (then: make restart-molior, make import-db, make release-molior)
+	kubectl -n $(NAMESPACE) exec deploy/molior -c molior-server -- touch /var/lib/molior/molior-hold
+
+release-molior:  ## Remove the hold file: a waiting molior runs db-upgrade.sh and starts
+	kubectl -n $(NAMESPACE) exec deploy/molior -c molior-server -- rm -f /var/lib/molior/molior-hold
+
 import-db:  ## Import a molior database dump (pg_dump -C, .sql or .sql.gz) into the molior-postgres container, streamed from this machine (usage: make import-db DUMP=<file>; FORCE=1 if the database holds data)
 	@test -n "$(DUMP)" || (echo "Usage: make import-db DUMP=<file>"; exit 1)
 	NAMESPACE="$(NAMESPACE)" DUMP="$(DUMP)" FORCE="$(FORCE)" sh scripts/import-db
@@ -219,4 +225,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help import-db set-passwords push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help hold-molior release-molior import-db set-passwords push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean

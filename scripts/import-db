@@ -10,13 +10,15 @@
 #   FORCE=1       import even if the current database already holds builds, projects or project versions
 #
 # What it does:
+#  0. stops unless molior is on hold: the hold file /var/lib/molior/molior-hold exists and molior is not running
+#     (make hold-molior, make restart-molior; afterwards make release-molior)
 #  1. checks the file (gzip -t) and reads db_version from the dump,
 #     stops if it is higher than the schema of the molior-server image
 #  2. stops if the current database holds builds, projects or project versions (unless FORCE=1)
 #  3. DROP DATABASE molior WITH (FORCE), then restores the dump (it has CREATE DATABASE and \connect),
 #     psql stops at the first error
 #  4. prints row counts
-# It does not touch the pod. Delete the molior pod afterwards so start-molior runs db-upgrade.sh.
+# It does not touch the pod. Run make release-molior afterwards: start-molior then runs db-upgrade.sh and starts molior.
 set -eu
 
 NAMESPACE=${NAMESPACE:-}
@@ -38,6 +40,11 @@ POD=$(k get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')
 [ -n "$POD" ] || { echo "Error: no pod with label app=molior in $NAMESPACE" >&2; exit 1; }
 # sql <database> <query>: run as postgres in the molior-postgres container
 sql() { k exec "$POD" -c molior-postgres -- su postgres -c "psql -q -At -d $1 -c \"$2\""; }
+
+k exec "$POD" -c molior-server -- test -e /var/lib/molior/molior-hold || {
+    echo "Error: molior is not on hold. Run: make hold-molior, make restart-molior, wait until the pod is up, then import." >&2; exit 1; }
+k exec "$POD" -c molior-server -- test ! -e /var/run/molior.pid || {
+    echo "Error: molior is running (the hold file only applies at the pod start). Run: make restart-molior, wait until the pod is up, then import." >&2; exit 1; }
 
 echo "Pod: $POD"
 echo "Dump: $DUMP"
@@ -68,4 +75,4 @@ for t in build project projectversion molioruser; do
     echo "  $t: $(sql molior "select count(*) from $t")"
 done
 echo "  db_version: $(sql molior "select value from metadata where name='db_version'")"
-echo "Next: delete the molior pod so db-upgrade.sh migrates the database to $IMAGE_VERSION."
+echo "Next: make release-molior, then db-upgrade.sh migrates the database to $IMAGE_VERSION and molior starts."
