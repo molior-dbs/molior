@@ -22,15 +22,63 @@ from ..model.sourepprover import SouRepProVer
 def has_pending_work(topbuild):
     """
     Returns True if a top level build has work which is continued after a start:
-    a source build waiting for its publish, or a deb build which is waiting to be built or published.
+    a source build waiting for its build (new, retry) or its publish, or a deb build which is waiting to be built or published.
     """
     for source in topbuild.children:
-        if source.buildstate == "needs_publish":
+        # new: created, not started yet (e.g. waiting for a source build slot)
+        if source.buildstate in ["new", "needs_build", "needs_publish"]:
             return True
         for deb in source.children:
             if deb.buildstate in ["needs_build", "scheduled", "needs_publish"]:
                 return True
     return False
+
+
+_source_build_slots = None
+
+
+def source_build_slots():
+    """
+    Returns the semaphore which limits the source builds running at the same time (they run inside
+    molior: git, dpkg-buildpackage -S or a download), or None if there is no limit.
+    Setting max_parallel_source_builds in molior.yml (0 or unset: no limit); read once, a change needs a restart.
+    """
+    global _source_build_slots
+    if _source_build_slots is None:
+        limit = Configuration().max_parallel_source_builds
+        if type(limit) is not int or limit <= 0:
+            return None
+        logger.info("worker: at most %d source builds in parallel", limit)
+        _source_build_slots = asyncio.Semaphore(limit)
+    return _source_build_slots
+
+
+async def run_source_build(build_id):
+    """
+    Runs BuildSourcePackage when a source build slot is free. While it waits the source build keeps its state
+    (new or needs_build), so abort, a restart (queue_pending_builds) and the checks for a running source build see it.
+    """
+    slots = source_build_slots()
+    if slots is None:
+        await BuildSourcePackage(build_id)
+        return
+
+    def state():
+        with Session() as session:
+            build = session.query(Build).filter(Build.id == build_id).first()
+            return build.buildstate if build else None
+
+    queued_state = state()
+    if slots.locked():
+        logger.info("worker: source build %d waits for a free source build slot", build_id)
+    async with slots:
+        current = state()
+        if current != queued_state:
+            # aborted (build_failed) or removed while waiting
+            logger.info("worker: source build %d not started, state changed while waiting: %s -> %s",
+                        build_id, queued_state, current)
+            return
+        await BuildSourcePackage(build_id)
 
 
 async def cleanup_builds():
@@ -79,8 +127,10 @@ async def cleanup_builds():
 async def queue_pending_builds():
     """
     Queues the builds which wait for the (in memory) queues, which are empty after a start:
-    publishes all builds in needs_publish (in id order, no age limit), then runs the scheduler once
-    (for the builds in needs_build and the scheduled ones which cleanup_builds set back to needs_build).
+    publishes all builds in needs_publish (in id order, no age limit), queues a rebuild of the source builds
+    in needs_build (only a retry of a failed source build sets this state) and of the new source builds of running
+    top builds (not started, e.g. waiting for a source build slot), then runs the scheduler once
+    (for the deb builds in needs_build and the scheduled ones which cleanup_builds set back to needs_build).
     """
 
     with Session() as session:
@@ -88,10 +138,21 @@ async def queue_pending_builds():
             Build.buildstate == "needs_publish",
             Build.buildtype.in_(["source", "deb"])).order_by(Build.id).all()
         pending = [(build.buildtype, build.id) for build in builds]
+        # retried source builds (needs_build), and new source builds of running top builds (waiting for a source
+        # build slot or not started yet; old new rows of failed top builds are not revived)
+        builds = session.query(Build).filter(
+            Build.buildstate.in_(["new", "needs_build"]),
+            Build.buildtype == "source").order_by(Build.id).all()
+        sources = [build.id for build in builds
+                   if build.buildstate == "needs_build" or (build.parent and build.parent.buildstate == "building")]
 
     for buildtype, build_id in pending:
         await enqueue_aptly({"src_publish" if buildtype == "source" else "publish": [build_id]})
-    logger.info("startup: queued %d builds waiting for publishing, running the scheduler", len(pending))
+    for build_id in sources:
+        # as the retry API does; _rebuild checks the repo and starts the source build
+        await enqueue_task({"rebuild": [build_id, "build_failed", False]})
+    logger.info("startup: queued %d builds waiting for publishing and %d source builds, running the scheduler",
+                len(pending), len(sources))
     await enqueue_task({"schedule": []})
 
 
@@ -220,7 +281,7 @@ class Worker:
         if build.buildstate != "new" and build.buildstate != "build_failed":
             return
 
-        asyncio.ensure_future(BuildSourcePackage(build_id))
+        asyncio.ensure_future(run_source_build(build_id))
 
     async def _buildlatest(self, args, session):
         logger.debug("worker: got buildlatest task")
@@ -336,7 +397,9 @@ class Worker:
                     logger.info("worker: repo %d not ready, requeueing", build.sourcerepository.id)
                     await asyncio.sleep(2)
                     return
-                await enqueue_task({"src_build": [build.id]})
+                # start it here: the src_build task (_srcbuild) only accepts new and build_failed,
+                # but the retry API has already set needs_build, so the task would be dropped
+                asyncio.ensure_future(run_source_build(build.id))
                 ok = True
 
         if build.buildtype == "chroot":

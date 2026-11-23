@@ -33,6 +33,8 @@ backend_http:
 
 # Molior server settings
 max_parallel_chroots: 4
+# source builds running at the same time (git, dpkg-buildpackage -S, download); 0 or unset: no limit
+max_parallel_source_builds: 4
 
 # Aptly settings
 aptly:

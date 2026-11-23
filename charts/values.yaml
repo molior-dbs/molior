@@ -23,6 +23,8 @@ molior:
   ciPackagesTtl: 7
   backend: "kubernetes"
   maxParallelChroots: 4
+  # source builds running at the same time inside the molior pod (git, dpkg-buildpackage -S, download); 0: no limit
+  maxParallelSourceBuilds: 4
   terminationGracePeriodSeconds: 300
 
 aptly:

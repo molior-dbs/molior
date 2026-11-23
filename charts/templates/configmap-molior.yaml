@@ -45,6 +45,8 @@ data:
 
     max_parallel_chroots: {{ .Values.molior.maxParallelChroots }}
 
+    max_parallel_source_builds: {{ .Values.molior.maxParallelSourceBuilds }}
+
     aptly:
         apt_url_public: '{{ .Values.aptly.publicUrl }}'
         apt_url: '{{ .Values.aptly.internalUrl }}'
