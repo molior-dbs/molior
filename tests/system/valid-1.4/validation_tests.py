@@ -11,7 +11,8 @@ import requests
 from datetime import datetime
 from time import sleep
 
-from utils import get_build, get_build_log, get_deb_build_ids, logger, pull_image, wait_for_paralell_builds
+from utils import BUILD_TIMEOUT, get_build, get_build_log, get_deb_build_ids, latest_package_version, logger, pull_image, \
+    wait_for_paralell_builds
 
 basemirror = "trixie"
 basemirror_version = "13"
@@ -28,7 +29,18 @@ basemirror_filter = (
     "Priority (required) | apt | build-essential | ca-certificates"
     " | fakeroot | eatmydata | libfile-fcntllock-perl | lintian | devscripts | curl | git | passwd"
     " | debhelper | python3"
+    # test_mono_build: Build-Depends of keepass2 (test-mono)
+    " | archmage | cli-common-dev | imagemagick | libmono-cil-dev | mono-devel | mono-xbuild | python3-pkg-resources"
+    # test_dotnet_core_project: the Debian dependencies of the dotnet packages of the dotnet-core mirror (libicu, krb5)
+    " | libicu76 | libgssapi-krb5-2"
 )
+
+# test_dotnet_core_mirror: the public Microsoft repository for Debian 13, filtered to one SDK (with its dependencies).
+# The SDK major version is the one test-dotnet-core builds with; the newest SDK version of it is read from the index.
+dotnet_mirror_url = "https://packages.microsoft.com/debian/13/prod/"
+dotnet_key_url = "https://packages.microsoft.com/keys/microsoft-2025.asc"
+dotnet_sdk = "dotnet-sdk-11.0"
+dotnet_mirror_version = "11.0"
 
 
 @pytest.mark.metadata(
@@ -545,6 +557,30 @@ def test_multi_project_builds(molior_url, aptly_url, build_test, project_name):
 
 
 @pytest.mark.metadata(
+    id="4bdcb6d8",
+    author="im",
+    requirements=["000", "001"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_multi_project_builds")
+def test_mono_build(molior_url, build_test, get_project_vars, project_name):
+    """
+    Test a build using the mono mirror
+    """
+    logger.warning("==================================================== test_mono_build")
+    build_test(
+        "tests/api-tests/create-project.yml",
+        get_project_vars(
+            project_name,
+            "mono",
+            "https://github.com/molior-dbs/test-mono.git",
+        ),
+    )
+    get_build(molior_url, "keepass2", buildstate="successful", timeout=BUILD_TIMEOUT)
+
+
+@pytest.mark.metadata(
     id="2872bce4",
     author="im",
     requirements=["000", "001"],
@@ -590,3 +626,59 @@ def test_submodule_build(molior_url, build_test, get_project_vars, project_name)
         ),
     )
     get_build(molior_url, "submodulepackage", buildstate="successful")
+
+
+@pytest.mark.metadata(
+    id="08347517",
+    author="im",
+    requirements=["002"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_submodule_build")
+def test_dotnet_core_mirror(create_mirror, get_basemirror, aptly_url):
+    """
+    Test the creation of the .net core mirror
+    """
+    logger.warning("==================================================== test_dotnet_core_mirror")
+    basemirror_id = get_basemirror(basemirror, basemirror_version)
+    assert basemirror_id, "Base mirror not found"
+
+    sdk_version = latest_package_version(dotnet_mirror_url, basemirror, "main", "amd64", dotnet_sdk)
+    assert sdk_version, "{} not found in {}".format(dotnet_sdk, dotnet_mirror_url)
+    create_mirror(
+        dotnet_mirror_url,
+        "dotnet-core",
+        dotnet_mirror_version,
+        basemirror,
+        "main",
+        "amd64",
+        basemirror_id=basemirror_id,
+        keyurl=dotnet_key_url,
+        allow_rerun=True,
+        mirror_filter="{} (= {})".format(dotnet_sdk, sdk_version),
+        filter_with_deps=True,
+    )
+    response = requests.get(
+        "{}/{}/{}/mirrors/dotnet-core/{}/dists/{}/".format(
+            aptly_url, basemirror, basemirror_version, dotnet_mirror_version, basemirror
+        )
+    )
+    assert response.ok, "Mirror was not created on aptly"
+
+
+@pytest.mark.metadata(
+    id="91afb195",
+    author="im",
+    requirements=["102", "002"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_dotnet_core_mirror")
+def test_dotnet_core_project(molior_url, build_test):
+    """
+    Test the creation of the .net core project
+    """
+    logger.warning("==================================================== test_dotnet_core_project")
+    build_test("tests/api-tests/dotnet-core-project.yml")
+    get_build(molior_url, "mira-test", buildstate="successful", timeout=BUILD_TIMEOUT)

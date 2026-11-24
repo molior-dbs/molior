@@ -245,6 +245,21 @@ def create_project(v):
          {"architectures": ["amd64"], "url": v["repo_url"]})
 
 
+def dotnet_core_project(v):
+    """dotnet-core-project.yml: projectversion dotnet with the dotnet-core mirror as dependency and test-dotnet-core"""
+    step = Step(v)
+    project = v["project_name"]
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    step("Create mono Projectversion", "POST", "/api2/projectbase/{}/versions".format(project),
+         {"basemirror": "trixie/13", "architectures": ["amd64"], "name": "dotnet", "description": "mono test",
+          "dependency_policy": "strict", "cibuilds": False})
+    step("Add the dependency", "POST", "/api2/project/{}/dotnet/dependencies".format(project),
+         {"dependency": "dotnet-core/11.0", "use_cibuilds": False})
+    step("Add Sourcerepository dotnet-core-test", "POST", "/api2/project/{}/dotnet/repositories".format(project),
+         {"architectures": ["amd64"], "url": "https://github.com/molior-dbs/test-dotnet-core.git"})
+
+
 def role_based_access(v):
     """rolebasedaccess.yml. 1.4 logged in an existing LDAP user; here the admin first creates a local user (db auth
     backend) with a random password, then the yml steps run with it. The user is not deleted (as in 1.4)."""
@@ -282,4 +297,5 @@ SUITES = {
     "tests/api-tests/multi-project.yml": multi_project,
     "tests/api-tests/create-project.yml": create_project,
     "tests/api-tests/rolebasedaccess.yml": role_based_access,
+    "tests/api-tests/dotnet-core-project.yml": dotnet_core_project,
 }

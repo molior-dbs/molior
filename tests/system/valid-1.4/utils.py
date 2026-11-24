@@ -3,6 +3,7 @@ calls as the web UI). Same names and arguments as in 1.4; failures raise instead
 import json
 import logging
 import os
+import re
 import subprocess
 import tarfile
 import time
@@ -247,6 +248,31 @@ def _image_files(base, manifest):
             with tarfile.open(fileobj=blob.raw, mode="r|*") as tar:
                 for member in tar:
                     yield tar, member
+
+
+def latest_package_version(repo_url, dist, component, arch, package):
+    """
+    Returns the newest version of a package in the Packages index of an APT repository (None if not there).
+    Used to mirror exactly one version of a package that the repository has in many versions.
+    """
+    res = requests.get("{}/dists/{}/{}/binary-{}/Packages".format(repo_url.rstrip("/"), dist, component, arch),
+                       timeout=60)
+    assert res.ok, "Packages index of {}: {}".format(repo_url, res.status_code)
+    versions, name = [], None
+    for line in res.text.splitlines():
+        if line.startswith("Package: "):
+            name = line.split(" ", 1)[1].strip()
+        elif line.startswith("Version: ") and name == package:
+            versions.append(line.split(" ", 1)[1].strip())
+    if not versions:
+        return None
+    return max(versions, key=_debian_version_key)
+
+
+def _debian_version_key(version):
+    # good enough for the versions of one package in one repository (e.g. 11.0.100-1, 11.0.101-1): compare the
+    # numeric and the other parts of epoch, upstream version and revision in order
+    return [(0, int(p), "") if p.isdigit() else (1, 0, p) for p in re.findall(r"\d+|[^\d]+", version)]
 
 
 def get_build_log(build_id, marker=None, timeout=60):
