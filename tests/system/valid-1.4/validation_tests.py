@@ -11,7 +11,7 @@ import requests
 from datetime import datetime
 from time import sleep
 
-from utils import get_build, get_build_log, get_deb_build_ids, logger, wait_for_paralell_builds
+from utils import get_build, get_build_log, get_deb_build_ids, logger, pull_image, wait_for_paralell_builds
 
 basemirror = "trixie"
 basemirror_version = "13"
@@ -151,6 +151,55 @@ def test_build_output(aptly_url, project_name):
         ), "Package occurence is unexpected {} should be {}".format(
             package, debian_packages[package]
         )
+
+
+@pytest.mark.metadata(
+    id="c1c240a6",
+    author="im",
+    requirements=["005"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_build_output")
+def test_schroot_creation(molior_exec):
+    """
+    Tests if the schroot has been created on molior
+    """
+    logger.warning("==================================================== test_schroot_creation")
+    # 1.4 checked the schroot tarball /var/lib/schroot/chroots/stretch-9.3-amd64.tar.xz on the molior host. 1.5 builds
+    # in a docker image per base mirror and architecture (create-docker.sh), pushed to the registry of molior's build
+    # backend: pull it from there, as a build node does, and check what a build needs.
+    registry = molior_exec("sed -n 's/^ *server: *//p' /etc/molior/backend-kubernetes.yml").strip().strip("\"'")
+    assert registry, "no registry in /etc/molior/backend-kubernetes.yml"
+    config, files = pull_image(registry, "molior/{}-amd64".format(basemirror), basemirror_version,
+                               ["/etc/os-release", "/app/docker-build", "/etc/passwd", "/usr/bin/dpkg-buildpackage"])
+    assert config.get("architecture") == "amd64", "image architecture: {}".format(config.get("architecture"))
+    assert files["/etc/os-release"], "no /etc/os-release in the build environment"
+    assert 'VERSION_ID="{}"'.format(basemirror_version) in files["/etc/os-release"].decode(), \
+        files["/etc/os-release"].decode()
+    assert files["/app/docker-build"], "no build script /app/docker-build in the build environment"
+    assert files["/usr/bin/dpkg-buildpackage"], "no dpkg-buildpackage (build-essential) in the build environment"
+    assert any(line.startswith("build:") for line in files["/etc/passwd"].decode().splitlines()), \
+        "no build user in the build environment"
+
+
+@pytest.mark.metadata(
+    id="f84a5354",
+    author="im",
+    requirements=["200"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_schroot_creation")
+def test_repository_location(aptly_exec):
+    """
+    Tests if the system stores artifacts on an aptly system
+    """
+    logger.warning("==================================================== test_repository_location")
+    # 1.4: systemctl status aptly and the rootDir of the aptly config, over ssh on the aptly host. 1.5: the aptly
+    # service runs in the aptly pod (no systemd), checked with kubectl exec
+    aptly_exec("kill -0 $(cat /tmp/aptly.pid)")
+    aptly_exec("su - aptly -c 'aptly config show' | grep -i -E 'root_?dir'")
 
 
 @pytest.mark.metadata(

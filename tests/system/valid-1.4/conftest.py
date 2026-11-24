@@ -153,3 +153,16 @@ def molior_exec():
         return utils.molior_exec(command)
 
     yield __molior_exec
+
+
+@pytest.fixture
+def aptly_exec():
+    """
+    Returns a callable that runs a shell command in the aptly server container and returns its stdout
+    (1.4: aptly_ssh_run, ssh to the aptly host). Raises when the command fails.
+    """
+
+    def __aptly_exec(command):
+        return utils.aptly_exec(command)
+
+    yield __aptly_exec

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import subprocess
+import tarfile
 import time
 
 import requests
@@ -18,6 +19,8 @@ ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 MOLIOR_NAMESPACE = os.environ.get("MOLIOR_NAMESPACE", "molior")
 MOLIOR_DEPLOYMENT = os.environ.get("MOLIOR_DEPLOYMENT", "molior")
 MOLIOR_CONTAINER = os.environ.get("MOLIOR_CONTAINER", "molior-server")
+APTLY_DEPLOYMENT = os.environ.get("APTLY_DEPLOYMENT", "aptly")
+APTLY_CONTAINER = os.environ.get("APTLY_CONTAINER", "aptly-server")
 BUILDOUT = "/var/lib/molior/buildout"
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "nothing_done")
 
@@ -162,25 +165,88 @@ def basemirror_name(session, molior_host, basemirror_id):
     raise AssertionError("base mirror {} not found".format(basemirror_id))
 
 
-def molior_exec(command, timeout=60):
+def molior_exec(command, timeout=60, deployment=MOLIOR_DEPLOYMENT, container=MOLIOR_CONTAINER):
     """
-    Runs a shell command in the molior server container and returns its stdout (replaces the 1.4 ssh_run).
-    Raises when the command fails (1.4: check=True), with its stderr in the message.
+    Runs a shell command in the molior server container (or another container of the namespace) and returns its
+    stdout (replaces the 1.4 ssh_run). Raises when the command fails (1.4: check=True), with its stderr in the message.
 
     Example:
 
         >>> molior_exec("ls -al /var/lib/molior")
     """
     result = subprocess.run(
-        ["kubectl", "-n", MOLIOR_NAMESPACE, "exec", "deploy/" + MOLIOR_DEPLOYMENT, "-c", MOLIOR_CONTAINER,
+        ["kubectl", "-n", MOLIOR_NAMESPACE, "exec", "deploy/" + deployment, "-c", container,
          "--", "sh", "-c", command],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=timeout,
     )
-    assert result.returncode == 0, "molior_exec '{}' failed ({}): {}".format(
-        command, result.returncode, result.stderr.decode("utf-8", errors="replace").strip())
+    assert result.returncode == 0, "exec '{}' in {}/{} failed ({}): {}".format(
+        command, deployment, container, result.returncode, result.stderr.decode("utf-8", errors="replace").strip())
     return result.stdout.decode("utf-8", errors="replace")
+
+
+def aptly_exec(command, timeout=60):
+    """
+    Runs a shell command in the aptly server container (replaces the 1.4 aptly_ssh_run).
+    """
+    return molior_exec(command, timeout, APTLY_DEPLOYMENT, APTLY_CONTAINER)
+
+
+def pull_image(registry, name, tag, files):
+    """
+    Pulls a docker image from a registry (registry API v2, as the container runtime of a build node does) and returns
+    its config and the content of the given files (path in the image: bytes or None; symlinks are followed). The
+    layers are streamed twice (symlinks, then content), not stored. Plain HTTP, no login (the registry of the test
+    cluster).
+    """
+    accept = ", ".join(["application/vnd.oci.image.manifest.v1+json",
+                        "application/vnd.docker.distribution.manifest.v2+json"])
+    base = "http://{}/v2/{}".format(registry, name)
+    res = requests.get("{}/manifests/{}".format(base, tag), headers={"Accept": accept}, timeout=30)
+    assert res.status_code == 200, "image {}/{}:{} not found: {} {}".format(
+        registry, name, tag, res.status_code, res.text[:200])
+    manifest = res.json()
+    config = requests.get("{}/blobs/{}".format(base, manifest["config"]["digest"]), timeout=30).json()
+    links = {}
+    for tar, member in _image_files(base, manifest):
+        if member.issym():
+            links[_image_path(member.name)] = _image_path(os.path.join(os.path.dirname(_image_path(member.name)),
+                                                                       member.linkname))
+    # follow symlinks inside the image, also of parent directories (/etc/os-release -> ../usr/lib/os-release)
+    resolved = {}
+    for f in files:
+        path, seen = _image_path(f), 0
+        while seen < 20:
+            parts = path.split("/")
+            for i in range(1, len(parts) + 1):
+                if "/".join(parts[:i]) in links:
+                    path = _image_path(os.path.join(links["/".join(parts[:i])], *parts[i:]))
+                    break
+            else:
+                break
+            seen += 1
+        resolved[f] = path
+    content = {}
+    for tar, member in _image_files(base, manifest):
+        if member.isfile() and _image_path(member.name) in resolved.values():
+            content[_image_path(member.name)] = tar.extractfile(member).read()
+    return config, {f: content.get(resolved[f]) for f in files}
+
+
+def _image_path(path):
+    return os.path.normpath("/" + path).lstrip("/")
+
+
+def _image_files(base, manifest):
+    """The files of all layers of an image (tar and member), streamed from the registry."""
+    for layer in manifest["layers"]:
+        with requests.get("{}/blobs/{}".format(base, layer["digest"]), stream=True, timeout=300) as blob:
+            assert blob.status_code == 200, "layer {}: {}".format(layer["digest"], blob.status_code)
+            blob.raw.decode_content = True
+            with tarfile.open(fileobj=blob.raw, mode="r|*") as tar:
+                for member in tar:
+                    yield tar, member
 
 
 def get_build_log(build_id, marker=None, timeout=60):

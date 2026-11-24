@@ -166,6 +166,8 @@ A mirror that is still used by project versions cannot be deleted.
 
 For every architecture of a base mirror, molior creates a **build environment**: a minimal system of that distribution, installed from the mirror itself. Packages are always built in a fresh copy of it, so no build can influence another one.
 
+**Change from 1.4:** a build environment is no longer a schroot tarball on the build host, but a **container image** per base mirror and architecture (for example `molior/trixie-amd64:13`). Molior creates it from the mirror (debootstrap, build tools, build user and build script), and pushes it to the container registry of the build backend. Build nodes pull it from there (see [8.3](#83-build-backend)), so no build environment has to be installed on a build host.
+
 The build environments are created automatically when a base mirror is ready. Building for foreign architectures (arm on an amd64 host) uses emulation. An administrator can rebuild the build environments of a base mirror, for example after the build tooling has changed.
 
 A project version can only build once the build environment for its base mirror and architecture exists.
@@ -610,9 +612,10 @@ These tests are taken over into the 1.5 system tests, so that 1.5 is checked aga
 | Aspect | Design decision |
 |---|---|
 | **Traceability** | each taken over test keeps its name, description, test id and requirement references, so the link to the requirements and to the 1.4 report stays |
-| **Same steps, current interfaces** | the steps and checks stay the same. They are written in the same way as the other system tests, instead of the REST test tool used in 1.4, and use the 1.5 interfaces where the old ones are gone: mirrors are created with the current API, build logs are read as live logs, users are local instead of LDAP |
+| **Same steps, current interfaces** | the steps and checks stay the same. They are written in the same way as the other system tests, instead of the REST test tool used in 1.4, and use the 1.5 interfaces where the old ones are gone: mirrors are created with the current API, users are local instead of LDAP, and what 1.4 checked by SSH on the hosts is checked in the containers of the test installation (build logs, the aptly service and its storage). The build environment test pulls the build environment image from the registry, as a build node does, instead of looking for the schroot tarball (see [4.4](#44-build-environments)) |
 | **Current distribution** | the tests run on a Debian trixie base mirror instead of stretch |
-| **Only what applies** | tests of functionality that molior 1.5 no longer has are not taken over, instead of being copied and disabled: build notification hooks, access to the hosts by SSH (chroots, aptly service), and mirrors of old third party software. Product deployments are tested with the deployment tools (see [7](#7-product-deployments)) |
+| **Only what applies** | tests of functionality that molior 1.5 no longer has are not taken over, instead of being copied and disabled: build notification hooks, and the cleanup of a long-lived test installation (every test run gets a new one). Product deployments are tested with the deployment tools (see [7](#7-product-deployments)) |
+| **Third party mirrors** | tests that mirrored third party software use current public repositories of the same software instead of the old internal copies, with a filter so that only what the test builds with is mirrored |
 | **Later** | the arm build tests are taken over when the test environment can build arm packages |
 
 The tests build a set of small **test packages**, each covering one case: a successful build with a passing short test, a build failing in its short test, build order between packages, several binary packages from one source, a package without molior configuration (never built), CI builds, one source for two project versions, files stored with git LFS, git submodules, and an architecture dependent package for arm. They come from the 1.4 tests and were cleaned up and updated for trixie. They are kept as public git repositories (one per package, named `test-<name>`) in the molior organisation on GitHub, from where the system tests build them. Build order entries therefore use these repository names.
