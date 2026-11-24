@@ -514,7 +514,7 @@ For development, molior runs on a **local Kubernetes cluster in containers (k3d)
 
 The goal is that what works locally works in production: same images, same chart, same build backend. Only scale and access differ.
 
-**Arm builds without arm nodes (testing only).** For testing, arm64 and armhf packages can be built on amd64 nodes through emulation (qemu): install `binfmt-support` and `qemu-user-binfmt` on the hosts of the amd64 nodes (the qemu handlers must be registered so that they also work inside chroots and containers, see the development notes), and set the node label of the arm builders to the amd64 label in the environment's settings. The arm build jobs then run on the amd64 nodes, and the arm programs in them run emulated. This is **not recommended for production**: emulated builds are a lot slower, and emulation can behave differently from real arm hardware. Production uses real arm nodes (see [11.3](#113-production-deployment)).
+**Arm builds without arm nodes (testing only).** For testing, arm64 and armhf packages can be built on amd64 nodes through emulation (qemu): install `binfmt-support` and `qemu-user-static` on the hosts of the amd64 nodes (the qemu handlers must be registered so that they also work inside chroots and containers, see the development notes), and set the node label of the arm builders to the amd64 label in the environment's settings. The arm build jobs then run on the amd64 nodes, and the arm programs in them run emulated. This is **not recommended for production**: emulated builds are a lot slower, and emulation can behave differently from real arm hardware. Production uses real arm nodes (see [11.3](#113-production-deployment)).
 
 ### 11.3 Production deployment
 

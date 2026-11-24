@@ -89,6 +89,19 @@ async def create_aptly_mirror(aptly, mirror):
     return created, [name for name in names if name not in created]
 
 
+def is_mirror_publish_task(task_name, names):
+    '''Is the aptly task the publish of the snapshots `names` (one per component, as mirror_publish() creates them)?
+
+    aptly 1.6 names it 'Publish snapshot repository <prefix>/<distribution> with components "main", "contrib"
+    and sources "<mirror>-main", "<mirror>-contrib"'. The sources part names the snapshots, which have the names
+    of the aptly mirrors. "Publish snapshot: <names>" is also accepted (older format).
+    '''
+    if task_name == "Publish snapshot: " + ", ".join(names):
+        return True
+    sources = " and sources " + ", ".join(f'"{name}"' for name in names)
+    return task_name.startswith("Publish snapshot repository ") and task_name.endswith(sources)
+
+
 def mirror_resume_state(tasks, names):
     '''Decide how to continue a mirror after a molior restart, from the aptly task list.
 
@@ -110,8 +123,7 @@ def mirror_resume_state(tasks, names):
                 if name not in updates or task["ID"] > updates[name]["ID"]:
                     updates[name] = task
 
-    publish_name = "Publish snapshot: " + ", ".join(names)
-    publishes = [task for task in tasks if task["Name"] == publish_name]
+    publishes = [task for task in tasks if is_mirror_publish_task(task["Name"], names)]
 
     last_update = max([t["ID"] for t in updates.values()], default=-1)
     if publishes:
@@ -158,6 +170,7 @@ async def startup_mirror():
         logger.error("startup mirror: aptly not available, running mirrors are not continued")
         tasks = []
 
+    pending = (TaskState.INIT.value, TaskState.RUNNING.value)
     continued = []
     with Session() as session:
         query = session.query(ProjectVersion)
@@ -186,6 +199,12 @@ async def startup_mirror():
                     logger.info("no mirroring tasks found on aptly for %s", mirrorname)
                     await mirror.set_mirror_state("error")
                     session.commit()
+                continue
+
+            if mirror.mirror_state == "error" and not any(
+                    task["ID"] in task_ids and task.get("State") in pending for task in tasks):
+                # the error is final: its tasks ended (e.g. published, then a build environment failed).
+                # Continuing it would publish again; a retry or an update by the admin starts it again
                 continue
 
             build = session.query(Build).filter(Build.buildtype == "mirror", Build.projectversion_id == mirror.id).first()
@@ -479,12 +498,12 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                     except Exception as exc:
                         logger.error("error publishing mirror %s: %s", mirrorname, str(exc))
 
+                        await build.log("E: error publishing mirror: {}\n".format(exc))
                         await mirror.set_mirror_state("error")
                         await build.set_publish_failed()
+                        await build.logdone()
                         session.commit()
-
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
-                                                           mirror_project, mirror_version, components)
+                        # keep the snapshots: they may be published already (aptly refuses to drop those)
                         return
 
                     # States:
@@ -493,11 +512,12 @@ async def finalize_mirror(build_id, base_mirror, base_mirror_version,
                         break
                     if upd_progress["State"] == 3:
                         logger.error("error publishing mirror %s snapshot", mirrorname)
+                        await build.log("E: error publishing mirror (aptly task %d failed)\n" % task_id)
                         await mirror.set_mirror_state("error")
                         await build.set_publish_failed()
+                        await build.logdone()
                         session.commit()
-                        await aptly.mirror_snapshot_delete(base_mirror, base_mirror_version,
-                                                           mirror_project, mirror_version, components)
+                        # keep the snapshots: they may be published already (aptly refuses to drop those)
                         return
 
                     if upd_progress["TotalNumberOfPackages"] > 0:

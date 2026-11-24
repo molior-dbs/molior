@@ -265,6 +265,48 @@ def test_finalize_no_transaction_open_while_waiting(state, task_ids):
     assert aptly.commits_at_first_poll == 1
 
 
+# publish task name of aptly 1.6
+PUBLISH_1_6_3 = ('Publish snapshot repository trixie/13.8/trixie with components "main", "contrib", "non-free", '
+                 '"non-free-firmware" and sources "trixie-13.8-main", "trixie-13.8-contrib", "trixie-13.8-non-free", '
+                 '"trixie-13.8-non-free-firmware"')
+
+# aptly task list of a published mirror: all tasks ended
+PUBLISHED_TASKS = [dict(t, State=3 if t["ID"] in (1, 5) else 2) for t in RESTART_TASKS] + [
+    {"ID": 13, "State": 2, "Name": "Update mirror trixie-13.8-main"},
+    {"ID": 14, "State": 2, "Name": "Update mirror trixie-13.8-contrib"},
+    {"ID": 15, "State": 2, "Name": "Update mirror trixie-13.8-non-free"},
+    {"ID": 16, "State": 2, "Name": "Update mirror trixie-13.8-non-free-firmware"},
+    {"ID": 21, "State": 2, "Name": PUBLISH_1_6_3},
+]
+
+
+def test_publish_task_name_of_aptly_1_6_3():
+    assert worker_aptly.is_mirror_publish_task(PUBLISH_1_6_3, NAMES)
+    assert worker_aptly.is_mirror_publish_task("Publish snapshot: " + ", ".join(NAMES), NAMES)
+    # another mirror, or only some of the components
+    assert not worker_aptly.is_mirror_publish_task(PUBLISH_1_6_3.replace("13.8", "13.9"), NAMES)
+    assert not worker_aptly.is_mirror_publish_task(PUBLISH_1_6_3, NAMES[:2])
+    assert not worker_aptly.is_mirror_publish_task("Update mirror trixie-13.8-main", NAMES)
+
+
+def test_resume_finds_the_publish_of_aptly_1_6_3():
+    """the publish (21) is newer than the updates 13 to 16"""
+    assert mirror_resume_state(PUBLISHED_TASKS, NAMES) == ("publishing", [21])
+
+
+def test_finalize_failed_publish_keeps_the_snapshots():
+    """the snapshots may be published already (aptly refuses to drop them)"""
+    aptly = FakeAptly()
+    aptly.mirror_snapshot_delete = AsyncMock()
+    aptly.tasks.append({"ID": 25, "State": 3, "Name": PUBLISH_1_6_3})
+    build, mirror = run_finalize(aptly, "publishing", [25])
+
+    aptly.mirror_snapshot_delete.assert_not_called()
+    build.set_publish_failed.assert_awaited_once()
+    build.logdone.assert_awaited_once()
+    assert mirror.mirror_state == "error"
+
+
 class ListQuery:
     """query(...).join/filter(...).all()/first(): returns the next result of the list given for the model"""
 
@@ -490,3 +532,23 @@ def test_init_skips_existing_mirrors():
     build.set_failed.assert_not_called()
     enqueued.assert_called_once_with({"update_mirror": [1]})
     assert "I: mirror exists already on aptly: " + ", ".join(NAMES[1:]) + "\n" in build_log(build)
+
+
+def test_startup_leaves_a_mirror_in_error_whose_tasks_ended():
+    """a published mirror in error (a build environment failed) is not published again"""
+    trixie = make_mirror("trixie", "13.8", "error")
+    finalize, loop = run_startup([PUBLISHED_TASKS], [(trixie, None)], [])
+
+    finalize.assert_not_called()
+    trixie.set_mirror_state.assert_not_called()
+
+
+def test_startup_continues_a_mirror_in_error_with_a_running_task():
+    trixie = make_mirror("trixie", "13.8", "error")
+    build = make_mirror_build(100, "build_failed")
+    tasks = [dict(t) for t in PUBLISHED_TASKS]
+    tasks[-1]["State"] = 1  # the publish still runs
+    finalize, loop = run_startup([tasks], [(trixie, build)], [])
+
+    assert finalize.call_args.args[-1] == [21]
+    assert trixie.mirror_state == "publishing"
