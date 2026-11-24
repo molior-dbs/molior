@@ -7,6 +7,16 @@ from ..model.chroot import Chroot
 from ..molior.queues import enqueue_task, buildlog
 
 
+async def _fail_mirror(session, build, chroot_id):
+    """A build environment failed: the mirror build fails and the base mirror goes to error (it is not usable for
+    builds; a retry of the chroot build sets it to ready when it works)."""
+    await build.parent.set_failed()
+    await build.parent.logdone()
+    chroot = session.query(Chroot).filter(Chroot.id == chroot_id).first()
+    if chroot:
+        await chroot.basemirror.set_mirror_state("error")
+
+
 async def CreateBuildEnv(chroot_id, build_id, dist,
                          name, version, arch, components, repo_url, mirror_keys):
     """
@@ -55,8 +65,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             await build.logtitle("Done", no_footer_newline=True)
             await build.set_failed()
             await build.logdone()
-            await build.parent.set_failed()
-            await build.parent.logdone()
+            await _fail_mirror(session, build, chroot_id)
             session.commit()
             return False
 
@@ -78,6 +87,7 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
             await build.logtitle("Done", no_footer_newline=True)
             await build.set_publish_failed()
             await build.logdone()
+            await _fail_mirror(session, build, chroot_id)
             session.commit()
             return False
 
