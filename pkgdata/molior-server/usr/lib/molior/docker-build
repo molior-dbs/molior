@@ -173,8 +173,12 @@ fi
 
 home=`mktemp -d`
 chown build $home
+# The package build gets a clean environment: only what su sets for the user build, and HOME. The variables of this
+# script (PLATFORM, VERSION, BUILD_TOKEN, ...) are not passed on: build tools read them (msbuild and xbuild take
+# PLATFORM as the build platform), and the token stays out of the package build.
+cleanenv='env -i PATH="$PATH" USER="$USER" LOGNAME="$LOGNAME" SHELL="$SHELL"'
 log "Running: dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
-su build -c "HOME=$home dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
+su build -c "$cleanenv HOME=$home dpkg-buildpackage -nc -us -uc -ui --target-arch $ARCH $buildargs"
 if [ "$?" -ne 0 ]; then
   echo "E: Error building debian package $dsc_url" >&2
   exit 7
@@ -182,7 +186,7 @@ fi
 
 if [ "$RUN_LINTIAN" = "True" ]; then
     log_title "Running Lintian"
-    su build -c lintian
+    su build -c "$cleanenv HOME=$home lintian"
 fi
 
 cd ..
