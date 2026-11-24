@@ -325,7 +325,9 @@ A build that had nothing to do ends as *already exists* (built before), *already
 
 ### 6.5 Build order
 
-When packages of a product depend on each other, a package must be built after the packages it needs. A repository lists them under *build after*. Molior looks for them in the version and its dependencies, and holds the binary build back while any of them is still being built or published in those versions. Independent packages build in parallel.
+When packages of a product depend on each other, a package must be built after the packages it needs. A repository lists them under *build after*, by **repository name** (the last part of its git URL, without `.git`), not by package name. Molior looks for them in the version and its dependencies, and holds the binary build back while any of them is still being built or published in those versions. Independent packages build in parallel.
+
+An entry that matches no repository in the version or its dependencies is an error: the build is not started and waits, and its log says which dependency is missing. The scheduler checks waiting builds again whenever builds finish, so it can start after a repository of that name is added and a build of it is published.
 
 ### 6.6 Following, retrying and aborting builds
 
@@ -607,7 +609,9 @@ These tests are taken over into the 1.5 system tests, so that 1.5 is checked aga
 | **Only what applies** | tests of functionality that molior 1.5 no longer has are not taken over, instead of being copied and disabled: build notification hooks, access to the hosts by SSH (chroots, aptly service), and mirrors of old third party software. Product deployments are tested with the deployment tools (see [7](#7-product-deployments)) |
 | **Later** | the arm build tests are taken over when the test environment can build arm packages |
 
-The tests build a set of small **test packages**, each covering one case: a successful build with a passing short test, a build failing in its short test, build order between packages, several binary packages from one source, a package without molior configuration (never built), CI builds, one source for two project versions, files stored with git LFS, git submodules, and an architecture dependent package for arm. They come from the 1.4 tests and were cleaned up and updated for trixie. They are kept as public git repositories (one per package, named `test-<name>`) in the molior organisation on GitHub, from where the system tests build them.
+The tests build a set of small **test packages**, each covering one case: a successful build with a passing short test, a build failing in its short test, build order between packages, several binary packages from one source, a package without molior configuration (never built), CI builds, one source for two project versions, files stored with git LFS, git submodules, and an architecture dependent package for arm. They come from the 1.4 tests and were cleaned up and updated for trixie. They are kept as public git repositories (one per package, named `test-<name>`) in the molior organisation on GitHub, from where the system tests build them. Build order entries therefore use these repository names.
+
+The parallel build test adds all test packages to one version at once and waits for all of them. It checks parallel building and the build order together: a package that has to be built after another one only finishes if its build order dependency is found and built first.
 
 ---
 

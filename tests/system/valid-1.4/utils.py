@@ -10,6 +10,9 @@ import requests
 MOLIOR_URL = os.environ.get("MOLIOR_URL", "http://web:8000").rstrip("/")
 RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "1500"))
+BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1200"))
+APTLY_URL = os.environ.get("APTLY_URL", "http://aptly:8000").rstrip("/")
+ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "nothing_done")
 
 logger = logging.getLogger("molior-validation")
@@ -18,7 +21,7 @@ logger = logging.getLogger("molior-validation")
 def molior_session(molior_host=MOLIOR_URL):
     session = requests.Session()
     r = session.post(molior_host + "/api/login",
-                     json={"username": "admin", "password": os.environ["MOLIOR_ADMIN_PASSWORD"]}, timeout=30)
+                     json={"username": "admin", "password": ADMIN_PASSWORD}, timeout=30)
     assert r.status_code == 200, r.text
     return session
 
@@ -124,3 +127,45 @@ def create_mirror(
     print(release_url, "exists")
     print("Mirror '{}-{}' succesfully created".format(mirror_name, mirror_version))
     return 0
+
+
+def wait_for_paralell_builds(molior_host, builds):
+    """
+    Waits until the deb builds of the given source packages are done (successful, build_failed or nothing_done),
+    at most BUILD_TIMEOUT seconds (1.4: 60 times 10 s). Returns the deb builds found.
+    """
+    our_builds = []
+    session = molior_session(molior_host)
+    for _ in range(int(BUILD_TIMEOUT / 10)):
+        time.sleep(10)
+
+        builds_response = session.get("{}/api/builds".format(molior_host), params={"page": 1, "page_size": 100},
+                                      timeout=30)
+        assert builds_response.ok, "Could not get the builds"
+        current_builds = builds_response.json().get("results")
+        our_builds = [
+            build for build in current_builds if build.get("sourcename") in builds and build.get("buildtype") == "deb"
+        ]
+        if not our_builds:
+            continue
+        done = True
+        for sourcename in builds:
+            found = False
+            for b in our_builds:
+                if b.get("sourcename") == sourcename:
+                    found = True
+                    if b.get("buildstate") not in ("successful", "build_failed", "nothing_done"):
+                        done = False
+                        break
+            if not found:
+                done = False
+                break
+            if not done:
+                break
+        if done:
+            break
+
+    os.makedirs(RESULTS, exist_ok=True)
+    with open(os.path.join(RESULTS, "builds-{}.json".format(int(time.time()))), "w") as f:
+        json.dump(current_builds, f, indent=2)
+    return our_builds

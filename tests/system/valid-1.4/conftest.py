@@ -1,6 +1,7 @@
 """Fixtures of the 1.4 validation tests (molior-testing conftest.py), ported to the current API."""
 import pytest
 
+import api_tests
 import utils
 
 
@@ -27,3 +28,42 @@ def create_mirror(molior_url):
         utils.create_mirror(molior_url, *args, **kwargs)
 
     yield __create_mirror
+
+
+@pytest.fixture
+def aptly_url():
+    """URL of the published APT repos (aptly nginx), as the 1.4 testconfig.yaml aptly_url"""
+    yield utils.APTLY_URL
+
+
+@pytest.fixture(scope="session")
+def project_name():
+    yield "{}-{}".format("molior", "validation")
+
+
+@pytest.fixture
+def project_version():
+    yield "1"
+
+
+@pytest.fixture
+def api_vars(project_name, project_version, molior_url):
+    yield {
+        "molior_url": molior_url,
+        "api_user": "admin",
+        "api_password": utils.ADMIN_PASSWORD,
+        "project_name": project_name,
+        "projectversion_name": project_version,
+    }
+
+
+@pytest.fixture
+def api_test(api_vars):
+    """
+    Runs a 1.4 API test suite (tests/api-tests/<name>.yml, translated in api_tests.py)
+    """
+
+    def __api_test(path):
+        api_tests.SUITES[path](api_vars)
+
+    yield __api_test

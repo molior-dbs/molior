@@ -5,13 +5,15 @@
 # stretch, deb.debian.org instead of the internal mirror) and the helpers in utils.py, which use the current API.
 
 import pytest
+import requests
+from time import sleep
 
-from utils import logger
+from utils import logger, wait_for_paralell_builds
 
 basemirror = "trixie"
 basemirror_version = "13"
 
-# Only what the build environments and the test packages need (see README.md): debootstrap (Priority required,
+# Only what the build environments and the test packages need (see DEVELOPMENT-1.5.md): debootstrap (Priority required,
 # apt, build-essential, ca-certificates), the build environment tools (create-docker.sh) and the build
 # dependencies of the test packages (debhelper, python3). aptly adds their dependencies (FilterWithDeps).
 basemirror_filter = (
@@ -48,3 +50,46 @@ def test_basemirror_creation(create_mirror):
         mirror_filter=basemirror_filter,
         filter_with_deps=True,
     )
+
+
+@pytest.mark.metadata(
+    id="c0588942",
+    author="im",
+    requirements=["000", "006", "007", "016"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_basemirror_creation")
+def test_build_parallelization(
+    molior_url,
+    aptly_url,
+    api_test,
+    project_name,
+):
+    """
+    Tests the parallel building of repositories
+    """
+    logger.warning("==================================================== test_build_parallelization")
+
+    # create the repositories using the api test
+    api_test("tests/api-tests/init-testproject.yml")
+
+    print("APTLY URL TEST: ", "{}/{}/{}/repos/{}".format(aptly_url, basemirror, basemirror_version, project_name))
+    # verify that the aptly repository has been created
+    response = requests.get(
+        "{}/{}/{}/repos/{}".format(aptly_url, basemirror, basemirror_version, project_name)
+    )
+    assert response.ok, "The aptly repo was not created for project '{}'".format(
+        project_name
+    )
+
+    sleep(5)
+    # wait for the processes to finish
+    # 1.4 waited for repo names ("build-notifications", "ci-build", "badtick", ...); the deb builds carry the source
+    # package name, so the 1.4 wait always ran into its timeout. Source package names, badtrick has no molior.yml
+    # and builds nothing.
+    builds = wait_for_paralell_builds(molior_url, ["build-notify-package", "cipackage", "testproject",
+                                                   "badtrack", "trick", "tick", "track"])
+    for b in builds:
+        assert b.get("buildstate") == "successful" or b.get("buildstate") == "build_failed" \
+            or b.get("buildstate") == "nothing_done"

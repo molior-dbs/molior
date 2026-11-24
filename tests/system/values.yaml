@@ -5,12 +5,12 @@ molior:
   dev: true                 # plain HTTP session cookies, no TLS in the test cluster
   ciBuildsEnabled: true
   maxParallelChroots: 1
-  maxParallelSourceBuilds: 1
+  maxParallelSourceBuilds: 2
   terminationGracePeriodSeconds: 60
 
 builder:
   amd64:
-    parallel: 1
+    parallel: 2             # test_build_parallelization: more than one build at a time
   arm64:
     parallel: 1
 
