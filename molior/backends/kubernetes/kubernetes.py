@@ -1,5 +1,6 @@
 import asyncio
 import concurrent
+import re
 import time
 
 from contextlib import suppress
@@ -10,6 +11,18 @@ from ...logger import logger
 from ...molior.configuration import Configuration
 from ...molior.queues import enqueue_buildtask, dequeue_buildtask, buildlog, enqueue_backend, enqueue_buildlog_nowait
 from ...tools import write_log_title
+
+
+def build_job_name(build_id, repository_name, version, distrelease, distversion, arch):
+    """
+    Name of the Kubernetes Job of a build. Debian versions may have characters that a Job name must not have
+    (CI versions "1.0+git20200101.abc", epochs "1:2.0", "~"): every character but a-z, 0-9 and "-" becomes "-".
+    The name is also a label value: max 63 bytes, starting and ending with a letter or digit
+    (the build id at the front keeps it unique).
+    """
+    name = f"build-{build_id}-{repository_name}-{version}-{distrelease}-{distversion}-{arch}"
+    name = re.sub(r"[^a-z0-9-]", "-", name.lower())
+    return name[:63].rstrip("-")
 
 
 class KubernetesBackend:
@@ -208,12 +221,8 @@ class KubernetesBackend:
                 node_label = (cfg.builder.get(queue_arch) or {}).get("nodeLabel") or f"kubernetes.io/arch={queue_arch}"
 
                 namespace = "molior"
-                jobversion = task['version'].replace("~", "-")
-                job_name = f"build-{task['build_id']}-{task['repository_name']}-{jobversion}-" \
-                           f"{distrelease}-{distversion}-{arch}"
-                job_name = job_name.replace(".", "-")
-                # the job name is also a label value: max 63 bytes (the build id at the front keeps it unique)
-                job_name = job_name[:63].rstrip("-")
+                job_name = build_job_name(task['build_id'], task['repository_name'], task['version'],
+                                          distrelease, distversion, arch)
                 image = f"{registry}/molior/{distrelease}-{arch}:{distversion}"
 
                 envvars = [
