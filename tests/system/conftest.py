@@ -66,12 +66,14 @@ def pytest_report_teststatus(report, config):
 def pytest_configure(config):
     """Result lines in verbose mode: the number of the test, the location and the result in columns, the time of
     the test (setup and call) in whole seconds before the percentage:
-        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED       0s [ 15%]"
+        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED     0s [ 15%]"
     Uses the location line and the progress message of pytest's terminal reporter (private, checked)."""
     reporter = config.pluginmanager.get_plugin("terminalreporter")
     if not reporter or config.option.verbose <= 0:
         return
-    if not all(hasattr(reporter, a) for a in ("_get_progress_information_message", "_locationline", "_session")):
+    needed = ("_get_progress_information_message", "_write_progress_information_filling_space", "_get_main_color",
+              "_locationline", "_session")
+    if not all(hasattr(reporter, a) for a in needed):
         return
     progress = reporter._get_progress_information_message
     location = reporter._locationline
@@ -79,7 +81,12 @@ def pytest_configure(config):
 
     def with_time():
         msg = progress()
-        return " {:>6}".format("{}s".format(int(round(_pending[0])))) + msg if _pending else msg
+        return " {:>5}".format("{}s".format(int(round(_pending[0])))) + msg if _pending else msg
+
+    def right_after():
+        # pytest right-aligns the progress to the terminal width; write it right after the result instead
+        color, _ = reporter._get_main_color()
+        reporter.write(reporter._get_progress_information_message(), flush=True, **{color: True})
 
     def numbered(nodeid, *args):
         items = getattr(reporter._session, "items", None) or []
@@ -95,3 +102,4 @@ def pytest_configure(config):
 
     reporter._get_progress_information_message = with_time
     reporter._locationline = numbered
+    reporter._write_progress_information_filling_space = right_after
