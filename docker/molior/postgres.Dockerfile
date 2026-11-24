@@ -8,4 +8,5 @@ RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get full-upgrad
    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY docker/molior/start-postgres /usr/local/bin/
-CMD start-postgres
+# exec form: start-postgres is PID 1 and gets the TERM (its trap stops postgres); the shell form ignores it
+CMD ["start-postgres"]

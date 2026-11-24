@@ -4,6 +4,24 @@ pg_version=17
 pg_data=/var/lib/postgresql/$pg_version/main
 pg_ctl=/usr/lib/postgresql/$pg_version/bin/pg_ctl
 
+# Only one postgres may run on the data directory. A pod delete (and a Deployment that replaces its pod) starts
+# the new pod while the old one is still in its preStop, and both mount the volume. The new postgres cannot see the
+# old one (other PID namespace), takes its postmaster.pid for stale and starts: two postgres on one data directory,
+# writes of one of them are lost. So wait for the old one first.
+# The lock is held on fd 9 by this shell and inherited by su and all postgres processes; the kernel releases it
+# when the last of them ends, also when the container is killed. flock works between pods on the same node and
+# volume (hostPath, local-path); not on volumes of other nodes (not used: the PVs are bound to one node).
+lockfile=$pg_data/.molior-postgres.lock
+trap 'echo "postgres: stopped while waiting for the old postgres"; exit 0' TERM
+exec 9>>"$lockfile"
+if ! flock -n 9; then
+    echo "postgres: waiting for the postgres of the old pod to stop (lock $lockfile)..."
+    until flock -w 10 9; do
+        echo "postgres: still waiting for the postgres of the old pod to stop..."
+    done
+    echo "postgres: the old postgres stopped"
+fi
+
 sig() {
     echo "postgres: stopping gracefully..."
     su postgres -c "$pg_ctl stop -D $pg_data -m smart -w"
