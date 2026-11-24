@@ -360,3 +360,133 @@ def test_startup_without_tasks_fails_the_mirror_build():
     finalize.assert_not_called()
     assert trixie.mirror_state == "error"
     build.set_failed.assert_awaited_once()
+
+
+# missing aptly mirrors (e.g. trixie-13.8-main was deleted after its update failed, the other components are kept):
+# update and init of the mirror create the missing ones
+
+class RecreateAptly:
+    """aptly with the mirrors in `existing`; records creates and updates."""
+
+    def __init__(self, existing, create_error=None):
+        self.existing = set(existing)
+        self.create_error = create_error
+        self.created = []
+        self.updated = []
+
+    async def mirror_exists(self, name):
+        return name in self.existing
+
+    async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, dist, components,
+                            architectures, mirror_filter, skip_existing=False, **kwargs):
+        if self.create_error:
+            raise Exception(self.create_error)
+        created = []
+        for name in mirror_aptly_names(base_mirror, base_mirror_version, mirror, version, components):
+            if skip_existing and name in self.existing:
+                continue
+            if name in self.existing:
+                raise Exception(f"mirror with name {name} already exists")
+            self.existing.add(name)
+            created.append(name)
+        self.created += created
+        return created
+
+    async def snapshot_exists(self, name):
+        return False
+
+    async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
+        names = mirror_aptly_names(base_mirror, base_mirror_version, mirror, version, components)
+        missing = [name for name in names if name not in self.existing]
+        if missing:
+            raise worker_aptly.AptlyError(f"mirror {missing[0]} not found")
+        self.updated = names
+        return [1, 2, 3, 4]
+
+    async def gpg_add_key(self, **kwargs):
+        return True, "key added"
+
+
+def make_trixie_mirror(mirror_state):
+    build, mirror = make_build_and_mirror(mirror_state)
+    build.id = 100
+    build.set_building = AsyncMock()
+    mirror.external_repo = False
+    mirror.basemirror = None
+    mirror.project.name = "trixie"
+    mirror.name = "13.8"
+    mirror.mirror_url = "https://deb.debian.org/debian/"
+    mirror.mirror_components = ",".join(COMPONENTS)
+    mirror.mirror_architectures = "{amd64,i386,arm64,armhf}"
+    mirror.mirror_with_sources = True
+    mirror.mirror_with_installer = False
+    mirror.mirror_filter = ""
+    mirror.mirror_filter_with_deps = False
+    return build, mirror
+
+
+def run_worker(method, aptly, build, mirror, mirrorkey=None):
+    session = FakeSession(build, mirror)
+    orig_query = session.query
+
+    def query(model):
+        if model is worker_aptly.MirrorKey:
+            return Query(mirrorkey)
+        return orig_query(model)
+    session.query = query
+    enqueued = AsyncMock()
+    worker = worker_aptly.AptlyWorker.__new__(worker_aptly.AptlyWorker)
+    with patch.object(worker_aptly, "Session", session), \
+            patch.object(worker_aptly, "get_aptly_connection", return_value=aptly), \
+            patch.object(worker_aptly, "enqueue_aptly", enqueued), \
+            patch.object(worker_aptly, "finalize_mirror", AsyncMock()):
+        asyncio.run(getattr(worker, method)([1]))
+    return enqueued
+
+
+def build_log(build):
+    return "".join(c.args[0] for c in build.log.call_args_list)
+
+
+def test_update_creates_missing_mirror_first():
+    aptly = RecreateAptly(NAMES[1:])
+    build, mirror = make_trixie_mirror("error")
+    run_worker("_update_mirror", aptly, build, mirror)
+    assert aptly.created == ["trixie-13.8-main"]
+    assert aptly.updated == NAMES
+    assert mirror.mirror_state == "updating"
+    build.set_failed.assert_not_called()
+    assert "I: mirror missing on aptly, created again: trixie-13.8-main\n" in build_log(build)
+
+
+def test_update_with_all_mirrors_creates_nothing():
+    aptly = RecreateAptly(NAMES)
+    build, mirror = make_trixie_mirror("error")
+    run_worker("_update_mirror", aptly, build, mirror)
+    assert aptly.created == []
+    assert aptly.updated == NAMES
+    assert "created again" not in build_log(build)
+
+
+def test_update_fails_the_build_if_the_create_fails():
+    aptly = RecreateAptly(NAMES[1:], create_error="unable to fetch Release")
+    build, mirror = make_trixie_mirror("error")
+    run_worker("_update_mirror", aptly, build, mirror)
+    assert aptly.updated == []
+    assert mirror.mirror_state == "error"
+    build.set_failed.assert_called_once()
+    build.logdone.assert_called_once()
+    assert "unable to fetch Release" in build_log(build)
+
+
+def test_init_skips_existing_mirrors():
+    """A retry of an init that created only some of the components (before: 'already exists', init_error)."""
+    aptly = RecreateAptly(NAMES[1:])
+    build, mirror = make_trixie_mirror("init_error")
+    mirrorkey = MagicMock(keyurl="", keyids="{}", keyserver="")
+    enqueued = run_worker("_init_mirror", aptly, build, mirror, mirrorkey)
+    assert aptly.created == ["trixie-13.8-main"]
+    assert mirror.mirror_state == "created"
+    build.set_failed.assert_not_called()
+    enqueued.assert_called_once_with({"update_mirror": [1]})
+    assert "I: mirror exists already on aptly: " + ", ".join(NAMES[1:]) + "\n" in build_log(build)

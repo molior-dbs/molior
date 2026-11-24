@@ -197,3 +197,40 @@ def test_mirror_create_filter_with_deps_default_off():
                                   ["main", "contrib"], ["amd64"], "Name (% python3*)"))
     assert [c[2]["Name"] for c in calls] == ["trixie-13.8-main", "trixie-13.8-contrib"]
     assert all(c[2]["FilterWithDeps"] is False for c in calls)
+
+
+def test_mirror_create_skip_existing():
+    """
+    Test mirror_create with skip_existing creates only the aptly mirrors that are missing
+    (e.g. trixie-13.8-main was deleted, the other components exist)
+    """
+    import asyncio
+
+    api, calls = _mirror_api()
+    existing = {"trixie-13.8-contrib", "trixie-13.8-non-free"}
+
+    async def mirror_exists(name):
+        return name in existing
+    api.mirror_exists = mirror_exists
+
+    created = asyncio.run(api.mirror_create("trixie", "13.8", "", "", "http://deb.debian.org/debian", "trixie",
+                                            ["main", "contrib", "non-free"], ["amd64"], "", skip_existing=True))
+    assert created == ["trixie-13.8-main"]
+    assert [c[2]["Name"] for c in calls] == ["trixie-13.8-main"]
+
+
+def test_mirror_create_without_skip_existing_does_not_look_up():
+    """
+    Test mirror_create without skip_existing creates all mirrors and does not ask aptly first
+    """
+    import asyncio
+
+    api, calls = _mirror_api()
+
+    async def mirror_exists(name):
+        raise AssertionError("not expected")
+    api.mirror_exists = mirror_exists
+
+    created = asyncio.run(api.mirror_create("trixie", "13.8", "", "", "http://deb.debian.org/debian", "trixie",
+                                            ["main", "contrib"], ["amd64"], ""))
+    assert created == ["trixie-13.8-main", "trixie-13.8-contrib"]

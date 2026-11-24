@@ -55,6 +55,40 @@ def mirror_aptly_names(base_mirror, base_mirror_version, mirror, version, compon
     return [f"{name}-{component}" for component in components]
 
 
+async def create_aptly_mirror(aptly, mirror):
+    '''Create the aptly mirrors (one per component) of a mirror from its settings in the DB.
+    The ones that exist already on aptly are kept (not changed).
+
+    Returns:
+        tuple: (names of the aptly mirrors created, names of the ones that existed already)
+    '''
+    # FIXME: should be array in db
+    # NOTE: return empty array when the components are empty, because
+    # the default `.split()` algorythm returns `[""]` when
+    # an empty string is given: https://stackoverflow.com/a/16645307/12356463
+    components = mirror.mirror_components.split(",") if mirror.mirror_components else []
+    base_mirror = mirror.basemirror.project.name if mirror.basemirror else ""
+    base_mirror_version = mirror.basemirror.name if mirror.basemirror else ""
+    created = await aptly.mirror_create(
+        mirror.project.name,
+        mirror.name,
+        base_mirror,
+        base_mirror_version,
+        mirror.mirror_url,
+        mirror.mirror_distribution,
+        components,
+        db2array(mirror.mirror_architectures),
+        mirror.mirror_filter,
+        download_sources=mirror.mirror_with_sources,
+        download_udebs=mirror.mirror_with_installer,
+        download_installer=mirror.mirror_with_installer,
+        filter_with_deps=bool(mirror.mirror_filter_with_deps),
+        skip_existing=True,
+    )
+    names = mirror_aptly_names(base_mirror, base_mirror_version, mirror.project.name, mirror.name, components)
+    return created, [name for name in names if name not in created]
+
+
 def mirror_resume_state(tasks, names):
     '''Decide how to continue a mirror after a molior restart, from the aptly task list.
 
@@ -702,25 +736,10 @@ class AptlyWorker:
                     await build.log("I: using filter %s%s\n" % (mirror.mirror_filter,
                                     " (with dependencies)" if mirror.mirror_filter_with_deps else ""))
                 try:
-                    await aptly.mirror_create(
-                        mirror.project.name,
-                        mirror.name,
-                        mirror.basemirror.project.name if mirror.basemirror else "",
-                        mirror.basemirror.name if mirror.basemirror else "",
-                        mirror.mirror_url,
-                        mirror.mirror_distribution,
-                        # FIXME: should be array in db
-                        # NOTE: return empty array when the components are empty, because
-                        # the default `.split()` algorythm returns `[""]` when
-                        # an empty string is given: https://stackoverflow.com/a/16645307/12356463
-                        mirror.mirror_components.split(",") if mirror.mirror_components else [],
-                        db2array(mirror.mirror_architectures),
-                        mirror.mirror_filter,
-                        download_sources=mirror.mirror_with_sources,
-                        download_udebs=mirror.mirror_with_installer,
-                        download_installer=mirror.mirror_with_installer,
-                        filter_with_deps=bool(mirror.mirror_filter_with_deps),
-                    )
+                    # skip existing: a retry after an init that created only some of the components
+                    _, existing = await create_aptly_mirror(aptly, mirror)
+                    if existing:
+                        await build.log("I: mirror exists already on aptly: %s\n" % ", ".join(existing))
 
                 except NotFoundError as exc:
                     await build.log("E: aptly seems to be not available: %s\n" % str(exc))
@@ -772,6 +791,21 @@ class AptlyWorker:
                 session.commit()
 
                 mirror_name = "{}/{}".format(mirror.project.name, mirror.name)
+                try:
+                    # an aptly mirror can be missing, e.g. deleted after a failed update: create it again
+                    missing, _ = await create_aptly_mirror(get_aptly_connection(), mirror)
+                    if missing:
+                        await build.log("I: mirror missing on aptly, created again: %s\n" % ", ".join(missing))
+                        logger.warning("update mirror %s: created missing aptly mirrors %s", mirror_name, missing)
+                except Exception as exc:
+                    await build.log("E: failed to create missing mirror %s on aptly: %s\n" % (mirror_name, str(exc)))
+                    logger.error("failed to create missing mirror %s on aptly: %s", mirror_name, str(exc))
+                    await mirror.set_mirror_state("error")
+                    await build.set_failed()
+                    await build.logdone()
+                    session.commit()
+                    return
+
                 try:
                     await update_mirror(
                         build.id,

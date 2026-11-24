@@ -160,6 +160,25 @@ def test_snapshot_exists_raises_on_other_errors(api_module, status):
         asyncio.run(api.snapshot_exists(TMP))
 
 
+# mirror_exists
+
+@pytest.mark.parametrize("status,expected", [(200, True), (404, False)])
+def test_mirror_exists(api_module, status, expected):
+    FakeSession.answers = {f"{URL}/mirrors/trixie-13.8-main": (status, "")}
+    api = api_module.AptlyApi(URL, "gpg@key")
+    assert asyncio.run(api.mirror_exists("trixie-13.8-main")) is expected
+    assert FakeSession.urls == [f"{URL}/mirrors/trixie-13.8-main"]
+
+
+@pytest.mark.parametrize("status", [401, 500, 502])
+def test_mirror_exists_raises_on_other_errors(api_module, status):
+    """A proxy error (502) or an auth error must not be taken for a missing mirror (it would be created)."""
+    FakeSession.answers = {f"{URL}/mirrors/trixie-13.8-main": (status, "bad")}
+    api = api_module.AptlyApi(URL, "gpg@key")
+    with pytest.raises(AptlyError):
+        asyncio.run(api.mirror_exists("trixie-13.8-main"))
+
+
 # republish
 
 def test_republish_without_leftover_tmp_snapshot(api_module):

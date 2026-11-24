@@ -236,12 +236,18 @@ class AptlyApi:
 
     async def mirror_create(self, mirror, version, base_mirror, base_mirror_version, url, mirror_distribution,
                             components, architectures, mirror_filter, download_sources=True,
-                            download_udebs=True, download_installer=True, filter_with_deps=False):
+                            download_udebs=True, download_installer=True, filter_with_deps=False,
+                            skip_existing=False):
         """
         Creates a debian archive mirror.
 
         Args:
             FIXME: data (dict): Params for mirror creation.
+            skip_existing (bool): do not create the aptly mirrors (one per component) that exist already,
+                e.g. after a failed init that created only some of them, or after one was deleted.
+
+        Returns:
+            list: the names of the aptly mirrors created
 
         Raises:
             molior.aptly.errors.AptlyError: If a known error occurs while
@@ -253,9 +259,13 @@ class AptlyApi:
         if not components:
             components = [None]
 
+        created = []
         for component in components:
+            mirrorname = f"{name}-{component}" if component is not None else name
+            if skip_existing and await self.mirror_exists(mirrorname):
+                continue
             data = {
-                "Name": f"{name}-{component}" if component is not None else name,
+                "Name": mirrorname,
                 "ArchiveURL": url,
                 "Distribution": mirror_distribution,
                 "Components": None if component is None else [component],
@@ -268,6 +278,26 @@ class AptlyApi:
             }
 
             await self.POST("/mirrors", data=data)
+            created.append(mirrorname)
+        return created
+
+    async def mirror_exists(self, name):
+        """
+        Checks if an aptly mirror exists, by name.
+
+        Returns:
+            bool: True if aptly has the mirror, False if aptly answers 404.
+
+        Raises:
+            AptlyError: on any other answer (e.g. 502 from a proxy, 401), so that an error is not taken for "missing".
+        """
+        async with aiohttp.ClientSession() as http:
+            async with http.get(f"{self.url}/mirrors/{name}", auth=self.auth) as resp:
+                if resp.status in self.SUCCESS:
+                    return True
+                if resp.status == 404:
+                    return False
+                raise AptlyError(f"mirror lookup '{name}' failed: HTTP {resp.status}", await resp.text())
 
     async def mirror_update(self, base_mirror, base_mirror_version, mirror, version, components):
         """
