@@ -82,13 +82,24 @@ WORK=$(mktemp -d /tmp/molior-$ID.XXXXXX)
 export KUBECONFIG=$WORK/kubeconfig
 mkdir -p "$RESULTS_DIR"
 PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-REGISTRY=k3d-$ID-registry         # name inside the cluster (and in the chart), port $PORT
+REGISTRY=k3d-$ID-registry         # name inside the cluster (and in the chart), port 5000 there, $PORT on the host
 
 log "registry $REGISTRY on 127.0.0.1:$PORT"
 k3d registry create "$ID-registry" --port "127.0.0.1:$PORT" >/dev/null
 
+# Inside the docker network the registry listens on 5000, only the host has $PORT. Molior pushes the build images
+# itself (create-docker.sh, podman) to registry.server, so the chart gets $REGISTRY:5000, and containerd needs a
+# mirror for that name (--registry-use only adds $REGISTRY:$PORT).
+cat > "$WORK/registries.yaml" <<EOF
+mirrors:
+  "$REGISTRY:5000":
+    endpoint:
+      - http://$REGISTRY:5000
+EOF
+
 log "cluster $ID"
-k3d cluster create "$ID" --registry-use "$REGISTRY:$PORT" --no-lb --wait --timeout 300s \
+k3d cluster create "$ID" --registry-use "$REGISTRY:$PORT" --registry-config "$WORK/registries.yaml" \
+    --no-lb --wait --timeout 300s \
     --kubeconfig-update-default=false --kubeconfig-switch-context=false \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" >/dev/null
 k3d kubeconfig get "$ID" > "$KUBECONFIG"
@@ -116,7 +127,7 @@ kubectl -n molior create secret generic molior-passwords --from-literal=molior-p
     --from-literal=registry-password=unused >/dev/null
 unset ADMIN_PASSWORD
 timeout 900 helm install -n molior molior charts/ -f tests/system/values.yaml \
-    --set registry.host="$REGISTRY" --set registry.port="$PORT" --wait --timeout 600s >/dev/null
+    --set registry.host="$REGISTRY" --set registry.port=5000 --wait --timeout 600s >/dev/null
 
 log "test runner"
 kubectl -n molior apply -f - >/dev/null <<EOF
@@ -128,7 +139,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: tests
-      image: $REGISTRY:$PORT/molior-test-web:dev
+      image: $REGISTRY:5000/molior-test-web:dev
       env:
         - name: MOLIOR_URL
           value: http://web:8000

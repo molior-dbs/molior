@@ -88,6 +88,13 @@ def create_mirror(
         build = session.get("{}/api2/build/{}".format(molior_host, build_id), timeout=30).json()
         if state == "ready" and (not is_basemirror or build["buildstate"] in FINAL_STATES):
             break
+        # stop on a failure, also if the mirror state is not updated (older molior versions, see buildenv.py)
+        if build["buildstate"] in ("build_failed", "publish_failed"):
+            break
+        children = [session.get("{}/api2/build/{}".format(molior_host, c["id"]), timeout=30).json()
+                    for c in build.get("children", [])]
+        if any(c["buildstate"] in ("build_failed", "publish_failed") for c in children):
+            break
         time.sleep(10)
     summary["seconds"] = round(time.time() - start)
     summary["states"] = states
