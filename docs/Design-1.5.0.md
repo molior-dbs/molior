@@ -156,7 +156,7 @@ Then molior:
 5. for a base mirror, **prepares the build environments** (see 4.4),
 6. marks the mirror **ready** and locks it.
 
-If a step fails, the mirror shows an error and the administrator can retry it. A download that has been made is kept, so a retry does not start from zero.
+If a step fails, the mirror shows an error and the administrator can retry it. A download that has been made is kept, so a retry does not start from zero. A retry of the mirror build retries only what failed: the failed build environments if the mirror itself is published, otherwise the mirror update.
 
 Mirroring continues when molior is restarted: the download runs in the repository server, and molior picks up the progress again after its start.
 
@@ -509,10 +509,12 @@ For development, molior runs on a **local Kubernetes cluster in containers (k3d)
 - molior images are **built from the working copy** and pushed to the local registry, so a code change is tested by building the images and restarting the molior pod;
 - the same chart is used as in production, with a **development flag** that allows plain HTTP (no TLS) and test passwords;
 - volumes are small and live inside the cluster, and can be thrown away;
-- builds run on the developer's machine; amd64 builds natively, arm builds through emulation;
+- builds run on the developer's machine; amd64 builds natively, arm builds through emulation (see below);
 - a copy of production data (database and repositories) can be imported for realistic tests.
 
 The goal is that what works locally works in production: same images, same chart, same build backend. Only scale and access differ.
+
+**Arm builds without arm nodes (testing only).** For testing, arm64 and armhf packages can be built on amd64 nodes through emulation (qemu): install `binfmt-support` and `qemu-user-binfmt` on the hosts of the amd64 nodes (the qemu handlers must be registered so that they also work inside chroots and containers, see the development notes), and set the node label of the arm builders to the amd64 label in the environment's settings. The arm build jobs then run on the amd64 nodes, and the arm programs in them run emulated. This is **not recommended for production**: emulated builds are a lot slower, and emulation can behave differently from real arm hardware. Production uses real arm nodes (see [11.3](#113-production-deployment)).
 
 ### 11.3 Production deployment
 
@@ -521,7 +523,7 @@ In production, molior runs on a **regular Kubernetes cluster (kubeadm)**:
 - **Front end on the host:** a web server on the host terminates **TLS** and forwards to molior's web UI and API. The APT repositories are served to builds and target systems through their own entry point.
 - **Image registry on the host**, also behind TLS; the cluster nodes trust its certificate. Pushing images needs a password, pulling does not.
 - **Storage:** the three volumes are bound to fixed directories on the host's data disk, so data stays where it is across reinstalls and can be backed up with the host.
-- **Build nodes:** amd64 builds run on the cluster's amd64 nodes, arm builds on arm64 nodes (natively, or through emulation where no arm nodes exist). The number of parallel builds per architecture is set per environment.
+- **Build nodes:** amd64 builds run on the cluster's amd64 nodes, arm builds on arm64 nodes. Building arm on amd64 nodes through emulation is for testing only (see [11.2](#112-local-development-setup)). The number of parallel builds per architecture is set per environment.
 - **Signing keys** of the existing installation are kept, so target systems keep trusting the repositories.
 - **Name resolution:** pods must resolve the registry host name, also when the host has no DNS entry.
 
@@ -701,7 +703,7 @@ Endpoints are grouped by the chapters above. `/api` is the original API, `/api2`
 | GET | `/api/builds` | user | list and filter builds |
 | GET | `/api/build/{id}` | public | build tree |
 | GET | `/api2/build/{id}` | user | build details |
-| PUT | `/api2/build/{id}` | user | retry a build |
+| PUT | `/api2/build/{id}` | user (admin for mirror builds) | retry a build |
 | POST | `/api2/build/{id}/abort` | user | abort a build |
 | DELETE | `/api2/build/{id}` | user | delete a build and its packages |
 | DELETE | `/api2/project/{p}/{v}/build/{id}` | owner | delete a build from a version |

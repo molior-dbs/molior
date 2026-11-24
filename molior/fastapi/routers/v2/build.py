@@ -112,6 +112,9 @@ async def rebuild_build(
     if build.buildtype == "build":
         return await _retry_top_build(build, db)
 
+    if build.buildtype == "mirror":
+        return await _retry_mirror_build(build, current_user, db)
+
     if build.buildtype == "deb" and (not build.parent or build.parent.buildstate != "successful"):
         raise HTTPException(status_code=400, detail="The source package of this build is not built, retry the source build")
 
@@ -166,6 +169,57 @@ async def _retry_top_build(top, db):
     if debs:
         await enqueue_task({"schedule": []})
     return "Rebuild triggered"
+
+
+def _mirror_retry_plan(mirror_build):
+    """
+    Returns what a retry of a failed mirror build does, as (action, builds):
+    - ("chroots", [...]): its chroot builds (build environments) in build_failed or publish_failed,
+      the mirror itself is downloaded and published
+    - ("init", []) or ("update", []): no failed chroot build, the mirror itself failed; the same as the
+      mirror update (POST /api/mirror/{id}/update): init if aptly has no mirror yet, update otherwise
+    - (None, []): nothing to retry
+    """
+    failed = ("build_failed", "publish_failed")
+    chroots = [b for b in mirror_build.children if b.buildtype == "chroot" and b.buildstate in failed]
+    if chroots:
+        return "chroots", chroots
+    mirror = mirror_build.projectversion
+    if not mirror:
+        return None, []
+    if mirror.mirror_state in ("new", "init_error"):
+        return "init", []
+    if mirror.mirror_state == "error":
+        return "update", []
+    return None, []
+
+
+async def _retry_mirror_build(mirror_build, current_user, db):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    action, chroots = _mirror_retry_plan(mirror_build)
+    if not action:
+        raise HTTPException(status_code=400, detail="No failed build environments and the mirror is not in error")
+    mirror = mirror_build.projectversion
+
+    if action == "chroots":
+        logger.info("rebuilding %d build environments of mirror build %d", len(chroots), mirror_build.id)
+        tasks = []
+        for build in chroots:
+            oldstate = build.buildstate
+            await build.set_needs_build()
+            tasks.append([build.id, oldstate])
+        await mirror_build.set_building()
+        db.commit()
+        for task in tasks:
+            await enqueue_task({"rebuild": task})
+        return "Rebuild triggered"
+
+    if mirror.is_locked:
+        raise HTTPException(status_code=400, detail="Mirror is locked")
+    logger.info("mirror build %d: %s of mirror %d", mirror_build.id, action, mirror.id)
+    await enqueue_aptly({"init_mirror" if action == "init" else "update_mirror": [mirror.id]})
+    return "Mirror update started"
 
 
 def _collect_build_tree(build):
