@@ -167,6 +167,8 @@ kubectl -n molior cp test-runner:/tmp/results "$RESULTS_DIR" >/dev/null 2>&1 || 
 kubectl -n molior logs deploy/molior -c molior-server > "$RESULTS_DIR/molior-server.log" 2>&1 || true
 kubectl -n molior logs deploy/molior -c molior-postgres > "$RESULTS_DIR/molior-postgres.log" 2>&1 || true
 kubectl -n molior logs deploy/aptly -c aptly-server > "$RESULTS_DIR/aptly-server.log" 2>&1 || true
+kubectl -n molior cp -c molior-server "$(kubectl -n molior get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')":/var/lib/molior/buildout \
+    "$RESULTS_DIR/buildout" >/dev/null 2>&1 || true
 
 if [ "$COVERAGE" = 1 ]; then
     log "server coverage"

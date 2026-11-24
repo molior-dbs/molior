@@ -19,7 +19,10 @@ RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get full-upgrad
 
 RUN useradd --uid 7778 -m --shell /bin/sh --home-dir /home/tester tester
 
-COPY tests/system /tests/system
+# only the test code: tests/system/molior-testing (1.4 input, contains secrets) stays out of the image
+COPY tests/system/conftest.py tests/system/moliortest.py /tests/system/
+COPY tests/system/smoke /tests/system/smoke
+COPY tests/system/valid-1.4 /tests/system/valid-1.4
 
 ENV CHROME_BIN=/usr/bin/chromium \
     CHROMEDRIVER=/usr/bin/chromedriver \

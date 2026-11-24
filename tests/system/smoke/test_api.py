@@ -1,6 +1,6 @@
 """API smoke tests: the server answers, login and permissions work, basic objects can be created.
 No mirror and no build is needed."""
-from conftest import Api, ADMIN_PASSWORD
+from moliortest import Api, ADMIN_PASSWORD
 
 
 def test_status_is_public(public):

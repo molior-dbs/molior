@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from conftest import MOLIOR_URL, ADMIN_PASSWORD
+from moliortest import MOLIOR_URL, ADMIN_PASSWORD
 
 RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 
