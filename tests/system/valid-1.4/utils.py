@@ -12,6 +12,7 @@ RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "1500"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1200"))
 APTLY_URL = os.environ.get("APTLY_URL", "http://aptly:8000").rstrip("/")
+APTLY_API_URL = os.environ.get("APTLY_API_URL", "http://aptly:3143").rstrip("/")
 ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "nothing_done")
 

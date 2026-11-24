@@ -47,9 +47,17 @@ def project_version():
 
 
 @pytest.fixture
-def api_vars(project_name, project_version, molior_url):
+def aptly_api_url():
+    """URL of the aptly REST API (nginx with basic auth in front of aptly), as the 1.4 testconfig.yaml aptly_api_url"""
+    yield utils.APTLY_API_URL
+
+
+@pytest.fixture
+def api_vars(project_name, project_version, molior_url, aptly_url, aptly_api_url):
     yield {
         "molior_url": molior_url,
+        "aptly_url": aptly_url,
+        "aptly_api_url": aptly_api_url,
         "api_user": "admin",
         "api_password": utils.ADMIN_PASSWORD,
         "project_name": project_name,
@@ -67,3 +75,15 @@ def api_test(api_vars):
         api_tests.SUITES[path](api_vars)
 
     yield __api_test
+
+
+@pytest.fixture
+def aptly_api_test(api_vars):
+    """
+    Runs a 1.4 API test suite against the aptly API URL
+    """
+
+    def __aptly_api_test(path):
+        api_tests.SUITES[path](api_vars)
+
+    yield __aptly_api_test

@@ -611,7 +611,7 @@ These tests are taken over into the 1.5 system tests, so that 1.5 is checked aga
 
 The tests build a set of small **test packages**, each covering one case: a successful build with a passing short test, a build failing in its short test, build order between packages, several binary packages from one source, a package without molior configuration (never built), CI builds, one source for two project versions, files stored with git LFS, git submodules, and an architecture dependent package for arm. They come from the 1.4 tests and were cleaned up and updated for trixie. They are kept as public git repositories (one per package, named `test-<name>`) in the molior organisation on GitHub, from where the system tests build them. Build order entries therefore use these repository names.
 
-The parallel build test adds all test packages to one version at once and waits for all of them. It checks parallel building and the build order together: a package that has to be built after another one only finishes if its build order dependency is found and built first.
+The parallel build test adds all test packages to one version at once and waits until all of them have ended, successful or failed as expected. A package whose build order dependency is not found never ends, so this test fails then. That the build order was kept (a package starts only after the package it needs has ended) is checked by the build order test, from the start and end times of the builds.
 
 ---
 

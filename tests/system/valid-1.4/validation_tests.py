@@ -93,3 +93,181 @@ def test_build_parallelization(
     for b in builds:
         assert b.get("buildstate") == "successful" or b.get("buildstate") == "build_failed" \
             or b.get("buildstate") == "nothing_done"
+
+
+@pytest.mark.metadata(
+    id="4a919a48",
+    author="im",
+    requirements=["000", "001", "010"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_build_parallelization")
+def test_build_output(aptly_url, project_name):
+    """
+    Tests if the debian packages have been built
+    """
+    logger.warning("==================================================== test_build_output")
+    debian_packages = {
+        "trick": True,
+        "trick-dev": True,
+        "trick-dbg": True,
+        "track": True,
+        "tick": True,
+        "badtrick": False,
+        "testproject-vbox": True,
+    }
+
+    # get the packages file from aptly
+    logger.warning("REQUEST: {}/{}/{}/repos/{}/1/dists/stable/main/binary-amd64/Packages".format(
+                    aptly_url, basemirror, basemirror_version, project_name
+                            ))
+    packages_response = requests.get(
+        "{}/{}/{}/repos/{}/1/dists/stable/main/binary-amd64/Packages".format(
+            aptly_url, basemirror, basemirror_version, project_name
+        )
+    )
+    assert (
+        packages_response.ok
+    ), "Could not download packages file for repo '{}'".format(
+        project_name
+    )
+    packages = packages_response.text
+    logger.warning("PACKAGES: {}".format(packages_response))
+
+    for package in debian_packages:
+        logger.warning("CHECKING PACKAGE: %s" % package)
+        found = "Package: {}".format(package) in packages
+        assert (
+            found == debian_packages[package]
+        ), "Package occurence is unexpected {} should be {}".format(
+            package, debian_packages[package]
+        )
+
+
+@pytest.mark.metadata(
+    id="8a89f528",
+    author="im",
+    requirements=["100", "101"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_schroot_creation")
+def test_api(api_test):
+    """
+    Tests various api calls
+    """
+    logger.warning("==================================================== test_api")
+    api_test("tests/api-tests/get-tests.yml")
+
+
+@pytest.mark.metadata(
+    id="8cd64879",
+    author="im",
+    requirements=["010"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_api")
+def test_aptly(aptly_api_test):
+    """
+    Tests the aptly repository
+    """
+    logger.warning("==================================================== test_aptly")
+    aptly_api_test("tests/api-tests/aptly.yml")
+
+
+@pytest.mark.metadata(
+    id="b8f486cc",
+    author="fb",
+    requirements=["008"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_api")
+def test_projectversion_delete(api_test):
+    """
+    Tests the creation and deletion of a projectversion
+    """
+    logger.warning("==================================================== test_projectversion_delete")
+    api_test("tests/api-tests/delete-projectversion.yml")
+
+
+@pytest.mark.metadata(
+    id="681288e5",
+    author="fb",
+    requirements=["007"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_projectversion_delete")
+def test_projectversion_clone(api_test):
+    """
+    Tests the cloning of a projectversion
+    """
+    logger.warning("==================================================== test_projectversion_clone")
+    api_test("tests/api-tests/clone-projectversion.yml")
+
+
+@pytest.mark.metadata(
+    id="c6b970e6",
+    author="fb",
+    requirements=["007"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_projectversion_clone")
+def test_projectversion_overlay(api_test):
+    """
+    Tests the creation of an overlay of a projectversion
+    """
+    logger.warning("==================================================== test_projectversion_overlay")
+    api_test("tests/api-tests/overlay-projectversion.yml")
+
+
+@pytest.mark.metadata(
+    id="375cd781",
+    author="fb",
+    requirements=["102", "007"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_projectversion_overlay")
+def test_projectversion_dependency_edit(api_test):
+    """
+    Tests editing of dependencies of a projectversion
+    """
+    logger.warning("==================================================== test_projectversion_dependency_edit")
+    api_test("tests/api-tests/edit-dependencies.yml")
+
+
+@pytest.mark.metadata(
+    id="e34fe8d2",
+    author="fb",
+    requirements=["100"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_projectversion_dependency_edit")
+def test_projectversion_search_and_sort(api_test):
+    """
+    Tests sorting of projectversions of a project
+    """
+    logger.warning("==================================================== test_projectversion_search_and_sort")
+    api_test("tests/api-tests/sorted.yml")
+
+
+@pytest.mark.metadata(
+    id="99106b79",
+    author="fb",
+    requirements=["007"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_projectversion_search_and_sort")
+def test_projectversion_repository_delete(api_test):
+    """
+    Tests projectversion repository delete
+    """
+    logger.warning("==================================================== test_projectversion_repository_delete")
+    api_test("tests/api-tests/delete-repository.yml")
