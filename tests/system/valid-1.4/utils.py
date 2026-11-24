@@ -280,13 +280,15 @@ def get_build_log(build_id, marker=None, timeout=60):
     Returns the build log of a build, read from the molior server (1.4: GET /buildout/<id>/build.log, which 1.5
     does not serve). With a marker, waits until the log contains it, at most timeout seconds: the server writes
     the log through a queue, so the end of the log can be written after the build state has changed.
-    Returns the last log read (the caller checks the marker).
+    Returns the log. Fails when the marker is not in the log after timeout seconds.
     """
     deadline = time.time() + timeout
     while True:
         log = molior_exec("cat {}/{}/build.log".format(BUILDOUT, int(build_id)))
-        if not marker or marker in log or time.time() > deadline:
+        if not marker or marker in log:
             return log
+        assert time.time() < deadline, "timeout after {} s: '{}' not in the log of build {}, log end:\n{}".format(
+            timeout, marker, build_id, log[-2000:])
         time.sleep(2)
 
 
@@ -310,9 +312,10 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
     """
     Waits until the deb builds of the given source packages are done (successful, build_failed or nothing_done),
     at most BUILD_TIMEOUT seconds (1.4: 60 times 10 s). Deb builds with an id in ignore_ids are not looked at
-    (builds of an earlier test). Returns the deb builds found.
+    (builds of an earlier test). Returns the deb builds found. Fails when they are not all done in time (1.4 returned
+    what it had found and the test went on).
     """
-    our_builds = []
+    our_builds, current_builds, done = [], [], False
     session = molior_session(molior_host)
     for _ in range(int(BUILD_TIMEOUT / 10)):
         time.sleep(10)
@@ -347,6 +350,11 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
     os.makedirs(RESULTS, exist_ok=True)
     with open(os.path.join(RESULTS, "builds-{}.json".format(int(time.time()))), "w") as f:
         json.dump(current_builds, f, indent=2)
+    if not done:
+        states = {name: [b.get("buildstate") for b in our_builds if b.get("sourcename") == name] for name in builds}
+        raise AssertionError("timeout after {} s, deb builds not done: {}".format(BUILD_TIMEOUT, ", ".join(
+            "{} ({})".format(name, ", ".join(s) or "no build") for name, s in states.items()
+            if not s or any(x not in ("successful", "build_failed", "nothing_done") for x in s))))
     return our_builds
 
 

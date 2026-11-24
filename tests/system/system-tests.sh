@@ -11,6 +11,8 @@
 #   COVERAGE=0    skip the server coverage report
 #   CITIZEN_MIRROR_URL, CITIZEN_KEY_URL  repository and armored key URL for test_mirror of valid-1.4
 #                 (passed to the test runner; the test is skipped when they are not set)
+#   TEST_TIMEOUT  seconds per test (pytest-timeout), a test that takes longer fails and the run goes on (default 3600)
+#   RUN_TIMEOUT   seconds for the whole pytest run; when reached pytest is killed and the run fails (default 14400)
 #
 # Requires the image molior-base:dev (make docker-images-molior). Nothing outside docker is written except RESULTS_DIR,
 # and the cluster, registry, their volumes and the temp files are removed at the end
@@ -24,6 +26,8 @@ ID=test-$$                      # cluster k3d-$ID, registry k3d-$ID-registry
 RESULTS_DIR=$(realpath -m "${RESULTS_DIR:-system-test-results}")
 KEEP=${KEEP:-0}
 COVERAGE=${COVERAGE:-1}
+TEST_TIMEOUT=${TEST_TIMEOUT:-3600}
+RUN_TIMEOUT=${RUN_TIMEOUT:-14400}
 WORK=""
 
 log() { echo "== $(date -u +%H:%M:%S) $*"; }
@@ -226,8 +230,8 @@ done
 [ $# -gt 0 ] || set -- smoke
 log "running tests: $*"
 set +e
-timeout 1800 kubectl -n molior exec test-runner -- \
-    python3 -m pytest -p no:cacheprovider -v --junitxml=/tmp/results/junit.xml "$@"
+timeout "$RUN_TIMEOUT" kubectl -n molior exec test-runner -- \
+    python3 -m pytest -p no:cacheprovider -v --timeout="$TEST_TIMEOUT" --junitxml=/tmp/results/junit.xml "$@"
 TESTS_RC=$?
 set -e
 
