@@ -9,6 +9,8 @@
 #   KEEP=1        do not remove the cluster at the end (for debugging; remove it later with CLEANUP_ONLY=<id>)
 #   CLEANUP_ONLY=<id>  only remove the cluster and registry of an earlier run (e.g. test-12345)
 #   COVERAGE=0    skip the server coverage report
+#   CITIZEN_MIRROR_URL, CITIZEN_KEY_URL  repository and armored key URL for test_mirror of valid-1.4
+#                 (passed to the test runner; the test is skipped when they are not set)
 #
 # Requires the image molior-base:dev (make docker-images-molior). Nothing outside docker is written except RESULTS_DIR,
 # and the cluster, registry, their volumes and the temp files are removed at the end
@@ -144,12 +146,48 @@ timeout 900 helm install -n molior molior charts/ -f tests/system/values.yaml \
     --set registry.host="$REGISTRY" --set registry.port=5000 --wait --timeout 600s >/dev/null
 
 log "test runner"
+# the 1.4 validation tests read build logs in the molior container (kubectl exec deploy/molior): the runner's service
+# account may only find the molior pod and exec into it, in this namespace
+kubectl -n molior apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-runner
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]      # kubectl exec over WebSocket is a GET, over SPDY a POST
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-runner
+subjects:
+  - kind: ServiceAccount
+    name: test-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-runner
+EOF
 kubectl -n molior apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: test-runner
 spec:
+  serviceAccountName: test-runner
   restartPolicy: Never
   containers:
     - name: tests
@@ -159,6 +197,12 @@ spec:
           value: http://web:8000
         - name: RESULTS_DIR
           value: /tmp/results
+        - name: COLUMNS        # width of the pytest result lines (number, location, result, time, progress)
+          value: "140"
+        - name: CITIZEN_MIRROR_URL
+          value: "${CITIZEN_MIRROR_URL:-}"
+        - name: CITIZEN_KEY_URL
+          value: "${CITIZEN_KEY_URL:-}"
         - name: MOLIOR_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:

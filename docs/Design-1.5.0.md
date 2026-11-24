@@ -336,6 +336,9 @@ An entry that matches no repository in the version or its dependencies is an err
 - A failed build can be **retried**. Its log is kept with the build.
 - Running builds can be **aborted**, per build or for a whole version.
 - Builds can be **deleted**, which also removes their packages from the repository.
+- **Build notification hooks are dropped in 1.5.** In molior 1.4 a web hook could be set per source repository (URL,
+  method, body), which molior called when a build of that repository changed its state. 1.5 has no such hooks: builds
+  are followed in the web UI with live updates, and other systems use the REST API (see [10](#10-interfaces)).
 
 ### 6.7 Retention
 
@@ -460,6 +463,7 @@ Everything is signed with molior's repository key; the public key is shown on th
 - **Tokens**: for CI systems and molior-tools (see [3](#3-roles-and-access)).
 - **APT sources**: a ready-to-use sources list for every project version and mirror, public.
 - **Build interface**: build jobs fetch their sources list and upload their results with a one-time token per build.
+- **Not in 1.5**: build notification hooks (calls to other systems when a build changes its state, see [6.6](#66-following-retrying-and-aborting-builds)).
 
 ---
 

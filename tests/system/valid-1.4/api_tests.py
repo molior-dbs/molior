@@ -6,6 +6,7 @@ the base mirror is trixie/13 instead of stretch/9.3 (also in the checks: 9.3 is 
 pyresttest's default (200 to 299) where the yml has none. A yml `delay` in front of a step that waits for an async
 aptly operation becomes polling (poll(): every 2 s, at most 120 s).
 """
+import secrets
 import time
 
 import requests
@@ -13,6 +14,9 @@ import requests
 from utils import logger
 
 GIT = "https://github.com/molior-dbs/{}.git"
+# Local user of the role based access test. 1.4 used an LDAP user; the system tests use the db auth backend, so the
+# admin creates this user first (POST /api/users).
+TEST_USER = "testuser"
 
 
 class Step:
@@ -197,6 +201,73 @@ def delete_repository(v):
     assert data["total_result_count"] == 0
 
 
+def ci_build(v):
+    """ci-build.yml. The ref and branch of 1.4 do not exist in the public repo; test-ci-build has one commit on main
+    (tag v0.0.1). Returns the build id of the trigger (1.4 ignored the response)."""
+    step = Step(v)
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    r = step("Trigger ci build", "POST", "/api/build",
+             {"git_ref": "f2b79d9282f7095acfa5c3d537148f0ad77f6aee", "git_branch": "main",
+              "repository": GIT.format("test-ci-build"), "targets": ["molior-validation/1"], "force_ci": True},
+             expected_status=[200])
+    return r.json()["build_id"]
+
+
+def multi_project(v):
+    step = Step(v)
+    project = v["project_name"]
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    for name in ("prj1", "prj2"):
+        step("Create Projectversion " + name[-1], "POST", "/api2/projectbase/{}/versions".format(project),
+             {"basemirror": "trixie/13", "architectures": ["amd64"], "name": name, "description": "validation test",
+              "dependency_policy": "strict", "cibuilds": False})
+    step("Add Sourcerepository multitest to prj1", "POST", "/api2/project/{}/prj1/repositories".format(project),
+         {"architectures": ["amd64"], "url": GIT.format("test-multiproject")})
+    step("Add Sourcerepository multitest to prj2", "POST", "/api2/project/{}/prj2/repositories".format(project),
+         {"architectures": ["amd64"], "url": GIT.format("test-multiproject"), "startbuild": False})
+
+
+def create_project(v):
+    """create-project.yml: a projectversion with one repository, used by build_test with get_project_vars"""
+    step = Step(v)
+    project = v["project_name"]
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    data = step("Create ProjectVersion", "POST", "/api2/projectbase/{}/versions".format(project),
+                {"basemirror": "trixie/13", "architectures": ["amd64"], "name": v["projectversion_name"],
+                 "description": v["projectversion_name"], "dependency_policy": "strict", "cibuilds": False}).json()
+    # extract_binds projectversion_id and projectversion_name, as in the yml (only the name is used, in the next URL)
+    assert "id" in data, data
+    version = data["name"]
+    step("Create Sourcerepository Track", "POST", "/api2/project/{}/{}/repositories".format(project, version),
+         {"architectures": ["amd64"], "url": v["repo_url"]})
+
+
+def role_based_access(v):
+    """rolebasedaccess.yml. 1.4 logged in an existing LDAP user; here the admin first creates a local user (db auth
+    backend) with a random password, then the yml steps run with it. The user is not deleted (as in 1.4)."""
+    admin, step = Step(v), Step(v)
+    project = v["project_name"]
+    password = secrets.token_urlsafe(16)
+    admin("Login as admin to create the test user", "POST", "/api/login",
+          {"username": v["api_user"], "password": v["api_password"]}, expected_status=[200])
+    admin("Create local test user", "POST", "/api/users",
+          {"name": TEST_USER, "email": TEST_USER + "@example.com", "password": password, "is_admin": False},
+          expected_status=[200])
+
+    # the yml steps: one session, the admin login replaces the cookie of the user login (extract_binds 'session')
+    step("Login with LDAP user", "POST", "/api/login", {"username": TEST_USER, "password": password},
+         expected_status=[200])
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    step("Add user as admin to a project", "POST", "/api2/projectbase/{}/permissions".format(project),
+         {"username": TEST_USER, "role": "owner"}, expected_status=[200])
+    step("Remove user from a project", "DELETE", "/api2/projectbase/{}/permissions".format(project),
+         {"username": TEST_USER})
+
+
 SUITES = {
     "tests/api-tests/init-testproject.yml": init_testproject,
     "tests/api-tests/get-tests.yml": get_tests,
@@ -207,4 +278,8 @@ SUITES = {
     "tests/api-tests/edit-dependencies.yml": edit_dependencies,
     "tests/api-tests/sorted.yml": sorted_projectversions,
     "tests/api-tests/delete-repository.yml": delete_repository,
+    "tests/api-tests/ci-build.yml": ci_build,
+    "tests/api-tests/multi-project.yml": multi_project,
+    "tests/api-tests/create-project.yml": create_project,
+    "tests/api-tests/rolebasedaccess.yml": role_based_access,
 }

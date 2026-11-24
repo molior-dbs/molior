@@ -87,3 +87,69 @@ def aptly_api_test(api_vars):
         api_tests.SUITES[path](api_vars)
 
     yield __aptly_api_test
+
+
+@pytest.fixture
+def build_test(api_vars):
+    """
+    Executes a build and tests if it succeeded
+
+    1.4 ran the yml with pyresttest (utils.execute_build_test); here the translated suite of api_tests.py runs
+    directly. Returns what the suite returns (ci-build.yml: the build id).
+    """
+
+    def __execute_build_test(api_test_description, build_vars=api_vars):
+        return api_tests.SUITES[api_test_description](build_vars)
+
+    yield __execute_build_test
+
+
+@pytest.fixture
+def get_project_vars(api_vars):
+    """
+    Returns a callable with the build variables
+
+    1.4 returned a JSON string for pyresttest with its fixed test user; here a dict with the admin of api_vars.
+    """
+
+    def __get_project_vars(project_name, project_version, repository_url):
+        return dict(api_vars, project_name=project_name, projectversion_name=project_version, repo_url=repository_url)
+
+    yield __get_project_vars
+
+
+@pytest.fixture
+def get_basemirror(molior_url):
+    """
+    Returns ID of base mirror
+    """
+
+    def __get_basemirror(*args, **kwargs):
+        return utils.get_basemirror(molior_url, *args, **kwargs)
+
+    yield __get_basemirror
+
+
+@pytest.fixture
+def get_build_id(molior_url):
+    """
+    Returns a callable to get the build id
+    """
+
+    def __get_build_id(package):
+        return utils.get_build(molior_url, package).get("id")
+
+    yield __get_build_id
+
+
+@pytest.fixture
+def molior_exec():
+    """
+    Returns a callable that runs a shell command in the molior server container and returns its stdout
+    (1.4: molior_ssh_run, ssh to the molior host). Raises when the command fails.
+    """
+
+    def __molior_exec(command):
+        return utils.molior_exec(command)
+
+    yield __molior_exec

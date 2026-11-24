@@ -32,7 +32,8 @@ def pytest_runtest_makereport(item, call):
 
 
 _setup_time = {}   # nodeid: setup time of a test whose setup passed (added to its call time)
-_shown = {}        # nodeid: time to show next to the result of the phase just reported
+_shown = {}        # nodeid: time of the phase just reported
+_pending = []      # the time to show in front of the percentage of the result line being written
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -46,15 +47,51 @@ def pytest_runtest_logreport(report):
         _shown[report.nodeid] = report.duration
     yield
     _shown.pop(report.nodeid, None)
+    _pending.clear()
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_report_teststatus(report, config):
-    """Shows the time of each test (setup and call) right after its result: "PASSED 66.2s [ 18%]"."""
+    """Pads the word of a result line (not of the summary) to one column and marks the line to get its time."""
     outcome = yield
     category, letter, word = outcome.get_result()
     if not word or report.nodeid not in _shown:
-        return  # no result line for this phase, or called for the summary at the end
-    seconds = " {:.1f}s".format(_shown[report.nodeid])
-    word = (word[0] + seconds, word[1]) if isinstance(word, tuple) else word + seconds
+        return
+    _pending[:] = [_shown[report.nodeid]]
+    word = (word[0].ljust(7), word[1]) if isinstance(word, tuple) else word.ljust(7)
     outcome.force_result((category, letter, word))
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_configure(config):
+    """Result lines in verbose mode: the number of the test, the location and the result in columns, the time of
+    the test (setup and call) in whole seconds before the percentage:
+        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED       0s [ 15%]"
+    Uses the location line and the progress message of pytest's terminal reporter (private, checked)."""
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if not reporter or config.option.verbose <= 0:
+        return
+    if not all(hasattr(reporter, a) for a in ("_get_progress_information_message", "_locationline", "_session")):
+        return
+    progress = reporter._get_progress_information_message
+    location = reporter._locationline
+    columns = {}   # nodeid: number of the test; "width": width of the longest location
+
+    def with_time():
+        msg = progress()
+        return " {:>6}".format("{}s".format(int(round(_pending[0])))) + msg if _pending else msg
+
+    def numbered(nodeid, *args):
+        items = getattr(reporter._session, "items", None) or []
+        if not columns and items:
+            for i, item in enumerate(items, 1):
+                columns[item.nodeid] = i
+            columns["width"] = max(len(location(item.nodeid, *item.location)) for item in items)
+        if nodeid not in columns:
+            return location(nodeid, *args)
+        total = len(items)
+        return "{:>{}}/{}: {} ".format(columns[nodeid], len(str(total)), total,
+                                       location(nodeid, *args).ljust(columns["width"]))
+
+    reporter._get_progress_information_message = with_time
+    reporter._locationline = numbered
