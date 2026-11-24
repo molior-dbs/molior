@@ -75,7 +75,9 @@ async def GitClone(build_id, repo_id, session):
             session.commit()
             return
 
-        git_commands = ["git config http.sslverify false", "git lfs install"]
+        # --local: the lfs filter goes into the repo's .git/config. Without it every clone writes the global
+        # ~/.gitconfig, and parallel clones fail on its lock ("could not lock config file").
+        git_commands = ["git config http.sslverify false", "git lfs install --local"]
         for git_command in git_commands:
             if not await run_git(git_command, str(repo.src_path), build):
                 logger.error("error running git command: %s", git_command)
