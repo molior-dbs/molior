@@ -105,19 +105,33 @@ k3d cluster create "$ID" --registry-use "$REGISTRY:$PORT" --registry-config "$WO
 k3d kubeconfig get "$ID" > "$KUBECONFIG"
 chmod 600 "$KUBECONFIG"
 
-log "building images"
+log "building images (in parallel)"
 cd "$TOP"
 build() {  # build <dockerfile> <image>: push it to the test registry, keep no local tag (the build cache stays)
-    docker build -q -f "$1" -t "localhost:$PORT/$2:dev" . >/dev/null 2>"$WORK/build.err" || { cat "$WORK/build.err"; return 1; }
-    docker push -q "localhost:$PORT/$2:dev" >/dev/null
-    docker rmi "localhost:$PORT/$2:dev" >/dev/null
+    docker build -q -f "$1" -t "localhost:$PORT/$2:dev" . >/dev/null 2>"$WORK/build-$2.err" &&
+        docker push -q "localhost:$PORT/$2:dev" >/dev/null 2>>"$WORK/build-$2.err" &&
+        docker rmi "localhost:$PORT/$2:dev" >/dev/null 2>>"$WORK/build-$2.err" || return 1
     log "  $2"
 }
-build tests/system/test.Dockerfile molior
-build docker/molior/postgres.Dockerfile molior-postgres
-build docker/aptly/aptly.Dockerfile aptly
-build docker/aptly/nginx.Dockerfile molior-nginx
-build tests/system/test-web.Dockerfile molior-test-web
+# the images do not depend on each other (molior-base:dev and debian:trixie-slim are their bases)
+pids=""
+for spec in tests/system/test.Dockerfile:molior docker/molior/postgres.Dockerfile:molior-postgres \
+            docker/aptly/aptly.Dockerfile:aptly docker/aptly/nginx.Dockerfile:molior-nginx \
+            tests/system/test-web.Dockerfile:molior-test-web; do
+    build "${spec%%:*}" "${spec##*:}" &
+    pids="$pids $!:${spec##*:}"
+done
+failed=""
+for p in $pids; do
+    wait "${p%%:*}" || failed="$failed ${p##*:}"
+done
+if [ -n "$failed" ]; then
+    for image in $failed; do
+        echo "E: building $image failed:"
+        cat "$WORK/build-$image.err"
+    done
+    exit 1
+fi
 
 log "installing molior"
 ADMIN_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')
