@@ -10,7 +10,7 @@
     "react-router-dom": "^6.23.1"
   },
   "optionalDependencies": {
-    "webpack-dev-server": "^5.2.5"
+    "webpack-dev-server": "^5.2.6"
   },
   "peerDependencies": {
     "@babel/core":            "^7",
