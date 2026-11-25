@@ -56,13 +56,16 @@ def test_basemirror_creation(create_mirror):
     Tests the mirror creation on molior
     """
     logger.warning("==================================================== test_basemirror_creation")
+    # armhf and arm64 as in 1.4, for test_arm_build: a projectversion can only have architectures of its base mirror.
+    # The arm build environments are made in the molior pod with qemu (needs qemu binfmt handlers with the F flag on
+    # the host).
     create_mirror(
         "http://deb.debian.org/debian/",
         basemirror,
         basemirror_version,
         basemirror,
         "main",
-        "amd64",
+        "amd64,armhf,arm64",
         is_basemirror=True,
         keyserver="hkp://keyserver.ubuntu.com:80",
         keys="762F67A0B2C39DE4,78DBA3BC47EF2265,6ED0E7B82643E131",
@@ -682,3 +685,38 @@ def test_dotnet_core_project(molior_url, build_test):
     logger.warning("==================================================== test_dotnet_core_project")
     build_test("tests/api-tests/dotnet-core-project.yml")
     get_build(molior_url, "mira-test", buildstate="successful", timeout=BUILD_TIMEOUT)
+
+
+@pytest.mark.metadata(
+    id="6dc6c29d",
+    author="im",
+    requirements=["000", "001"],
+    reviewer="fb",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_dotnet_core_project")
+def test_arm_build(molior_url, build_test):
+    """
+    Test a build for the arm architecture
+    """
+    logger.warning("==================================================== test_arm_build")
+    # arm deb builds run in build pods on nodes with the arm64 builder label (builder.arm64.nodeLabel); without such
+    # a node the pods stay pending and this test fails
+    build_test("tests/api-tests/arm-project.yml")
+    get_build(molior_url, "armpackage", buildstate="successful")
+
+
+@pytest.mark.metadata(
+    id="a671b2ec",
+    author="fb",
+    requirements=["100"],
+    reviewer="ra",
+    review_date="Wed, 11 Nov 2020 15:51:54 +0100",
+)
+@pytest.mark.after("test_arm_build")
+def test_buildvariant_filter(api_test):
+    """
+    Tests the correct functionality of the buildvariant filter
+    """
+    logger.warning("==================================================== test_buildvariant_filter")
+    api_test("tests/api-tests/buildvariant-filter.yml")

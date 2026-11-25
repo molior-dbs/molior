@@ -260,6 +260,34 @@ def dotnet_core_project(v):
          {"architectures": ["amd64"], "url": "https://github.com/molior-dbs/test-dotnet-core.git"})
 
 
+def arm_project(v):
+    """arm-project.yml: projectversion arm-test (armhf, arm64, amd64) with test-arm for armhf and arm64"""
+    step = Step(v)
+    project = v["project_name"]
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    step("Create arm-test projectversion", "POST", "/api2/projectbase/{}/versions".format(project),
+         {"basemirror": "trixie/13", "architectures": ["armhf", "arm64", "amd64"], "name": "arm-test",
+          "description": "arm test", "dependency_policy": "strict", "cibuilds": False})
+    step("Add arm Sourcerepository", "POST", "/api2/project/{}/arm-test/repositories".format(project),
+         {"architectures": ["arm64", "armhf"], "url": GIT.format("test-arm")})
+
+
+def buildvariant_filter(v):
+    """buildvariant-filter.yml: the build search with an architecture and a source name. 3 each: the deb build of
+    that architecture, its source build and the top build (the search adds parent and grandparent)."""
+    step = Step(v)
+    step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
+         expected_status=[200])
+    for name, search, count in (("Check with armhf filter", "armhf armpackage", 3),
+                                ("Check with arm64 filter", "arm64 armpackage", 3),
+                                ("Check with invalid filter", "invalid", 0)):
+        data = step(name, "GET", "/api/builds?search={}".format(search.replace(" ", "%20")),
+                    expected_status=[200]).json()
+        assert data["total_result_count"] == count, "{}: {} builds, expected {}: {}".format(
+            name, data["total_result_count"], count, data)
+
+
 def role_based_access(v):
     """rolebasedaccess.yml. 1.4 logged in an existing LDAP user; here the admin first creates a local user (db auth
     backend) with a random password, then the yml steps run with it. The user is not deleted (as in 1.4)."""
@@ -298,4 +326,6 @@ SUITES = {
     "tests/api-tests/create-project.yml": create_project,
     "tests/api-tests/rolebasedaccess.yml": role_based_access,
     "tests/api-tests/dotnet-core-project.yml": dotnet_core_project,
+    "tests/api-tests/arm-project.yml": arm_project,
+    "tests/api-tests/buildvariant-filter.yml": buildvariant_filter,
 }
