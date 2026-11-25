@@ -7,7 +7,11 @@ NAMESPACE := molior
 K3D_CLUSTER ?= molior
 K3D_VERSION ?= v5.9.0
 K3D_REGISTRY = k3d-$(K3D_CLUSTER)-registry
-K3D_REGISTRY_PORT := 5000
+# host ports of the local cluster (other values for a second cluster next to an existing one); the registry listens on
+# K3D_REGISTRY_PORT inside the cluster too
+K3D_REGISTRY_PORT ?= 5000
+K3D_WEB_PORT ?= 8000
+K3D_APTLY_PORT ?= 8080
 # true: plain-HTTP session cookies (no TLS in the local cluster)
 MOLIOR_DEV ?= true
 # system-tests: pytest args, relative to tests/system (default: all suites)
@@ -62,11 +66,11 @@ install-deps:  ## Install k3d to ~/.local/bin (helm, kubectl and podman or docke
 
 create-cluster:  ## Create the cluster and its registry (web UI http://localhost:8000, aptly http://localhost:8080)
 	k3d registry list $(K3D_CLUSTER)-registry >/dev/null 2>&1 || \
-		k3d registry create $(K3D_CLUSTER)-registry --port 0.0.0.0:$(K3D_REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
-	k3d cluster create $(K3D_CLUSTER) \
+		k3d registry create $(K3D_CLUSTER)-registry --port 0.0.0.0:$(K3D_REGISTRY_PORT) --enforce-port-match $(PODMAN_K3D_REGISTRY_ARGS)
+	k3d cluster create $(K3D_CLUSTER) --kubeconfig-switch-context=false \
 		--registry-use $(K3D_REGISTRY):$(K3D_REGISTRY_PORT) \
-		--port "8000:30080@server:0" \
-		--port "8080:30088@server:0" \
+		--port "$(K3D_WEB_PORT):30080@server:0" \
+		--port "$(K3D_APTLY_PORT):30088@server:0" \
 		--k3s-arg "--disable=traefik@server:0" \
 		--k3s-arg "--disable=metrics-server@server:0"
 
@@ -99,7 +103,8 @@ install-helmchart:  ## Install molior with the helm chart (VALUES=<values file>,
 		--from-literal=molior-password=molior-dev --from-literal=aptly-password=molior-dev \
 		--from-literal=registry-password=molior-dev
 	$(HELM_LOCAL) install molior charts/ $(if $(VALUES),-f $(VALUES)) \
-		--set registry.host=$(K3D_REGISTRY) --set registry.port=$(K3D_REGISTRY_PORT) --set molior.dev=$(MOLIOR_DEV)
+		--set registry.host=$(K3D_REGISTRY) --set registry.port=$(K3D_REGISTRY_PORT) --set molior.dev=$(MOLIOR_DEV) \
+		--set aptly.publicUrl=http://localhost:$(K3D_APTLY_PORT)
 
 reload: docker-images-molior deploy-molior  ## Rebuild molior, push it and restart its pod (dev loop)
 	$(KUBECTL_LOCAL) delete pod -l app=molior
@@ -107,8 +112,11 @@ reload: docker-images-molior deploy-molior  ## Rebuild molior, push it and resta
 redeploy: docker-images deploy  ## Rebuild and push all images, install molior again
 	@$(MAKE) --no-print-directory uninstall-helmchart install-helmchart
 
+# --cascade foreground: helm waits until the pods are gone (default: background, the old pods still terminate while
+# a new install starts them again, two aptly or postgres on the same volume)
 uninstall-helmchart:  ## Uninstall molior (the volumes stay)
-	$(HELM_LOCAL) uninstall --wait molior || true
+	$(HELM_LOCAL) uninstall --ignore-not-found --cascade foreground --wait --timeout 300s molior
+	$(KUBECTL_LOCAL) wait --for=delete pod -l 'app in ($(ALL_APPS))' --timeout=300s
 
 delete-cluster:  ## Delete the cluster (the registry and its images stay)
 	k3d cluster delete $(K3D_CLUSTER)

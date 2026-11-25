@@ -44,6 +44,8 @@ remove_run() {
 cleanup() {
     rc=$?
     set +e
+    # image builds still running (Ctrl-C while building): background jobs of a script ignore SIGINT
+    for p in $pids; do pkill -P "${p%%:*}" 2>/dev/null; kill "${p%%:*}" 2>/dev/null; done
     if [ "$KEEP" = 1 ]; then
         log "KEEP=1: cluster $ID kept, KUBECONFIG=$WORK/kubeconfig; remove with: CLEANUP_ONLY=$ID $0"
     else
@@ -88,8 +90,11 @@ done
 docker image inspect molior-base:dev >/dev/null 2>&1 || { echo "E: image molior-base:dev missing, run: make docker-images"; exit 1; }
 
 remove_stale
+pids=""             # image builds in the background (pid:image), stopped by cleanup
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+# timeout --foreground: without it timeout runs the command in its own process group, Ctrl-C does not reach it
+# and the script waits until the timeout
 
 WORK=$(mktemp -d /tmp/molior-$ID.XXXXXX)
 export KUBECONFIG=$WORK/kubeconfig
@@ -128,7 +133,6 @@ build() {  # build <dockerfile> <image>: push it to the test registry, keep no l
     log "  $2"
 }
 # the images do not depend on each other (molior-base:dev and debian:trixie-slim are their bases)
-pids=""
 for spec in tests/system/test.Dockerfile:molior docker/molior/postgres.Dockerfile:molior-postgres \
             docker/aptly/aptly.Dockerfile:aptly docker/aptly/nginx.Dockerfile:molior-nginx \
             tests/system/test-web.Dockerfile:molior-test-web; do
@@ -154,7 +158,7 @@ kubectl -n molior create secret generic molior-passwords --from-literal=molior-p
     --from-literal=aptly-password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')" \
     --from-literal=registry-password=unused >/dev/null
 unset ADMIN_PASSWORD
-timeout 900 helm install -n molior molior charts/ -f tests/system/values.yaml \
+timeout --foreground 900 helm install -n molior molior charts/ -f tests/system/values.yaml \
     --set registry.host="$REGISTRY" --set registry.port=5000 --wait --timeout 600s >/dev/null
 
 log "test runner"
@@ -242,7 +246,7 @@ spec:
     - port: 80
       targetPort: 8080
 EOF
-timeout 300 kubectl -n molior wait --for=condition=Ready pod/test-runner --timeout=280s >/dev/null
+timeout --foreground 300 kubectl -n molior wait --for=condition=Ready pod/test-runner --timeout=280s >/dev/null
 for i in $(seq 60); do
     kubectl -n molior exec test-runner -- curl -sf -o /dev/null http://web:8000/api/status && break
     sleep 5
@@ -251,7 +255,7 @@ done
 [ $# -gt 0 ] || set -- smoke
 log "running tests: $*"
 set +e
-timeout "$RUN_TIMEOUT" kubectl -n molior exec test-runner -- \
+timeout --foreground "$RUN_TIMEOUT" kubectl -n molior exec test-runner -- \
     python3 -m pytest -p no:cacheprovider -v --timeout="$TEST_TIMEOUT" --junitxml=/tmp/results/junit.xml "$@"
 TESTS_RC=$?
 set -e
