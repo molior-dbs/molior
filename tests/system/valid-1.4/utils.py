@@ -293,6 +293,20 @@ def get_build_log(build_id, marker=None, timeout=60):
         time.sleep(2)
 
 
+def source_failed(builds, name):
+    """
+    Raises an AssertionError when the newest source build of name in builds (a result list of /api/builds) has failed:
+    its deb builds were created with it and do not build (or are not published), a wait for them would only end at
+    the timeout.
+    Not detected: a build which fails before its source build is created (git clone, debian/changelog).
+    """
+    sources = [b for b in builds if b.get("buildtype") == "source" and b.get("sourcename") == name]
+    newest = max(sources, key=lambda b: b.get("id"), default=None)
+    if newest and newest.get("buildstate") in ("build_failed", "publish_failed", "already_failed"):
+        raise AssertionError("source build {} of {} has failed: {}".format(
+            newest.get("id"), name, newest.get("buildstate")))
+
+
 def get_deb_build_ids(molior_host, sourcenames):
     """
     Ids of the existing deb builds of the given source packages. A test that builds a source again passes them to
@@ -315,7 +329,7 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
     build_failed or nothing_done, so a publish_failed build waited until the timeout),
     at most BUILD_TIMEOUT seconds (1.4: 60 times 10 s). Deb builds with an id in ignore_ids are not looked at
     (builds of an earlier test). Returns the deb builds found. Fails when they are not all done in time (1.4 returned
-    what it had found and the test went on).
+    what it had found and the test went on), or at once when the newest source build of a package has failed.
     """
     our_builds, current_builds, done = [], [], False
     session = molior_session(molior_host)
@@ -326,6 +340,8 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
                                       timeout=30)
         assert builds_response.ok, "Could not get the builds"
         current_builds = builds_response.json().get("results")
+        for name in builds:
+            source_failed(current_builds, name)
         our_builds = [
             build for build in current_builds if build.get("sourcename") in builds and build.get("buildtype") == "deb"
             and build.get("id") not in ignore_ids
@@ -372,6 +388,7 @@ def get_build(molior_host, name, buildtype="deb", buildstate=None, timeout=300):
       got no parameters and returned only the newest 10 builds)
     - with a buildstate, it fails at once when all builds of the name have ended in another state (1.4 waited
       until the timeout)
+    - for deb builds, it fails at once when the newest source build of the name has failed (source_failed)
     """
     build = None
     with molior_session(molior_host) as molior:
@@ -380,8 +397,10 @@ def get_build(molior_host, name, buildtype="deb", buildstate=None, timeout=300):
                                   params={"search": name, "page": 1, "page_size": 100}, timeout=30)
             assert response.ok, "Could not get builds from molior"
 
-            results = [r for r in response.json().get("results")
-                       if r.get("buildtype") == buildtype and r.get("sourcename") == name]
+            builds = response.json().get("results")
+            if buildtype == "deb":
+                source_failed(builds, name)
+            results = [r for r in builds if r.get("buildtype") == buildtype and r.get("sourcename") == name]
             for result in results:
                 if buildstate and result.get("buildstate") != buildstate:
                     continue

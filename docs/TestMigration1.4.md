@@ -10,8 +10,8 @@ values that pointed to the old site and the helpers that used the old interfaces
 ## Overview
 
 1.4 has 30 tests. 27 are ported, in the 1.4 file order. Tests 1 to 25 pass in the 1.5 system tests (25 passed in
-727 s, exit 0, after the molior fixes in "molior changes the port needed"). Tests 26 and 27 (arm) need an arm build
-node.
+727 s, exit 0, after the molior fixes in "molior changes the port needed"). Tests 26 and 27 (arm) run the arm builds
+with qemu on the amd64 node of the test cluster (not run yet with that setting).
 
 | # | Test | Id | Status | Change in the test function |
 |---|---|---|---|---|
@@ -40,7 +40,7 @@ node.
 | 23 | `test_submodule_build` | d2a19958 | ported | public git URL |
 | 24 | `test_dotnet_core_mirror` | 08347517 | ported | public Microsoft repository, filter on one SDK |
 | 25 | `test_dotnet_core_project` | 91afb195 | ported | longer wait (suite: dependency `dotnet-core/11.0`) |
-| 26 | `test_arm_build` | 6dc6c29d | ported | comment only (suite: base mirror `trixie/13`, public git URL); needs an arm build node |
+| 26 | `test_arm_build` | 6dc6c29d | ported | creates its own base mirror `trixie-arm/13` (suite: that base mirror, public git URL); arm builds with qemu on the amd64 node, longer wait |
 | 27 | `test_buildvariant_filter` | a671b2ec | ported | none |
 | - | `test_cleanup` | 4643c05a | obsolete | every run uses a new cluster |
 | - | `test_build_notification` | 1a8ebb57 | obsolete | build notification hooks are removed in 1.5 |
@@ -100,11 +100,17 @@ node.
   environments. It fails on an error state; 1.4 returned 1 and the test went on. It writes the timings to
   `RESULTS_DIR`.
 - `get_build` sends `search`, `page` and `page_size`. In 1.4 the parameters went into `str.format()` by mistake, so the
-  API got none and returned only the newest 10 builds.
+  API got none and returned only the newest 10 builds. **It does not wait for a build that has ended:** with a
+  build state, it fails at once when all builds of the package have ended in another state, and for deb builds when
+  the newest source build of the package has failed (its deb builds do not build). 1.4 waited until the timeout.
 - `wait_for_paralell_builds` sends `page_size=100` (1.4 sent `pagesize`, which the API ignores) and waits up to
   `BUILD_TIMEOUT` (default 1200 s; 1.4 waited 600 s). It takes `ignore_ids`, so that builds of an earlier test can be
   skipped. **It fails on a timeout** and names the builds that are not done. 1.4 returned what it had found and the
-  test went on.
+  test went on. It takes all end states as done (1.4: `successful`, `build_failed` and `nothing_done`, so a
+  `publish_failed` build waited until the timeout), and it fails at once when the newest source build of a package
+  has failed.
+- The end states are `FINAL_STATES` in `utils.py`. Not detected: a build that fails before its source build is
+  created (git clone, `debian/changelog`); the wait for it ends at the timeout.
 - `molior_session` logs in as `admin` with `MOLIOR_ADMIN_PASSWORD`. 1.4 logged in the fixed test user.
 - **Dropped helpers:** `get_random_word` (unused), `ssh_run` (no SSH), `wait_or_kill` (websocket listener),
   `run_api_tests` and `execute_build_test` (pyresttest; `api_test` and `build_test` call `api_tests.py`).
@@ -229,9 +235,9 @@ the system tests. Arm builds of `test-arm` by molior are not checked.
 - The mirror source is `http://deb.debian.org/debian/`. 1.4 used an internal Debian mirror.
 - The key comes from `hkp://keyserver.ubuntu.com:80` with the Debian archive keys `762F67A0B2C39DE4`,
   `78DBA3BC47EF2265` and `6ED0E7B82643E131`. 1.4 used the armored key URL of the internal mirror.
-- Architectures: `amd64,armhf,arm64`, as in 1.4 (test 26 needs the arm architectures: a projectversion can only have
-  architectures of its base mirror). The arm build environments are made in the molior pod with qemu, so the host
-  needs qemu binfmt handlers with the `F` flag.
+- Architectures: `amd64` only. 1.4 had `amd64,armhf,arm64` for test 26 (a projectversion can only have architectures
+  of its base mirror). Here test 26 creates its own base mirror with the arm architectures, so the arm build
+  environments (made with qemu, about 9 minutes) are not made in the first test (101 s instead of 712 s).
 - New: `mirror_filter=basemirror_filter` and `filter_with_deps=True`. The filter keeps the mirror small. It contains
   the required packages and `apt`, `build-essential` and `ca-certificates`. It adds the tools of the build environment
   (`fakeroot`, `eatmydata`, `lintian`, `devscripts`, `curl`, `git`, `passwd` and more) and the build dependencies of the
@@ -392,10 +398,20 @@ are unchanged. Their changes are in the suites, see "The API suites" below.
     made builds fail without an error.
 
 ### 26. `test_arm_build`
-- The test function is unchanged; a comment says that it needs a node with the arm64 builder label.
+- New: it first creates the base mirror `trixie-arm/13` (dist `trixie`, `amd64,armhf,arm64`, the same source, keys
+  and filter as test 1) with `create_mirror`. 1.4 used its first base mirror, which had these architectures. The arm
+  build environments are made in the molior pod with qemu, so the host needs qemu binfmt handlers with the `F` flag.
+  Their images are `molior/trixie-arm-<arch>:13`, apart from those of `trixie/13`. `tests/system/values.yaml` sets
+  `molior.maxParallelChroots: 3` (was 1), so the three build environments are made at the same time.
 - molior runs arm64 and armhf deb builds in build pods with the node selector of the arm64 queue
-  (`builder.arm64.nodeLabel`, default `kubernetes.io/arch=arm64`). The test cluster has no arm node, so molior fails
-  the builds (`no node with label kubernetes.io/arch=arm64 in the cluster`) and `get_build` fails after 300 s.
+  (`builder.arm64.nodeLabel`, default `kubernetes.io/arch=arm64`). The test cluster has no arm node, so
+  `tests/system/values.yaml` sets `builder.arm64.nodeLabel: kubernetes.io/arch=amd64`: the arm build pods run on the
+  amd64 node, and the arm binaries in them run through qemu (binfmt `F` flag, see above).
+- `get_build` waits up to `BUILD_TIMEOUT` (default 1200 s; 1.4: 300 s), builds under qemu are slower.
+- Without that setting and without an arm node, molior fails the builds at once
+  (`no node with label kubernetes.io/arch=arm64 in the cluster`), and `get_build` fails right after
+  (`deb build of armpackage not successful: ...`). Seen in two runs before the setting; the unit tests in
+  `tests/unit/molior/test_kubernetes_job.py` cover it.
 - The package builds for amd64, arm64 and armhf (checked with qemu, outside molior).
 
 ### 27. `test_buildvariant_filter`
@@ -461,8 +477,9 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
   - The extracts `projectversion_id` and `projectversion_name` become `assert "id" in data` and the name for the next
     URL. The `assert` is new.
 - **`dotnet-core-project.yml`** (test 25): see test 25.
-- **`arm-project.yml`** (test 26): base mirror `trixie/13`, the repo `https://github.com/molior-dbs/test-arm.git`.
-  The projectversion `arm-test` has `armhf`, `arm64` and `amd64`, the repo `arm64` and `armhf`, as in 1.4.
+- **`arm-project.yml`** (test 26): base mirror `trixie-arm/13` (made by test 26), the repo
+  `https://github.com/molior-dbs/test-arm.git`. The projectversion `arm-test` has `armhf`, `arm64` and `amd64`, the
+  repo `arm64` and `armhf`, as in 1.4.
 - **`buildvariant-filter.yml`** (test 27): the URL gets a leading `/` (`/api/builds`). The three
   `total_result_count` checks are `assert`s.
 - **Not ported:** `cleanup.yml`, `add-notification-hook.yml` and `trigger-notify-build.yml` belong to obsolete tests.

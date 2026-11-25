@@ -16,6 +16,11 @@ from utils import BUILD_TIMEOUT, get_build, get_build_log, get_deb_build_ids, la
 
 basemirror = "trixie"
 basemirror_version = "13"
+# test_arm_build: a second base mirror with the arm architectures. A projectversion can only have architectures of its
+# base mirror; 1.4 had them in the first base mirror, here the arm build environments (made with qemu, minutes) are
+# only made for the arm tests at the end of the run.
+arm_basemirror = "trixie-arm"
+arm_basemirror_architectures = "amd64,armhf,arm64"
 # The 1.4 test mirrored an internal repository (a vendor printer driver, one package). Its URLs are not in the code:
 # CITIZEN_MIRROR_URL is the repository root (with dists/), CITIZEN_KEY_URL its armored signing key. Without them
 # the test is skipped.
@@ -56,16 +61,14 @@ def test_basemirror_creation(create_mirror):
     Tests the mirror creation on molior
     """
     logger.warning("==================================================== test_basemirror_creation")
-    # armhf and arm64 as in 1.4, for test_arm_build: a projectversion can only have architectures of its base mirror.
-    # The arm build environments are made in the molior pod with qemu (needs qemu binfmt handlers with the F flag on
-    # the host).
+    # amd64 only; 1.4 also had armhf and arm64, here test_arm_build creates its own base mirror with them
     create_mirror(
         "http://deb.debian.org/debian/",
         basemirror,
         basemirror_version,
         basemirror,
         "main",
-        "amd64,armhf,arm64",
+        "amd64",
         is_basemirror=True,
         keyserver="hkp://keyserver.ubuntu.com:80",
         keys="762F67A0B2C39DE4,78DBA3BC47EF2265,6ED0E7B82643E131",
@@ -695,15 +698,33 @@ def test_dotnet_core_project(molior_url, build_test):
     review_date="Wed, 11 Nov 2020 15:51:54 +0100",
 )
 @pytest.mark.after("test_dotnet_core_project")
-def test_arm_build(molior_url, build_test):
+def test_arm_build(molior_url, build_test, create_mirror):
     """
     Test a build for the arm architecture
     """
     logger.warning("==================================================== test_arm_build")
+    # the base mirror of arm-project.yml (see arm_basemirror): the same packages as the first base mirror, with the
+    # arm architectures (and amd64, the arm-test projectversion has it as in 1.4). The arm build environments are made
+    # in the molior pod with qemu (needs qemu binfmt handlers with the F flag on the host).
+    create_mirror(
+        "http://deb.debian.org/debian/",
+        arm_basemirror,
+        basemirror_version,
+        basemirror,
+        "main",
+        arm_basemirror_architectures,
+        is_basemirror=True,
+        keyserver="hkp://keyserver.ubuntu.com:80",
+        keys="762F67A0B2C39DE4,78DBA3BC47EF2265,6ED0E7B82643E131",
+        allow_rerun=True,
+        mirror_filter=basemirror_filter,
+        filter_with_deps=True,
+    )
     # arm deb builds run in build pods on nodes with the arm64 builder label (builder.arm64.nodeLabel); without such
-    # a node molior fails the builds ("no node with label ...") and this test fails
+    # a node molior fails the builds ("no node with label ..."). The test cluster sets the label to the amd64 node, the
+    # builds run there with qemu (tests/system/values.yaml), slower than on arm hardware: BUILD_TIMEOUT.
     build_test("tests/api-tests/arm-project.yml")
-    get_build(molior_url, "armpackage", buildstate="successful")
+    get_build(molior_url, "armpackage", buildstate="successful", timeout=BUILD_TIMEOUT)
 
 
 @pytest.mark.metadata(

@@ -4,7 +4,7 @@ molior:
   version: dev
   dev: true                 # plain HTTP session cookies, no TLS in the test cluster
   ciBuildsEnabled: true
-  maxParallelChroots: 1
+  maxParallelChroots: 3     # test_arm_build: the amd64, armhf and arm64 build environments of trixie-arm at the same time
   maxParallelSourceBuilds: 2
   terminationGracePeriodSeconds: 60
 

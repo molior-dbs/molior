@@ -95,10 +95,12 @@ async def CreateBuildEnv(chroot_id, build_id, dist,
         await build.logtitle("Done", no_footer_newline=True)
         await build.set_successful()
 
+        # the mirror build is done when all its build environments have ended; one that is new, scheduled or
+        # needs_build has not run yet (maxParallelChroots), it must not count as failed
         done = True
         successful = True
         for sibling in build.parent.children:
-            if sibling.buildstate == "building" or sibling.buildstate == "publishing":
+            if sibling.buildstate not in ("successful", "build_failed", "publish_failed"):
                 done = False
                 break
             if sibling.buildstate != "successful":

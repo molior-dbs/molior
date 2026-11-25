@@ -261,13 +261,14 @@ def dotnet_core_project(v):
 
 
 def arm_project(v):
-    """arm-project.yml: projectversion arm-test (armhf, arm64, amd64) with test-arm for armhf and arm64"""
+    """arm-project.yml: projectversion arm-test (armhf, arm64, amd64, as in 1.4) with test-arm for armhf and arm64. The
+    base mirror is trixie-arm/13 (made by test_arm_build, the first base mirror trixie/13 has amd64 only)."""
     step = Step(v)
     project = v["project_name"]
     step("Login", "POST", "/api/login", {"username": v["api_user"], "password": v["api_password"]},
          expected_status=[200])
     step("Create arm-test projectversion", "POST", "/api2/projectbase/{}/versions".format(project),
-         {"basemirror": "trixie/13", "architectures": ["armhf", "arm64", "amd64"], "name": "arm-test",
+         {"basemirror": "trixie-arm/13", "architectures": ["armhf", "arm64", "amd64"], "name": "arm-test",
           "description": "arm test", "dependency_policy": "strict", "cibuilds": False})
     step("Add arm Sourcerepository", "POST", "/api2/project/{}/arm-test/repositories".format(project),
          {"architectures": ["arm64", "armhf"], "url": GIT.format("test-arm")})

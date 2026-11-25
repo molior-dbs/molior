@@ -9,6 +9,8 @@ import importlib.util
 import os
 import sys
 
+import pytest
+
 from unittest.mock import MagicMock, patch
 
 BUILDENV_PY = os.path.join(os.path.dirname(__file__), "..", "..", "..", "molior", "ops", "buildenv.py")
@@ -104,12 +106,16 @@ class StubChroot:
     id = MagicMock()
 
 
-def run_buildenv(build_rc, publish_rc):
-    """Runs CreateBuildEnv for one chroot build below a mirror build. Returns (result, chroot build, mirror build,
-    mirror, chroot, queued tasks)."""
+def run_buildenv(build_rc, publish_rc, sibling_states=()):
+    """Runs CreateBuildEnv for one chroot build below a mirror build. sibling_states: the states of the other build
+    environments of the mirror. Returns (result, chroot build, mirror build, mirror, chroot, queued tasks)."""
     mirror_build = FakeBuild(1, "mirror")
     build = FakeBuild(2, "chroot", parent=mirror_build)
     mirror_build.children = [build]
+    for i, state in enumerate(sibling_states):
+        sibling = FakeBuild(3 + i, "chroot", parent=mirror_build)
+        sibling.buildstate = state
+        mirror_build.children.append(sibling)
     mirror = FakeMirror()
     chroot = FakeChroot(mirror)
     session = FakeSession(build, chroot)
@@ -161,6 +167,31 @@ def test_success_makes_mirror_ready():
     assert mirror.mirror_state == "ready"
     assert chroot.ready is True
     assert queued == [{"schedule": []}]
+
+
+@pytest.mark.parametrize("state", ["new", "scheduled", "needs_build", "building", "needs_publish", "publishing"])
+def test_mirror_build_waits_for_build_environments_that_have_not_ended(state):
+    """With maxParallelChroots the other build environments can still be scheduled when one ends: the mirror build
+    must not end (before, only building and publishing counted, so it went to build_failed and back to building)."""
+    ret, build, mirror_build, mirror, chroot, queued = run_buildenv(0, 0, [state])
+    assert ret is True
+    assert build.buildstate == "successful"
+    assert mirror_build.buildstate == "publishing"
+    assert chroot.ready is True
+
+
+def test_mirror_build_successful_when_all_build_environments_are():
+    ret, build, mirror_build, mirror, chroot, queued = run_buildenv(0, 0, ["successful", "successful"])
+    assert ret is True
+    assert mirror_build.buildstate == "successful"
+
+
+@pytest.mark.parametrize("state", ["build_failed", "publish_failed"])
+def test_mirror_build_fails_when_an_ended_build_environment_failed(state):
+    ret, build, mirror_build, mirror, chroot, queued = run_buildenv(0, 0, ["successful", state])
+    assert ret is True
+    assert build.buildstate == "successful"
+    assert mirror_build.buildstate == "build_failed"
 
 
 def test_build_failure_fails_mirror():
