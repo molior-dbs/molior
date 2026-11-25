@@ -7,7 +7,7 @@
     "build": "webpack --mode production"
   },
   "dependencies": {
-    "react-router-dom": "^6.23.1"
+    "react-router-dom": "^7.18.7"
   },
   "optionalDependencies": {
     "webpack-dev-server": "^5.2.5"
