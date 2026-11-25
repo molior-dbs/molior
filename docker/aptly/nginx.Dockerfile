@@ -17,4 +17,4 @@ ADD docker/aptly/start-nginx /usr/local/sbin/start-nginx
 
 STOPSIGNAL SIGQUIT
 
-CMD start-nginx
+CMD ["start-nginx"]

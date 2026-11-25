@@ -33,5 +33,5 @@ if [ -f "/config/aptly.conf" ]; then
 fi
 
 su aptly -c 'aptly api serve -listen 0.0.0.0:3142 & pid=$!; echo -n $pid >/tmp/aptly.pid; wait $pid' &
-suppid=$!
+supid=$!
 wait $supid

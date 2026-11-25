@@ -64,6 +64,12 @@ This sets up:
 Another name: `make create-cluster K3D_CLUSTER=local` creates the cluster `local` and the registry `k3d-local-registry:5000`.
 Pass the same `K3D_CLUSTER` to all Local Development targets.
 
+Other host ports, e.g. for a second cluster next to an existing one: `K3D_WEB_PORT` (default 8000), `K3D_APTLY_PORT`
+(8080) and `K3D_REGISTRY_PORT` (5000, also the registry port inside the cluster). Pass them to all Local Development
+targets too.
+
+`make create-cluster` does not change the current kubectl context.
+
 ---
 
 ## 2. Build the Docker images
@@ -105,13 +111,13 @@ passwords (an empty answer keeps the current one).
 
 ## 5. Monitor the pods
 
+`make list`, `make watch`, `make logs`, `make shell`, `make psql`, `make restart` and the other Molior Maintenance
+targets use the current kubectl context. Switch to the new cluster first:
+
 ```sh
+kubectl config use-context k3d-molior
 make watch
 ```
-
-`make list`, `make watch`, `make logs`, `make shell`, `make psql`, `make restart` and the other Molior Maintenance
-targets use the current kubectl context. `k3d cluster create` makes the new cluster the current context; check it with
-`kubectl config current-context`.
 
 Once all pods are running, Molior is available at **http://localhost:8000** and the Aptly repository at **http://localhost:8080**.
 

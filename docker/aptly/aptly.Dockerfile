@@ -14,4 +14,4 @@ RUN useradd --uid 7777 -m --shell /bin/sh --home-dir /var/lib/aptly aptly
 ADD docker/aptly/start-aptly /usr/local/sbin/start-aptly
 ADD pkgdata/molior-aptly/usr/sbin/create-aptly-keys /usr/local/sbin/
 
-CMD start-aptly
+CMD ["start-aptly"]

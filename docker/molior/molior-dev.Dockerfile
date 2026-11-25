@@ -20,4 +20,4 @@ RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot
 
 WORKDIR /
-CMD start-molior
+CMD ["start-molior"]

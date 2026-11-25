@@ -50,4 +50,4 @@ RUN printf '%s\n' \
 ENV COVERAGE_PROCESS_START=/etc/molior/coveragerc
 
 WORKDIR /
-CMD start-molior
+CMD ["start-molior"]

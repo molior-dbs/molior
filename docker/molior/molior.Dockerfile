@@ -19,4 +19,4 @@ RUN echo deb http://molior.info/1.5-next stable main > /etc/apt/sources.list.d/m
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
-CMD start-molior
+CMD ["start-molior"]
