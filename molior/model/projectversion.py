@@ -233,6 +233,9 @@ class ProjectVersion(Base):
             retention_successful_builds=retention_successful_builds,
             retention_failed_builds=retention_failed_builds,
         )
+        # in the session before the loop: its lazy loads autoflush, and the new projectversion is already in
+        # project.projectversions and in the projectversions of the source repositories (SAWarning otherwise)
+        db.add(new_projectversion)
 
         for dependency in self.dependencies:
             if basemirror_id != self.basemirror_id:
@@ -244,7 +247,6 @@ class ProjectVersion(Base):
                     continue
             new_projectversion.dependencies.append(dependency)
 
-        db.add(new_projectversion)
         db.flush()  # assign new_projectversion.id and materialise SouRepProVer join rows
 
         for repo in new_projectversion.sourcerepositories:
