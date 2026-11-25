@@ -4,7 +4,7 @@ Provides test molior configuration class.
 import asyncio
 from datetime import datetime
 
-from mock import patch, Mock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from molior.molior.debianrepository import DebianRepository
 from molior.aptly.api import get_snapshot_name
@@ -80,8 +80,8 @@ def test_remove_old_packages():
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
 
-        aptly_connection.repo_packages_delete = Mock(side_effect=asyncio.coroutine(lambda a, b: 1337))
-        aptly_connection.wait_task = Mock(side_effect=asyncio.coroutine(lambda a: 1342))
+        aptly_connection.repo_packages_delete = AsyncMock(return_value=1337)
+        aptly_connection.wait_task = AsyncMock(return_value=1342)
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"
@@ -90,8 +90,7 @@ def test_remove_old_packages():
         archs = []
         repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(repo._DebianRepository__remove_old_packages(packages))
+        res = asyncio.run(repo._DebianRepository__remove_old_packages(packages))
         aptly_connection.wait_task.assert_called_with(1337)
         assert set(res).issubset([new_package, "Pi386 test 0.0.1 c36ac"])
 
@@ -113,8 +112,8 @@ def test_remove_old_packages_none():
 
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
-        aptly_connection.repo_packages_delete.return_value = 1337
-        aptly_connection.wait_task = Mock(side_effect=asyncio.coroutine(lambda a: 1342))
+        aptly_connection.repo_packages_delete = AsyncMock(return_value=1337)
+        aptly_connection.wait_task = AsyncMock(return_value=1342)
 
         basemirror_name = "stretch"
         basemirror_version = "9.2"
@@ -125,11 +124,9 @@ def test_remove_old_packages_none():
             basemirror_name, basemirror_version, project_name, project_version, archs
         )
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(
-            repo._DebianRepository__remove_old_packages(packages)
-        )
+        res = asyncio.run(repo._DebianRepository__remove_old_packages(packages))
         assert res == packages
+        aptly_connection.repo_packages_delete.assert_not_called()
 
 
 # def test_get_packages_non_ci():
@@ -211,65 +208,62 @@ def test_remove_old_packages_none():
 
 def test_add_packages():
     """
-    Test add packages
+    Test add packages: upload to the stable repo, wait for the aptly task, delete the upload dir
+    (the republish is a separate step, DebianRepository.republish)
     """
     files = ['file1', 'file2']
 
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
-            DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name, patch(
             "molior.molior.debianrepository.logger"):
-
-        get_snapshot_name.return_value = "jessie_8.8_repos_test_1-stable"
-        publish_name.return_value = "jessie_8.8_repos_test_1"
 
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
-        aptly_connection.repo_add = Mock(side_effect=asyncio.coroutine(lambda a, b: (1337, "/tmp")))
-        aptly_connection.delete_directory = Mock(side_effect=asyncio.coroutine(lambda a: True))
-        aptly_connection.snapshot_create = Mock(side_effect=asyncio.coroutine(lambda a, b: 1338))
-        aptly_connection.snapshot_get = Mock(
-            side_effect=asyncio.coroutine(
-                lambda: [
-                    {"Name": "jessie_8.8_repos_test_1-stable"},
-                    {"Invalid": 1},
-                ]
-            )
-        )
-        aptly_connection.snapshot_delete = Mock(side_effect=asyncio.coroutine(lambda a: 1339))
-        aptly_connection.snapshot_publish_update = Mock(side_effect=asyncio.coroutine(lambda a, b, c, d: 1340))
-        aptly_connection.snapshot_rename = Mock(side_effect=asyncio.coroutine(lambda a, b: 1341))
-        aptly_connection.wait_task = Mock(side_effect=asyncio.coroutine(lambda a: 1342))
-        aptly_connection.republish = Mock(side_effect=asyncio.coroutine(lambda a, b, c: None))
+        aptly_connection.repo_add = AsyncMock(return_value=(1337, "/tmp/upload"))
+        aptly_connection.wait_task = AsyncMock(return_value=True)
+        aptly_connection.delete_directory = AsyncMock(return_value=True)
+        aptly_connection.republish = AsyncMock(return_value=True)
 
-        basemirror_name = "jessie"
-        basemirror_version = "8.8"
-        project_name = "test"
-        project_version = "1"
-        archs = []
-        repo = DebianRepository(basemirror_name, basemirror_version, project_name, project_version, archs)
+        repo = DebianRepository("jessie", "8.8", "test", "1", [])
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(repo.add_packages(files))
-        aptly_connection.republish.assert_called_with(
-            "stable",
-            "jessie-8.8-test-1-stable",
-            "jessie_8.8_repos_test_1",
-        )
+        assert asyncio.run(repo.add_packages(files)) is True
+        aptly_connection.repo_add.assert_awaited_once_with("jessie-8.8-test-1-stable", files)
+        aptly_connection.wait_task.assert_awaited_once_with(1337)
+        aptly_connection.delete_directory.assert_awaited_once_with("/tmp/upload")
+        aptly_connection.republish.assert_not_called()
+
+
+def test_add_packages_upload_fails():
+    """
+    Test add packages if the aptly task fails: False, the upload dir is kept
+    """
+    with patch(
+            "molior.molior.debianrepository.Configuration"), patch(
+            "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
+            "molior.molior.debianrepository.logger"):
+
+        aptly_connection = MagicMock()
+        get_aptly_connection.return_value = aptly_connection
+        aptly_connection.repo_add = AsyncMock(return_value=(1337, "/tmp/upload"))
+        aptly_connection.wait_task = AsyncMock(return_value=False)
+        aptly_connection.delete_directory = AsyncMock(return_value=True)
+
+        repo = DebianRepository("jessie", "8.8", "test", "1", [])
+
+        assert asyncio.run(repo.add_packages(["file1"], ci_build=True)) is False
+        aptly_connection.repo_add.assert_awaited_once_with("jessie-8.8-test-1-unstable", ["file1"])
+        aptly_connection.delete_directory.assert_not_called()
 
 
 def test_init():
     """
     Test repo init
     """
-    loop = asyncio.get_event_loop()
-
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
+            "molior.molior.debianrepository.get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):
@@ -280,17 +274,11 @@ def test_init():
 
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
-        aptly_connection.snapshot_create = Mock(
-            side_effect=asyncio.coroutine(lambda a, b: 37)
-        )
-        aptly_connection.snapshot_get = Mock(side_effect=asyncio.coroutine(lambda: []))
-        aptly_connection.snapshot_publish = Mock(
-            side_effect=asyncio.coroutine(lambda a, b, c, d, e: 38)
-        )
-        aptly_connection.repo_get = Mock(side_effect=asyncio.coroutine(lambda: []))
-        aptly_connection.repo_create = Mock(
-            side_effect=asyncio.coroutine(lambda a: None)
-        )
+        aptly_connection.snapshot_create = AsyncMock(return_value=37)
+        aptly_connection.snapshot_get = AsyncMock(return_value=[])
+        aptly_connection.snapshot_publish = AsyncMock(return_value=38)
+        aptly_connection.repo_get = AsyncMock(return_value=[])
+        aptly_connection.repo_create = AsyncMock(return_value=None)
 
         async def wait_task_mock(_):
             """wait task mock"""
@@ -308,11 +296,12 @@ def test_init():
         )
         repo.DISTS = ["stable"]
 
-        loop.run_until_complete(repo.init())
+        assert asyncio.run(repo.init()) is True
 
         aptly_connection.repo_create.assert_called_with("stretch-9.2-test-2-stable")
+        aptly_connection.snapshot_create.assert_called_with("stretch-9.2-test-2-stable", "stretch_9.2_test_2-stable")
         aptly_connection.snapshot_publish.assert_called_with(
-            "stretch_9.2_repos_test_2-stable",
+            "stretch_9.2_test_2-stable",
             "main",
             ["source", "all"],
             "stable",
@@ -324,12 +313,10 @@ def test_init_exists():
     """
     Test repo init if snapshot and repo already exist
     """
-    loop = asyncio.get_event_loop()
-
     with patch(
             "molior.molior.debianrepository.Configuration"), patch(
             "molior.molior.debianrepository.get_aptly_connection") as get_aptly_connection, patch(
-            "molior.aptly.api.get_snapshot_name") as get_snapshot_name, patch.object(
+            "molior.molior.debianrepository.get_snapshot_name") as get_snapshot_name, patch.object(
             DebianRepository, "publish_name", new_callable=PropertyMock) as publish_name_mock, patch.object(
             DebianRepository, "name", new_callable=PropertyMock) as name_mock, patch(
             "molior.molior.debianrepository.logger"):
@@ -341,17 +328,9 @@ def test_init_exists():
 
         aptly_connection = MagicMock()
         get_aptly_connection.return_value = aptly_connection
-        aptly_connection.snapshot_get = Mock(
-            side_effect=asyncio.coroutine(
-                lambda: [{"Name": "stretch_9.2_test_2-stable"}]
-            )
-        )
-        aptly_connection.repo_get = Mock(
-            side_effect=asyncio.coroutine(lambda: [{"Name": "stretch-9.2-test-2-stable"}])
-        )
-        aptly_connection.repo_create = Mock(
-            side_effect=asyncio.coroutine(lambda a: None)
-        )
+        aptly_connection.snapshot_get = AsyncMock(return_value=[{"Name": "stretch_9.2_test_2-stable"}])
+        aptly_connection.repo_get = AsyncMock(return_value=[{"Name": "stretch-9.2-test-2-stable"}])
+        aptly_connection.repo_create = AsyncMock(return_value=None)
 
         async def wait_task_mock(_):
             """wait task mock"""
@@ -370,7 +349,7 @@ def test_init_exists():
         )
         repo.DISTS = ["stable"]
 
-        loop.run_until_complete(repo.init())
+        assert asyncio.run(repo.init()) is False
 
         aptly_connection.repo_create.assert_not_called()
         aptly_connection.snapshot_publish.assert_not_called()

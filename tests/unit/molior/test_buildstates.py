@@ -1,11 +1,15 @@
 import asyncio
-import sys
+import importlib
+import pkgutil
 
-from mock import MagicMock, mock, Mock
-sys.modules['aiofile'] = mock.MagicMock()
+from unittest.mock import AsyncMock, MagicMock
 
-from molior.model.build import Build            # noqa: E402
-from molior.model.maintainer import Maintainer  # noqa: F401, E402
+import molior.model
+
+# all models, so that the relationships between them can be set up (also when this file runs alone)
+for _module in pkgutil.iter_modules(molior.model.__path__):
+    importlib.import_module("molior.model." + _module.name)
+from molior.model.build import Build  # noqa: E402
 
 
 def logmock(build):
@@ -13,14 +17,14 @@ def logmock(build):
     build.parent.log_state = MagicMock()
     if build.parent.parent:
         build.parent.parent.log_state = MagicMock()
-    build.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
-    build.parent.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+    build.log = AsyncMock(return_value=None)
+    build.parent.log = AsyncMock(return_value=None)
     if build.parent.parent:
-        build.parent.parent.log = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
-    build.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
-    build.parent.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+        build.parent.parent.log = AsyncMock(return_value=None)
+    build.logtitle = AsyncMock(return_value=None)
+    build.parent.logtitle = AsyncMock(return_value=None)
     if build.parent.parent:
-        build.parent.parent.logtitle = Mock(side_effect=asyncio.coroutine(lambda a, **args: None))
+        build.parent.parent.logtitle = AsyncMock(return_value=None)
 
 
 def test_src_build_failed():
@@ -32,8 +36,7 @@ def test_src_build_failed():
 
     logmock(src_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(src_build.set_failed())
+    asyncio.run(src_build.set_failed())
 
     assert src_build.buildstate == "build_failed"
     assert src_build.parent.buildstate == "build_failed"
@@ -49,8 +52,7 @@ def test_deb_build_failed():
 
     logmock(deb_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(deb_build.set_failed())
+    asyncio.run(deb_build.set_failed())
 
     assert deb_build.buildstate == "build_failed"
     assert deb_build.parent.parent.buildstate == "build_failed"
@@ -66,8 +68,7 @@ def test_src_build_publish_failed():
 
     logmock(src_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(src_build.set_publish_failed())
+    asyncio.run(src_build.set_publish_failed())
 
     assert src_build.buildstate == "publish_failed"
     assert src_build.parent.buildstate == "build_failed"
@@ -84,8 +85,7 @@ def test_deb_build_publish_failed():
 
     logmock(deb_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(deb_build.set_publish_failed())
+    asyncio.run(deb_build.set_publish_failed())
 
     assert deb_build.buildstate == "publish_failed"
     assert deb_build.parent.parent.buildstate == "build_failed"
@@ -102,8 +102,7 @@ def test_deb_build_successful_only_build():
 
     logmock(deb_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(deb_build.set_successful())
+    asyncio.run(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate == "successful"
@@ -128,8 +127,7 @@ def test_deb_build_successful_all_successful():
 
     logmock(deb_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(deb_build.set_successful())
+    asyncio.run(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate == "successful"
@@ -154,8 +152,7 @@ def test_deb_build_successful_other_failed():
 
     logmock(deb_build)
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(deb_build.set_successful())
+    asyncio.run(deb_build.set_successful())
 
     assert deb_build.buildstate == "successful"
     assert deb_build.parent.parent.buildstate != "successful"

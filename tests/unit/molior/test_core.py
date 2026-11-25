@@ -2,7 +2,7 @@ import pytest
 import asyncio
 
 from pathlib import Path
-from mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from molior.molior.core import get_projectversion, get_target_config
 from molior.molior.core import get_maintainer, get_target_arch
@@ -32,8 +32,8 @@ def test_get_projectversion_v_set():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_projectversion(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_projectversion(path)
         assert result == ""
 
 
@@ -50,8 +50,8 @@ def test_get_projectversion_n_v_set():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_projectversion(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_projectversion(path)
         assert result == ""
 
 
@@ -68,8 +68,8 @@ def test_get_projectversion_tgt_inv():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_projectversion(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_projectversion(path)
         assert result == ""
 
 
@@ -86,8 +86,8 @@ def test_get_projectversion_tgt_set():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_projectversion(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_projectversion(path)
         assert result == "foo-next"
 
 
@@ -96,8 +96,7 @@ def test_get_target_config_no_cfg():
     Test get target config if config does not exist
     """
     path = Path("/foo/bar")
-    setattr(path.__class__, "exists", MagicMock(return_value=False))
-    with patch("molior.molior.core.logger"):
+    with patch.object(Path, "exists", return_value=False), patch("molior.molior.core.logger"):
         result = get_target_config(path)
         assert result == []
 
@@ -114,8 +113,8 @@ def test_get_target_cfg_empty_cfg():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_target_config(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_target_config(path)
         assert result == []
 
 
@@ -131,8 +130,8 @@ def test_get_target_config():
         mock.return_value = cfg
 
         path = Path("/foo/bar")
-        setattr(path.__class__, "exists", MagicMock(return_value=True))
-        result = get_target_config(path)
+        with patch.object(Path, "exists", return_value=True):
+            result = get_target_config(path)
         assert set(result).issubset([("testproject", "1"), ("testproject", "next")])
 
 
@@ -142,10 +141,9 @@ def test_get_maintainer():
     """
     path = "/foo/bar"
     with patch("molior.molior.core.get_changelog_attr",
-               side_effect=asyncio.coroutine(lambda a, b: "Jon Doe <jon@doe.com>")) as get_changelog_attr:
+               new_callable=AsyncMock, return_value="Jon Doe <jon@doe.com>") as get_changelog_attr:
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(get_maintainer(path))
+        res = asyncio.run(get_maintainer(path))
         get_changelog_attr.assert_called_with("Maintainer", path)
         assert res == ("Jon", "Doe", "jon@doe.com")
 
@@ -156,10 +154,9 @@ def test_get_maintainer_none():
     """
     path = "/foo/bar"
     with patch("molior.molior.core.get_changelog_attr",
-               side_effect=asyncio.coroutine(lambda a, b: "")):
+               new_callable=AsyncMock, return_value=""):
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(get_maintainer(path))
+        res = asyncio.run(get_maintainer(path))
         assert res is None
 
 
@@ -169,10 +166,9 @@ def test_get_maintainer_invalid():
     """
     path = "/foo/bar"
     with patch("molior.molior.core.get_changelog_attr",
-               side_effect=asyncio.coroutine(lambda a, b: "Jon Doe")):
+               new_callable=AsyncMock, return_value="Jon Doe"):
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(get_maintainer(path))
+        res = asyncio.run(get_maintainer(path))
         assert res is None
 
 

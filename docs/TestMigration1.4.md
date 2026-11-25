@@ -9,9 +9,10 @@ values that pointed to the old site and the helpers that used the old interfaces
 
 ## Overview
 
-1.4 has 30 tests. 27 are ported, in the 1.4 file order. Tests 1 to 25 pass in the 1.5 system tests (25 passed in
-727 s, exit 0, after the molior fixes in "molior changes the port needed"). Tests 26 and 27 (arm) run the arm builds
-with qemu on the amd64 node of the test cluster (not run yet with that setting).
+1.4 has 30 tests. 27 are ported, in the 1.4 file order. All 27 pass in the 1.5 system tests except `test_mirror`,
+which is skipped without its environment variables (26 passed, 1 skipped in 912 s, exit 0, after the molior fixes
+in "molior changes the port needed"). Tests 26 and 27 (arm) run the arm builds with qemu on the amd64 node of the
+test cluster.
 
 | # | Test | Id | Status | Change in the test function |
 |---|---|---|---|---|
@@ -44,7 +45,7 @@ with qemu on the amd64 node of the test cluster (not run yet with that setting).
 | 27 | `test_buildvariant_filter` | a671b2ec | ported | none |
 | - | `test_cleanup` | 4643c05a | obsolete | every run uses a new cluster |
 | - | `test_build_notification` | 1a8ebb57 | obsolete | build notification hooks are removed in 1.5 |
-| - | `test_molior_deploy` | 4643c058 | left out | tests the 1.4 deploy tools; 1.5 deploys with Helm |
+| - | `test_molior_deploy` | 4643c058 | TODO | not in this suite; to be run in a separate suite `tests/deploy/` on the runner |
 
 ## Changes that apply to all tests
 
@@ -148,7 +149,7 @@ with qemu on the amd64 node of the test cluster (not run yet with that setting).
 - `tests/webserver.py`: a Flask receiver for the notification hooks of the obsolete `test_build_notification`.
 - `tests/websocket-test.py`: a websocket listener that checked the build state sequence; already commented out in
   1.4 (fixture `websocket_server`).
-- `tests/test-deploy.sh`: used by `test_molior_deploy`, which is left out.
+- `tests/test-deploy.sh`: used by `test_molior_deploy`, which moves to the separate suite `tests/deploy/` (TODO).
 - SSH keys for the 1.4 hosts (two directories and a submodule). Not copied (secrets).
 - `README.md`: the 1.4 installation of the test site.
 
@@ -489,5 +490,6 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
 - **`test_cleanup`** (4643c05a): obsolete. It deleted the test data of an earlier run, and every run now uses a new
   cluster.
 - **`test_build_notification`** (1a8ebb57): obsolete. The build notification hooks are removed in 1.5.
-- **`test_molior_deploy`** (4643c058): left out. It tested the 1.4 deploy tools; 1.5 deploys with Helm, and
-  `system-tests.sh` installs the chart for every run.
+- **`test_molior_deploy`** (4643c058): not in this suite. It tested the 1.4 deploy tools; 1.5 deploys with Helm, and
+  `system-tests.sh` installs the chart for every run. TODO: it will be run in a separate test suite (`tests/deploy/`)
+  on the runner.
