@@ -6,7 +6,7 @@ import utils
 
 
 def pytest_configure(config):
-    # marks of the 1.4 tests: metadata for the validation report, first/after for the order (pytest-order is not
+    # marks of the 1.4 tests: metadata (id, author, requirements), first/after for the order (pytest-order is not
     # used; the tests run in file order)
     config.addinivalue_line("markers", "metadata(**kwargs): validation metadata (id, author, requirements)")
     config.addinivalue_line("markers", "first: run first (1.4 ordering)")
