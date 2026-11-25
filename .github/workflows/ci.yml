@@ -10,6 +10,10 @@
 # container registry of this repository as ghcr.io/<owner>/<repo>/molior-ci:latest, which the other jobs use. Run it
 # again when debian/control, molior-base.Dockerfile or ci.Dockerfile change.
 #
+# Summaries: every job writes a step summary (.github/scripts/summary.py). Warnings (flake8 findings, pytest warnings,
+# tracebacks, errors and warnings in the server logs, docker build warnings) are shown in the summary and as
+# annotations; they do not fail the job.
+#
 # Runner: needs docker (the system tests create a k3d cluster, the image jobs run docker build) and sudo for the
 # packages that are missing (.github/scripts/install-tools.sh). Set the repository variable CI_RUNNER to use another
 # runner than ubuntu-latest.
@@ -54,9 +58,11 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Build
+        shell: bash
         run: |
-          docker build --pull -t molior-base:dev -f docker/molior/molior-base.Dockerfile .
-          docker build -t "$CI_IMAGE" -f docker/ci.Dockerfile .
+          set -o pipefail
+          docker build --pull -t molior-base:dev -f docker/molior/molior-base.Dockerfile . 2>&1 | tee build-base.log
+          docker build -t "$CI_IMAGE" -f docker/ci.Dockerfile . 2>&1 | tee build-ci.log
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
@@ -67,6 +73,12 @@ jobs:
 
       - name: Push
         run: docker push "$CI_IMAGE"
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 .github/scripts/summary.py images "CI image" "$CI_IMAGE"
+          python3 .github/scripts/summary.py docker-build "CI image build" build-base.log build-ci.log
 
       - name: Cleanup
         if: always()
@@ -122,7 +134,14 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: flake8
-        run: make lint
+        shell: bash
+        run: |
+          set -o pipefail
+          make lint 2>&1 | tee flake8.txt
+
+      - name: Summary
+        if: always()
+        run: python3 .github/scripts/summary.py flake8 flake8.txt
 
   tests-unit:
     name: Unit Tests
@@ -138,7 +157,14 @@ jobs:
       - name: Run unit tests
         env:
           COVERAGE_FILE: coverage-unit.data
-        run: make unit-tests
+        shell: bash
+        run: |
+          set -o pipefail
+          make unit-tests 2>&1 | tee unit-tests.txt
+
+      - name: Summary
+        if: always()
+        run: python3 .github/scripts/summary.py junit "Unit tests" unit-test-report.xml unit-tests.txt
 
       - name: Upload unit test reports
         if: always()
@@ -148,6 +174,7 @@ jobs:
           path: |
             coverage-unit.data
             unit-test-report.xml
+            unit-tests.txt
           if-no-files-found: error
 
   # One cluster, one pytest run: the suites run after each other (smoke first)
@@ -186,7 +213,17 @@ jobs:
         run: make set-version
 
       - name: Run system tests
-        run: tests/system/system-tests.sh smoke valid-1.4/validation_tests.py
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RESULTS_DIR"
+          tests/system/system-tests.sh smoke valid-1.4/validation_tests.py 2>&1 | tee "$RESULTS_DIR/system-tests.txt"
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 .github/scripts/summary.py junit "System tests" "$RESULTS_DIR/junit.xml" "$RESULTS_DIR/system-tests.txt"
+          python3 .github/scripts/summary.py logs "Server logs (system tests)" "$RESULTS_DIR"/*.log
 
       - name: Upload system test results
         if: always()
@@ -277,18 +314,20 @@ jobs:
         run: make set-version
 
       - name: Build images
-        run: make docker-images DOCKERCMD=docker
+        shell: bash
+        run: |
+          set -o pipefail
+          make docker-images DOCKERCMD=docker 2>&1 | tee build-images.log
 
       - name: Tag images
         run: make tag-images DOCKERCMD=docker
 
       - name: Summary
+        if: always()
         run: |
-          {
-            echo "### Docker images (not pushed, target \`$TARGET\`)"
-            echo ""
-            for i in molior molior-postgres aptly molior-nginx; do echo "* \`$i:$MOLIOR_VERSION\`"; done
-          } >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/summary.py images "Docker images (not pushed, target $TARGET)" \
+            molior:$MOLIOR_VERSION molior-postgres:$MOLIOR_VERSION aptly:$MOLIOR_VERSION molior-nginx:$MOLIOR_VERSION
+          python3 .github/scripts/summary.py docker-build "Docker image build" build-images.log
 
   helm:
     name: Helm Chart
@@ -306,15 +345,14 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Build helm chart
-        run: make helm-package
+        shell: bash
+        run: |
+          set -o pipefail
+          make helm-package 2>&1 | tee helm.txt
 
       - name: Summary
-        run: |
-          {
-            echo "### Helm chart (not pushed, target \`$TARGET\`)"
-            echo ""
-            echo "* \`molior-$MOLIOR_VERSION.tgz\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: python3 .github/scripts/summary.py text "Helm chart (not pushed, target $TARGET)" helm.txt
 
       - name: Upload helm chart
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
