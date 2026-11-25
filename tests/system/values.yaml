@@ -13,6 +13,9 @@ builder:
     parallel: 2             # test_build_parallelization: more than one build at a time
   arm64:
     parallel: 1
+    # the test cluster has no arm node: arm64 and armhf build pods run on the amd64 node, the arm binaries in them run
+    # through qemu (the host needs qemu binfmt handlers with the F flag, see test_arm_build)
+    nodeLabel: kubernetes.io/arch=amd64
 
 aptly:
   # the APT URL shown to users (About page, sources lists): reachable from the test runner pod
