@@ -71,9 +71,9 @@ def pytest_report_teststatus(report, config):
 
 @pytest.hookimpl(trylast=True)
 def pytest_configure(config):
-    """Result lines in verbose mode: the number of the test, the location and the result in columns, the time of
-    the test (setup and call) in whole seconds, rounded up, before the percentage:
-        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED     1s [ 15%]"
+    """Result lines in verbose mode: the start time of the test (UTC), the number of the test, the location and the
+    result in columns, the time of the test (setup and call) in whole seconds, rounded up, before the percentage:
+        "13:09:09  3/20: valid-1.4/validation_tests.py::test_api       PASSED     1s [ 15%]"
     Uses the location line and the progress message of pytest's terminal reporter (private, checked)."""
     reporter = config.pluginmanager.get_plugin("terminalreporter")
     if not reporter or config.option.verbose <= 0:
@@ -85,6 +85,7 @@ def pytest_configure(config):
     progress = reporter._get_progress_information_message
     location = reporter._locationline
     columns = {}   # nodeid: number of the test; "width": width of the longest location
+    started = {}   # nodeid: start time; pytest writes the location again if it changes between start and result
 
     def with_time():
         msg = progress()
@@ -104,8 +105,10 @@ def pytest_configure(config):
         if nodeid not in columns:
             return location(nodeid, *args)
         total = len(items)
-        return "{:>{}}/{}: {} ".format(columns[nodeid], len(str(total)), total,
-                                       location(nodeid, *args).ljust(columns["width"]))
+        if nodeid not in started:
+            started[nodeid] = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
+        return "{} {:>{}}/{}: {} ".format(started[nodeid], columns[nodeid], len(str(total)), total,
+                                          location(nodeid, *args).ljust(columns["width"]))
 
     reporter._get_progress_information_message = with_time
     reporter._locationline = numbered

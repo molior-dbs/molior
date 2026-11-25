@@ -104,7 +104,8 @@ mirrors:
 EOF
 
 log "cluster $ID"
-k3d cluster create "$ID" --registry-use "$REGISTRY:$PORT" --registry-config "$WORK/registries.yaml" \
+# k3d writes a hosts file (k3d-hostsfile-<n>) to TMPDIR and does not remove it: put it in $WORK
+TMPDIR=$WORK k3d cluster create "$ID" --registry-use "$REGISTRY:$PORT" --registry-config "$WORK/registries.yaml" \
     --no-lb --wait --timeout 300s \
     --kubeconfig-update-default=false --kubeconfig-switch-context=false \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" >/dev/null
