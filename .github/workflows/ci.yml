@@ -1,14 +1,15 @@
 # Molior CI
 #
-# Setup:    CI Image (manual), Configure (versions, target)
+# Setup:    CI Image, Configure (versions, target)
 # Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
 # Build:    Docker Images, Helm Chart (after the tests, all with the CI version, no push yet)
 #
 # The CI image is molior-base (docker/molior/molior-base.Dockerfile: the build dependencies of the deb packages) plus
 # the python packages the unit tests import (docker/ci.Dockerfile). The test and image jobs use it as molior-base:dev.
-# The "CI Image" job runs only with "Run workflow" (workflow_dispatch). It builds the image and pushes it to the GitHub
-# container registry of this repository as ghcr.io/<owner>/<repo>/molior-ci:latest, which the other jobs use. Run it
-# again when debian/control, molior-base.Dockerfile or ci.Dockerfile change.
+# The "CI Image" job runs on every push and with "Run workflow". It builds the image and pushes it to the GitHub
+# container registry of this repository as ghcr.io/<owner>/<repo>/molior-ci:latest, which the other jobs use. No job
+# waits for it: they use the latest pushed image, so a change of debian/control, molior-base.Dockerfile or
+# ci.Dockerfile reaches the other jobs in the next run.
 #
 # Summaries: every job writes a step summary (.github/scripts/summary.py). Warnings (flake8 findings, pytest warnings,
 # tracebacks, errors and warnings in the server logs, docker build warnings) are shown in the summary and as
@@ -47,7 +48,6 @@ jobs:
 
   build-ci-image:
     name: CI Image
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
