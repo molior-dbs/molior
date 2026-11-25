@@ -1,5 +1,6 @@
 """Shared fixtures of the system tests. They run in the test runner pod (test-web.Dockerfile) inside the
 test cluster and talk to molior at MOLIOR_URL (default http://web:8000)."""
+import math
 import uuid
 
 import pytest
@@ -65,8 +66,8 @@ def pytest_report_teststatus(report, config):
 @pytest.hookimpl(trylast=True)
 def pytest_configure(config):
     """Result lines in verbose mode: the number of the test, the location and the result in columns, the time of
-    the test (setup and call) in whole seconds before the percentage:
-        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED     0s [ 15%]"
+    the test (setup and call) in whole seconds, rounded up, before the percentage:
+        " 3/20: valid-1.4/validation_tests.py::test_api       PASSED     1s [ 15%]"
     Uses the location line and the progress message of pytest's terminal reporter (private, checked)."""
     reporter = config.pluginmanager.get_plugin("terminalreporter")
     if not reporter or config.option.verbose <= 0:
@@ -81,7 +82,7 @@ def pytest_configure(config):
 
     def with_time():
         msg = progress()
-        return " {:>5}".format("{}s".format(int(round(_pending[0])))) + msg if _pending else msg
+        return " {:>5}".format("{}s".format(math.ceil(_pending[0]))) + msg if _pending else msg
 
     def right_after():
         # pytest right-aligns the progress to the terminal width; write it right after the result instead
