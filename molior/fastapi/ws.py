@@ -8,6 +8,10 @@ GET /api/events
 
 WS /api/websocket
     Single WebSocket endpoint, preserving the original cirrina design.
+    Needs a login, like in cirrina: the session cookie (or the
+    X-MoliorToken header) is checked once, when the client connects.
+    Without a valid login the server sends {"status": 401} and closes the
+    connection with code 4401 (the web UI logs out on that message).
     The server pushes build/mirror/userrole change notifications to every
     connected client (same as cirrina's websocket_broadcast).
     The client may additionally request build-log streaming:
@@ -31,7 +35,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 
-from .auth import authenticated, CurrentUser
+from .auth import authenticated, get_current_user, CurrentUser
 from ..logger import logger
 from ..model.build import Build
 from ..model.database import Session
@@ -48,6 +52,10 @@ _ws_queues: set = set()     # set[asyncio.Queue]  one per WebSocket client
 
 _MSG_CONNECTED = json.dumps({"subject": Subject.websocket.value, "event": Event.connected.value})
 _MSG_BUILDLOG_DONE = json.dumps({"subject": Subject.buildlog.value, "event": Event.done.value})
+_MSG_UNAUTHORIZED = json.dumps({"status": 401})
+
+WS_CLOSE_UNAUTHORIZED = 4401
+WS_CLOSE_INTERNAL_ERROR = 1011
 
 
 async def broadcast(msg: dict):
@@ -175,6 +183,26 @@ class _BuildLogger:
 
 
 # ---------------------------------------------------------------------------
+# Authentication of a WebSocket connection
+# ---------------------------------------------------------------------------
+
+def websocket_user(websocket: WebSocket) -> CurrentUser | None:
+    """
+    Returns the user of the WebSocket connection, or None without a valid login.
+
+    Uses the same session cookie and token header as the HTTP handlers. The
+    DB session is closed right away, so an open connection holds no DB
+    connection.
+    """
+    with Session() as session:
+        return get_current_user(
+            molior_session=websocket.cookies.get("molior_session"),
+            x_molior_token=websocket.headers.get("x-moliortoken"),
+            db=session,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main WebSocket endpoint
 # ---------------------------------------------------------------------------
 
@@ -189,6 +217,22 @@ async def main_websocket(websocket: WebSocket):
     The client may start/stop a build-log stream by sending action messages.
     """
     await websocket.accept()
+
+    try:
+        user = websocket_user(websocket)
+    except Exception as exc:
+        logger.error("ws: cannot check the login: %s", exc)
+        await websocket.close(code=WS_CLOSE_INTERNAL_ERROR)
+        return
+
+    if not user:
+        logger.info("ws: connection without a valid login refused")
+        with contextlib.suppress(Exception):
+            await websocket.send_text(_MSG_UNAUTHORIZED)
+            await websocket.close(code=WS_CLOSE_UNAUTHORIZED)
+        return
+
+    logger.debug("ws: new connection from user %s", user.username)
     await websocket.send_text(_MSG_CONNECTED)
 
     # Per-connection notification queue — broadcast() will put payloads here
@@ -246,7 +290,7 @@ async def main_websocket(websocket: WebSocket):
                 if not build_id:
                     logger.error("ws: start message missing build_id")
                     continue
-                logger.debug("ws: starting log stream for build %s", build_id)
+                logger.debug("ws: user %s starts the log stream of build %s", user.username, build_id)
                 active_logger = _BuildLogger(websocket.send_text, int(build_id))
                 logger_task = asyncio.create_task(active_logger.run())
 
