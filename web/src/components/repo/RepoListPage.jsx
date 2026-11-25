@@ -16,16 +16,11 @@ import ContextMenu from '../common/ContextMenu';
 import Pagination from '../common/Pagination';
 import { rules, fieldClass, fieldError } from '../../lib/validate';
 import { apiUrl } from '../../lib/base';
+import { gitWebUrl } from '../../lib/gitUrl';
 
 const PRIMARY  = '#571845';
 const TH       = { backgroundColor: PRIMARY, color: 'white' };
 const PAGE_SIZE = 20;
-
-// ── SSH → HTTPS URL transform (mirrors transformUrl in Angular) ────────────
-function transformUrl(url) {
-  const m = url?.match(/^git@ssh\.code\.roche\.com:(.+)\/(.+)\.git$/);
-  return m ? `https://code.roche.com/${m[1]}/${m[2]}` : url;
-}
 
 // ── State icon ────────────────────────────────────────────────────────────
 function stateIcon(state) {
@@ -379,7 +374,7 @@ export default function RepoListPage() {
 
                 <td onClick={e => e.stopPropagation()}
                   style={{ userSelect: 'all', fontFamily: 'monospace', fontSize: 12 }}>
-                  <a href={transformUrl(repo.url)} target="_blank" rel="noreferrer"
+                  <a href={gitWebUrl(repo.url)} target="_blank" rel="noreferrer"
                     style={{ color: 'darkblue' }}>{repo.url}</a>
                 </td>
 
