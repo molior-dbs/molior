@@ -107,8 +107,8 @@ def pytest_configure(config):
         total = len(items)
         if nodeid not in started:
             started[nodeid] = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
-        return "{} {:>{}}/{}: {} ".format(started[nodeid], columns[nodeid], len(str(total)), total,
-                                          location(nodeid, *args).ljust(columns["width"]))
+        return "{} [{:>{}}/{}] {} ".format(started[nodeid], columns[nodeid], len(str(total)), total,
+                                           location(nodeid, *args).ljust(columns["width"]))
 
     reporter._get_progress_information_message = with_time
     reporter._locationline = numbered

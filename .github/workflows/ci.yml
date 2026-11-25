@@ -2,7 +2,7 @@
 #
 # Setup:    CI Image (manual), Configure (versions, target)
 # Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
-# Build:    Docker Images and Helm Chart, all with the CI version (no push yet)
+# Build:    Docker Images, Helm Chart (after the tests, all with the CI version, no push yet)
 #
 # The CI image is molior-base (docker/molior/molior-base.Dockerfile: the build dependencies of the deb packages) plus
 # the python packages the unit tests import (docker/ci.Dockerfile). The test and image jobs use it as molior-base:dev.
@@ -245,8 +245,8 @@ jobs:
   ##############################################################################
 
   images:
-    name: Docker Images and Helm Chart
-    needs: [configure, lint, coverage]
+    name: Docker Images
+    needs: [configure, lint, tests-unit, tests-system]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     env:
       MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
@@ -277,9 +277,33 @@ jobs:
         run: make set-version
 
       - name: Build images
+        run: make docker-images DOCKERCMD=docker
+
+      - name: Tag images
+        run: make tag-images DOCKERCMD=docker
+
+      - name: Summary
         run: |
-          make docker-images DOCKERCMD=docker
-          make tag-images DOCKERCMD=docker
+          {
+            echo "### Docker images (not pushed, target \`$TARGET\`)"
+            echo ""
+            for i in molior molior-postgres aptly molior-nginx; do echo "* \`$i:$MOLIOR_VERSION\`"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  helm:
+    name: Helm Chart
+    needs: [configure, lint, tests-unit, tests-system]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    env:
+      MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
+      TARGET: ${{ needs.configure.outputs.target }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install helm
+        run: |
+          sh .github/scripts/install-tools.sh "$HOME/.local/bin" helm
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Build helm chart
         run: make helm-package
@@ -287,9 +311,8 @@ jobs:
       - name: Summary
         run: |
           {
-            echo "### Docker images and helm chart (not pushed, target \`$TARGET\`)"
+            echo "### Helm chart (not pushed, target \`$TARGET\`)"
             echo ""
-            for i in molior molior-postgres aptly molior-nginx; do echo "* \`$i:$MOLIOR_VERSION\`"; done
             echo "* \`molior-$MOLIOR_VERSION.tgz\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
