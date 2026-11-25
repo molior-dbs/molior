@@ -36,6 +36,56 @@ def test_admin_login_and_logout(admin):
     assert admin.get("/api/userinfo").json() is None
 
 
+def create_user(admin, name):
+    r = admin.post("/api/users", json={"name": name, "email": f"{name}@example.com", "password": "pw-" + name})
+    assert r.status_code == 200, r.text
+
+
+def copy_of(api):
+    """A second client with a copy of the session cookie (another browser, or a stolen cookie)."""
+    copy = Api()
+    copy.session.cookies.set("molior_session", api.session.cookies["molior_session"])
+    return copy
+
+
+def test_logout_ends_a_copied_cookie(admin):
+    """The session is stored on the server: after logout a copy of the cookie does not work any more."""
+    copy = copy_of(admin)
+    assert copy.get("/api/userinfo").json()["username"] == "admin"
+    assert admin.get("/api/logout").status_code == 200
+    assert copy.get("/api/userinfo").json() is None
+    assert copy.get("/api/projects").status_code == 401
+
+
+def test_logout_ends_all_sessions_of_the_user(admin, unique):
+    name = unique("user")
+    create_user(admin, name)
+    first, second = Api().login(name, "pw-" + name), Api().login(name, "pw-" + name)
+    assert first.session.cookies["molior_session"] != second.session.cookies["molior_session"]
+    assert first.get("/api/logout").status_code == 200
+    assert second.get("/api/projects").status_code == 401
+    assert admin.get("/api/projects").status_code == 200     # other users stay logged in
+
+
+def test_password_change_and_delete_end_the_sessions(admin, unique):
+    name = unique("user")
+    create_user(admin, name)
+    user = Api().login(name, "pw-" + name)
+    user_id = user.get("/api/userinfo").json()["user_id"]
+    r = admin.put(f"/api/users/{user_id}", json={"is_admin": False, "email": f"{name}@example.com", "password": "new-" + name})
+    assert r.status_code == 200, r.text
+    assert user.get("/api/projects").status_code == 401
+    user = Api().login(name, "new-" + name)
+    assert admin.delete(f"/api/users/{user_id}").status_code == 200
+    assert user.get("/api/projects").status_code == 401
+
+
+def test_forged_cookie_does_not_log_in(public):
+    public.session.cookies.set("molior_session", "not-a-session")
+    assert public.get("/api/userinfo").json() is None
+    assert public.get("/api/projects").status_code == 401
+
+
 def test_lists_answer(admin):
     for path in ["/api/projects", "/api/mirrors", "/api/builds", "/api/repositories", "/api/users",
                  "/api/projectversions", "/api/buildstates", "/api2/tokens"]:

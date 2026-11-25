@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# websession: login sessions on the server. The session cookie holds a random value, the table its sha256.
+# Logout, deleting a user and changing a password delete the rows, so the cookie no longer works.
+# Before, the cookie was signed and not stored, so a logout could not end it. Existing logins end with this
+# upgrade (the old cookies are not in the table).
+
+psql molior <<EOSQL
+
+CREATE TABLE websession (
+    id serial PRIMARY KEY,
+    token character varying NOT NULL UNIQUE,
+    username character varying NOT NULL,
+    created timestamp with time zone NOT NULL,
+    expires timestamp with time zone NOT NULL
+);
+ALTER TABLE websession OWNER TO molior;
+ALTER SEQUENCE websession_id_seq OWNER TO molior;
+CREATE INDEX ix_websession_username ON websession USING btree (username);
+
+EOSQL

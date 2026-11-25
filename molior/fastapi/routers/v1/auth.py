@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from typing import Optional
-from ...auth import CurrentUser, get_current_user, create_session_cookie
+from ...auth import CurrentUser, get_current_user, create_session, delete_sessions, SESSION_MAX_AGE
 from ...db import get_db
+from ...ws import close_user_connections
 from ....auth.auth import Auth
 from ....model.user import User
 from ....molior.configuration import Configuration
@@ -41,9 +42,10 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
         if not Auth().login(username, password):
             raise HTTPException(status_code=400, detail="Login failed")
 
-    cookie = create_session_cookie(username)
+    cookie = create_session(db, username)
     response.set_cookie(
         "molior_session", cookie,
+        max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
         secure=_SECURE_COOKIE,
@@ -53,7 +55,12 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
 
 @router.get("/api/logout")
 @router.post("/api/logout")
-def logout(response: Response):
+def logout(response: Response, current_user: Optional[CurrentUser] = Depends(get_current_user),
+           db: Session = Depends(get_db)):
+    """Ends all login sessions of the user (all browsers) and closes their live update connections."""
+    if current_user and current_user.auth_token is None:
+        delete_sessions(db, current_user.username)
+        close_user_connections(current_user.username)
     response.delete_cookie("molior_session")
     return ""
 

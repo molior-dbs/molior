@@ -9,9 +9,13 @@ GET /api/events
 WS /api/websocket
     Single WebSocket endpoint, preserving the original cirrina design.
     Needs a login, like in cirrina: the session cookie (or the
-    X-MoliorToken header) is checked once, when the client connects.
+    X-MoliorToken header) is checked when the client connects.
     Without a valid login the server sends {"status": 401} and closes the
     connection with code 4401 (the web UI logs out on that message).
+    The same happens to an open connection when the sessions of the user
+    end (logout in any browser, user deleted, password changed), when its
+    session expires, and when the token is deleted (checked every
+    LOGIN_RECHECK_INTERVAL seconds).
     The server pushes build/mirror/userrole change notifications to every
     connected client (same as cirrina's websocket_broadcast).
     The client may additionally request build-log streaming:
@@ -29,13 +33,14 @@ WS /internal/buildlog/{token}
 import asyncio
 import contextlib
 import json
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 
-from .auth import authenticated, get_current_user, CurrentUser
+from .auth import authenticated, get_current_user, session_expiry, CurrentUser
 from ..logger import logger
 from ..model.build import Build
 from ..model.database import Session
@@ -186,6 +191,10 @@ class _BuildLogger:
 # Authentication of a WebSocket connection
 # ---------------------------------------------------------------------------
 
+# seconds between two checks of the login of an open connection (deleted user or token)
+LOGIN_RECHECK_INTERVAL = 60
+
+
 def websocket_user(websocket: WebSocket) -> CurrentUser | None:
     """
     Returns the user of the WebSocket connection, or None without a valid login.
@@ -202,6 +211,85 @@ def websocket_user(websocket: WebSocket) -> CurrentUser | None:
         )
 
 
+class _Connection:
+    """An open, logged in WebSocket connection."""
+
+    def __init__(self, websocket: WebSocket, user: CurrentUser, notify_q: asyncio.Queue):
+        self.websocket = websocket
+        self.user = user
+        self.cookie = websocket.cookies.get("molior_session")
+        self.notify_q = notify_q
+        self.logged_out = asyncio.Event()
+
+    def logout(self):
+        """No notification is queued for the connection any more; the handler sends 401 and closes."""
+        _ws_queues.discard(self.notify_q)
+        self.logged_out.set()
+
+
+_ws_connections: set = set()    # set[_Connection]
+_loop: asyncio.AbstractEventLoop | None = None     # the event loop of the connections
+
+
+def close_user_connections(username: str) -> int:
+    """
+    Called when the login sessions of a user end (logout, user deleted,
+    password changed): the open WebSocket connections of the user get
+    {"status": 401} and are closed. Returns the number of connections.
+    Can be called from the event loop and from the threads of sync handlers.
+    """
+    found = [c for c in list(_ws_connections) if c.user.username == username]
+    if not found:
+        return 0
+    try:
+        in_loop = asyncio.get_running_loop() is _loop
+    except RuntimeError:
+        in_loop = False
+    for conn in found:
+        if in_loop:
+            conn.logout()
+        else:
+            _loop.call_soon_threadsafe(conn.logout)
+    return len(found)
+
+
+def _session_expiry(cookie: str) -> float | None:
+    with Session() as session:
+        return session_expiry(session, cookie)
+
+
+async def _watch_login(conn: _Connection) -> str:
+    """
+    Ends when the login of the connection is no longer valid, returns the reason:
+    logout (close_user_connections), the session expired, or the session, user
+    or token is gone (checked every LOGIN_RECHECK_INTERVAL seconds, also finds
+    a logout in another server process). A DB error during a check keeps the
+    connection.
+    """
+    expiry = None
+    if conn.user.auth_token is None and conn.cookie:
+        try:
+            expiry = _session_expiry(conn.cookie)
+        except Exception as exc:
+            logger.error("ws: cannot read the session expiry of user %s: %s", conn.user.username, exc)
+    while True:
+        timeout = LOGIN_RECHECK_INTERVAL
+        if expiry is not None:
+            timeout = max(0, min(timeout, expiry - time.time()))
+        try:
+            await asyncio.wait_for(conn.logged_out.wait(), timeout=timeout)
+            return "sessions of the user ended"
+        except asyncio.TimeoutError:
+            pass
+        if expiry is not None and time.time() >= expiry:
+            return "session expired"
+        try:
+            if not websocket_user(conn.websocket):
+                return "login no longer valid"
+        except Exception as exc:
+            logger.error("ws: cannot check the login of user %s: %s", conn.user.username, exc)
+
+
 # ---------------------------------------------------------------------------
 # Main WebSocket endpoint
 # ---------------------------------------------------------------------------
@@ -215,7 +303,11 @@ async def main_websocket(websocket: WebSocket):
     The server pushes all build/mirror/userrole notifications to the client
     via a per-connection asyncio queue (same fan-out as SSE).
     The client may start/stop a build-log stream by sending action messages.
+    When the sessions of the user end, the session expires, or the token is
+    deleted, the server sends {"status": 401} and closes the connection (4401).
     """
+    global _loop
+    _loop = asyncio.get_running_loop()
     await websocket.accept()
 
     try:
@@ -238,6 +330,8 @@ async def main_websocket(websocket: WebSocket):
     # Per-connection notification queue — broadcast() will put payloads here
     notify_q: asyncio.Queue = asyncio.Queue(maxsize=256)
     _ws_queues.add(notify_q)
+    conn = _Connection(websocket, user, notify_q)
+    _ws_connections.add(conn)
 
     logger_task: asyncio.Task | None = None
     active_logger: _BuildLogger | None = None
@@ -259,9 +353,9 @@ async def main_websocket(websocket: WebSocket):
             payload = await notify_q.get()
             await websocket.send_text(payload)
 
-    push_task = asyncio.create_task(_push_notifications())
-
-    try:
+    async def _receive_messages():
+        """Handles the messages of the client, returns when the client disconnects."""
+        nonlocal logger_task, active_logger
         while True:
             try:
                 raw = await asyncio.wait_for(websocket.receive_text(), timeout=30)
@@ -270,6 +364,8 @@ async def main_websocket(websocket: WebSocket):
                 with contextlib.suppress(Exception):
                     await websocket.send_text('{"subject":1,"event":5}')
                 continue
+            except WebSocketDisconnect:
+                return
 
             try:
                 msg = json.loads(raw)
@@ -300,16 +396,32 @@ async def main_websocket(websocket: WebSocket):
             else:
                 logger.warning("ws: unknown action %s", action)
 
-    except WebSocketDisconnect:
-        pass
+    push_task = asyncio.create_task(_push_notifications())
+    receive_task = asyncio.create_task(_receive_messages())
+    watch_task = asyncio.create_task(_watch_login(conn))
+    reason = None
+
+    try:
+        await asyncio.wait({receive_task, watch_task}, return_when=asyncio.FIRST_COMPLETED)
+        if watch_task.done() and not watch_task.cancelled() and watch_task.exception() is None:
+            reason = watch_task.result()
     finally:
+        _ws_connections.discard(conn)
         _ws_queues.discard(notify_q)
-        push_task.cancel()
-        try:
-            with contextlib.suppress(asyncio.CancelledError):
-                await push_task
-        except WebSocketDisconnect:
+        for task in (receive_task, watch_task, push_task):
+            task.cancel()
+        results = await asyncio.gather(receive_task, watch_task, push_task, return_exceptions=True)
+        for result in results[:2]:
+            if isinstance(result, Exception):
+                logger.error("ws: connection of user %s failed: %s", user.username, result)
+        if isinstance(results[2], WebSocketDisconnect):
             # the push task ended because sending to the closed connection failed
             logger.warning("ws: client disconnected")
-        finally:
-            await _stop_logger()
+        await _stop_logger()
+
+    if reason:
+        # no notification or log data is sent after this message
+        logger.info("ws: closing the connection of user %s: %s", user.username, reason)
+        with contextlib.suppress(Exception):
+            await websocket.send_text(_MSG_UNAUTHORIZED)
+            await websocket.close(code=WS_CLOSE_UNAUTHORIZED)

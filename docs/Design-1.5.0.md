@@ -44,6 +44,12 @@
     - [12.3 System test layers](#123-system-test-layers)
     - [12.4 Rules for tests](#124-rules-for-tests)
     - [12.5 Validation tests from molior 1.4](#125-validation-tests-from-molior-14)
+13. [Authentication](#13-authentication)
+    - [13.1 Who logs in, and how](#131-who-logs-in-and-how)
+    - [13.2 Sessions](#132-sessions)
+    - [13.3 Live updates](#133-live-updates)
+    - [13.4 Tokens](#134-tokens)
+    - [13.5 Limits](#135-limits)
 - [Appendix A: API endpoints](#appendix-a-api-endpoints)
 
 ---
@@ -119,6 +125,8 @@ Access is granted per project. Every logged-in user can see all projects, mirror
 - A **global token** may create projects and mirrors, for example molior-tools setting up a new product.
 
 **Maintenance mode** lets an administrator stop new work (for example before an upgrade). Non-administrators see a maintenance notice instead of the UI.
+
+How people, tools and build jobs prove who they are is described in [13](#13-authentication).
 
 ---
 
@@ -624,19 +632,77 @@ The parallel build test adds all test packages to one version at once and waits 
 
 ---
 
+## 13. Authentication
+
+Chapter [3](#3-roles-and-access) says *what* a caller may do. This chapter says how molior knows *who* the caller is, for the REST API, the live updates and the build jobs.
+
+### 13.1 Who logs in, and how
+
+| Caller | Proves its identity with | Checked against |
+|---|---|---|
+| **user** (web UI, scripts) | user name and password, then a session cookie | the user database (passwords stored as salted hashes); an authentication backend can be plugged in instead |
+| **administrator account** `admin` | user name and password, then a session cookie | the password in molior's settings, not the user database |
+| **CI system, molior-tools** | a token in the `X-MoliorToken` header of each request | the token list (only a hash of each token is stored) |
+| **build job** | a token per build in the URL of the build interface (upload, log) | the build it belongs to |
+| **anyone** | nothing | public endpoints only: status, APT sources, version and mirror details (see [Appendix A](#appendix-a-api-endpoints)) |
+
+After the identity is known, the permissions of [3](#3-roles-and-access) apply: administrators may do everything, users what their project roles allow, tokens what they were created for.
+
+### 13.2 Sessions
+
+- A successful login creates a **session** on the server and returns a **session cookie**. The browser sends it with every request and with the live update connection, so the web UI needs no other credentials.
+- The cookie holds a long random value. The server stores only a hash of it, with the user and the expiry, so the database does not contain values that log in. A cookie that is not in the session list does not log in.
+- Each login is its own session: two browsers have two different cookies.
+- A session is valid for **3.5 days** after the login (as in molior 1.4). After that, the API answers *401*, and the live update connection of the web UI is closed with a `401` message, on which the web UI shows the login page (see [13.3](#133-live-updates)).
+- The cookie cannot be read by scripts in the page (HttpOnly), is not sent with requests started by other sites (SameSite=Lax), and is only sent over HTTPS in production.
+- Every request checks the session and the user: an ended session or a deleted user is rejected at once.
+- **The sessions of a user end** (all browsers), and their live update connections are closed, when:
+  - the user **logs out** in any browser,
+  - an administrator **changes the user's password**,
+  - an administrator **deletes the user** (a user created later with the same name does not get the old sessions).
+- Ending a session works on the server: a copy of the cookie does not work any more either.
+- Expired sessions are removed from the session list at the next login.
+- The upgrade to molior 1.5 with this session list ends the logins made before.
+
+### 13.3 Live updates
+
+The live update connection (`/api/websocket`, see [10](#10-interfaces)) needs a login, like the REST API, as in molior 1.4.
+
+- When the connection opens, the server checks the session cookie or the token. Without a valid login it sends `{"status": 401}` and closes the connection. The web UI logs out on this message and shows the login page.
+- While the connection is open, it is closed in the same way (`{"status": 401}`, then closed) when:
+  - the **sessions of the user end** (see [13.2](#132-sessions)), at once,
+  - its **session expires**, at the moment of expiry,
+  - its session, its user or its token is gone for another reason. The server checks this every minute.
+- After the `401` message the connection sends nothing else: no build or mirror updates, no build log.
+- If the login cannot be checked for a moment (the database does not answer), the open connection stays. A connection that cannot be checked when it opens is closed without the `401`, so that the web UI does not log the user out because of a short outage.
+- The Server-Sent Events channel (`/api/events`) needs a login as well; it checks it when it is opened.
+
+### 13.4 Tokens
+
+- **Project and global tokens** are for automation (see [3](#3-roles-and-access)). Molior shows a token **once**, when it is created; only a hash of it is stored. Tokens do not expire: a token is valid until an owner or administrator deletes it. Open live update connections of a deleted token are closed within a minute.
+- **Build tokens** are created for each build. A build job uses its token to upload its results and stream its log (see [10](#10-interfaces)); the sources list and the source package it fetches are public. A build token gives access to its own build only, not to the API. The build job gets it in its environment, but the package build itself runs with a clean environment and does not see it.
+
+### 13.5 Limits
+
+- **One server process.** The open live update connections are found in the memory of the server process. Molior runs as one process. With several processes, the connections in the other processes would be closed at their next check, within a minute, instead of at once.
+- **No list of sessions in the UI.** Users and administrators cannot see the sessions or end a single one; ending the sessions of a user ends all of them.
+- **Password rules and login limits** (lockout after failed logins) are not part of 1.5.
+
+---
+
 ## Appendix A: API endpoints
 
 Endpoints are grouped by the chapters above. `/api` is the original API, `/api2` the newer one; both are in use. `{p}/{v}` stands for project and version. Access: *public* (no login), *user* (logged in), *member*, *owner* (of the project), *admin*.
 
-### A.1 Session and users (chapter 3)
+### A.1 Session and users (chapters 3 and 13)
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | POST | `/api/login` | public | log in |
-| GET, POST | `/api/logout` | user | log out |
+| GET, POST | `/api/logout` | user | log out: end all sessions of the user, close their live update connections |
 | GET | `/api/userinfo` | user | current user |
 | GET, POST | `/api/users` | user, admin | list users, create a user |
-| PUT, DELETE | `/api/users/{id}` | admin | edit, delete a user |
+| PUT, DELETE | `/api/users/{id}` | admin | edit, delete a user (a new password or deleting ends the user's sessions) |
 | GET | `/api/users/{id}/roles` | admin | project roles of a user |
 | GET | `/api/userroles` | public | list of roles |
 | GET | `/api2/user/{username}` | user | user details |
@@ -727,7 +793,7 @@ Endpoints are grouped by the chapters above. `/api` is the original API, `/api2`
 | POST | `/api/status/maintenance` | admin | maintenance mode (original API) |
 | GET | `/api/info/aptlyhostname` | user | host name of the APT repositories |
 
-### A.6 Live updates and build interface (chapters 8 and 10)
+### A.6 Live updates and build interface (chapters 8, 10 and 13)
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|

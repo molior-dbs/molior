@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...auth import CurrentUser, authenticated, require_admin
+from ...auth import CurrentUser, authenticated, require_admin, delete_sessions
 from ...db import get_db
 from ...responses import PaginationParams
+from ...ws import close_user_connections
 from ....auth.auth import Auth
 from ....model.project import Project
 from ....model.user import User
@@ -76,6 +77,18 @@ class EditUserBody(BaseModel):
     password: Optional[str] = None
 
 
+def _end_sessions(db: Session, username: Optional[str]):
+    """Ends the login sessions and the live update connections of a user."""
+    if username:
+        delete_sessions(db, username)
+        close_user_connections(username)
+
+
+def _username(db: Session, user_id: int) -> Optional[str]:
+    user = db.query(User).filter_by(id=user_id).first()
+    return user.username if user else None
+
+
 @router.put("/api/users/{user_id}")
 @router.put("/api/user/{user_id}")
 def update_user(
@@ -86,6 +99,9 @@ def update_user(
 ):
     if not Auth().edit_user(user_id, body.password, body.email, body.is_admin):
         raise HTTPException(status_code=400, detail="Error modifying user")
+    if body.password:
+        # a new password ends the logins with the old one
+        _end_sessions(db, _username(db, user_id))
     return {}
 
 
@@ -96,8 +112,11 @@ def delete_user(
     _: CurrentUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    username = _username(db, user_id)
     if not Auth().delete_user(user_id):
         raise HTTPException(status_code=400, detail="Error deleting user")
+    # a user created later with the same name must not get these logins
+    _end_sessions(db, username)
     return {}
 
 

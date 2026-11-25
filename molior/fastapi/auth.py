@@ -7,8 +7,9 @@ Replaces:
   - @req_role("owner")      ->  Depends(require_role("owner"))
   - @req_role(["m","o"])    ->  Depends(require_role(["member", "owner"]))
 
-Session is carried in a signed cookie (itsdangerous) under the key
-MOLIOR_SESSION.  The cookie is set on login and cleared on logout.
+The login session is stored on the server (table websession). The cookie
+molior_session holds a random value, the table its sha256. The cookie is set
+on login; logout deletes all sessions of the user.
 Token auth via the X-MoliorToken header is also supported, matching the
 existing authenticate_token behaviour.
 
@@ -16,11 +17,12 @@ Current user is exposed as a CurrentUser dataclass injected via Depends.
 """
 
 import hashlib
+import secrets
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Cookie, Depends, Header, HTTPException, status
-from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 
@@ -32,47 +34,71 @@ from ..model.projectversion import ProjectVersion
 from ..model.authtoken import Authtoken
 from ..model.authtoken_project import Authtoken_Project
 from ..model.userrole import UserRole
+from ..model.websession import WebSession
 from ..tools import parse_int, db2array
 
 
 # ---------------------------------------------------------------------------
-# Session serialiser — secret comes from molior.yml
+# Login sessions — stored on the server (table websession)
 # ---------------------------------------------------------------------------
-
-def _get_serializer() -> URLSafeTimedSerializer:
-    secret = Configuration().admin.get("admin_password")
-    if not secret:
-        raise RuntimeError("admin_password is not set in molior.yml")
-    return URLSafeTimedSerializer(secret)
-
 
 def assert_secret_configured() -> None:
     """
     Call once at startup. Raises RuntimeError if admin_password is missing
-    from molior.yml so the server refuses to start with no signing secret.
+    from molior.yml: the admin account logs in with it.
     """
     from ..logger import logger
-    secret = Configuration().admin.get("admin_password")
-    if not secret:
+    if not Configuration().admin.get("admin_password"):
         raise RuntimeError(
             "admin_password is not set in molior.yml — "
-            "cannot sign session cookies. Server will not start."
+            "the admin account cannot log in. Server will not start."
         )
-    logger.debug("auth: session secret loaded from admin_password")
+    logger.debug("auth: admin_password is set")
 
 
-def create_session_cookie(username: str) -> str:
-    """Sign and return a session cookie value for the given username."""
-    return _get_serializer().dumps({"username": username})
+# A login session is valid for 302400 seconds (3.5 days), as session_max_age of the cirrina server in 1.4.
+SESSION_MAX_AGE = 302400
 
 
-def decode_session_cookie(cookie: str) -> Optional[dict]:
-    """Decode and verify the session cookie. Returns None if invalid/expired."""
-    try:
-        # max_age: 302400 seconds = 1 week (matching existing behaviour)
-        return _get_serializer().loads(cookie, max_age=302400)
-    except BadSignature:
+def _hash(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def create_session(db: Session, username: str) -> str:
+    """
+    Stores a new login session and returns the cookie value (random, 256 bit).
+    Only its sha256 is stored. Expired sessions are removed here as well.
+    """
+    now = datetime.now(timezone.utc)
+    value = secrets.token_urlsafe(32)
+    db.query(WebSession).filter(WebSession.expires <= now).delete(synchronize_session=False)
+    db.add(WebSession(token=_hash(value), username=username, created=now,
+                      expires=now + timedelta(seconds=SESSION_MAX_AGE)))
+    db.commit()
+    return value
+
+
+def get_session(db: Session, cookie: Optional[str]) -> Optional[WebSession]:
+    """The session of a cookie value, None if there is none or it expired."""
+    if not cookie:
         return None
+    return db.query(WebSession).filter(
+        WebSession.token == _hash(cookie),
+        WebSession.expires > datetime.now(timezone.utc),
+    ).first()
+
+
+def session_expiry(db: Session, cookie: Optional[str]) -> Optional[float]:
+    """The time (epoch seconds) at which the session of a cookie value expires, None if it is not valid."""
+    session = get_session(db, cookie)
+    return session.expires.timestamp() if session else None
+
+
+def delete_sessions(db: Session, username: str) -> int:
+    """Ends all login sessions of a user (logout, user deleted, password changed). Returns their number."""
+    count = db.query(WebSession).filter(WebSession.username == username).delete(synchronize_session=False)
+    db.commit()
+    return count
 
 
 # ---------------------------------------------------------------------------
@@ -117,22 +143,19 @@ def get_current_user(
             )
 
     # --- Cookie / session auth ---
-    if molior_session:
-        data = decode_session_cookie(molior_session)
-        if data and "username" in data:
-            username = data["username"]
+    session = get_session(db, molior_session)
+    if session:
+        # Admin user is authenticated against config, not DB
+        if session.username == "admin":
+            return CurrentUser(username="admin", user_id=0, is_admin=True)
 
-            # Admin user is authenticated against config, not DB
-            if username == "admin":
-                return CurrentUser(username="admin", user_id=0, is_admin=True)
-
-            user = db.query(User).filter_by(username=username).first()
-            if user:
-                return CurrentUser(
-                    username=user.username,
-                    user_id=user.id,
-                    is_admin=bool(user.is_admin),
-                )
+        user = db.query(User).filter_by(username=session.username).first()
+        if user:
+            return CurrentUser(
+                username=user.username,
+                user_id=user.id,
+                is_admin=bool(user.is_admin),
+            )
 
     return None
 

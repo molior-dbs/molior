@@ -1,7 +1,9 @@
-"""main_websocket: login check at connect, and a client which disconnects while a notification is sent."""
+"""main_websocket: login check at connect and while connected (logout, expiry, deleted user), and a client which
+disconnects while a notification is sent."""
 import asyncio
 import importlib.util
 import sys
+import time
 import types
 from enum import Enum
 from unittest.mock import MagicMock, patch
@@ -71,16 +73,21 @@ class FakeWebSocket:
 
 
 class CurrentUser:
-    def __init__(self, username):
+    def __init__(self, username, auth_token=None):
         self.username = username
+        self.auth_token = auth_token
+
+
+# session cookies get_current_user accepts and their user (a test may remove one: session ended, user deleted)
+VALID = {"valid": "alice", "valid-2": "alice", "bob-session": "bob"}
 
 
 def fake_get_current_user(molior_session=None, x_molior_token=None, db=None):
     """Like auth.get_current_user: a user for a valid cookie or token, None otherwise."""
-    if molior_session == "valid":
-        return CurrentUser("alice")
     if x_molior_token == "valid-token":
-        return CurrentUser("__token__")
+        return CurrentUser("__token__", auth_token="hashed")
+    if molior_session in VALID:
+        return CurrentUser(VALID[molior_session])
     return None
 
 
@@ -89,6 +96,9 @@ def ws():
     logger = MagicMock()
     auth = MagicMock(CurrentUser=CurrentUser)
     auth.get_current_user = MagicMock(side_effect=fake_get_current_user)
+    auth.session_expiry = MagicMock(return_value=time.time() + 3600)    # (db, cookie)
+    VALID.clear()
+    VALID.update({"valid": "alice", "valid-2": "alice", "bob-session": "bob"})
     package = types.ModuleType("molior.fastapi")
     package.__path__ = ["molior/fastapi"]
     stubs = {
@@ -253,3 +263,162 @@ def test_login_check_error_closes_without_401(ws):
     assert websocket.closed == 1011
     assert module._ws_queues == set()
     logger.error.assert_called_once()
+
+
+def connected(websocket):
+    """The connected event was sent and no 401."""
+    return websocket.sent and websocket.sent[0] == '{"subject": 1, "event": 4}'
+
+
+def run_until_closed(module, websocket, action, timeout=2):
+    """Starts main_websocket, waits until it sent the connected event, runs action(), waits for the end."""
+    async def main():
+        task = asyncio.create_task(module.main_websocket(websocket))
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert connected(websocket)
+        result = action()
+        if asyncio.iscoroutine(result):
+            await result
+        await asyncio.wait_for(task, timeout=timeout)
+
+    asyncio.run(main())
+
+
+def test_logout_closes_all_connections_of_the_user(ws):
+    """close_user_connections(username): all connections of the user (all browsers) get 401 and 4401,
+    those of other users stay open."""
+    module, logger = ws
+    first = FakeWebSocket(fail_send=False)
+    second = FakeWebSocket(fail_send=False, cookies={"molior_session": "valid-2"})     # another browser
+    other = FakeWebSocket(fail_send=False, cookies={"molior_session": "bob-session"})
+
+    async def main():
+        tasks = [asyncio.create_task(module.main_websocket(w)) for w in (first, second, other)]
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert len(module._ws_connections) == 3
+        assert module.close_user_connections("alice") == 2
+        await asyncio.wait_for(asyncio.gather(*tasks[:2]), timeout=2)
+        assert not tasks[2].done()
+        other.gone.set()
+        await asyncio.wait_for(tasks[2], timeout=2)
+
+    asyncio.run(main())
+    for websocket in (first, second):
+        assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+        assert websocket.closed == 4401
+    assert other.sent == ['{"subject": 1, "event": 4}']
+    assert other.closed is None
+    assert module._ws_connections == set()
+    assert module._ws_queues == set()
+
+
+def test_close_user_without_connections(ws):
+    module, logger = ws
+    assert module.close_user_connections("nobody") == 0
+
+
+def test_close_user_connections_from_a_thread(ws):
+    """Sync handlers (user deleted, password changed) run in a thread: the logout is passed to the event loop."""
+    module, logger = ws
+    websocket = FakeWebSocket(fail_send=False)
+
+    async def from_thread():
+        assert await asyncio.to_thread(module.close_user_connections, "alice") == 1
+
+    run_until_closed(module, websocket, from_thread)
+    assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+    assert websocket.closed == 4401
+
+
+def test_logout_stops_notifications_and_log_stream(ws):
+    """After the 401 nothing else is sent, the log stream is stopped."""
+    module, logger = ws
+    stopped = []
+
+    class BuildLogger:
+        def __init__(self, send, build_id):
+            pass
+
+        def stop(self):
+            stopped.append(True)
+
+        async def run(self):
+            await asyncio.sleep(10)
+
+    module._BuildLogger = BuildLogger
+    start = '{"subject": %d, "action": %d, "data": {"build_id": 5}}' % (Subject.buildlog.value, Action.start.value)
+    websocket = FakeWebSocket(fail_send=False, incoming=[start])
+
+    async def logout():
+        module.close_user_connections("alice")
+        await module.broadcast({"subject": 7})     # a notification right after the logout
+
+    run_until_closed(module, websocket, logout)
+    assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+    assert stopped == [True]
+
+
+def test_expired_session_is_closed(ws):
+    """The session expires while connected: 401 and 4401 at the expiry time (read from the session table)."""
+    module, logger = ws
+    module.auth.session_expiry.return_value = time.time() + 0.2
+    websocket = FakeWebSocket(fail_send=False)
+    run_until_closed(module, websocket, lambda: None)
+    assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+    assert websocket.closed == 4401
+    logger.info.assert_called_with("ws: closing the connection of user %s: %s", "alice", "session expired")
+    assert module.auth.session_expiry.call_args.args[1] == "valid"
+
+
+def test_already_expired_cookie_is_refused_at_connect(ws):
+    """get_current_user does not accept the cookie of an expired session, so no connection."""
+    module, logger = ws
+    websocket = FakeWebSocket(fail_send=False, cookies={"molior_session": "expired"})
+    run(module, websocket, broadcast=False)
+    assert websocket.sent == ['{"status": 401}']
+    assert websocket.closed == 4401
+
+
+def test_ended_session_is_closed_at_the_next_check(ws):
+    """The session row is gone (logout in another server process, user deleted): found by the recheck."""
+    module, logger = ws
+    module.LOGIN_RECHECK_INTERVAL = 0.05
+    websocket = FakeWebSocket(fail_send=False)
+    run_until_closed(module, websocket, lambda: VALID.pop("valid"))
+    assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+    assert websocket.closed == 4401
+    logger.info.assert_called_with("ws: closing the connection of user %s: %s", "alice", "login no longer valid")
+
+
+def test_token_connection_has_no_expiry_and_is_rechecked(ws):
+    """Tokens do not expire; a deleted token is found at the next check."""
+    module, logger = ws
+    module.LOGIN_RECHECK_INTERVAL = 0.05
+    websocket = FakeWebSocket(fail_send=False, cookies={}, headers={"x-moliortoken": "valid-token"})
+
+    def delete_token():
+        websocket.headers["x-moliortoken"] = "deleted"
+
+    run_until_closed(module, websocket, delete_token)
+    module.auth.session_expiry.assert_not_called()
+    assert websocket.sent == ['{"subject": 1, "event": 4}', '{"status": 401}']
+    assert websocket.closed == 4401
+
+
+def test_db_error_during_recheck_keeps_the_connection(ws):
+    module, logger = ws
+    module.LOGIN_RECHECK_INTERVAL = 0.02
+    websocket = FakeWebSocket(fail_send=False)
+
+    async def db_down_then_leave():
+        module.auth.get_current_user.side_effect = RuntimeError("db down")
+        await asyncio.sleep(0.1)
+        websocket.gone.set()
+
+    run_until_closed(module, websocket, db_down_then_leave)
+    assert websocket.sent == ['{"subject": 1, "event": 4}']
+    assert websocket.closed is None
+    assert logger.error.call_count >= 2
+    assert module._ws_connections == set()
