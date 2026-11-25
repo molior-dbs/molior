@@ -1,0 +1,18 @@
+# Dependabot: npm packages of the web UI (web/package.json, web/package-lock.json)
+#
+# Security updates come as one grouped pull request instead of one per package. Version updates are off
+# (open-pull-requests-limit: 0 only stops version update pull requests, security updates still come).
+# CI builds and tests dependabot branches but does not push their images and chart (.github/workflows/ci.yml).
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
