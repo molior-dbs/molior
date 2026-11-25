@@ -1178,8 +1178,17 @@ async def s3_endpoints(
 # ---------------------------------------------------------------------------
 
 
-async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
-    """Process uploaded external build files and trigger publishing."""
+def _upload_arch_ok(arch, architectures):
+    """An uploaded file must be for an architecture of the projectversion, or for all (built as amd64).
+    Without architectures in the projectversion nothing is checked."""
+    return arch == "all" or not architectures or arch in architectures
+
+
+async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files, architectures=()):
+    """Process uploaded external build files and trigger publishing.
+
+    Files for an architecture that is not in architectures (of the projectversion) are skipped with an error in the
+    build log."""
     cfg = Configuration()
     buildout_path = Path(cfg.working_dir) / "buildout"
     build_version = None
@@ -1240,6 +1249,10 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
                 logs.append("W: invalid filename: '%s'\n" % filename)
                 continue
             pkgname, version, arch = s
+            if not _upload_arch_ok(arch, architectures):
+                logs.append("E: invalid architecture: '%s'\n" % arch)
+                Path(tmp_path).unlink(missing_ok=True)
+                continue
             destbuild_id = await get_debbuild(arch, version, srcbuild_id, projectversion_id)
 
         elif filename.endswith(".changes"):
@@ -1249,6 +1262,10 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
                 continue
             pkgname, version, arch = s
             arch = arch.split(".")[0]
+            if not _upload_arch_ok(arch, architectures):
+                logs.append("E: invalid architecture: '%s'\n" % arch)
+                Path(tmp_path).unlink(missing_ok=True)
+                continue
             has_changes_file = True
             if not sourcename:
                 sourcename = pkgname
@@ -1262,6 +1279,10 @@ async def _finalize_extbuild(build_id, projectversion_id, srcbuild_id, files):
                 continue
             pkgname, version, arch = s
             arch = arch.split(".")[0]
+            if not _upload_arch_ok(arch, architectures):
+                logs.append("E: invalid architecture: '%s'\n" % arch)
+                Path(tmp_path).unlink(missing_ok=True)
+                continue
             has_buildinfo_file = True
             if not sourcename:
                 sourcename = pkgname
@@ -1469,7 +1490,7 @@ async def extbuild(
         raise HTTPException(status_code=500, detail="Upload failed")
 
     background_tasks.add_task(
-        _finalize_extbuild, build.id, pv.id, srcbuild.id, buffered
+        _finalize_extbuild, build.id, pv.id, srcbuild.id, buffered, db2array(pv.mirror_architectures)
     )
 
     return {"build_id": build.id}
