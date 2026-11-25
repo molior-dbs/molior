@@ -28,9 +28,7 @@ permissions:
   contents: read
   packages: read
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency group: every push gets a complete run, a new run never cancels or replaces an older one
 
 env:
   # tools of the system tests and the image job (.github/scripts/install-tools.sh)
