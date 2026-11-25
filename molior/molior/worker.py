@@ -1,11 +1,11 @@
 import asyncio
-import giturlparse
 import os
 
 from shutil import rmtree
 from pathlib import Path
 
 
+from ..giturl import parse_git_url, GitUrlError
 from ..logger import logger
 from ..ops import GitClone, GitChangeUrl, get_latest_tag
 from ..ops import PrepareBuilds, BuildPreparationState, CreateBuilds, BuildSourcePackage, ScheduleBuilds, CreateBuildEnv
@@ -170,8 +170,8 @@ def cleanup_repos():
         repos = session.query(SourceRepository).filter(SourceRepository.name.is_(None)).all()
         for repo in repos:
             try:
-                repoinfo = giturlparse.parse(repo.url)
-            except giturlparse.parser.ParserError:
+                repoinfo = parse_git_url(repo.url)
+            except GitUrlError:
                 logger.warning("error parsing git url: {}".format(repo.url))
                 continue
             repo.name = repoinfo.name
@@ -575,8 +575,8 @@ class Worker:
             return
 
         try:
-            repoinfo = giturlparse.parse(url)
-        except giturlparse.parser.ParserError:
+            repoinfo = parse_git_url(url)
+        except GitUrlError:
             logger.error("repo_change_url: invalid git url %s", url)
             return
 

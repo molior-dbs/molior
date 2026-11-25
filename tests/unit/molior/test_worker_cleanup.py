@@ -1,7 +1,7 @@
 """
 Tests for cleanup_builds() (molior/molior/worker.py), which runs at every molior start.
 
-The heavy imports of worker.py (sqlalchemy models, ops, giturlparse) are replaced by stubs,
+The heavy imports of worker.py (sqlalchemy models, ops) are replaced by stubs,
 and the Build "columns" evaluate their filters against fake builds, so the filter
 conditions of cleanup_builds() are really tested.
 """
@@ -103,7 +103,6 @@ def run_worker(function, builds):
         queued.append(("task", task))
 
     stubs = {
-        "giturlparse": MagicMock(),
         "molior.logger": MagicMock(),
         "molior.ops": MagicMock(),
         "molior.molior.configuration": MagicMock(),
@@ -336,7 +335,6 @@ def run_rebuild(build, oldstate):
         pass
 
     stubs = {
-        "giturlparse": MagicMock(),
         "molior.logger": MagicMock(),
         "molior.ops": MagicMock(BuildSourcePackage=build_source_package),
         "molior.molior.configuration": MagicMock(Configuration=lambda *a: MagicMock(max_parallel_source_builds=2)),
@@ -423,7 +421,6 @@ def run_slots(limit, builds, abort=None):
         running.remove(build_id)
 
     stubs = {
-        "giturlparse": MagicMock(),
         "molior.logger": MagicMock(),
         "molior.ops": MagicMock(BuildSourcePackage=build_source_package),
         "molior.molior.configuration": MagicMock(Configuration=lambda *a: MagicMock(max_parallel_source_builds=limit)),

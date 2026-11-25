@@ -12,9 +12,7 @@ RUN echo deb http://molior.info/1.5-next stable main > /etc/apt/sources.list.d/m
     apt-get update && \
     export DEBIAN_FRONTEND=noninteractive; apt-get build-dep -y . && \
     apt-get install -y --no-install-recommends \
-        lsb-base dh-autoreconf git git-lfs python3-psycopg2 sudo expect yq podman uidmap git-lfs \
-        postgresql-client binfmt-support devscripts bc xz-utils debootstrap openssh-client binfmt-support qemu-user-static \
-        npm nodejs libjs-bootstrap5 libjs-ansi-up \
-        node-react node-react-dom node-babel-loader node-mini-css-extract-plugin && \
+        dh-autoreconf git-lfs openssh-client python3-psycopg2 sudo expect yq podman uidmap postgresql-client \
+        qemu-user-static devscripts bc xz-utils debootstrap && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

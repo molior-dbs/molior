@@ -5,5 +5,3 @@ targets:
     - "1.5"
 build_after:
   - "launchy"
-  - "async-cron"
-  - "git-url-parse"

@@ -9,16 +9,16 @@
  * Production build (local): `npm install && npm run build`
  *
  * Debian package build (debian/rules):
- *   npm ci --legacy-peer-deps   ← installs only babel-loader, mini-css-extract-plugin,
- *                                  react-router-dom, bootstrap-icons and their deps (~22 pkgs).
- *                                  Peer deps (webpack, @babel/*, css-loader, react, bootstrap,
- *                                  ansi_up) are skipped because they are provided by Debian
- *                                  system packages and resolved via NODE_PATH=/usr/share/nodejs.
- *   NODE_PATH=/usr/share/nodejs node_modules/.bin/webpack --mode production
+ *   npm ci --legacy-peer-deps --omit=optional   ← installs only react-router-dom and its deps (not in Debian).
+ *                                  The optional peer deps (webpack, babel-loader, @babel/*, css-loader,
+ *                                  mini-css-extract-plugin, react, react-dom, bootstrap, bootstrap-icons,
+ *                                  ansi_up) come from Debian packages, resolved via NODE_PATH=/usr/share/nodejs.
+ *   NODE_PATH=/usr/share/nodejs webpack --mode production
  *
  * The isDebian flag is true whenever react is not in node_modules (Debian build).
  * In that case webpack aliases redirect react, react-dom, bootstrap and ansi_up to
  * their system paths under /usr/share/.
+ * Bootstrap Icons: the CSS is generated from the Debian SVG files by bootstrap-icons-loader.js.
  */
 const path = require('path');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -69,7 +69,7 @@ module.exports = (env, argv) => {
     module: {
       rules: [
         // JSX + modern JS via Babel.
-        // babel-loader comes from node_modules (npm).
+        // babel-loader comes from node-babel-loader (Debian) via NODE_PATH.
         // @babel/core, @babel/preset-env, @babel/preset-react come from node-babel7 (Debian)
         // via NODE_PATH=/usr/share/nodejs in the Debian build, or from node_modules in dev.
         {
@@ -88,14 +88,20 @@ module.exports = (env, argv) => {
 
         // CSS — extract to assets/main.css in both dev and prod.
         // css-loader comes from node-css-loader (Debian) via NODE_PATH, or node_modules in dev.
+        // src/bootstrap-icons.css is generated (see bootstrap-icons-loader.js).
         {
           test: /\.css$/,
+          exclude: path.resolve(__dirname, 'src/bootstrap-icons.css'),
           use: [MiniCssExtractPlugin.loader, 'css-loader'],
         },
-
-        // Fonts + images (bootstrap-icons woff2, logo PNGs, etc.)
         {
-          test: /\.(woff2?|png|svg|ico)$/,
+          test: path.resolve(__dirname, 'src/bootstrap-icons.css'),
+          use: [MiniCssExtractPlugin.loader, 'css-loader', path.resolve(__dirname, 'bootstrap-icons-loader.js')],
+        },
+
+        // Images (logo, favicon, etc.)
+        {
+          test: /\.(png|svg|ico)$/,
           type: 'asset/resource',
           generator: { filename: 'assets/[name][ext]' },
         },
@@ -103,7 +109,7 @@ module.exports = (env, argv) => {
     },
 
     plugins: [
-      // mini-css-extract-plugin comes from node_modules (npm) — no Debian package exists.
+      // mini-css-extract-plugin comes from node-mini-css-extract-plugin (Debian) via NODE_PATH.
       new MiniCssExtractPlugin({ filename: 'assets/main.css' }),
     ],
 

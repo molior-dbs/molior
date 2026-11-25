@@ -24,10 +24,6 @@ and will be built inside the cluster:
 
 ```sh
 git clone https://github.com/molior-dbs/aiofile
-git clone https://github.com/molior-dbs/aiohttp-session-file
-git clone https://github.com/neolynx/aiohttp-swagger
-git clone https://github.com/molior-dbs/async-cron
-git clone https://github.com/molior-dbs/git-url-parse
 git clone https://github.com/neolynx/launchy
 git clone https://github.com/molior-dbs/molior-tools
 ```

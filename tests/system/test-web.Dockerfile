@@ -1,4 +1,4 @@
-# Test runner image for system tests: API tests (pytest, requests/httpx/websockets) and web UI tests
+# Test runner image for system tests: API tests (pytest, requests, websockets) and web UI tests
 # (selenium with headless chromium). Runs as a pod in the test namespace and reaches molior at http://web:8000.
 # Kept separate from tests/system/test.Dockerfile, so the molior test image does not carry chromium.
 #
@@ -14,8 +14,8 @@ RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get full-upgrad
     apt-get install -y --no-install-recommends \
         chromium chromium-driver fonts-dejavu-core \
         python3 python3-selenium \
-        python3-pytest python3-pytest-xdist python3-pytest-timeout python3-junit.xml \
-        python3-requests python3-httpx python3-websockets \
+        python3-pytest python3-pytest-timeout \
+        python3-requests python3-websockets \
         ca-certificates curl kubernetes-client && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

@@ -930,7 +930,7 @@ async def add_repository(
     current_user: CurrentUser = Depends(require_role(["member", "owner"])),
     db: Session = Depends(get_db),
 ):
-    import giturlparse
+    from ....giturl import parse_git_url, GitUrlError
     from ....molior.queues import enqueue_task
 
     if not body.url:
@@ -945,8 +945,8 @@ async def add_repository(
         raise HTTPException(status_code=400, detail="Projectversion is locked")
 
     try:
-        repoinfo = giturlparse.parse(body.url)
-    except giturlparse.parser.ParserError:
+        repoinfo = parse_git_url(body.url)
+    except GitUrlError:
         raise HTTPException(status_code=400, detail="Invalid git URL")
 
     for arch in body.architectures:

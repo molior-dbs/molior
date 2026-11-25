@@ -19,6 +19,7 @@ Molior allows the following via WebUI, REST API or commandline tools:
 * [Screenshots](#screenshots)
 * [Installation](#installation)
 * [Components](#components)
+* [Dependencies](#dependencies)
 * [Usage](#usage)
     * [Login to the Web UI](#login-to-the-web-ui)
     * [Creating Mirrors](#creating-mirrors)
@@ -92,6 +93,36 @@ The molior Debian Build System consists of the following components:
   - create releases
   - create deployments
   - automation scripts
+
+# Dependencies
+
+What the images, the Debian packages, the pipeline and the system tests download, and from where.
+
+**Docker base images** (Docker Hub, not pinned): `debian:trixie-slim` for all molior images (molior-base, molior,
+molior-postgres, aptly, molior-nginx) and the test images.
+
+**Debian packages** come from `deb.debian.org` (trixie, trixie-updates, trixie-security), with two exceptions:
+
+| Repository | Used by | Packages |
+|---|---|---|
+| `http://molior.info/1.5-next` | `docker/molior/molior-base.Dockerfile`, `docker/molior/molior.Dockerfile` | `python3-launchy` (not in Debian; build and run dependency of molior-server); `molior-server` in the prod image |
+| `http://repo.aptly.info/release` | `docker/aptly/aptly.Dockerfile` | `aptly` |
+
+**Python:** Debian packages only, no pip.
+
+**JavaScript (web UI):** the deb build (`debian/rules`) runs `npm ci --legacy-peer-deps --omit=optional` in `web/`,
+which installs the packages of `web/package-lock.json` from `registry.npmjs.org` (checked against the lock file's
+integrity hashes): only `react-router-dom`, `react-router` and `@remix-run/router`, which are not in Debian.
+Everything else comes from Debian packages (see `web/webpack.config.js`): react, react-dom, bootstrap, ansi_up,
+bootstrap-icons (SVG files; `web/bootstrap-icons-loader.js` generates the CSS of the icons in use), webpack, babel,
+babel-loader, css-loader and mini-css-extract-plugin.
+
+**CI pipeline** (`.github/`): GitHub actions pinned by commit SHA; k3d (github.com), helm (get.helm.sh) and kubectl
+(dl.k8s.io) with sha256 checks; qemu and docker from the runner's apt; the CI image from ghcr.io.
+
+**System tests** (k3d cluster): `rancher/k3s`, `registry:2`, `ghcr.io/k3d-io/k3d-tools` and the k3s system images
+(coredns, local-path-provisioner, busybox, pause); at run time the tests mirror `deb.debian.org` and
+`packages.microsoft.com` (dotnet) and clone the test repositories from `github.com/molior-dbs`.
 
 
 # Usage
@@ -198,11 +229,7 @@ git clone https://github.com/molior-dbs/molior-web2.git
 
 # optionally:
 git clone https://github.com/neolynx/launchy.git
-git clone https://github.com/neolynx/aiohttp-session.git
-git clone https://github.com/neolynx/aiohttp-swagger.git
 git clone https://github.com/molior-dbs/aiofile.git
-git clone https://github.com/molior-dbs/async-cron.git
-git clone https://github.com/molior-dbs/git-url-parse.git
 ```
 
 ## Build

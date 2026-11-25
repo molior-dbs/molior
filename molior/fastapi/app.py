@@ -12,8 +12,6 @@ import asyncio
 import os
 from contextlib import asynccontextmanager, suppress
 
-from async_cron.job import CronJob
-from async_cron.schedule import Scheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
@@ -21,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from launchy import Launchy
 
 from ..auth.auth import Auth
+from ..cron import WEEKDAYS, parse_time, run_weekly
 from ..logger import logger
 from ..model.database import Session
 from ..model.metadata import MetaData
@@ -31,11 +30,6 @@ from ..molior.worker_aptly import AptlyWorker
 from ..molior.worker_backend import BackendWorker
 from ..molior.worker_notification import NotificationWorker
 from ..version import MOLIOR_VERSION
-
-
-def _get_weekday_number(name):
-    return {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
-            "Friday": 4, "Saturday": 5, "Sunday": 6}.get(name)
 
 
 @asynccontextmanager
@@ -68,15 +62,21 @@ async def lifespan(app: FastAPI):
 
         if cleanup_active and cleanup_weekdays and cleanup_time:
             if cleanup_active.value.lower() != "false":
-                sched = Scheduler(locale="en_US")
+                weekdays = set()
                 for weekday in cleanup_weekdays.value.split(","):
-                    logger.info("cleanup job: every %s at %s", weekday, cleanup_time.value)
-                    job = CronJob(name=f"cleanup_{weekday}")
-                    job.every().weekday(_get_weekday_number(weekday)).at(cleanup_time.value).go(
-                        lambda: asyncio.ensure_future(enqueue_aptly({"cleanup": []}))
-                    )
-                    sched.add_job(job)
-                task_cron = asyncio.ensure_future(sched.start())
+                    if weekday.strip() in WEEKDAYS:
+                        weekdays.add(WEEKDAYS[weekday.strip()])
+                    else:
+                        logger.error("cleanup job: unknown weekday '%s'", weekday)
+                try:
+                    at = parse_time(cleanup_time.value)
+                except ValueError as exc:
+                    logger.error("cleanup job: %s", exc)
+                    weekdays = set()
+                if weekdays:
+                    logger.info("cleanup job: every %s at %s", cleanup_weekdays.value, cleanup_time.value)
+                    task_cron = asyncio.ensure_future(run_weekly(
+                        weekdays, at, lambda: asyncio.ensure_future(enqueue_aptly({"cleanup": []}))))
             else:
                 logger.info("cleanup job disabled")
         else:

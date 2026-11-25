@@ -1,6 +1,6 @@
 # molior image for system tests: used instead of molior:dev in the test namespace.
 # Same as docker/molior/molior-dev.Dockerfile (build and install the molior deb packages from the working copy),
-# plus python test and coverage tools, and server-side coverage collection.
+# plus server-side coverage collection (python3-coverage comes with molior-base).
 #
 # Built by tests/system/system-tests.sh. By hand (from the repo root, needs molior-base:dev from `make docker-images-molior`):
 #   docker build -f tests/system/test.Dockerfile -t molior-test:dev .
@@ -26,11 +26,10 @@ WORKDIR /work/src
 # Build debian package
 RUN dpkg-buildpackage -us -uc -b
 
-# molior packages, and the test tools (pytest, coverage and pytest-cov come with molior-base as build dependencies)
+# molior packages; coverage (server coverage) comes with molior-base as a build dependency. The tests run in the
+# test runner pod (test-web.Dockerfile), so this image needs no test tools.
 RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && \
-    apt-get install -y --no-install-recommends /work/molior-server*deb /work/molior-common*deb \
-        python3-coverage python3-pytest python3-pytest-cov python3-pytest-xdist python3-pytest-timeout \
-        python3-requests python3-httpx python3-websockets && \
+    apt-get install -y --no-install-recommends /work/molior-server*deb /work/molior-common*deb && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /work
 RUN ln -s /usr/lib/molior/create-docker.sh /etc/molior/mirror-hooks.d/03-create-docker
 RUN rm /etc/molior/mirror-hooks.d/01-create-chroot

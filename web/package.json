@@ -7,35 +7,37 @@
     "build": "webpack --mode production"
   },
   "dependencies": {
-    "ansi_up": "^5.1.0",
-    "bootstrap-icons": "^1.11.3",
     "react-router-dom": "^6.23.1"
-  },
-  "devDependencies": {
-    "babel-loader": "^10.1.1",
-    "mini-css-extract-plugin": "^2.10.2"
   },
   "optionalDependencies": {
     "webpack-dev-server": "^5.2.5"
   },
   "peerDependencies": {
-    "@babel/core":        "^7",
-    "@babel/preset-env":  "^7",
-    "@babel/preset-react":"^7",
-    "bootstrap":          "^5",
-    "css-loader":         "^6",
-    "react":              "^18",
-    "react-dom":          "^18",
-    "webpack":            "^5"
+    "@babel/core":            "^7",
+    "@babel/preset-env":      "^7",
+    "@babel/preset-react":    "^7",
+    "ansi_up":                "^5",
+    "babel-loader":           "^9 || ^10",
+    "bootstrap":              "^5",
+    "bootstrap-icons":        "^1",
+    "css-loader":             "^6",
+    "mini-css-extract-plugin":"^2",
+    "react":                  "^18",
+    "react-dom":              "^18",
+    "webpack":                "^5"
   },
   "peerDependenciesMeta": {
-    "@babel/core":        { "optional": true },
-    "@babel/preset-env":  { "optional": true },
-    "@babel/preset-react":{ "optional": true },
-    "bootstrap":          { "optional": true },
-    "css-loader":         { "optional": true },
-    "react":              { "optional": true },
-    "react-dom":          { "optional": true },
-    "webpack":            { "optional": true }
+    "@babel/core":            { "optional": true },
+    "@babel/preset-env":      { "optional": true },
+    "@babel/preset-react":    { "optional": true },
+    "ansi_up":                { "optional": true },
+    "babel-loader":           { "optional": true },
+    "bootstrap":              { "optional": true },
+    "bootstrap-icons":        { "optional": true },
+    "css-loader":             { "optional": true },
+    "mini-css-extract-plugin":{ "optional": true },
+    "react":                  { "optional": true },
+    "react-dom":              { "optional": true },
+    "webpack":                { "optional": true }
   }
 }
