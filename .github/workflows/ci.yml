@@ -327,7 +327,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          make docker-images DOCKERCMD=docker 2>&1 | tee build-images.log
+          make docker-images DOCKERCMD=docker IMAGE_SOURCE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" 2>&1 \
+            | tee build-images.log
 
       - name: Tag images
         run: make tag-images DOCKERCMD=docker

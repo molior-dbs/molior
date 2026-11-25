@@ -5,6 +5,9 @@ REGISTRY_PORT := 5000
 MOLIOR_DEV ?= true
 PUSH_REGISTRY ?= localhost:$(REGISTRY_PORT)
 MOLIOR_VERSION ?= dev
+# IMAGE_SOURCE=<repo url>: label org.opencontainers.image.source (CI: ghcr links a new package to the repo)
+IMAGE_SOURCE ?=
+IMAGE_LABEL = $(if $(IMAGE_SOURCE),--label org.opencontainers.image.source=$(IMAGE_SOURCE))
 
 NAMESPACE := molior
 LOCAL_PATH_VERSION ?= v0.0.32
@@ -35,12 +38,12 @@ docker-images: docker-images-molior docker-images-aptly  ## Create docker images
 docker-images-molior:  ## Build molior docker images (moior, postgres)
 	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
 		$(DOCKERCMD) build -f docker/molior/molior-base.Dockerfile -t molior-base:dev .)
-	$(DOCKERCMD) build -f docker/molior/molior-dev.Dockerfile -t molior:dev .
-	$(DOCKERCMD) build -f docker/molior/postgres.Dockerfile -t molior-postgres:dev .
+	$(DOCKERCMD) build $(IMAGE_LABEL) -f docker/molior/molior-dev.Dockerfile -t molior:dev .
+	$(DOCKERCMD) build $(IMAGE_LABEL) -f docker/molior/postgres.Dockerfile -t molior-postgres:dev .
 
 docker-images-aptly:  ## Build aptly docker images (aptly, nginx)
-	$(DOCKERCMD) build -f docker/aptly/aptly.Dockerfile -t aptly:dev .
-	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:dev .
+	$(DOCKERCMD) build $(IMAGE_LABEL) -f docker/aptly/aptly.Dockerfile -t aptly:dev .
+	$(DOCKERCMD) build $(IMAGE_LABEL) -f docker/aptly/nginx.Dockerfile -t molior-nginx:dev .
 
 tag-images:  ## Tag the local <image>:dev images as $(MOLIOR_VERSION) (no push): make tag-images MOLIOR_VERSION=<version>
 	@test "$(MOLIOR_VERSION)" != dev || { echo "usage: make tag-images MOLIOR_VERSION=<version>"; exit 1; }
