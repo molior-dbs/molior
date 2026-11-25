@@ -2,7 +2,9 @@
 #
 # Setup:    CI Image (manual), Configure (versions, target)
 # Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
-# Build:    Docker Images, Helm Chart (after the tests, all with the CI version, no push yet)
+# Build:    Docker Images, Helm Chart (after the tests, all with the CI version), pushed to ghcr.io/<owner>/<target>/
+#           <image>:<version> and ghcr.io/<owner>/<target>/charts/molior:<version>; target dev, test or prod by branch.
+#           Retention: dev versions are deleted after RETENTION_DEV days, test after RETENTION_TEST, prod are kept.
 #
 # The CI image is molior-base (docker/molior/molior-base.Dockerfile: the build dependencies of the deb packages) plus
 # the python packages the unit tests import (docker/ci.Dockerfile). The test and image jobs use it as molior-base:dev.
@@ -39,6 +41,9 @@ env:
   K3D_VERSION: v5.9.0
   HELM_VERSION: v4.2.3
   KUBECTL_VERSION: v1.35.7
+  # days the pushed images and charts are kept (.github/scripts/retention.py); prod: kept
+  RETENTION_DEV: 14
+  RETENTION_TEST: 28
 
 jobs:
   ##############################################################################
@@ -286,9 +291,14 @@ jobs:
     name: Docker Images
     needs: [configure, lint, tests-unit, tests-system]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
     env:
       MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
       TARGET: ${{ needs.configure.outputs.target }}
+      # e.g. ghcr.io/molior-dbs/dev/molior:<version>
+      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ needs.configure.outputs.target }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -323,20 +333,37 @@ jobs:
       - name: Tag images
         run: make tag-images DOCKERCMD=docker
 
+      - name: Push images
+        run: make push REGISTRY="$IMAGE_PREFIX" DOCKERCMD=docker
+
       - name: Summary
         if: always()
         run: |
-          python3 .github/scripts/summary.py images "Docker images (not pushed, target $TARGET)" \
+          python3 .github/scripts/summary.py images "Docker images ($IMAGE_PREFIX/<image>:$MOLIOR_VERSION)" \
             molior:$MOLIOR_VERSION molior-postgres:$MOLIOR_VERSION aptly:$MOLIOR_VERSION molior-nginx:$MOLIOR_VERSION
           python3 .github/scripts/summary.py docker-build "Docker image build" build-images.log
+
+      - name: Retention
+        if: needs.configure.outputs.target != 'prod'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DAYS: ${{ needs.configure.outputs.target == 'dev' && env.RETENTION_DEV || env.RETENTION_TEST }}
+        run: |
+          python3 .github/scripts/retention.py "$GITHUB_REPOSITORY_OWNER" "$DAYS" \
+            "$TARGET/molior" "$TARGET/molior-postgres" "$TARGET/aptly" "$TARGET/molior-nginx"
 
   helm:
     name: Helm Chart
     needs: [configure, lint, tests-unit, tests-system]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
     env:
       MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
       TARGET: ${{ needs.configure.outputs.target }}
+      # e.g. ghcr.io/molior-dbs/dev/charts/molior:<version>
+      CHART_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ needs.configure.outputs.target }}/charts
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -351,9 +378,25 @@ jobs:
           set -o pipefail
           make helm-package 2>&1 | tee helm.txt
 
+      - name: Push helm chart
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          helm push "molior-$MOLIOR_VERSION.tgz" "oci://$CHART_PREFIX" 2>&1 | tee -a helm.txt
+
       - name: Summary
         if: always()
-        run: python3 .github/scripts/summary.py text "Helm chart (not pushed, target $TARGET)" helm.txt
+        run: python3 .github/scripts/summary.py text "Helm chart ($CHART_PREFIX/molior:$MOLIOR_VERSION)" helm.txt
+
+      - name: Retention
+        if: needs.configure.outputs.target != 'prod'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DAYS: ${{ needs.configure.outputs.target == 'dev' && env.RETENTION_DEV || env.RETENTION_TEST }}
+        run: python3 .github/scripts/retention.py "$GITHUB_REPOSITORY_OWNER" "$DAYS" "$TARGET/charts/molior"
 
       - name: Upload helm chart
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
