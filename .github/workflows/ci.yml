@@ -1,0 +1,303 @@
+# Molior CI
+#
+# Setup:    CI Image (manual), Configure (versions, target)
+# Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
+# Build:    Docker Images and Helm Chart, all with the CI version (no push yet)
+#
+# The CI image is molior-base (docker/molior/molior-base.Dockerfile: the build dependencies of the deb packages) plus
+# the python packages the unit tests import (docker/ci.Dockerfile). The test and image jobs use it as molior-base:dev.
+# The "CI Image" job runs only with "Run workflow" (workflow_dispatch). It builds the image and pushes it to the GitHub
+# container registry of this repository as ghcr.io/<owner>/<repo>/molior-ci:latest, which the other jobs use. Run it
+# again when debian/control, molior-base.Dockerfile or ci.Dockerfile change.
+#
+# Runner: needs docker (the system tests create a k3d cluster, the image jobs run docker build) and sudo for the
+# packages that are missing (.github/scripts/install-tools.sh). Set the repository variable CI_RUNNER to use another
+# runner than ubuntu-latest.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # tools of the system tests and the image job (.github/scripts/install-tools.sh)
+  K3D_VERSION: v5.9.0
+  HELM_VERSION: v4.2.3
+  KUBECTL_VERSION: v1.35.7
+
+jobs:
+  ##############################################################################
+  # Setup
+  ##############################################################################
+
+  build-ci-image:
+    name: CI Image
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CI_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Build
+        run: |
+          docker build --pull -t molior-base:dev -f docker/molior/molior-base.Dockerfile .
+          docker build -t "$CI_IMAGE" -f docker/ci.Dockerfile .
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push
+        run: docker push "$CI_IMAGE"
+
+      - name: Cleanup
+        if: always()
+        run: docker rmi -f "$CI_IMAGE" molior-base:dev || true
+
+  configure:
+    name: Configure
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    outputs:
+      molior-version: ${{ steps.version.outputs.molior-version }}
+      target: ${{ steps.version.outputs.target }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # One version for the deb packages (debian/changelog, set with make set-version), the docker images and the
+      # helm chart: <changelog version, ~ as ->-<UTC date and time>-<commit>, e.g. 1.5.0-beta46-20260101120000-0123abcd
+      - name: Compute version and target
+        id: version
+        run: |
+          base=$(sed -n '1s/^[^ ]* (\([^)]*\)).*/\1/p' debian/changelog)
+          test -n "$base" || { echo "E: no version in the first line of debian/changelog"; exit 1; }
+          MOLIOR_VERSION=$(echo "$base" | tr '~' '-')-$(date -u +%Y%m%d%H%M%S)-$(echo "$GITHUB_SHA" | cut -c1-8)
+          dpkg --validate-version "$MOLIOR_VERSION"
+          case "$GITHUB_REF_NAME" in
+            master) TARGET=prod ;;
+            dev) TARGET=test ;;
+            *) TARGET=dev ;;
+          esac
+          {
+            echo "molior-version=$MOLIOR_VERSION"
+            echo "target=$TARGET"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Configure"
+            echo ""
+            echo "* Version: \`$MOLIOR_VERSION\` (debian/changelog \`$base\`)"
+            echo "* Target: \`$TARGET\` (branch \`$GITHUB_REF_NAME\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ##############################################################################
+  # Tests
+  ##############################################################################
+
+  lint:
+    name: Lint
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    container:
+      image: ghcr.io/${{ github.repository }}/molior-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: flake8
+        run: make lint
+
+  tests-unit:
+    name: Unit Tests
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    container:
+      image: ghcr.io/${{ github.repository }}/molior-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Run unit tests
+        env:
+          COVERAGE_FILE: coverage-unit.data
+        run: make unit-tests
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests-unit
+          path: |
+            coverage-unit.data
+            unit-test-report.xml
+          if-no-files-found: error
+
+  # One cluster, one pytest run: the suites run after each other (smoke first)
+  tests-system:
+    name: System Tests
+    needs: configure
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 300
+    env:
+      MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
+      RESULTS_DIR: ${{ github.workspace }}/system-test-results
+      # test_mirror of valid-1.4 is skipped without CITIZEN_MIRROR_URL and CITIZEN_KEY_URL
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install docker, qemu, k3d, helm, kubectl
+        run: |
+          sh .github/scripts/install-tools.sh "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: CI image as molior-base:dev  # the base of the test images
+        env:
+          CI_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
+        run: |
+          docker pull "$CI_IMAGE"
+          docker tag "$CI_IMAGE" molior-base:dev
+
+      - name: Set version
+        run: make set-version
+
+      - name: Run system tests
+        run: tests/system/system-tests.sh smoke valid-1.4/validation_tests.py
+
+      - name: Upload system test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests-system
+          path: |
+            system-test-results/
+            !system-test-results/buildout/
+          if-no-files-found: error
+
+  coverage:
+    name: Combine Coverage
+    needs: [tests-unit, tests-system]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    container:
+      image: ghcr.io/${{ github.repository }}/molior-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Download test artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: tests-*
+          path: artifacts
+
+      # .coveragerc maps the installed package of the system tests to the source tree
+      - name: Combine coverage
+        run: |
+          files="artifacts/tests-unit/coverage-unit.data artifacts/tests-system/coverage.data"
+          for f in $files; do test -f "$f" || { echo "E: $f missing"; exit 1; }; done
+          python3 -m coverage combine --keep --rcfile=.coveragerc $files
+          python3 -m coverage report --rcfile=.coveragerc | tee coverage.txt
+          python3 -m coverage xml --rcfile=.coveragerc -o coverage.xml
+          {
+            echo "### Coverage"
+            echo ""
+            for f in $files; do echo "* $f: $(python3 -m coverage report --rcfile=.coveragerc --data-file="$f" | grep '^TOTAL')"; done
+            echo "* combined: $(grep '^TOTAL' coverage.txt)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            coverage.txt
+          if-no-files-found: error
+
+  ##############################################################################
+  # Build (no push yet)
+  ##############################################################################
+
+  images:
+    name: Docker Images and Helm Chart
+    needs: [configure, lint, coverage]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    env:
+      MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
+      TARGET: ${{ needs.configure.outputs.target }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install docker, qemu, k3d, helm, kubectl
+        run: |
+          sh .github/scripts/install-tools.sh "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: CI image as molior-base:dev  # the base of the molior image
+        env:
+          CI_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
+        run: |
+          docker pull "$CI_IMAGE"
+          docker tag "$CI_IMAGE" molior-base:dev
+
+      - name: Set version
+        run: make set-version
+
+      - name: Build images
+        run: |
+          make docker-images DOCKERCMD=docker
+          make tag-images DOCKERCMD=docker
+
+      - name: Build helm chart
+        run: make helm-package
+
+      - name: Summary
+        run: |
+          {
+            echo "### Docker images and helm chart (not pushed, target \`$TARGET\`)"
+            echo ""
+            for i in molior molior-postgres aptly molior-nginx; do echo "* \`$i:$MOLIOR_VERSION\`"; done
+            echo "* \`molior-$MOLIOR_VERSION.tgz\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload helm chart
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: helm-chart
+          path: molior-${{ env.MOLIOR_VERSION }}.tgz
+          if-no-files-found: error

@@ -1,5 +1,10 @@
 *.pyc
 .coverage
+.coverage.*
+coverage.xml
+unit-test-report.xml
+system-test-results/
+molior-*.tgz
 *.swp
 
 molior/version.py

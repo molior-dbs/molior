@@ -42,6 +42,25 @@ docker-images-aptly:  ## Build aptly docker images (aptly, nginx)
 	$(DOCKERCMD) build -f docker/aptly/aptly.Dockerfile -t aptly:dev .
 	$(DOCKERCMD) build -f docker/aptly/nginx.Dockerfile -t molior-nginx:dev .
 
+tag-images:  ## Tag the local <image>:dev images as $(MOLIOR_VERSION) (no push): make tag-images MOLIOR_VERSION=<version>
+	@test "$(MOLIOR_VERSION)" != dev || { echo "usage: make tag-images MOLIOR_VERSION=<version>"; exit 1; }
+	@for i in molior molior-postgres aptly molior-nginx; do \
+		echo "== $$i:dev -> $$i:$(MOLIOR_VERSION)"; \
+		$(DOCKERCMD) tag $$i:dev $$i:$(MOLIOR_VERSION) || exit 1; \
+	done
+
+set-version:  ## Set the version of the top entry in debian/changelog (CI builds): make set-version MOLIOR_VERSION=<version>
+	@test "$(MOLIOR_VERSION)" != dev || { echo "usage: make set-version MOLIOR_VERSION=<version>"; exit 1; }
+	sed -i '1s/^\([^ ]*\) ([^)]*)/\1 ($(MOLIOR_VERSION))/' debian/changelog
+	@head -1 debian/changelog
+
+lint:  ## Run flake8
+	flake8 molior tests
+
+unit-tests:  ## Run the unit tests with coverage (data file COVERAGE_FILE, default .coverage; junit unit-test-report.xml)
+	python3 -m pytest -q -p no:cacheprovider --cov --cov-config=.coveragerc --cov-report= \
+		--junitxml=unit-test-report.xml tests/unit
+
 docker-images-prod:
 	$(DOCKERCMD) build --no-cache -f docker/aptly/aptly.Dockerfile -t aptly:prod .
 	$(DOCKERCMD) build --no-cache -f docker/aptly/nginx.Dockerfile -t molior-nginx:prod .
@@ -54,8 +73,16 @@ docker-shell:  ## Start a shell in a new molior container
 helm-push: helm-package  ## Push helm chart to local OCI registry
 	helm push molior-$(MOLIOR_VERSION).tgz oci://$(PUSH_REGISTRY)/charts
 
-helm-package:  ## Build helm package
+# MOLIOR_VERSION other than dev: chart version, app version and image tag (molior.version) are set to it
+helm-package:  ## Build helm package (MOLIOR_VERSION=<version> sets the chart version and the image tag)
+ifeq ($(MOLIOR_VERSION),dev)
 	helm package charts/
+else
+	@set -e; D=$$(mktemp -d); trap 'rm -rf "$$D"' EXIT; cp -r charts "$$D/molior"; \
+		sed -i '/^molior:/,/^[^ #]/s/^\(  version:\).*/\1 "$(MOLIOR_VERSION)"/' "$$D/molior/values.yaml"; \
+		grep -q '^  version: "$(MOLIOR_VERSION)"$$' "$$D/molior/values.yaml"; \
+		helm package --version $(MOLIOR_VERSION) --app-version $(MOLIOR_VERSION) "$$D/molior"
+endif
 
 create-k3d:  ## Create k3d cluster $(K3D_CLUSTER) and its registry (default molior; make create-k3d K3D_CLUSTER=local)
 	k3d registry list $(K3D_CLUSTER)-registry >/dev/null 2>&1 || k3d registry create $(K3D_CLUSTER)-registry --port 0.0.0.0:$(REGISTRY_PORT) $(PODMAN_K3D_REGISTRY_ARGS)
@@ -229,4 +256,4 @@ docker-clean:  ## Remove docker images
 #	@docker-compose start molior
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help hold-molior release-molior import-db set-passwords push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean
+.PHONY: help tag-images set-version lint unit-tests helm-package hold-molior release-molior import-db set-passwords push docker-images docker-images-molior docker-images-aptly docker-shell create-k3d delete-k3d rsync install-registry passwd-registry uninstall-registry install-docker install-containerd-trust install-nginx configure-cluster install-local-path-provisioner deploy-k3d install-k3d uninstall-k3d reinstall-k3d redeploy-k3d reload list watch logs logs-molior logs-aptly shell-molior shell-aptly restart-molior restart-aptly psql docker-clean

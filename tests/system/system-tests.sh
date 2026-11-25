@@ -6,6 +6,7 @@
 #   tests/system/system-tests.sh [pytest args, default: smoke]
 # Environment:
 #   RESULTS_DIR   where junit xml, screenshots, logs and coverage go (default: ./system-test-results)
+#                 (coverage: coverage-report.txt, coverage.xml and the data file coverage.data)
 #   KEEP=1        do not remove the cluster at the end (for debugging; remove it later with CLEANUP_ONLY=<id>)
 #   CLEANUP_ONLY=<id>  only remove the cluster and registry of an earlier run (e.g. test-12345)
 #   COVERAGE=0    skip the server coverage report
@@ -261,6 +262,8 @@ if [ "$COVERAGE" = 1 ]; then
     POD=$(kubectl -n molior get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')
     kubectl -n molior cp -c molior-server "molior/$POD:/var/lib/molior/coverage/report.txt" "$RESULTS_DIR/coverage-report.txt" >/dev/null 2>&1 || true
     kubectl -n molior cp -c molior-server "molior/$POD:/var/lib/molior/coverage/coverage.xml" "$RESULTS_DIR/coverage.xml" >/dev/null 2>&1 || true
+    # the combined data file, to merge it with other coverage data (.coveragerc in the repo root maps the paths)
+    kubectl -n molior cp -c molior-server "molior/$POD:/var/lib/molior/coverage/.coverage" "$RESULTS_DIR/coverage.data" >/dev/null 2>&1 || true
     tail -1 "$RESULTS_DIR/coverage-report.txt" 2>/dev/null || echo "coverage report missing"
 fi
 

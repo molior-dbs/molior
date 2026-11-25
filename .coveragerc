@@ -1,0 +1,14 @@
+# Coverage of the unit tests (make unit-tests) and the combined report of the CI pipeline.
+# The system tests measure the installed package in the molior pod (tests/system/test.Dockerfile); [paths] maps it to
+# the source tree, so `coverage combine` can merge both.
+[run]
+source = molior
+relative_files = true
+
+[paths]
+source =
+    molior/
+    /usr/lib/python3/dist-packages/molior/
+
+[report]
+show_missing = true
