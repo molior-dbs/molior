@@ -31,12 +31,14 @@ WORK=""
 
 log() { echo "== $(date -u +%H:%M:%S) $*"; }
 
-# remove cluster, registry and registry volume of one run id
+# remove cluster, registry, registry volume and docker network of one run id (k3d cluster delete leaves the network
+# while the registry is still attached to it; without the removal docker runs out of address pools)
 remove_run() {
     vols=$(docker inspect "k3d-$1-registry" --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}} {{end}}{{end}}' 2>/dev/null || true)
     k3d cluster delete "$1" >/dev/null 2>&1 || true
     k3d registry delete "k3d-$1-registry" >/dev/null 2>&1 || true
     for v in $vols; do docker volume rm "$v" >/dev/null 2>&1 || true; done
+    docker network rm "k3d-$1" >/dev/null 2>&1 || true
 }
 
 cleanup() {
@@ -65,6 +67,12 @@ remove_stale() {
         case "$name" in
             k3d-test-[0-9]*-registry) pid=${name#k3d-test-}; pid=${pid%-registry}
                          if ! kill -0 "$pid" 2>/dev/null; then log "removing stale registry $name"; remove_run "test-$pid"; fi ;;
+        esac
+    done
+    for name in $(docker network ls --format '{{.Name}}' --filter name=k3d-test-); do
+        case "$name" in
+            k3d-test-[0-9]*) pid=${name#k3d-test-}
+                         if ! kill -0 "$pid" 2>/dev/null; then log "removing stale network $name"; remove_run "test-$pid"; fi ;;
         esac
     done
 }
