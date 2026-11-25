@@ -13,6 +13,21 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "after(name): run after the named test (1.4 ordering)")
 
 
+# Without the base mirror and its build environments no build can run: the build tests would each wait until
+# BUILD_TIMEOUT. A failure of one of these tests ends the run (the result and the junit report are written).
+STOP_ON_FAILURE = ("test_basemirror_creation",)
+_session = []
+
+
+def pytest_sessionstart(session):
+    _session.append(session)
+
+
+def pytest_runtest_logreport(report):
+    if report.failed and report.nodeid.split("::")[-1] in STOP_ON_FAILURE and _session:
+        _session[0].shouldstop = "{} failed, the build tests need the base mirror".format(report.nodeid)
+
+
 @pytest.fixture
 def molior_url():
     yield utils.MOLIOR_URL
