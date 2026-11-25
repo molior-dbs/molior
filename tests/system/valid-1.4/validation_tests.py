@@ -701,7 +701,7 @@ def test_arm_build(molior_url, build_test):
     """
     logger.warning("==================================================== test_arm_build")
     # arm deb builds run in build pods on nodes with the arm64 builder label (builder.arm64.nodeLabel); without such
-    # a node the pods stay pending and this test fails
+    # a node molior fails the builds ("no node with label ...") and this test fails
     build_test("tests/api-tests/arm-project.yml")
     get_build(molior_url, "armpackage", buildstate="successful")
 

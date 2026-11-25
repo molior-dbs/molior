@@ -23,7 +23,8 @@ MOLIOR_CONTAINER = os.environ.get("MOLIOR_CONTAINER", "molior-server")
 APTLY_DEPLOYMENT = os.environ.get("APTLY_DEPLOYMENT", "aptly")
 APTLY_CONTAINER = os.environ.get("APTLY_CONTAINER", "aptly-server")
 BUILDOUT = "/var/lib/molior/buildout"
-FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "nothing_done")
+# build states that do not change any more (molior/model/build.py BUILD_STATES)
+FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "already_failed", "nothing_done")
 
 logger = logging.getLogger("molior-validation")
 
@@ -310,7 +311,8 @@ def get_deb_build_ids(molior_host, sourcenames):
 
 def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
     """
-    Waits until the deb builds of the given source packages are done (successful, build_failed or nothing_done),
+    Waits until the deb builds of the given source packages are done (in one of FINAL_STATES; 1.4: successful,
+    build_failed or nothing_done, so a publish_failed build waited until the timeout),
     at most BUILD_TIMEOUT seconds (1.4: 60 times 10 s). Deb builds with an id in ignore_ids are not looked at
     (builds of an earlier test). Returns the deb builds found. Fails when they are not all done in time (1.4 returned
     what it had found and the test went on).
@@ -336,7 +338,7 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
             for b in our_builds:
                 if b.get("sourcename") == sourcename:
                     found = True
-                    if b.get("buildstate") not in ("successful", "build_failed", "nothing_done"):
+                    if b.get("buildstate") not in FINAL_STATES:
                         done = False
                         break
             if not found:
@@ -354,7 +356,7 @@ def wait_for_paralell_builds(molior_host, builds, ignore_ids=()):
         states = {name: [b.get("buildstate") for b in our_builds if b.get("sourcename") == name] for name in builds}
         raise AssertionError("timeout after {} s, deb builds not done: {}".format(BUILD_TIMEOUT, ", ".join(
             "{} ({})".format(name, ", ".join(s) or "no build") for name, s in states.items()
-            if not s or any(x not in ("successful", "build_failed", "nothing_done") for x in s))))
+            if not s or any(x not in FINAL_STATES for x in s))))
     return our_builds
 
 
@@ -365,8 +367,11 @@ def get_build(molior_host, name, buildtype="deb", buildstate=None, timeout=300):
     Args:
         name (str): Name of the package
 
-    Same as 1.4, except that the list is requested with search=name and page_size=100 (1.4 passed its params into
-    str.format, so the API got no parameters and returned only the newest 10 builds).
+    Same as 1.4, except:
+    - the list is requested with search=name and page_size=100 (1.4 passed its params into str.format, so the API
+      got no parameters and returned only the newest 10 builds)
+    - with a buildstate, it fails at once when all builds of the name have ended in another state (1.4 waited
+      until the timeout)
     """
     build = None
     with molior_session(molior_host) as molior:
@@ -375,18 +380,18 @@ def get_build(molior_host, name, buildtype="deb", buildstate=None, timeout=300):
                                   params={"search": name, "page": 1, "page_size": 100}, timeout=30)
             assert response.ok, "Could not get builds from molior"
 
-            results = response.json().get("results")
+            results = [r for r in response.json().get("results")
+                       if r.get("buildtype") == buildtype and r.get("sourcename") == name]
             for result in results:
-                if result.get("buildtype") != buildtype:
-                    continue
-                if result.get("sourcename") != name:
-                    continue
                 if buildstate and result.get("buildstate") != buildstate:
                     continue
                 build = result
                 break
             if build:
                 break
+            if buildstate and results and all(r.get("buildstate") in FINAL_STATES for r in results):
+                raise AssertionError("{} build of {} not {}: {}".format(buildtype, name, buildstate, ", ".join(
+                    "{} {}".format(r.get("id"), r.get("buildstate")) for r in results)))
             time.sleep(10)
 
     assert build, "Could not determine the build id"
