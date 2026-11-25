@@ -14,3 +14,7 @@ rules:
   - apiGroups: [""]
     resources: ["pods/log", "pods/status"]
     verbs: ["get"]
+  # the image pull error of a build pod (e.g. image not found) is in its events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]

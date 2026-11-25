@@ -308,8 +308,9 @@ async def abort_build(
     if srcbuild.sourcerepository is None:
         raise HTTPException(status_code=404, detail="External build uploads cannot be aborted")
 
+    # scheduled: queued in the backend or waiting for a build node
     found = any(
-        deb.buildstate in ("building", "needs_build") for deb in srcbuild.children
+        deb.buildstate in ("scheduled", "building", "needs_build") for deb in srcbuild.children
     )
     if not found:
         raise HTTPException(status_code=404, detail="No running deb builds found")

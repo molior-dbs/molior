@@ -394,8 +394,8 @@ are unchanged. Their changes are in the suites, see "The API suites" below.
 ### 26. `test_arm_build`
 - The test function is unchanged; a comment says that it needs a node with the arm64 builder label.
 - molior runs arm64 and armhf deb builds in build pods with the node selector of the arm64 queue
-  (`builder.arm64.nodeLabel`, default `kubernetes.io/arch=arm64`). The test cluster has no arm node, so the pods stay
-  pending and `get_build` fails after 300 s.
+  (`builder.arm64.nodeLabel`, default `kubernetes.io/arch=arm64`). The test cluster has no arm node, so molior fails
+  the builds (`no node with label kubernetes.io/arch=arm64 in the cluster`) and `get_build` fails after 300 s.
 - The package builds for amd64, arm64 and armhf (checked with qemu, outside molior).
 
 ### 27. `test_buildvariant_filter`

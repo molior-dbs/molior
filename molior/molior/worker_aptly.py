@@ -1849,7 +1849,6 @@ class AptlyWorker:
                 Build.buildstate.in_(["new", "needs_build", "scheduled", "building", "needs_publish", "publishing"]),
             ).all()
             for deb in debs:
-                # FIXME: the kubernetes backend does not implement abort, running pods are left behind
                 if deb.buildstate in ["building", "scheduled"]:
                     await enqueue_backend({"abort": deb.id})
                 if deb.buildtask:
