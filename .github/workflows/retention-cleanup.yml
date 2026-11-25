@@ -1,0 +1,43 @@
+# Retention cleanup: once per day, delete the versions of the images and helm charts that CI pushed to ghcr
+# (.github/workflows/ci.yml) when they are older than the retention of their target:
+#   dev:  ghcr.io/<owner>/dev/...  after RETENTION_DEV days
+#   test: ghcr.io/<owner>/test/... after RETENTION_TEST days
+#   prod: kept
+# The versions of the newest push of a package are always kept (.github/scripts/retention.py).
+# GitHub runs scheduled workflows only from the default branch.
+
+name: Retention cleanup
+
+on:
+  schedule:
+    - cron: '30 3 * * *'   # daily 03:30 UTC
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  RETENTION_DEV: 14
+  RETENTION_TEST: 28
+
+jobs:
+  retention:
+    name: Retention
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/retention.py "$GITHUB_REPOSITORY_OWNER" "$RETENTION_DEV" \
+            dev/molior dev/molior-postgres dev/aptly dev/molior-nginx dev/charts/molior
+
+      - name: test
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/retention.py "$GITHUB_REPOSITORY_OWNER" "$RETENTION_TEST" \
+            test/molior test/molior-postgres test/aptly test/molior-nginx test/charts/molior
