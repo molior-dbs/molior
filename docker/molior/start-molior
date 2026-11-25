@@ -49,7 +49,7 @@ while true; do
 done
 
 # Hold file: molior does not start (and db-upgrade.sh does not run) while it exists, only postgres runs.
-# For work on the database, i.e. an import (make hold-molior, make import-db, make release-molior).
+# For work on the database, i.e. an import (make import-db creates and removes it; by hand: make hold-molior, make release-molior).
 HOLD=/var/lib/molior/molior-hold
 if [ -e $HOLD ]; then
     echo "start: $HOLD exists, molior is on hold, only postgres runs. Remove the file to continue (make release-molior)."

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Import a plain SQL dump of the molior database (pg_dump -C, optionally gzipped) into the
 # molior-postgres container of the release. Runs on the dev machine, the dump is streamed
-# through kubectl and is not copied anywhere.
+# through kubectl and is not copied anywhere. molior is restarted twice.
 # Usage: make import-db DUMP=<file>
 #
 # It uses the current kubectl context (kubectl config current-context) and prints it.
@@ -10,20 +10,22 @@
 #   FORCE=1       import even if the current database already holds builds, projects or project versions
 #
 # What it does:
-#  0. stops unless molior is on hold: the hold file /var/lib/molior/molior-hold exists and molior is not running
-#     (make hold-molior, make restart-molior; afterwards make release-molior)
 #  1. checks the file (gzip -t) and reads db_version from the dump,
 #     stops if it is higher than the schema of the molior-server image
 #  2. stops if the current database holds builds, projects or project versions (unless FORCE=1)
-#  3. DROP DATABASE molior WITH (FORCE), then restores the dump (it has CREATE DATABASE and \connect),
-#     psql stops at the first error
-#  4. prints row counts
-# It does not touch the pod. Run make release-molior afterwards: start-molior then runs db-upgrade.sh and starts molior.
+#  3. puts molior on hold: creates the hold file /var/lib/molior/molior-hold and restarts the pod,
+#     after the start only postgres runs (start-molior waits for the hold file to go away)
+#  4. checks 2. again, DROP DATABASE molior WITH (FORCE), then restores the dump (it has CREATE DATABASE
+#     and \connect), psql stops at the first error
+#  5. prints row counts
+#  6. removes the hold file: start-molior runs db-upgrade.sh and starts molior
+# If a step after 3. fails, molior stays on hold; remove the hold file with make release-molior.
 set -eu
 
 NAMESPACE=${NAMESPACE:-}
 DUMP=${DUMP:-}
 FORCE=${FORCE:-}
+HOLD=/var/lib/molior/molior-hold
 
 [ -n "$NAMESPACE" ] && [ -n "$DUMP" ] || { echo "Usage: make import-db DUMP=<file>" >&2; exit 1; }
 CONTEXT=$(kubectl config current-context) || { echo "Error: no current kubectl context" >&2; exit 1; }
@@ -36,15 +38,25 @@ case "$DUMP" in
 esac
 
 k() { kubectl -n "$NAMESPACE" "$@"; }
-POD=$(k get pod -l app=molior -o jsonpath='{.items[0].metadata.name}')
+# molior pod that is not being deleted
+molior_pod() {
+    k get pod -l app=molior -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.deletionTimestamp}{"\n"}{end}' \
+        | awk 'NF == 1 {print $1; exit}'
+}
+POD=$(molior_pod)
 [ -n "$POD" ] || { echo "Error: no pod with label app=molior in $NAMESPACE" >&2; exit 1; }
 # sql <database> <query>: run as postgres in the molior-postgres container
 sql() { k exec "$POD" -c molior-postgres -- su postgres -c "psql -q -At -d $1 -c \"$2\""; }
-
-k exec "$POD" -c molior-server -- test -e /var/lib/molior/molior-hold || {
-    echo "Error: molior is not on hold. Run: make hold-molior, make restart-molior, wait until the pod is up, then import." >&2; exit 1; }
-k exec "$POD" -c molior-server -- test ! -e /var/run/molior.pid || {
-    echo "Error: molior is running (the hold file only applies at the pod start). Run: make restart-molior, wait until the pod is up, then import." >&2; exit 1; }
+# stop if the current database holds data (unless FORCE=1)
+check_empty() {
+    [ -n "$(sql postgres "select 1 from pg_database where datname='molior'")" ] || return 0
+    BUSY=$(sql molior "select (select count(*) from build) + (select count(*) from project) + (select count(*) from projectversion)")
+    echo "Current database: builds + projects + project versions = $BUSY"
+    if [ "$BUSY" != 0 ] && [ -z "$FORCE" ]; then
+        echo "Error: the current database holds data, it would be dropped. Use FORCE=1 to import anyway." >&2
+        exit 1
+    fi
+}
 
 echo "Pod: $POD"
 echo "Dump: $DUMP"
@@ -56,15 +68,19 @@ LAST_UPGRADE=$(k exec "$POD" -c molior-server -- ls /usr/share/molior/database/ 
 IMAGE_VERSION=$((LAST_UPGRADE + 1))
 echo "db_version: dump $DUMP_VERSION, molior-server image $IMAGE_VERSION"
 [ "$DUMP_VERSION" -le "$IMAGE_VERSION" ] || { echo "Error: the dump is newer than the image (the image only migrates upwards)" >&2; exit 1; }
+check_empty
 
-if [ -n "$(sql postgres "select 1 from pg_database where datname='molior'")" ]; then
-    BUSY=$(sql molior "select (select count(*) from build) + (select count(*) from project) + (select count(*) from projectversion)")
-    echo "Current database: builds + projects + project versions = $BUSY"
-    if [ "$BUSY" != 0 ] && [ -z "$FORCE" ]; then
-        echo "Error: the current database holds data, it would be dropped. Use FORCE=1 to import anyway." >&2
-        exit 1
-    fi
-fi
+echo "Putting molior on hold and restarting the pod ..."
+k exec "$POD" -c molior-server -- touch "$HOLD"
+k delete pod "$POD" --wait=true >/dev/null
+k rollout status deployment/molior --timeout=300s >/dev/null
+POD=$(molior_pod)
+[ -n "$POD" ] || { echo "Error: no molior pod after the restart" >&2; exit 1; }
+k exec "$POD" -c molior-server -- test -e "$HOLD" || { echo "Error: $POD: hold file missing" >&2; exit 1; }
+k exec "$POD" -c molior-server -- test ! -e /var/run/molior.pid || {
+    echo "Error: $POD: molior is running although the hold file exists" >&2; exit 1; }
+echo "Pod: $POD (molior on hold)"
+check_empty
 
 echo "Dropping database molior and restoring the dump ..."
 sql postgres "DROP DATABASE IF EXISTS molior WITH (FORCE)"
@@ -75,4 +91,7 @@ for t in build project projectversion molioruser; do
     echo "  $t: $(sql molior "select count(*) from $t")"
 done
 echo "  db_version: $(sql molior "select value from metadata where name='db_version'")"
-echo "Next: make release-molior, then db-upgrade.sh migrates the database to $IMAGE_VERSION and molior starts."
+
+echo "Releasing the hold: db-upgrade.sh migrates the database to $IMAGE_VERSION and molior starts."
+k exec "$POD" -c molior-server -- rm -f "$HOLD"
+echo "Follow the start with: make logs APP=molior"

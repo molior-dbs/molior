@@ -13,7 +13,7 @@
 #   TEST_TIMEOUT  seconds per test (pytest-timeout), a test that takes longer fails and the run goes on (default 3600)
 #   RUN_TIMEOUT   seconds for the whole pytest run; when reached pytest is killed and the run fails (default 14400)
 #
-# Requires the image molior-base:dev (make docker-images-molior). Nothing outside docker is written except RESULTS_DIR,
+# Requires the image molior-base:dev (make docker-images, or make system-tests). Nothing outside docker is written except RESULTS_DIR,
 # and the cluster, registry, their volumes and the temp files are removed at the end
 # (also on failure or Ctrl-C). Stale clusters of earlier runs whose script is no longer running are removed first.
 # The current kubectl context and ~/.kube/config are not touched.
@@ -85,7 +85,7 @@ fi
 for tool in docker k3d helm kubectl python3; do
     command -v $tool >/dev/null || { echo "E: $tool not found in PATH"; exit 1; }
 done
-docker image inspect molior-base:dev >/dev/null 2>&1 || { echo "E: image molior-base:dev missing, run: make docker-images-molior"; exit 1; }
+docker image inspect molior-base:dev >/dev/null 2>&1 || { echo "E: image molior-base:dev missing, run: make docker-images"; exit 1; }
 
 remove_stale
 trap cleanup EXIT

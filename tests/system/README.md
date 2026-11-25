@@ -6,12 +6,15 @@ against `http://web:8000`, collects the results, and removes the cluster, the re
 The current kubectl context and `~/.kube/config` are not touched. The same script is meant for CI.
 
 ```
+make system-tests                       # all suites (smoke and valid-1.4), as in CI
+make system-tests TEST=valid-1.4/validation_tests.py::test_build_order
 tests/system/system-tests.sh            # smoke tests
 tests/system/system-tests.sh smoke/test_api.py -k token
 KEEP=1 tests/system/system-tests.sh     # keep the cluster for debugging, remove it with CLEANUP_ONLY=test-<pid>
 ```
 
-Needs docker, k3d, helm, kubectl, python3 and the image `molior-base:dev` (`make docker-images-molior`).
+Needs docker, k3d, helm, kubectl, python3 and the image `molior-base:dev` (`make system-tests` builds it when it is
+missing, or `make docker-images`).
 Results (junit xml, screenshots of failed UI tests, server logs, server coverage) go to `RESULTS_DIR`
 (default `./system-test-results`).
 

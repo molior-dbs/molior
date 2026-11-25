@@ -37,10 +37,13 @@ git clone https://github.com/molior-dbs/molior-tools
 - `k3d`, install it with:
 
 ```sh
-make download-k3d
+make install-deps
 ```
 
-> This downloads the k3d binary to `~/.local/bin/k3d`. Make sure `~/.local/bin` is in your `PATH`.
+> This downloads k3d (pinned version, checksum verified) to `~/.local/bin/k3d`. Make sure `~/.local/bin` is in your `PATH`.
+
+`make help` lists the targets by workflow. The Local Development targets work on the local k3d cluster (kubectl
+context `k3d-<cluster>`, the current context is not used).
 
 ---
 
@@ -49,77 +52,66 @@ make download-k3d
 Creates a local k3d registry and Kubernetes cluster with the required port mappings:
 
 ```sh
-make create-k3d
+make create-cluster
 ```
 
 This sets up:
 - A local image registry at `k3d-molior-registry:5000`
 - A k3d cluster named `molior`
-
-Another name: `make create-k3d K3D_CLUSTER=local` creates the cluster `local` and the registry `k3d-local-registry:5000`.
-Pass the same `K3D_CLUSTER` to `delete-k3d` and `install-k3d`.
 - Port `8000` → Molior web UI
 - Port `8080` → Aptly repository
+
+Another name: `make create-cluster K3D_CLUSTER=local` creates the cluster `local` and the registry `k3d-local-registry:5000`.
+Pass the same `K3D_CLUSTER` to all Local Development targets.
 
 ---
 
 ## 2. Build the Docker images
 
-Build all local development images:
-
 ```sh
 make docker-images
 ```
 
-This builds: `molior`, `molior-postgres`, `molior-nginx`, `molior-web`, `aptly`.
-
-Individual images can also be built separately:
-
-```sh
-make docker-image-molior
-make docker-web
-make docker-aptly
-```
+This builds `molior`, `molior-postgres`, `aptly` and `molior-nginx` (tag `dev`), and the base image `molior-base`
+when it is missing.
 
 ---
 
-## 3. Push images into the cluster
-
-Tag and push the local images into the k3d registry so the cluster can use them:
+## 3. Deploy the images
 
 ```sh
-make deploy-k3d
+make deploy
 ```
 
-Individual images can be pushed separately, e.g.:
-
-```sh
-make deploy-image-molior
-make deploy-image-aptly
-```
+Pushes the images into the k3d registry.
 
 ---
 
 ## 4. Install the Helm chart
 
-Deploy Molior into the cluster:
-
 ```sh
-make install-k3d
+make install-helmchart
 ```
 
-`VALUES=<file>` adds a values file of a machine, for example
-`make install-k3d K3D_CLUSTER=local VALUES=values-local.yaml`.
+Installs molior with the `charts/` Helm chart. `VALUES=<file>` adds a values file,
+for example `make install-helmchart K3D_CLUSTER=local VALUES=values-local.yaml`.
 
-Installs the `charts/` Helm chart into the cluster. The passwords are not chart values: they are read from the Secret `molior-passwords` (keys `molior-password`, `aptly-password`, `registry-password`). `make install-k3d` creates it with the dev password `molior-dev` if it does not exist. On a remote cluster run `make set-passwords` before `helm install`: it asks for the passwords (an empty answer keeps the current one).
+The passwords are not chart values: they are read from the Secret `molior-passwords` (keys `molior-password`,
+`aptly-password`, `registry-password`). `make install-helmchart` creates it with the dev password `molior-dev` if it
+does not exist. `make set-passwords` changes them on the cluster of the current kubectl context: it asks for the
+passwords (an empty answer keeps the current one).
 
 ---
 
-## 5. Monitor Kubernetes pods
+## 5. Monitor the pods
 
 ```sh
 make watch
 ```
+
+`make list`, `make watch`, `make logs`, `make shell`, `make psql`, `make restart` and the other Molior Maintenance
+targets use the current kubectl context. `k3d cluster create` makes the new cluster the current context; check it with
+`kubectl config current-context`.
 
 Once all pods are running, Molior is available at **http://localhost:8000** and the Aptly repository at **http://localhost:8080**.
 
@@ -127,37 +119,46 @@ Once all pods are running, Molior is available at **http://localhost:8000** and 
 
 ## Common workflows
 
-### Rebuild and redeploy everything
+### Rebuild molior and restart it (dev loop)
 
 ```sh
-make docker-images
-make redeploy-k3d
+make reload
 ```
 
-### Reinstall the Helm chart only (no image rebuild)
+### Rebuild all images and install again
 
 ```sh
-make reinstall-k3d
+make redeploy
+```
+
+### Install the Helm chart again (no image rebuild, no push)
+
+```sh
+make uninstall-helmchart install-helmchart
 ```
 
 ### View logs
 
 ```sh
-make logs          # molior + aptly combined
-make logs-molior
-make logs-aptly
+make logs               # molior + aptly (current context)
+make logs APP=molior
+make logs APP=aptly
 ```
 
-### Open a shell in the molior pod
+### Restart, shell, database
 
 ```sh
-make shell-molior
+make restart            # molior pod (current context), APP=aptly for aptly
+make shell              # molior pod (current context), APP=aptly for aptly
+make psql               # molior database (current context)
 ```
 
-### Restart the molior pod
+### Tests
 
 ```sh
-make restart-molior
+make lint
+make unit-tests
+make system-tests       # all suites in a throwaway k3d cluster, or TEST=<pytest args>
 ```
 
 ---
@@ -165,7 +166,8 @@ make restart-molior
 ## Teardown
 
 ```sh
-make clean
+make delete-cluster
 ```
 
-This deletes the k3d cluster, the local registry, and the `molior-base` Docker image. All persistent data including the database and Molior repositories will be lost.
+This deletes the k3d cluster with its data (database, repositories). The registry `k3d-molior-registry` and its
+images stay; remove it with `k3d registry delete k3d-molior-registry`.

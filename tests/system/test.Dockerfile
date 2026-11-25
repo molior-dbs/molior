@@ -2,7 +2,7 @@
 # Same as docker/molior/molior-dev.Dockerfile (build and install the molior deb packages from the working copy),
 # plus server-side coverage collection (python3-coverage comes with molior-base).
 #
-# Built by tests/system/system-tests.sh. By hand (from the repo root, needs molior-base:dev from `make docker-images-molior`):
+# Built by tests/system/system-tests.sh. By hand (from the repo root, needs molior-base:dev from `make docker-images`):
 #   docker build -f tests/system/test.Dockerfile -t molior-test:dev .
 #
 # Coverage: every python process that imports molior records coverage when COVERAGE_PROCESS_START is set

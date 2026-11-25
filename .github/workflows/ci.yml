@@ -222,7 +222,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$RESULTS_DIR"
-          tests/system/system-tests.sh smoke valid-1.4/validation_tests.py 2>&1 | tee "$RESULTS_DIR/system-tests.txt"
+          make system-tests 2>&1 | tee "$RESULTS_DIR/system-tests.txt"
 
       - name: Summary
         if: always()
@@ -377,7 +377,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          make helm-package 2>&1 | tee helm.txt
+          make chart 2>&1 | tee helm.txt
 
       - name: Push helm chart
         if: ${{ !startsWith(github.ref_name, 'dependabot/') }}
