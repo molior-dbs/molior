@@ -1,5 +1,6 @@
 """Shared fixtures of the system tests. They run in the test runner pod (test-web.Dockerfile) inside the
 test cluster and talk to molior at MOLIOR_URL (default http://web:8000)."""
+import datetime
 import math
 import uuid
 
@@ -22,6 +23,11 @@ def admin():
 def unique():
     """A unique, valid molior name (letters, digits, dashes)."""
     return lambda prefix: f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+def pytest_report_collectionfinish(config, start_path, items):
+    """The start time of the tests, after the "collected N items" line."""
+    return "start: " + datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 @pytest.hookimpl(hookwrapper=True)
