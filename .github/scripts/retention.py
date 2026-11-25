@@ -9,7 +9,8 @@ Environment: GITHUB_TOKEN (packages: write), GITHUB_API_URL (default https://api
 GITHUB_STEP_SUMMARY (optional, the result is appended as markdown).
 
 The versions of the newest push of a package are never deleted (the newest version and all versions created up to
-KEEP_WINDOW before it: a push can create several versions, e.g. an index and its manifests). Errors are printed
+KEEP_WINDOW before it: a push can create several versions, e.g. an index and its manifests), and neither is a version
+tagged latest (deleting it would delete the tag). Errors are printed
 as warnings, the exit code is always 0.
 """
 
@@ -88,7 +89,8 @@ def retention(owner, days, packages):
             continue
         newest = parse_time(found[0]["created_at"]) if found else None
         old = [v for v in found
-               if parse_time(v["created_at"]) < cutoff and parse_time(v["created_at"]) < newest - KEEP_WINDOW]
+               if parse_time(v["created_at"]) < cutoff and parse_time(v["created_at"]) < newest - KEEP_WINDOW
+               and "latest" not in tags(v)]
         deleted = 0
         for v in old:
             try:

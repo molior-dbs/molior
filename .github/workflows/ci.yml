@@ -4,6 +4,7 @@
 # Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
 # Build:    Docker Images, Helm Chart (after the tests, all with the CI version), pushed to ghcr.io/<owner>/<target>/
 #           <image>:<version> and ghcr.io/<owner>/<target>/charts/molior:<version>; target dev, test or prod by branch.
+#           The images of test and prod also get the tag latest (the chart not: helm needs semver tags).
 #           Old dev and test versions are deleted by .github/workflows/retention-cleanup.yml (daily).
 #           Dependabot branches (dependabot/...) are built and tested, but not pushed.
 #
@@ -298,6 +299,7 @@ jobs:
       # e.g. ghcr.io/molior-dbs/dev/molior:<version>
       IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/${{ needs.configure.outputs.target }}
       PUSHED: ${{ !startsWith(github.ref_name, 'dependabot/') && 'pushed to' || 'not pushed (dependabot), would be' }}
+      LATEST: ${{ needs.configure.outputs.target != 'dev' && ' and :latest' || '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -337,10 +339,16 @@ jobs:
         if: ${{ !startsWith(github.ref_name, 'dependabot/') }}
         run: make push REGISTRY="$IMAGE_PREFIX" DOCKERCMD=docker
 
+      # the same images as <image>:latest (only the tag is new, the layers are already pushed)
+      - name: Push latest tag
+        if: ${{ !startsWith(github.ref_name, 'dependabot/') && env.TARGET != 'dev' }}
+        run: make push REGISTRY="$IMAGE_PREFIX" MOLIOR_VERSION=latest DOCKERCMD=docker
+
       - name: Summary
         if: always()
         run: |
-          python3 .github/scripts/summary.py images "Docker images ($PUSHED $IMAGE_PREFIX/<image>:$MOLIOR_VERSION)" \
+          python3 .github/scripts/summary.py images \
+            "Docker images ($PUSHED $IMAGE_PREFIX/<image>:$MOLIOR_VERSION$LATEST)" \
             molior:$MOLIOR_VERSION molior-postgres:$MOLIOR_VERSION aptly:$MOLIOR_VERSION molior-nginx:$MOLIOR_VERSION
           python3 .github/scripts/summary.py docker-build "Docker image build" build-images.log
 
