@@ -154,7 +154,9 @@ make logs APP=aptly
 ### Restart, shell, database
 
 ```sh
-make restart            # molior pod (current context), APP=aptly for aptly
+make restart            # molior and aptly pods (current context)
+make restart-molior     # molior pod (current context)
+make restart-aptly      # aptly pod (current context)
 make shell              # molior pod (current context), APP=aptly for aptly
 make psql               # molior database (current context)
 ```

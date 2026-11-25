@@ -107,7 +107,8 @@ install-helmchart:  ## Install molior with the helm chart (VALUES=<values file>,
 		--set aptly.publicUrl=http://localhost:$(K3D_APTLY_PORT)
 
 reload: docker-images-molior deploy-molior  ## Rebuild molior, push it and restart its pod (dev loop)
-	$(KUBECTL_LOCAL) delete pod -l app=molior
+	$(KUBECTL_LOCAL) rollout restart deployment/molior
+	$(KUBECTL_LOCAL) rollout status deployment/molior --timeout=600s
 
 redeploy: docker-images deploy  ## Rebuild and push all images, install molior again
 	@$(MAKE) --no-print-directory uninstall-helmchart install-helmchart
@@ -261,8 +262,20 @@ shell:  ## Open a shell in a pod (APP=molior or APP=aptly, default molior)
 psql:  ## Open psql on the molior database
 	kubectl -n $(NAMESPACE) exec -it deploy/molior -c molior-server -- su molior -c 'psql molior'
 
-restart:  ## Restart a pod (APP=molior or APP=aptly, default molior)
-	kubectl -n $(NAMESPACE) delete pod -l app=$(or $(APP),molior)
+# rollout restart follows the Recreate strategy: the new pod starts when the old one is gone (kubectl delete pod lets the
+# ReplicaSet start the new pod at once, next to the terminating one on the same volumes)
+restart:  ## Restart the molior and aptly pods
+	kubectl -n $(NAMESPACE) rollout restart deployment/molior deployment/aptly
+	kubectl -n $(NAMESPACE) rollout status deployment/molior --timeout=600s
+	kubectl -n $(NAMESPACE) rollout status deployment/aptly --timeout=600s
+
+restart-molior:  ## Restart the molior pod
+	kubectl -n $(NAMESPACE) rollout restart deployment/molior
+	kubectl -n $(NAMESPACE) rollout status deployment/molior --timeout=600s
+
+restart-aptly:  ## Restart the aptly pod
+	kubectl -n $(NAMESPACE) rollout restart deployment/aptly
+	kubectl -n $(NAMESPACE) rollout status deployment/aptly --timeout=600s
 
 set-passwords:  ## Set the molior, aptly and registry passwords in the Secret molior-passwords (will ask for passwords)
 	@NAMESPACE="$(NAMESPACE)" sh scripts/set-passwords
@@ -280,4 +293,4 @@ release-molior:
 	kubectl -n $(NAMESPACE) exec deploy/molior -c molior-server -- rm -f /var/lib/molior/molior-hold
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster lint unit-tests system-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart set-passwords hold-molior import-db release-molior
+.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster lint unit-tests system-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart restart-molior restart-aptly set-passwords hold-molior import-db release-molior
