@@ -186,9 +186,10 @@ jobs:
     env:
       MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
       RESULTS_DIR: ${{ github.workspace }}/system-test-results
-      # test_mirror of valid-1.4 is skipped without CITIZEN_MIRROR_URL and CITIZEN_KEY_URL
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          lfs: true   # tests/system/ctzpos-cups.tar.xz, the repository of test_mirror
 
       - name: Install docker, qemu, k3d, helm, kubectl
         run: |

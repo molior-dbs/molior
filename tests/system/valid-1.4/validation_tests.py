@@ -4,8 +4,6 @@
 # requirements and steps are unchanged; changed are the values that pointed to the old site (trixie instead of
 # stretch, deb.debian.org instead of the internal mirror) and the helpers in utils.py, which use the current API.
 
-import os
-
 import pytest
 import requests
 from datetime import datetime
@@ -21,11 +19,11 @@ basemirror_version = "13"
 # only made for the arm tests at the end of the run.
 arm_basemirror = "trixie-arm"
 arm_basemirror_architectures = "amd64,armhf,arm64"
-# The 1.4 test mirrored an internal repository (a vendor printer driver, one package). Its URLs are not in the code:
-# CITIZEN_MIRROR_URL is the repository root (with dists/), CITIZEN_KEY_URL its armored signing key. Without them
-# the test is skipped.
-citizen_mirror_url = os.environ.get("CITIZEN_MIRROR_URL", "")
-citizen_key_url = os.environ.get("CITIZEN_KEY_URL", "")
+# The 1.4 test mirrored an internal repository (a vendor printer driver, one package). system-tests.sh serves a copy
+# (tests/system/ctzpos-cups.tar.xz) in the test runner pod as service ctzpos-cups: the repository root (with dists/)
+# and its armored signing key.
+citizen_mirror_url = "http://ctzpos-cups/"
+citizen_key_url = "http://ctzpos-cups/repo.asc"
 
 # Only what the build environments and the test packages need (see DEVELOPMENT-1.5.md): debootstrap (Priority required,
 # apt, build-essential, ca-certificates), the build environment tools (create-docker.sh) and the build
@@ -361,8 +359,6 @@ def test_mirror(create_mirror, get_basemirror, aptly_url):
     Tests the mirroring
     """
     logger.warning("==================================================== test_mirror")
-    if not citizen_mirror_url or not citizen_key_url:
-        pytest.skip("CITIZEN_MIRROR_URL and CITIZEN_KEY_URL are not set")
     basemirror_id = get_basemirror(basemirror, basemirror_version)
     assert basemirror_id, "Base mirror not found"
 

@@ -8,6 +8,8 @@
 # Chromium and its driver come from Debian (chromium, chromium-driver): /usr/bin/chromium, /usr/bin/chromedriver.
 # kubectl comes from Debian (kubernetes-client): the 1.4 validation tests read build logs in the molior container
 # with kubectl exec, using the service account of the test runner pod (system-tests.sh).
+# /srv/ctzpos-cups: the repository test_mirror of valid-1.4 mirrors (ctzpos-cups.tar.xz, git lfs), served by the test
+# runner pod on port 8080 (system-tests.sh).
 FROM debian:trixie-slim
 
 RUN export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get full-upgrade -y && \
@@ -25,6 +27,11 @@ RUN useradd --uid 7778 -m --shell /bin/sh --home-dir /home/tester tester
 COPY tests/system/conftest.py tests/system/moliortest.py /tests/system/
 COPY tests/system/smoke /tests/system/smoke
 COPY tests/system/valid-1.4 /tests/system/valid-1.4
+
+# ADD extracts the archive; without git lfs the file is only the lfs pointer, which ADD copies as it is
+ADD tests/system/ctzpos-cups.tar.xz /srv/ctzpos-cups/
+RUN test -s /srv/ctzpos-cups/dists/stretch/InRelease || \
+    (echo "tests/system/ctzpos-cups.tar.xz is not extracted: git lfs pull" >&2; exit 1)
 
 ENV CHROME_BIN=/usr/bin/chromium \
     CHROMEDRIVER=/usr/bin/chromedriver \

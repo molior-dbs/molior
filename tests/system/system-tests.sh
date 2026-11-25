@@ -10,8 +10,6 @@
 #   KEEP=1        do not remove the cluster at the end (for debugging; remove it later with CLEANUP_ONLY=<id>)
 #   CLEANUP_ONLY=<id>  only remove the cluster and registry of an earlier run (e.g. test-12345)
 #   COVERAGE=0    skip the server coverage report
-#   CITIZEN_MIRROR_URL, CITIZEN_KEY_URL  repository and armored key URL for test_mirror of valid-1.4
-#                 (passed to the test runner; the test is skipped when they are not set)
 #   TEST_TIMEOUT  seconds per test (pytest-timeout), a test that takes longer fails and the run goes on (default 3600)
 #   RUN_TIMEOUT   seconds for the whole pytest run; when reached pytest is killed and the run fails (default 14400)
 #
@@ -192,12 +190,18 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: test-runner
+  labels:
+    app: test-runner
 spec:
   serviceAccountName: test-runner
   restartPolicy: Never
   containers:
     - name: tests
       image: $REGISTRY:5000/molior-test-web:dev
+      # serves the test_mirror repository (test-web.Dockerfile) for molior and aptly as http://ctzpos-cups/ (service
+      # below), then waits for kubectl exec
+      command: ["sh", "-c", "mkdir -p /tmp/results && python3 -m http.server -d /srv/ctzpos-cups 8080 \
+                >/tmp/results/ctzpos-cups-http.log 2>&1 & exec sleep infinity"]
       env:
         - name: MOLIOR_URL
           value: http://web:8000
@@ -205,10 +209,6 @@ spec:
           value: /tmp/results
         - name: COLUMNS        # width of the pytest result lines (number, location, result, time, progress)
           value: "140"
-        - name: CITIZEN_MIRROR_URL
-          value: "${CITIZEN_MIRROR_URL:-}"
-        - name: CITIZEN_KEY_URL
-          value: "${CITIZEN_KEY_URL:-}"
         - name: MOLIOR_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -222,6 +222,17 @@ spec:
       emptyDir:
         medium: Memory
         sizeLimit: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ctzpos-cups
+spec:
+  selector:
+    app: test-runner
+  ports:
+    - port: 80
+      targetPort: 8080
 EOF
 timeout 300 kubectl -n molior wait --for=condition=Ready pod/test-runner --timeout=280s >/dev/null
 for i in $(seq 60); do

@@ -292,12 +292,14 @@ are unchanged. Their changes are in the suites, see "The API suites" below.
 
 ### 14. `test_mirror`
 - 1.4 mirrored a small repository from an internal server (`citizen` 1.2.2-0, one package), signed with the key of
-  that server. The URLs are internal and so they are not in the code.
-- They come from `CITIZEN_MIRROR_URL` (the repository root) and `CITIZEN_KEY_URL` (the armored key). Without them the
-  test is skipped.
+  that server.
+- The port mirrors a copy of that repository: `tests/system/ctzpos-cups.tar.xz` (git lfs) is extracted into the test
+  runner image and served by the test runner pod (`system-tests.sh`, service `ctzpos-cups`). The URLs are fixed in the
+  test: `http://ctzpos-cups/` (repository root) and `http://ctzpos-cups/repo.asc` (armored key). The test is not
+  skipped any more.
 - Name, version, distribution, component and architecture are unchanged. The base mirror is `trixie/13`, and the check
   URL uses `basemirror`/`basemirror_version`.
-- Open: a copy of the repository files, served in the test cluster, replaces the internal server and the variables.
+- Open: the copy is still signed with the key of the internal server; it needs its own test key.
 
 ### 15. `test_successful_build`
 - 1.4 read `/buildout/<id>/build.log` over HTTP and checked for `Status: successful`. 1.5 serves no `/buildout/` over

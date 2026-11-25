@@ -21,5 +21,6 @@ Results (junit xml, screenshots of failed UI tests, server logs, server coverage
 | `values.yaml` | Helm values for the test install |
 | `test.Dockerfile` | molior image for the tests: the molior deb from the working copy, test and coverage tools, server coverage |
 | `test-web.Dockerfile` | test runner image: pytest, requests, selenium with headless chromium |
+| `ctzpos-cups.tar.xz` | repository for `test_mirror` of valid-1.4 (one package, signed), served by the test runner pod (git lfs) |
 | `conftest.py` | fixtures: API client (`public`, `admin`), unique names, screenshots on failure |
 | `smoke/` | smoke tests: API and web UI, no mirror and no build |
