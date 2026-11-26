@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import or_
@@ -182,7 +182,8 @@ class TriggerBuildBody(BaseModel):
     git_ref: Optional[str] = None
     git_branch: Optional[str] = None
     targets: Optional[list] = None
-    force_ci: Optional[bool] = False
+    # molior 1.4 accepted both spellings, clients may still send forceCI
+    force_ci: Optional[bool] = Field(default=False, validation_alias=AliasChoices("force_ci", "forceCI"))
 
 
 @router.post("/api/build")

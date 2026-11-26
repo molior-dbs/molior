@@ -521,6 +521,28 @@ def test_update_fails_the_build_if_the_create_fails():
     assert "unable to fetch Release" in build_log(build)
 
 
+def test_update_flat_mirror_has_no_components():
+    """A flat mirror (distribution "./", no components) is updated and published without components, not with [""]."""
+    name = mirror_aptly_names("", "", "trixie", "13.8", [])[0]
+    aptly = RecreateAptly([name])
+    build, mirror = make_trixie_mirror("ready")
+    mirror.mirror_distribution = "./"
+    mirror.mirror_components = ""
+    update_mirror = AsyncMock()
+    with patch.object(worker_aptly, "update_mirror", update_mirror):
+        run_worker("_update_mirror", aptly, build, mirror)
+    assert update_mirror.call_args.args[5] == []
+    build.set_failed.assert_not_called()
+
+
+@pytest.mark.parametrize("components,expected", [("", []), (None, []), ("main", ["main"]),
+                                                 ("main,contrib", ["main", "contrib"])])
+def test_mirror_components(components, expected):
+    mirror = MagicMock()
+    mirror.mirror_components = components
+    assert worker_aptly.mirror_components(mirror) == expected
+
+
 def test_init_skips_existing_mirrors():
     """A retry of an init that created only some of the components (before: 'already exists', init_error)."""
     aptly = RecreateAptly(NAMES[1:])
