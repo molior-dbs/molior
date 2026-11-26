@@ -1,0 +1,14 @@
+# Helm values for the deploy tests (tests/deploy/deploy-tests.sh). The script adds the registry of the test cluster
+# and aptly.publicUrl (the host port of the repo NodePort) on the command line: molior-deploy runs on the host and
+# takes the APT sources from molior (aptsources), so they must name a URL the host can reach. The builds in the
+# cluster use aptly.internalUrl.
+molior:
+  version: dev
+  dev: true                 # plain HTTP session cookies, no TLS in the test cluster
+  ciBuildsEnabled: false
+  maxParallelChroots: 1     # one base mirror, amd64 only
+  terminationGracePeriodSeconds: 60
+
+builder:
+  amd64:
+    parallel: 1             # one package (testproject)

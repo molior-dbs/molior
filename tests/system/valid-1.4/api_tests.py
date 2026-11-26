@@ -1,8 +1,8 @@
 """The 1.4 API test suites (molior-testing tests/api-tests/*.yml, run with pyresttest) translated to Python.
 
 One function per yml file, same file name. Each step keeps the name of the yml test, its request and its checks.
-Changed: the git URLs point to the public test repos (github.com/molior-dbs/test-*) instead of the internal git server,
-the base mirror is trixie/13 instead of stretch/9.3 (also in the checks: 9.3 is 13). Expected status: as in the yml,
+Changed: the git URLs point to the public test repos (github.com/molior-dbs/test-*, testproject) instead of the internal git
+server, the base mirror is trixie/13 instead of stretch/9.3 (also in the checks: 9.3 is 13). Expected status: as in the yml,
 pyresttest's default (200 to 299) where the yml has none. A yml `delay` in front of a step that waits for an async
 aptly operation becomes polling (poll(): every 2 s, at most 120 s).
 """
@@ -52,7 +52,7 @@ def init_testproject(v):
 
     repos = "/api2/project/{}/{}/repositories".format(project, version)
     for name, repo in (("Track", "test-track"), ("Tick", "test-tick"), ("Trick", "test-trick"),
-                       ("BadTrick", "test-badtrick"), ("BadTrack", "test-badtrack"), ("Test", "test-project"),
+                       ("BadTrick", "test-badtrick"), ("BadTrack", "test-badtrack"), ("Test", "testproject"),
                        ("Ci-Build", "test-ci-build")):
         step("Add Sourcerepository " + name, "POST", repos, {"architectures": ["amd64"], "url": GIT.format(repo)})
 

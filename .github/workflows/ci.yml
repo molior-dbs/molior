@@ -1,7 +1,7 @@
 # Molior CI
 #
 # Setup:    CI Image (manual), Configure (versions, target)
-# Tests:    Lint, Unit Tests and System Tests in parallel, Combine Coverage
+# Tests:    Lint, Unit Tests, System Tests and Deploy Tests in parallel, Combine Coverage
 # Build:    Docker Images, Helm Chart (after the tests, all with the CI version), pushed to ghcr.io/<owner>/<target>/
 #           <image>:<version> and ghcr.io/<owner>/<target>/charts/molior:<version>; target dev, test or prod by branch.
 #           The images of test and prod also get the tag latest (the chart not: helm needs semver tags).
@@ -20,7 +20,8 @@
 #
 # Runner: needs docker (the system tests create a k3d cluster, the image jobs run docker build) and sudo for the
 # packages that are missing (.github/scripts/install-tools.sh). Set the repository variable CI_RUNNER to use another
-# runner than ubuntu-latest.
+# runner than ubuntu-latest. The deploy tests run molior-deploy on the runner itself (root, loop devices, nbd,
+# virtualbox; .github/scripts/install-molior-tools.sh).
 
 name: CI
 
@@ -45,6 +46,8 @@ env:
   K3D_VERSION: v5.9.0
   HELM_VERSION: v4.2.3
   KUBECTL_VERSION: v1.35.7
+  # molior-tools of the deploy tests: a tag (or commit) of https://github.com/molior-dbs/molior-tools, built on the runner
+  MOLIOR_TOOLS_VERSION: v1.5.0-alpha9
 
 jobs:
   ##############################################################################
@@ -263,9 +266,74 @@ jobs:
             !system-test-results/buildout/
           if-no-files-found: error
 
+  # molior-deploy (molior-tools) on the runner against molior in a k3d cluster of its own (tests/deploy/deploy-tests.sh)
+  tests-deploy:
+    name: Deploy Tests
+    needs: configure
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 300
+    env:
+      MOLIOR_VERSION: ${{ needs.configure.outputs.molior-version }}
+      RESULTS_DIR: ${{ github.workspace }}/deploy-test-results
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install docker, qemu, k3d, helm, kubectl
+        run: |
+          sh .github/scripts/install-tools.sh "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install molior-tools, virtualbox and the deploy tools
+        run: sh .github/scripts/install-molior-tools.sh "$MOLIOR_TOOLS_VERSION"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: CI image as molior-base:dev  # the base of the test images
+        env:
+          CI_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
+        run: |
+          docker pull "$CI_IMAGE"
+          docker tag "$CI_IMAGE" molior-base:dev
+
+      - name: Set version
+        run: make set-version
+
+      - name: Run deploy tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RESULTS_DIR"
+          make deploy-tests 2>&1 | tee "$RESULTS_DIR/deploy-tests.txt"
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 .github/scripts/summary.py junit "Deploy tests" "$RESULTS_DIR/junit.xml" "$RESULTS_DIR/deploy-tests.txt"
+          python3 .github/scripts/summary.py logs "Server logs (deploy tests)" "$RESULTS_DIR"/*.log
+
+      # the logs of failed deployments (<project>_<version>_<variant>_<date>.log) are in molior-deploy-output/, the
+      # deployments themselves are removed by the test (several GB)
+      - name: Upload deploy test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests-deploy
+          path: |
+            deploy-test-results/
+            !deploy-test-results/buildout/
+            !deploy-test-results/molior-deploy-output/*.gz
+            !deploy-test-results/molior-deploy-output/*.iso
+            !deploy-test-results/molior-deploy-output/*.ova
+          if-no-files-found: error
+
   coverage:
     name: Combine Coverage
-    needs: [tests-unit, tests-system]
+    needs: [tests-unit, tests-system, tests-deploy]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     container:
       image: ghcr.io/${{ github.repository }}/molior-ci:latest
@@ -284,7 +352,7 @@ jobs:
       # .coveragerc maps the installed package of the system tests to the source tree
       - name: Combine coverage
         run: |
-          files="artifacts/tests-unit/coverage-unit.data artifacts/tests-system/coverage.data"
+          files="artifacts/tests-unit/coverage-unit.data artifacts/tests-system/coverage.data artifacts/tests-deploy/coverage.data"
           for f in $files; do test -f "$f" || { echo "E: $f missing"; exit 1; }; done
           python3 -m coverage combine --keep --rcfile=.coveragerc $files
           python3 -m coverage report --rcfile=.coveragerc | tee coverage.txt
@@ -311,7 +379,7 @@ jobs:
 
   images:
     name: Docker Images
-    needs: [configure, lint, tests-unit, tests-system]
+    needs: [configure, lint, tests-unit, tests-system, tests-deploy]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -377,7 +445,7 @@ jobs:
 
   helm:
     name: Helm Chart
-    needs: [configure, lint, tests-unit, tests-system]
+    needs: [configure, lint, tests-unit, tests-system, tests-deploy]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read

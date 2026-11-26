@@ -45,7 +45,7 @@ test cluster.
 | 27 | `test_buildvariant_filter` | a671b2ec | ported | none |
 | - | `test_cleanup` | 4643c05a | obsolete | every run uses a new cluster |
 | - | `test_build_notification` | 1a8ebb57 | obsolete | build notification hooks are removed in 1.5 |
-| - | `test_molior_deploy` | 4643c058 | TODO | not in this suite; to be run in a separate suite `tests/deploy/` on the runner |
+| - | `test_molior_deploy` | 4643c058 | ported to `tests/deploy/` | not in this suite; separate suite `tests/deploy/`, pytest on the runner host (not run yet) |
 
 ## Changes that apply to all tests
 
@@ -149,7 +149,7 @@ test cluster.
 - `tests/webserver.py`: a Flask receiver for the notification hooks of the obsolete `test_build_notification`.
 - `tests/websocket-test.py`: a websocket listener that checked the build state sequence; already commented out in
   1.4 (fixture `websocket_server`).
-- `tests/test-deploy.sh`: used by `test_molior_deploy`, which moves to the separate suite `tests/deploy/` (TODO).
+- `tests/test-deploy.sh`: copied unchanged to `tests/deploy/test-deploy.sh` (used by `test_molior_deploy`).
 - SSH keys for the 1.4 hosts (two directories and a submodule). Not copied (secrets).
 - `README.md`: the 1.4 installation of the test site.
 
@@ -181,7 +181,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `test-project` | testproject | v3.0.11 | test 2 |
+| testproject | `testproject` | testproject | v3.0.12 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -208,7 +208,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 - `test-track`, `test-badtrack`: the short test runs with `python3 -m unittest -v tests/unit.py` (1.4: `py.test`
   with `python-pytest`, gone since bullseye). The short test stays for requirement 012 "Short Test Run".
 - `test-tick`: `build_after: ['test-track']` (1.4: `track`).
-- `test-project`: `policykit-1` becomes `polkitd`, `xserver-xorg-video-modesetting` is removed (both not in trixie),
+- `testproject`: `policykit-1` becomes `polkitd`, `xserver-xorg-video-modesetting` is removed (both not in trixie),
   the description and a comment line in `deploy/dir.conf` named internal products; the description is neutral now and
   the comment is removed. `deploy/` is kept.
 - `test-submodule`: `.gitmodules` points to `https://github.com/molior-dbs/test-ci-build.git` (1.4: an SSH URL of
@@ -492,6 +492,23 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
 - **`test_cleanup`** (4643c05a): obsolete. It deleted the test data of an earlier run, and every run now uses a new
   cluster.
 - **`test_build_notification`** (1a8ebb57): obsolete. The build notification hooks are removed in 1.5.
-- **`test_molior_deploy`** (4643c058): not in this suite. It tested the 1.4 deploy tools; 1.5 deploys with Helm, and
-  `system-tests.sh` installs the chart for every run. TODO: it will be run in a separate test suite (`tests/deploy/`)
-  on the runner.
+- **`test_molior_deploy`** (4643c058): not in this suite, ported to the separate suite `tests/deploy/` (2026-11-26,
+  written, not run). It tests molior-deploy (molior-tools) against molior, so it runs on the runner host (root, loop
+  devices, nbd, docker, virtualbox), not in a pod. Changes:
+  - `tests/deploy/deploy-tests.sh`: own k3d cluster, NodePorts 30080 (web) and 30088 (repo) mapped to free host
+    ports, `aptly.publicUrl` set to the host repo port (molior-deploy takes the APT sources from `aptsources`, the
+    builds in the cluster use `internalUrl`), pytest on the host.
+  - Two setup tests in front (no 1.4 metadata): `test_deploy_basemirror` (own `trixie/13`, amd64, filter with the
+    Depends of the `testproject-*` packages and the installer initrd packages; the system test mirror is not used,
+    user decision) and `test_deploy_testproject` (`molior-validation/1` with `testproject`, waits for the build).
+    In 1.4 the mirror and the build came from the tests before it (`after("test_build_notification")`, now
+    `after("test_deploy_testproject")`).
+  - The test: same metadata, parameters and arguments; the script path is absolute and the cwd is `RESULTS_DIR`
+    (failed deployment logs are uploaded); stdin is `/dev/null` (the cleanup question of molior-deploy gets the
+    default).
+  - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
+    with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
+    from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.
+  - `test-deploy.sh` expects `<project>_<version>_3.0.12<suffix>`: the version of `testproject` (debian/changelog) is
+    fixed in the script, as in 1.4 (there 3.0.11). 3.0.12 sets `INSTALL_PACKAGE` in the deploy files: molior-tools
+    1.5 has no default for it any more.
