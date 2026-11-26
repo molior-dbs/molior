@@ -58,7 +58,7 @@ deployment_packages = {
     "dir": ["testproject-dir", "lxde", "nodm", "xserver-xorg", "vim", "rsyslog"],
     "docker": ["testproject-docker", "vim", "rsyslog", "net-tools"],
     "lxd": ["testproject-lxd", "vim", "rsyslog", "net-tools"],
-    "image": ["testproject-image", "grub-pc", "vim", "rsyslog", "net-tools"],
+    "image": ["testproject-image", "linux-image-amd64", "grub-pc", "vim", "rsyslog", "net-tools"],
 }
 
 

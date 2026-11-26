@@ -20,8 +20,12 @@ ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
-# seconds a VM of a deployment runs before the screenshot (boot_vm)
+# seconds a VM of a deployment runs before the screenshot (boot_vm): the OVA (the LXDE desktop)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
+# installer: seconds from the start of the VM to the hostname question, and from the reboot to the screenshot of the
+# installed system
+INSTALLER_BOOT_WAIT = int(os.environ.get("INSTALLER_BOOT_WAIT", "10"))
+INSTALLED_BOOT_WAIT = int(os.environ.get("INSTALLED_BOOT_WAIT", "30"))
 # installer: how long the installation may take (until it ejects the ISO)
 INSTALL_WAIT = int(os.environ.get("INSTALL_WAIT", "300"))
 # where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
@@ -193,9 +197,9 @@ def boot_vm(deployment):
     VMs are not touched.
     OVA: imported, screenshot <deployment>.png after BOOT_WAIT seconds.
     ISO (installer): a new VM with an empty disk, booting from the disk first and then the ISO. Screenshot
-    <deployment>.png after BOOT_WAIT seconds (the hostname question), Enter for the default hostname and Enter to
-    confirm the installation; when the installer is done (wait_installed) <deployment>.done.png, Enter to reboot, and
-    <deployment>.installed.png of the installed system after BOOT_WAIT seconds.
+    <deployment>.png after INSTALLER_BOOT_WAIT seconds (the hostname question), Enter for the default hostname and
+    5 s later Enter to confirm the installation; when the installer is done (wait_installed) <deployment>.done.png,
+    Enter to reboot, and <deployment>.installed.png of the installed system after INSTALLED_BOOT_WAIT seconds.
     Fails if the VM does not start or does not run any more at a screenshot."""
     path = os.path.join(DEPLOY_OUTPUT, deployment)
     vm = "deploy-test-{}".format(os.getpid())
@@ -217,17 +221,18 @@ def boot_vm(deployment):
             vboxmanage("storageattach", vm, "--storagectl", "SATA", "--port", "1", "--device", "0",
                        "--type", "dvddrive", "--medium", path)
         vboxmanage("startvm", vm, "--type", "headless")
-        time.sleep(BOOT_WAIT)
-        vm_running(vm, path, "", "after {} s".format(BOOT_WAIT))
+        wait = INSTALLER_BOOT_WAIT if deployment.endswith(".iso") else BOOT_WAIT
+        time.sleep(wait)
+        vm_running(vm, path, "", "after {} s".format(wait))
         if deployment.endswith(".iso"):
             press_enter(vm)     # the hostname question: the default (TARGET_HOSTNAME)
-            time.sleep(10)
+            time.sleep(5)
             press_enter(vm)     # "Are you sure to install to /dev/sda ?"
             wait_installed(vm, path, "SATA-1-0")
             vm_running(vm, path, "done.", "at the end of the installation")
             press_enter(vm)     # "press 'Enter' to reboot"
-            time.sleep(BOOT_WAIT)
-            vm_running(vm, path, "installed.", "{} s after the reboot".format(BOOT_WAIT))
+            time.sleep(INSTALLED_BOOT_WAIT)
+            vm_running(vm, path, "installed.", "{} s after the reboot".format(INSTALLED_BOOT_WAIT))
     finally:
         vboxmanage("controlvm", vm, "poweroff", check=False)
         time.sleep(3)

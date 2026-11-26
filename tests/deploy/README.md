@@ -36,11 +36,11 @@ uploads the logs and the screenshots of the VMs with the other results (artifact
 The deployments are found by their type (`*_installer.iso`, `*_vbox.ova`, ...), not by the version in their name.
 The deployment of a failed `test_molior_deploy` is copied to `RESULTS_DIR/failed-deployments/` (`conftest.py`), also
 when `test-deploy.sh` failed after molior-deploy; CI uploads it as the artifact `failed-deployments` (3 days) to
-download and debug it. The installer ISO is uploaded in every run (artifact `installer-iso`, 3 days).
+download and debug it.
 
 The VM deployments boot in VirtualBox (headless, `utils.boot_vm`), the screenshots go to `molior-deploy-output/`:
 
 | Deployment | Screenshots |
 |---|---|
 | vbox (OVA) | `<deployment>.png` after `BOOT_WAIT` seconds (default 60): the LXDE desktop (autologin of the user `molior`) |
-| installer (ISO, VM with an empty 8 GB disk) | `<deployment>.png` after `BOOT_WAIT` seconds: the hostname question; then Enter (default hostname) and Enter (confirm); `<deployment>.done.png` when the installer is done (it ejected the ISO); Enter (reboot); `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. ISO not ejected after `INSTALL_WAIT` seconds (default 300, a failed installer does not eject it): fails with `<deployment>.failed.png` |
+| installer (ISO, VM with an empty 8 GB disk) | `<deployment>.png` after `INSTALLER_BOOT_WAIT` seconds (default 10): the hostname question; then Enter (default hostname) and 5 s later Enter (confirm); `<deployment>.done.png` when the installer is done (it ejected the ISO); Enter (reboot); `<deployment>.installed.png` of the installed system after `INSTALLED_BOOT_WAIT` seconds (default 30). ISO not ejected after `INSTALL_WAIT` seconds (default 300, a failed installer does not eject it): fails with `<deployment>.failed.png` |

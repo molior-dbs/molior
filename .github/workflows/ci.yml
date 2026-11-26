@@ -134,6 +134,7 @@ jobs:
   # lint and unit-tests: make runs them in the CI image (TEST_IMAGE), as on a dev machine; no local flake8 or pytest
   lint:
     name: Lint
+    needs: configure
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     env:
       TEST_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
@@ -165,6 +166,7 @@ jobs:
 
   tests-unit:
     name: Unit Tests
+    needs: configure
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     env:
       TEST_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
@@ -332,17 +334,6 @@ jobs:
             deploy-test-results/molior-deploy-output/*.png
             !deploy-test-results/failed-deployments/
           if-no-files-found: error
-
-      # the installer ISO of every run, also when its test passed, to test it outside CI (about 320 MB)
-      - name: Upload installer ISO
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: installer-iso
-          path: deploy-test-results/molior-deploy-output/*_installer.iso
-          compression-level: 0  # the ISO is compressed already
-          retention-days: 3
-          if-no-files-found: warn
 
       # the deployment of each failed test_molior_deploy (tests/deploy/conftest.py), to download and debug it
       - name: Upload failed deployments

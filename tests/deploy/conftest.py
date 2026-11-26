@@ -9,7 +9,7 @@ import utils
 
 
 # minutes a run of all deploy tests takes about (the eta after the start time, tests/system/pytest_output.py)
-RUN_MINUTES = 20
+RUN_MINUTES = 25
 
 
 def pytest_output_run_minutes(config):

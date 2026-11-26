@@ -183,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `testproject` | testproject | v3.0.15 | tests 2, deploy |
+| testproject | `testproject` | testproject | v3.0.17 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -517,9 +517,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l`). CI
     uploads the logs (and the screenshots of the VMs) with the test results (artifact `tests-deploy`), not the
     deployments. The deployments of a failed test go to `RESULTS_DIR/failed-deployments/` (`conftest.py`), also when
-    `test-deploy.sh` failed after molior-deploy; CI uploads them as the artifact `failed-deployments` (3 days). The
-    installer ISO is uploaded in every run as the artifact `installer-iso` (3 days, about 320 MB), also when its test
-    passed, to test it outside CI (user, 2026-11-26).
+    `test-deploy.sh` failed after molior-deploy; CI uploads them as the artifact `failed-deployments` (3 days).
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
     (`utils.boot_vm`: headless, own `VBOX_USER_HOME`); the screenshots and the VM log go next to the deployment
     (`<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more at a screenshot.
@@ -527,12 +525,13 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     - vbox: the OVA is imported, screenshot `<deployment>.png` after `BOOT_WAIT` seconds (default 60). testproject
       3.0.13 logs in the user `molior` automatically (lightdm autologin into LXDE).
     - installer: the ISO in a new VM with an empty 8 GB disk, booting from the disk first and then the ISO.
-      `<deployment>.png` after `BOOT_WAIT` seconds (the hostname question), Enter (the default hostname), Enter
-      (confirm the installation, `keyboardputscancode`). The installer is done when it ejects the ISO (the DVD drive
-      is empty); a failed installer does not eject it, so after `INSTALL_WAIT` seconds (default 300) the test fails
-      with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the installer), Enter (reboot) and
-      `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. No disk monitoring (user
-      decision: the size of the VM disk says nothing about success; the disk-idle fallback was removed).
+      `<deployment>.png` after `INSTALLER_BOOT_WAIT` seconds (default 10, the hostname question), Enter (the
+      default hostname), 5 s later Enter (confirm the installation, `keyboardputscancode`). The installer is done
+      when it ejects the ISO (the DVD drive is empty); a failed installer does not eject it, so after `INSTALL_WAIT`
+      seconds (default 300) the test fails with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of
+      the installer), Enter (reboot) and `<deployment>.installed.png` of the installed system after
+      `INSTALLED_BOOT_WAIT` seconds (default 30). No disk monitoring (user decision: the size of the VM disk says
+      nothing about success; the disk-idle fallback was removed).
   - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
     (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
     the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
@@ -546,7 +545,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     same pattern (`utils.deployments`). 1.4 expected `<project>_<version>_3.0.11<suffix>`, the version of
     `testproject` (debian/changelog) fixed in the script; molior builds the latest tag of testproject, so a new tag
     broke the tests (and the upload of the failed deployments) until the script was changed. testproject versions:
-    3.0.16 adds `linux-image-amd64` to `testproject-devel` (the installed system of the ISO had no kernel and
+    3.0.17 adds `linux-image-amd64` to `testproject-image` (the image had no kernel), 3.0.16 adds `linux-image-amd64` to `testproject-devel` (the installed system of the ISO had no kernel and
     hung in grub), 3.0.15 installs e2fsprogs in the installer initrd (see the known problem below), 3.0.14 adds the desktop
     background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE` in the deploy files
     (molior-tools 1.5 has no default for it any more).
@@ -579,7 +578,11 @@ screen as the end of the installation.
   Found by booting the ISO of CI run 45854001850 (artifact `installer-iso`) in qemu.
 - Fix: testproject 3.0.15 (`deploy/installer.conf`): `INSTALLER_EXTRA_PACKAGES="e2fsprogs"` (user decision: in
   testproject, not in molior-tools). Other projects with ext file systems in the installer need the same line, or
-  molior-tools should install e2fsprogs itself. Not verified in CI yet.
+  molior-tools should install e2fsprogs itself. Checked in qemu: the 3.0.15 ISO installs.
+- Second problem, found with 3.0.15 in qemu: the installed system hangs in grub. `testproject-devel` depended on
+  `grub-pc` but not on a kernel, so `/boot` had no `vmlinuz` and `initrd.img`, and `update-grub` wrote no Linux
+  menu entry. Fix: testproject 3.0.16 adds `linux-image-amd64` to the Depends of `testproject-devel` (as
+  `testproject-vbox`). Not verified in CI yet.
 - The disk-idle fallback is removed: the test only passes when the installer ejected the ISO.
 - Still to do: a serial
   console for the ISO test (`console=ttyS0`, a VirtualBox UART to `<deployment>.serial.log`) would put the installer
