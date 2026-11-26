@@ -18,12 +18,13 @@ The tests, in this order:
 |---|---|
 | `test_deploy_basemirror` | setup: base mirror `trixie/13` (amd64), filtered to what the build and the deployments need |
 | `test_deploy_testproject` | setup: project `molior-validation/1` with https://github.com/molior-dbs/testproject.git, waits for its build |
-| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, installer, lxd, vbox and image; 1.5: the installer ISO and the vbox OVA boot in VirtualBox (headless, screenshot after `BOOT_WAIT` seconds, default 60) |
+| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, installer, lxd, vbox and image; 1.5: a few top level packages are installed in the dir, docker, lxd and image deployments (`deployment_packages`, read from their dpkg status file without root), the installer ISO and the vbox OVA boot in VirtualBox (headless, screenshot after `BOOT_WAIT` seconds, default 60) |
 
 Needs on the host: docker, k3d, helm, kubectl, python3 with pytest, pytest-timeout and requests, sudo without
 password for `molior-deploy` (`<user> ALL=(root) NOPASSWD: /usr/sbin/molior-deploy`),
 molior-tools (`/usr/sbin/molior-deploy`) and the host tools of the variants (genisoimage, xorriso, syslinux-utils,
-mtools, dosfstools, kpartx, qemu-utils, virtualbox, the kernel module nbd). `.github/scripts/install-molior-tools.sh`
+mtools, dosfstools, kpartx, qemu-utils, virtualbox, the kernel module nbd; for the package check of image e2fsprogs
+and fdisk). `.github/scripts/install-molior-tools.sh`
 installs all of them on a CI runner (molior-tools is built from its git tag). Also the image `molior-base:dev`
 (`make deploy-tests` builds it when it is missing). The molior image is the one of the system tests
 (`tests/system/test.Dockerfile`, with server coverage).

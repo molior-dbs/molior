@@ -1,11 +1,13 @@
 """Helpers of the deploy tests: the API calls that create the base mirror and the project, and the waits.
 The tests run on the runner host (molior-deploy needs root, loop devices and docker), so the URLs are the ports
 that tests/deploy/deploy-tests.sh maps from the test cluster to the host."""
+import gzip
 import json
 import logging
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import time
 
@@ -181,3 +183,99 @@ def boot_vm(deployment):
         vboxmanage("unregistervm", vm, "--delete", check=False)   # also deletes the disks of the VM
         os.environ.pop("VBOX_USER_HOME", None)
         shutil.rmtree(home, ignore_errors=True)
+
+
+DPKG_STATUS = "var/lib/dpkg/status"
+
+
+def run(*args, **kwargs):
+    """Runs a command, fails with its output if the exit code is not 0, returns stdout (bytes)."""
+    r = subprocess.run(list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    assert r.returncode == 0, "{}: exit {}\n{}".format(" ".join(args), r.returncode, r.stderr.decode(errors="replace"))
+    return r.stdout
+
+
+def status_from_tar(fileobj, prefix=""):
+    """dpkg status file of the root file system in a tar (stream) with the root at prefix."""
+    with tarfile.open(fileobj=fileobj, mode="r|*") as tar:
+        for member in tar:
+            if member.name.lstrip("./") == prefix + DPKG_STATUS and member.isfile():
+                return tar.extractfile(member).read().decode()
+    raise AssertionError("no {} in the tar".format(prefix + DPKG_STATUS))
+
+
+def status_from_docker_save(path):
+    """dpkg status file of a docker save tar of an image with one layer (docker import of the root file system):
+    the layer is the tar in it that contains var/lib/dpkg/status."""
+    with tarfile.open(path, mode="r|*") as image:
+        for member in image:
+            if not member.isfile() or member.size < 1024 * 1024:
+                continue   # manifest, config, index json
+            try:
+                return status_from_tar(image.extractfile(member))
+            except (AssertionError, tarfile.TarError):
+                continue
+    raise AssertionError("no layer with {} in {}".format(DPKG_STATUS, path))
+
+
+def status_from_disk(raw):
+    """dpkg status file of the ext file system on a partition of a raw disk image (read with debugfs, no mount)."""
+    table = json.loads(run("sfdisk", "--json", raw))["partitiontable"]
+    for part in table["partitions"]:
+        r = subprocess.run(["debugfs", "-R", "cat /" + DPKG_STATUS, "{}?offset={}".format(
+            raw, part["start"] * table.get("sectorsize", 512))], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        if r.returncode == 0 and r.stdout.startswith(b"Package:"):
+            return r.stdout.decode()
+    raise AssertionError("no partition with {} in {}".format(DPKG_STATUS, raw))
+
+
+def sparse_copy(src, dst, block=1024 * 1024):
+    """Copies a stream into a file, holes for blocks of zeros (a disk image of some GB needs only its used space)."""
+    with open(dst, "wb") as out:
+        while True:
+            data = src.read(block)
+            if not data:
+                break
+            if data.count(0) == len(data):
+                out.seek(len(data), os.SEEK_CUR)
+            else:
+                out.write(data)
+        out.truncate()
+
+
+def dpkg_status(deployment, tmp):
+    """The dpkg status file of the root file system of a deployment (by its file name); tmp for temporary files.
+    Not for installer and vbox: they are tested by booting them (boot_vm)."""
+    path = os.path.join(DEPLOY_OUTPUT, deployment)
+    if deployment.endswith("_docker.tar.gz"):
+        return status_from_docker_save(path)
+    if deployment.endswith("_lxd.tar.gz"):
+        with open(path, "rb") as f:
+            return status_from_tar(f, "rootfs/")
+    if deployment.endswith(".tar.gz"):                       # dir
+        with open(path, "rb") as f:
+            return status_from_tar(f)
+    if deployment.endswith(".img.gz"):                       # image: a disk
+        with gzip.open(path, "rb") as f:
+            sparse_copy(f, os.path.join(tmp, "disk.raw"))
+        return status_from_disk(os.path.join(tmp, "disk.raw"))
+    raise AssertionError("unknown deployment type: {}".format(deployment))
+
+
+def check_packages(deployment, packages):
+    """Fails unless all packages are installed in the root file system of the deployment (its dpkg status file)."""
+    tmp = tempfile.mkdtemp(prefix="molior-deploy-check-", dir=os.environ.get("MOLIOR_TMPDIR"))
+    try:
+        status = dpkg_status(deployment, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    installed = {}
+    for paragraph in status.split("\n\n"):
+        fields = dict(line.split(": ", 1) for line in paragraph.splitlines() if ": " in line and line[0] != " ")
+        if fields.get("Status") == "install ok installed":
+            installed[fields.get("Package")] = fields.get("Version")
+    for package in packages:
+        logger.warning("%s: %s %s", deployment, package, installed.get(package, "not installed"))
+    missing = [p for p in packages if p not in installed]
+    assert not missing, "{}: not installed: {} ({} packages installed)".format(
+        deployment, ", ".join(missing), len(installed))

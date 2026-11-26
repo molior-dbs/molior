@@ -9,10 +9,11 @@ values that pointed to the old site and the helpers that used the old interfaces
 
 ## Overview
 
-1.4 has 30 tests. 27 are ported, in the 1.4 file order. All 27 pass in the 1.5 system tests except `test_mirror`,
-which is skipped without its environment variables (26 passed, 1 skipped in 912 s, exit 0, after the molior fixes
-in "molior changes the port needed"). Tests 26 and 27 (arm) run the arm builds with qemu on the amd64 node of the
-test cluster.
+1.4 has 30 tests. 28 are ported, 2 are obsolete. 27 are in the 1.5 system tests (`tests/system/valid-1.4/`), in the
+1.4 file order. All 27 pass except `test_mirror`, which is skipped without its environment variables (26 passed, 1
+skipped in 912 s, exit 0, after the molior fixes in "molior changes the port needed"). Tests 26 and 27 (arm) run the
+arm builds with qemu on the amd64 node of the test cluster. `test_molior_deploy` is in the separate deploy suite
+(`tests/deploy/`, see "The deploy suite"), it passes for all 6 variants.
 
 | # | Test | Id | Status | Change in the test function |
 |---|---|---|---|---|
@@ -45,7 +46,7 @@ test cluster.
 | 27 | `test_buildvariant_filter` | a671b2ec | ported | none |
 | - | `test_cleanup` | 4643c05a | obsolete | every run uses a new cluster |
 | - | `test_build_notification` | 1a8ebb57 | obsolete | build notification hooks are removed in 1.5 |
-| - | `test_molior_deploy` | 4643c058 | ported to `tests/deploy/` | not in this suite; separate suite `tests/deploy/`, pytest on the runner host (not run yet) |
+| - | `test_molior_deploy` | 4643c058 | ported to `tests/deploy/` | separate suite, pytest on the runner host; boot and package checks (see "The deploy suite") |
 
 ## Changes that apply to all tests
 
@@ -149,7 +150,8 @@ test cluster.
 - `tests/webserver.py`: a Flask receiver for the notification hooks of the obsolete `test_build_notification`.
 - `tests/websocket-test.py`: a websocket listener that checked the build state sequence; already commented out in
   1.4 (fixture `websocket_server`).
-- `tests/test-deploy.sh`: copied unchanged to `tests/deploy/test-deploy.sh` (used by `test_molior_deploy`).
+- `tests/test-deploy.sh`: copied to `tests/deploy/test-deploy.sh` (used by `test_molior_deploy`, changes see "The
+  deploy suite").
 - SSH keys for the 1.4 hosts (two directories and a submodule). Not copied (secrets).
 - `README.md`: the 1.4 installation of the test site.
 
@@ -492,9 +494,13 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
 - **`test_cleanup`** (4643c05a): obsolete. It deleted the test data of an earlier run, and every run now uses a new
   cluster.
 - **`test_build_notification`** (1a8ebb57): obsolete. The build notification hooks are removed in 1.5.
-- **`test_molior_deploy`** (4643c058): not in this suite, ported to the separate suite `tests/deploy/` (2026-11-26,
-  written, not run). It tests molior-deploy (molior-tools) against molior, so it runs on the runner host (root, loop
-  devices, nbd, docker, virtualbox), not in a pod. Changes:
+
+## The deploy suite
+
+**`test_molior_deploy`** (4643c058) is not in the system tests, it is ported to the separate suite `tests/deploy/`.
+It passes in CI for all 6 variants (dir, docker, installer, lxd, vbox, image), job "Deploy Tests". It tests
+molior-deploy (molior-tools) against molior, so it runs on the runner host (root, loop devices, nbd, docker,
+virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs the host tools. Changes:
   - `tests/deploy/deploy-tests.sh`: own k3d cluster, NodePorts 30080 (web) and 30088 (repo) mapped to free host
     ports, `aptly.publicUrl` set to the host repo port (molior-deploy takes the APT sources from `aptsources`, the
     builds in the cluster use `internalUrl`), pytest on the host.
@@ -504,16 +510,22 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
     In 1.4 the mirror and the build came from the tests before it (`after("test_build_notification")`, now
     `after("test_deploy_testproject")`).
   - The test: same metadata, parameters and arguments; the script path is absolute and the cwd is `RESULTS_DIR`
-    (the deployments and their logs are uploaded); stdin is `/dev/null` (the cleanup question of molior-deploy gets
-    the default).
-  - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, and the
-    deployment file is kept (1.4: `rm -f $IMG_FILE`); CI uploads the logs (and the screenshots of the VMs) with the
-    test results (artifact `tests-deploy`), not the deployments.
+    (`test-deploy.sh` runs molior-deploy in `molior-deploy-output/` there: the deployments, their logs and the
+    screenshots); stdin is `/dev/null`.
+  - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
+    does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l
+    $IMG_FILE`); the testproject version is 3.0.12 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
+    VMs) with the test results (artifact `tests-deploy`), not the deployments.
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
     (`utils.boot_vm`: the OVA imported, the ISO in a new VM with an empty 8 GB disk; headless, own `VBOX_USER_HOME`),
     a screenshot after `BOOT_WAIT` seconds (default 60) and the VM log go next to the deployment
     (`<deployment>.png`, `<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more.
     No login check. The 1.4 test only checked that the file exists.
+  - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
+    (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
+    the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
+    lxd: the tar, docker: the layer in the docker image archive of the deployment (no docker call), image: the disk
+    with `sfdisk` and `debugfs`). Not for installer and vbox: they are tested by booting them.
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.

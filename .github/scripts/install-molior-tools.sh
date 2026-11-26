@@ -10,6 +10,8 @@
 #     kernel module nbd); docker: docker (already on the runner)
 #   - virtualbox as packaged by the distribution (with its kernel module, virtualbox-dkms); the vbox plugin only
 #     creates the disk and the VM and exports the OVA (vboxmanage), it never starts a VM
+#   - the tools of the package check of the image deployment (tests/deploy/utils.py check_packages, without root):
+#     e2fsprogs (debugfs) and fdisk (sfdisk)
 #   - python3 with pytest, pytest-timeout and requests (tests/deploy runs on the host)
 #   - /root/.moliorrc and /root/.netrc, if missing (molior-deploy runs with sudo, HOME=/root): without .moliorrc
 #     molior-deploy asks for the server URLs, writes the file and exits (-m and -a override its values); it calls
@@ -24,7 +26,7 @@ echo "== packages"
 sudo apt-get update -q
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends \
     git build-essential dpkg-dev debhelper dh-python python3-all python3-setuptools txt2man man2html-base \
-    genisoimage xorriso syslinux-utils mtools dosfstools kpartx qemu-utils \
+    genisoimage xorriso syslinux-utils mtools dosfstools kpartx qemu-utils e2fsprogs fdisk \
     python3-pytest python3-pytest-timeout python3-requests
 
 echo "== virtualbox"

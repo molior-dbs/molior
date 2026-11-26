@@ -52,6 +52,16 @@ def test_deploy_testproject(project_name, project_version):
     utils.wait_for_build("testproject")
 
 
+# 1.5: a few top level packages the deployments must have installed (INSTALL_PACKAGE of the deploy file of the
+# testproject repo and some of its Depends); installer and vbox are tested by booting them instead
+deployment_packages = {
+    "dir": ["testproject-dir", "lxde", "nodm", "xserver-xorg", "vim", "rsyslog"],
+    "docker": ["testproject-docker", "vim", "rsyslog", "net-tools"],
+    "lxd": ["testproject-lxd", "vim", "rsyslog", "net-tools"],
+    "image": ["testproject-image", "grub-pc", "vim", "rsyslog", "net-tools"],
+}
+
+
 @pytest.mark.metadata(
     id="4643c058",
     author="im",
@@ -100,6 +110,10 @@ def test_molior_deploy(
         stdin=subprocess.DEVNULL,
     )
     assert outcome.returncode == 0, "Molior deploy exited with code {}".format(outcome)
+    deployment = "{}_{}_{}{}".format(project_name, project_version, utils.TESTPROJECT_VERSION, build_type_output)
+    # 1.5: the top level packages are installed in the deployment
+    if build_type in deployment_packages:
+        utils.check_packages(deployment, deployment_packages[build_type])
     # 1.5: the VM deployments boot in VirtualBox, a screenshot goes next to the deployment (artifact "tests-deploy")
     if build_type in ("installer", "vbox"):
-        utils.boot_vm("{}_{}_{}{}".format(project_name, project_version, utils.TESTPROJECT_VERSION, build_type_output))
+        utils.boot_vm(deployment)
