@@ -254,9 +254,14 @@ done
 
 [ $# -gt 0 ] || set -- smoke
 log "running tests: $*"
+# kubectl exec gives pytest no tty, so pytest would not color; colors (PASSED green, FAILED red, SKIPPED yellow,
+# which most terminals show as brown) only when this script writes to a terminal, not into logs or CI
+color=no
+[ -t 1 ] && color=yes
 set +e
 timeout --foreground "$RUN_TIMEOUT" kubectl -n molior exec test-runner -- \
-    python3 -m pytest -p no:cacheprovider -v --timeout="$TEST_TIMEOUT" --junitxml=/tmp/results/junit.xml "$@"
+    python3 -m pytest -p no:cacheprovider -v --color=$color --timeout="$TEST_TIMEOUT" \
+    --junitxml=/tmp/results/junit.xml "$@"
 TESTS_RC=$?
 set -e
 
