@@ -84,7 +84,7 @@ def test_molior_deploy(
     """
     logger.warning("==================================================== test_molior_deploy")
     # 1.4 ran it in the checkout; here in RESULTS_DIR: the deployment and its log (molior-deploy -L) stay there.
-    # No stdin: a question of molior-deploy (cleanup after an error) gets the default answer instead of waiting.
+    # No stdin: molior-deploy must not wait for an answer (test-deploy.sh: -c, cleanup on error without asking).
     outcome = subprocess.run(
         [
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "test-deploy.sh"),

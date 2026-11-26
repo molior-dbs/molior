@@ -14,7 +14,7 @@ set -x
 
 mkdir -p molior-deploy-output
 cd molior-deploy-output
-sudo molior-deploy -L -v $DEPLOYMENT_TYPE -n testproject -m $MOLIOR_SERVER -a $APTLY_SERVER $PROJECT_NAME $PROJECT_VERSION
+sudo molior-deploy -L -c -v $DEPLOYMENT_TYPE -n testproject -m $MOLIOR_SERVER -a $APTLY_SERVER $PROJECT_NAME $PROJECT_VERSION
 if [ "$?" -ne 0 ]; then
   echo Failed: Error running molior-deploy
   exit 1

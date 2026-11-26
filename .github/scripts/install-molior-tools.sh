@@ -11,6 +11,9 @@
 #   - virtualbox as packaged by the distribution (with its kernel module, virtualbox-dkms); the vbox plugin only
 #     creates the disk and the VM and exports the OVA (vboxmanage), it never starts a VM
 #   - python3 with pytest, pytest-timeout and requests (tests/deploy runs on the host)
+#   - /root/.moliorrc and /root/.netrc, if missing (molior-deploy runs with sudo, HOME=/root): without .moliorrc
+#     molior-deploy asks for the server URLs, writes the file and exits (-m and -a override its values); it calls
+#     curl -n, which fails without .netrc in curl 8.18 (Ubuntu 26.04: exit 26, no request is sent; 8.5 does not)
 set -eu
 
 REF=${1:?usage: $0 <git ref>}
@@ -38,6 +41,10 @@ git -C "$T/molior-tools" log --oneline -1
 (cd "$T/molior-tools" && dpkg-buildpackage -us -uc -b >"$T/build.log" 2>&1) || { cat "$T/build.log"; exit 1; }
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends "$T"/molior-tools_*_all.deb
 cat /usr/lib/molior-tools/version
+
+echo "== /root/.moliorrc, /root/.netrc"
+sudo sh -c 'test -e /root/.moliorrc || printf "MOLIOR_URL=\nMOLIOR_REPO_URL=\n" > /root/.moliorrc'
+sudo sh -c 'test -e /root/.netrc || install -m 600 /dev/null /root/.netrc'
 
 echo "== kernel module nbd (vbox variant)"
 sudo modprobe nbd
