@@ -183,10 +183,13 @@ curl -sf -o /dev/null "$MOLIOR_URL/api/status" || { echo "E: molior not reachabl
 
 [ $# -gt 0 ] || set -- test_deploy.py
 log "running tests: $*"
+# colors only when this script writes to a terminal, not into logs or CI (as the system tests); result lines with
+# start time, number and time of each test: tests/system/pytest_output.py, 140 columns as in the system test pod
 color=no
 [ -t 1 ] && color=yes
 set +e
-(cd tests/deploy && timeout --foreground "$RUN_TIMEOUT" python3 -m pytest -p no:cacheprovider -v --color=$color \
+(cd tests/deploy && PYTHONPATH="$TOP/tests/system" COLUMNS=140 timeout --foreground "$RUN_TIMEOUT" \
+    python3 -m pytest -p no:cacheprovider -p pytest_output -v --color=$color \
     --timeout="$TEST_TIMEOUT" --junitxml="$RESULTS_DIR/junit.xml" "$@")
 TESTS_RC=$?
 set -e

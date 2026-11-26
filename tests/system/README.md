@@ -26,4 +26,5 @@ Results (junit xml, screenshots of failed UI tests, server logs, server coverage
 | `test-web.Dockerfile` | test runner image: pytest, requests, selenium with headless chromium |
 | `ctzpos-cups.tar.xz` | repository for `test_mirror` of valid-1.4 (one package, signed), served by the test runner pod (git lfs) |
 | `conftest.py` | fixtures: API client (`public`, `admin`), unique names, screenshots on failure |
+| `pytest_output.py` | result lines (start time, number, location, result, time) and the start line; also used by `tests/deploy` |
 | `smoke/` | smoke tests: API and web UI, no mirror and no build |
