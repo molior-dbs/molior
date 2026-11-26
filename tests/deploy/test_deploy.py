@@ -72,13 +72,15 @@ deployment_packages = {
 @pytest.mark.after("test_deploy_testproject")
 @pytest.mark.parametrize(
     "build_type,build_type_output",
+    # 1.4 order: dir, docker, installer, lxd, vbox, image. 1.5: the fast content checks first, then the VM boots
+    # (vbox, then the installer, the slowest), so a broken deployment shows up early.
     [
         ("dir", "_dir.tar.gz"),
         ("docker", "_docker.tar.gz"),
-        ("installer", "_installer.iso"),
         ("lxd", "_lxd.tar.gz"),
-        ("vbox", "_vbox.ova"),
         ("image", "_image.img.gz"),
+        ("vbox", "_vbox.ova"),
+        ("installer", "_installer.iso"),
     ],
 )
 def test_molior_deploy(

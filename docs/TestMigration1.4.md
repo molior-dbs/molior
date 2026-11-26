@@ -529,10 +529,10 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     - installer: the ISO in a new VM with an empty 8 GB disk, booting from the disk first and then the ISO.
       `<deployment>.png` after `BOOT_WAIT` seconds (the hostname question), Enter (the default hostname), Enter
       (confirm the installation, `keyboardputscancode`). The installer is done when it ejects the ISO (the DVD drive
-      is empty) or the disk did not grow for `INSTALL_IDLE` seconds (default 120); after `INSTALL_WAIT` seconds
-      (default 1200) the test fails with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the
-      installer), Enter (reboot) and `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds.
-      The disk-idle fallback is to be removed (done only when the ISO is ejected, else the test fails), see below.
+      is empty); a failed installer does not eject it, so after `INSTALL_WAIT` seconds (default 1200) the test fails
+      with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the installer), Enter (reboot) and
+      `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. No disk monitoring (user
+      decision: the size of the VM disk says nothing about success; the disk-idle fallback was removed).
   - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
     (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
     the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
@@ -579,6 +579,7 @@ screen as the end of the installation.
 - Fix: testproject 3.0.15 (`deploy/installer.conf`): `INSTALLER_EXTRA_PACKAGES="e2fsprogs"` (user decision: in
   testproject, not in molior-tools). Other projects with ext file systems in the installer need the same line, or
   molior-tools should install e2fsprogs itself. Not verified in CI yet.
-- Still to do: remove the disk-idle fallback, so the test only passes when the installer ejected the ISO; a serial
+- The disk-idle fallback is removed: the test only passes when the installer ejected the ISO.
+- Still to do: a serial
   console for the ISO test (`console=ttyS0`, a VirtualBox UART to `<deployment>.serial.log`) would put the installer
   output in the test results.

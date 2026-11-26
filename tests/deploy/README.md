@@ -19,7 +19,7 @@ The tests, in this order:
 |---|---|
 | `test_deploy_basemirror` | setup: base mirror `trixie/13` (amd64), filtered to what the build and the deployments need |
 | `test_deploy_testproject` | setup: project `molior-validation/1` with https://github.com/molior-dbs/testproject.git, waits for its build |
-| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, installer, lxd, vbox and image; 1.5: a few top level packages are installed in the dir, docker, lxd and image deployments (`deployment_packages`, read from their dpkg status file without root), the installer ISO and the vbox OVA boot in VirtualBox (headless, screenshots; the installer installs onto the VM disk and the installed system boots, see below) |
+| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, lxd, image, vbox and installer (fast content checks first, the VM boots last; 1.4: dir, docker, installer, lxd, vbox, image); 1.5: a few top level packages are installed in the dir, docker, lxd and image deployments (`deployment_packages`, read from their dpkg status file without root), the installer ISO and the vbox OVA boot in VirtualBox (headless, screenshots; the installer installs onto the VM disk and the installed system boots, see below) |
 
 Needs on the host: docker, k3d, helm, kubectl, python3 with pytest, pytest-timeout and requests, sudo without
 password for `molior-deploy` (`<user> ALL=(root) NOPASSWD: /usr/sbin/molior-deploy`),
@@ -43,4 +43,4 @@ The VM deployments boot in VirtualBox (headless, `utils.boot_vm`), the screensho
 | Deployment | Screenshots |
 |---|---|
 | vbox (OVA) | `<deployment>.png` after `BOOT_WAIT` seconds (default 60): the LXDE desktop (autologin of the user `molior`) |
-| installer (ISO, VM with an empty 8 GB disk) | `<deployment>.png` after `BOOT_WAIT` seconds: the hostname question; then Enter (default hostname) and Enter (confirm); `<deployment>.done.png` when the installer is done (it ejected the ISO, or the disk did not grow for `INSTALL_IDLE` seconds, default 120); Enter (reboot); `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. Not done after `INSTALL_WAIT` seconds (default 1200): fails with `<deployment>.failed.png` |
+| installer (ISO, VM with an empty 8 GB disk) | `<deployment>.png` after `BOOT_WAIT` seconds: the hostname question; then Enter (default hostname) and Enter (confirm); `<deployment>.done.png` when the installer is done (it ejected the ISO); Enter (reboot); `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. ISO not ejected after `INSTALL_WAIT` seconds (default 1200, a failed installer does not eject it): fails with `<deployment>.failed.png` |

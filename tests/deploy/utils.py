@@ -22,9 +22,8 @@ MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
-# installer: how long the installation may take, and how long the disk does not grow when the installer is done
+# installer: how long the installation may take (until it ejects the ISO)
 INSTALL_WAIT = int(os.environ.get("INSTALL_WAIT", "1200"))
-INSTALL_IDLE = int(os.environ.get("INSTALL_IDLE", "120"))
 # where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
 # the screenshots, artifact "tests-deploy")
 DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
@@ -171,10 +170,10 @@ def press_enter(vm):
     vboxmanage("controlvm", vm, "keyboardputscancode", "1c", "9c")
 
 
-def wait_installed(vm, path, disk, dvd):
-    """Waits until the installer in the VM is done: it ejects the ISO (the DVD drive is empty), or the disk did not
-    grow for INSTALL_IDLE seconds after it grew. Fails after INSTALL_WAIT seconds (screenshot <path>.failed.png)."""
-    start, size, idle = time.time(), os.path.getsize(disk), None
+def wait_installed(vm, path, dvd):
+    """Waits until the installer in the VM is done: it ejects the ISO (the DVD drive is empty). A failed installer
+    does not eject it. Fails after INSTALL_WAIT seconds (screenshot <path>.failed.png)."""
+    start = time.time()
     while time.time() - start < INSTALL_WAIT:
         time.sleep(10)
         info = vm_info(vm)
@@ -183,15 +182,9 @@ def wait_installed(vm, path, disk, dvd):
         if info.get(dvd) in ("emptydrive", "none"):
             logger.warning("installer done after %d s: the ISO is ejected", time.time() - start)
             return
-        if os.path.getsize(disk) != size:
-            size, idle = os.path.getsize(disk), time.time()
-        elif idle and time.time() - idle >= INSTALL_IDLE:
-            logger.warning("installer done after %d s: the disk (%d MB) did not grow for %d s",
-                           time.time() - start, size // 2**20, INSTALL_IDLE)
-            return
     vboxmanage("controlvm", vm, "screenshotpng", path + ".failed.png", check=False)
-    raise AssertionError("installer in the VM of {} not done after {} s (disk {} MB), see {}.failed.png".format(
-        os.path.basename(path), INSTALL_WAIT, size // 2**20, os.path.basename(path)))
+    raise AssertionError("installer in the VM of {} did not eject the ISO within {} s, see {}.failed.png".format(
+        os.path.basename(path), INSTALL_WAIT, os.path.basename(path)))
 
 
 def boot_vm(deployment):
@@ -230,7 +223,7 @@ def boot_vm(deployment):
             press_enter(vm)     # the hostname question: the default (TARGET_HOSTNAME)
             time.sleep(10)
             press_enter(vm)     # "Are you sure to install to /dev/sda ?"
-            wait_installed(vm, path, disk, "SATA-1-0")
+            wait_installed(vm, path, "SATA-1-0")
             vm_running(vm, path, "done.", "at the end of the installation")
             press_enter(vm)     # "press 'Enter' to reboot"
             time.sleep(BOOT_WAIT)
