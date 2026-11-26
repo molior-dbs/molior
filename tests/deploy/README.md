@@ -30,4 +30,4 @@ installs all of them on a CI runner (molior-tools is built from its git tag). Al
 
 Results (junit xml, server logs, server coverage) go to `RESULTS_DIR` (default `./deploy-test-results`), the
 deployments and the log of each `molior-deploy` call (`-L`) to `RESULTS_DIR/molior-deploy-output/` (several GB). CI
-uploads them as the artifact `deployments` (7 days).
+uploads the logs and the screenshots of the VMs with the other results (artifact `tests-deploy`), not the deployments.

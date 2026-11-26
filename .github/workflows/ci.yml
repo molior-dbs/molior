@@ -316,8 +316,9 @@ jobs:
           python3 .github/scripts/summary.py junit "Deploy tests" "$RESULTS_DIR/junit.xml" "$RESULTS_DIR/deploy-tests.txt"
           python3 .github/scripts/summary.py logs "Server logs (deploy tests)" "$RESULTS_DIR"/*.log
 
-      # molior-deploy-output/ is uploaded separately: the deployments (tar.gz, iso, ova, img.gz) and the log of each
-      # molior-deploy call (<project>_<version>_<variant>_<date>.log, molior-deploy -L), several GB
+      # from molior-deploy-output/ only the log of each molior-deploy call (<project>_<version>_<variant>_<date>.log,
+      # molior-deploy -L) and of each VM (<deployment>.VBox.log) and the screenshots (<deployment>.png), not the
+      # deployments themselves (tar.gz, iso, ova, img.gz: several GB)
       - name: Upload deploy test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -327,17 +328,9 @@ jobs:
             deploy-test-results/
             !deploy-test-results/buildout/
             !deploy-test-results/molior-deploy-output/
+            deploy-test-results/molior-deploy-output/*.log
+            deploy-test-results/molior-deploy-output/*.png
           if-no-files-found: error
-
-      - name: Upload deployments and their logs
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: deployments
-          path: deploy-test-results/molior-deploy-output/
-          compression-level: 0  # the deployments are compressed already
-          retention-days: 7
-          if-no-files-found: warn
 
   coverage:
     name: Combine Coverage

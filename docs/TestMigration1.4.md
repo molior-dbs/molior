@@ -507,7 +507,8 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
     (the deployments and their logs are uploaded); stdin is `/dev/null` (the cleanup question of molior-deploy gets
     the default).
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, and the
-    deployment file is kept (1.4: `rm -f $IMG_FILE`); CI uploads both as the artifact `deployments`.
+    deployment file is kept (1.4: `rm -f $IMG_FILE`); CI uploads the logs (and the screenshots of the VMs) with the
+    test results (artifact `tests-deploy`), not the deployments.
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
     (`utils.boot_vm`: the OVA imported, the ISO in a new VM with an empty 8 GB disk; headless, own `VBOX_USER_HOME`),
     a screenshot after `BOOT_WAIT` seconds (default 60) and the VM log go next to the deployment

@@ -21,7 +21,8 @@ BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
 TESTPROJECT_VERSION = "3.0.12"
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
-# where test-deploy.sh runs molior-deploy: the deployments and their logs (artifact "deployments" in CI)
+# where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
+# the screenshots, artifact "tests-deploy")
 DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
 # build states that do not change any more (molior/model/build.py BUILD_STATES)
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "already_failed", "nothing_done")
