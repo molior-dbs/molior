@@ -183,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `testproject` | testproject | v3.0.14 | tests 2, deploy |
+| testproject | `testproject` | testproject | v3.0.15 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -546,9 +546,11 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     same pattern (`utils.deployments`). 1.4 expected `<project>_<version>_3.0.11<suffix>`, the version of
     `testproject` (debian/changelog) fixed in the script; molior builds the latest tag of testproject, so a new tag
     broke the tests (and the upload of the failed deployments) until the script was changed. testproject versions:
-    3.0.14 adds the desktop background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE`
-    in the deploy files (molior-tools 1.5 has no default for it any more).
-  - testproject 3.0.14 (tag `v3.0.14`, commit `d1e4bc0`, pushed 2026-11-26) adds a desktop background to the vbox
+    3.0.15 installs e2fsprogs in the installer initrd (see the known problem below), 3.0.14 adds the desktop
+    background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE` in the deploy files
+    (molior-tools 1.5 has no default for it any more).
+  - testproject 3.0.14 (tag `v3.0.14`, commit `6dfffcc`; rewritten and force-pushed on 2026-11-26 to replace the
+    image, first `d1e4bc0`, then `e506fc5`; the image has no EXIF data) adds a desktop background to the vbox
     deployment (the 3.0.13 screenshot has a black background: `lxde-common` sets the pcmanfm wallpaper to
     `/etc/alternatives/desktop-background`, which only `desktop-base` provides, and it is not installed, not wanted).
     `vbox/background.jpg` (git lfs, `.gitattributes`) is installed to `/usr/share/testproject/background.jpg`, and
@@ -557,22 +559,26 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     --create-home`, which copies it to `~/.config/pcmanfm/LXDE/` (pcmanfm runs as `--desktop --profile LXDE`, the
     user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment).
 
-### Known problem: the ISO installation fails
+### Known problem: the ISO installation fails (mkfs.ext4 missing in the initrd)
 
-The installer deployment (`testproject-devel`, `deploy/installer.conf`) boots and asks its questions, but the
-installation into the VM fails. Seen in CI run 45833279920 (molior commit `86d870f`, testproject 3.0.13):
-`installer.iso.done.png` shows `creating partitions on /dev/sda`, `mkswap /dev/sda1`, `mkfs /dev/sda2`, then
-`E: Installation failed` and the BusyBox shell of `log_error`; `installer.iso.installed.png` shows the same shell (the
-reboot Enter went to it). The ISO was not ejected (VBox.log `SCSI-Eject/Insert 0 calls`); the test passed because
-the disk-idle fallback took the error screen as the end of the installation.
+The installer deployment (`testproject-devel`, `deploy/installer.conf`) booted and asked its questions, but the
+installation into the VM failed. Seen in CI run 45833279920 (molior commit `86d870f`, testproject 3.0.13) and run
+45852004798 (`c56fbaa`, testproject 3.0.14): `installer.iso.done.png` shows `creating partitions on /dev/sda`,
+`mkswap /dev/sda1`, `mkfs /dev/sda2`, then `E: Installation failed` and the BusyBox shell of `log_error`. The ISO was
+not ejected (VBox.log `SCSI-Eject/Insert 0 calls`); the test passed because the disk-idle fallback took the error
+screen as the end of the installation.
 
-- The disk is big enough: 8 GiB (swap 512 MiB, root about 7.5 GiB; `INSTALLER_DISK_MIN` 3).
-- The error message of the failed step goes to `/var/log/installer.log` in the VM, not to the screen, and the VM disk
-  is deleted after the test, so the cause is not known yet.
-- Probably a package change in trixie (the installer worked in 1.4 on older Debian releases): the initrd of the ISO is
-  built by molior-deploy from the packages of the base mirror (`mkfs` and its file system tools in the initrd).
-  Not checked which package or tool changed.
-- Next steps: a serial console for the ISO test (`console=ttyS0` in the installer kernel command line, a VirtualBox
-  UART to `<deployment>.serial.log`), so that the installer output and the error are in the test results; remove the
-  disk-idle fallback, so the test fails on this; then find the failing tool in the initrd (it was extracted to
-  `/tmp/initrd.img` on the agent host for the analysis).
+- Cause: `mkfs.ext4` is not in the initrd. The installer hook of molior-tools
+  (`initrd-installer/hooks/installer`) copies `/usr/sbin/mke2fs` and `/usr/sbin/mkswap` to `/mbin`, and
+  `init-premount/installer` links `mkfs.ext2/3/4` to `mke2fs` there. In the root the initrd is built from
+  (`plugins/installer.plugin`, `apt-get install` of `INSTALLER_EXTRA_PACKAGES`, the kernel, busybox,
+  initramfs-tools, ...) e2fsprogs was not installed, so the copy was skipped: in the initrd of the 3.0.14 ISO
+  `/usr/sbin/mke2fs` and `/usr/sbin/mkswap` are busybox (same inode), `/mbin` has no `mke2fs` and `mkswap`, and
+  there is no `libext2fs`. busybox has `mke2fs` and `mkswap`, but no `mkfs.ext4`, so swap worked and ext4 failed.
+  Found by booting the ISO of CI run 45854001850 (artifact `installer-iso`) in qemu.
+- Fix: testproject 3.0.15 (`deploy/installer.conf`): `INSTALLER_EXTRA_PACKAGES="e2fsprogs"` (user decision: in
+  testproject, not in molior-tools). Other projects with ext file systems in the installer need the same line, or
+  molior-tools should install e2fsprogs itself. Not verified in CI yet.
+- Still to do: remove the disk-idle fallback, so the test only passes when the installer ejected the ISO; a serial
+  console for the ISO test (`console=ttyS0`, a VirtualBox UART to `<deployment>.serial.log`) would put the installer
+  output in the test results.
