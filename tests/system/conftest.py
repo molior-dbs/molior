@@ -8,6 +8,12 @@ from moliortest import Api, ADMIN_PASSWORD
 
 # result lines with start time, number and time of each test (also used by tests/deploy)
 pytest_plugins = ["pytest_output"]
+# minutes a run of all system tests takes about (the eta after the start time, pytest_output.py)
+RUN_MINUTES = 25
+
+
+def pytest_output_run_minutes(config):
+    return RUN_MINUTES
 
 
 @pytest.fixture

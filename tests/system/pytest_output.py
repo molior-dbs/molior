@@ -1,15 +1,29 @@
-"""Output of the system and deploy tests (pytest -v): the start time after "collected N items", and result lines
-with the start time, the number, the location, the result and the time of each test. Loaded by
-tests/system/conftest.py (pytest_plugins) and by tests/deploy/deploy-tests.sh (-p pytest_output)."""
+"""Output of the system and deploy tests (pytest -v): the start time and the estimated end of the run after
+"collected N items", and result lines with the start time, the number, the location, the result and the time of each
+test. Loaded by tests/system/conftest.py (pytest_plugins) and by tests/deploy/deploy-tests.sh (-p pytest_output)."""
 import datetime
 import math
 
 import pytest
 
 
+class Hooks:
+    @pytest.hookspec(firstresult=True)
+    def pytest_output_run_minutes(self, config):
+        """Minutes a run of all tests of the suite takes about (RUN_MINUTES of its conftest.py), for the eta."""
+
+
+def pytest_addhooks(pluginmanager):
+    pluginmanager.add_hookspecs(Hooks)
+
+
 def pytest_report_collectionfinish(config, start_path, items):
-    """The start time of the tests, after the "collected N items" line."""
-    return "start: " + datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    """The start time of the tests and the estimated end of a run of all tests, after the "collected N items" line:
+        "start: 2026-11-26 13:56:59 UTC [eta 14:19]" """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    minutes = config.hook.pytest_output_run_minutes(config=config)
+    eta = " [eta {}]".format((now + datetime.timedelta(minutes=minutes)).strftime("%H:%M")) if minutes else ""
+    return "start: " + now.strftime("%Y-%m-%d %H:%M:%S UTC") + eta
 
 
 _setup_time = {}   # nodeid: setup time of a test whose setup passed (added to its call time)

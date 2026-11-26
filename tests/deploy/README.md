@@ -4,7 +4,8 @@
 chart (`charts/`, values `tests/deploy/values.yaml`) and maps the molior API (NodePort 30080) and the APT repos
 (NodePort 30088) to free ports on `127.0.0.1`. pytest runs **on the host**, because molior-deploy (molior-tools)
 needs root, loop devices, nbd, docker and virtualbox. Then it collects the results and removes the cluster. The output is the one of the system tests
-(`tests/system/pytest_output.py`: start time, number and time of each test; colors only on a terminal).
+(`tests/system/pytest_output.py`: start time, number and time of each test, the eta of the run from `RUN_MINUTES`
+in `conftest.py` (20); colors only on a terminal).
 
 ```
 make deploy-tests                                         # all deploy tests, as in CI

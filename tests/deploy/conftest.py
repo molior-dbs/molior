@@ -5,6 +5,14 @@ import pytest
 import utils
 
 
+# minutes a run of all deploy tests takes about (the eta after the start time, tests/system/pytest_output.py)
+RUN_MINUTES = 20
+
+
+def pytest_output_run_minutes(config):
+    return RUN_MINUTES
+
+
 def pytest_configure(config):
     # marks of the 1.4 test (molior-testing validation_tests.py); the tests run in file order
     config.addinivalue_line("markers", "metadata(**kwargs): validation metadata (id, author, requirements)")
