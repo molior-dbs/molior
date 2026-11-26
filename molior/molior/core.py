@@ -188,12 +188,16 @@ def get_target_arch(build, session):
     for arch in TARGET_ARCH_ORDER:
         if arch in db2array(build.projectversion.mirror_architectures):
             if build.buildtype == "deb":
+                # external uploads have no source repository
+                if not build.sourcerepository:
+                    continue
+                # the repository may have been removed from the projectversion
                 sourepprover = session.query(SouRepProVer).filter(
                         SouRepProVer.sourcerepository_id == build.sourcerepository.id,
                         SouRepProVer.projectversion_id == build.projectversion.id).first()
-                if arch not in db2array(sourepprover.architectures):
-                    continue
                 if not sourepprover:
+                    continue
+                if arch not in db2array(sourepprover.architectures):
                     continue
             return arch
     return None

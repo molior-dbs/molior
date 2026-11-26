@@ -184,6 +184,44 @@ def test_get_target_arch():
     assert ret == "i386"
 
 
+def test_get_target_arch_deb():
+    """
+    Test get target architecture of a deb build: the first arch of the projectversion
+    that the source repository is built for
+    """
+    build = MagicMock()
+    session = MagicMock()
+    build.projectversion.mirror_architectures = "{armhf,i386,amd64}"
+    build.buildtype = "deb"
+    session.query.return_value.filter.return_value.first.return_value.architectures = "{amd64,armhf}"
+    assert get_target_arch(build, session) == "amd64"
+
+
+def test_get_target_arch_deb_without_sourcerepository():
+    """
+    Test get target architecture of a deb build without source repository (external upload)
+    """
+    build = MagicMock()
+    session = MagicMock()
+    build.projectversion.mirror_architectures = "{amd64}"
+    build.buildtype = "deb"
+    build.sourcerepository = None
+    assert get_target_arch(build, session) is None
+    session.query.assert_not_called()
+
+
+def test_get_target_arch_deb_repository_not_in_projectversion():
+    """
+    Test get target architecture of a deb build whose repository was removed from the projectversion
+    """
+    build = MagicMock()
+    session = MagicMock()
+    build.projectversion.mirror_architectures = "{amd64}"
+    build.buildtype = "deb"
+    session.query.return_value.filter.return_value.first.return_value = None
+    assert get_target_arch(build, session) is None
+
+
 @pytest.mark.parametrize(
     "test_input,expected",
     [
