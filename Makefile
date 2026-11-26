@@ -156,13 +156,13 @@ unit-tests: docker-image-ci  ## Run the unit tests with coverage (in TEST_IMAGE)
 		--junitxml=unit-test-report.xml tests/unit
 
 # tests/system/system-tests.sh uses docker, so the base image is built with docker too
-system-tests:  ## Run the system tests in a throwaway k3d cluster (TEST=valid-1.4/validation_tests.py::test_build_order)
+system-tests:  ## Run the system tests in a temporary k3d cluster (TEST=valid-1.4/validation_tests.py::test_build_order)
 	@$(MAKE) --no-print-directory docker-image-base DOCKERCMD=docker
 	tests/system/system-tests.sh $(TEST)
 
 # runs pytest on this host: needs molior-deploy (molior-tools), passwordless sudo and the host tools of the variants
 # (CI: .github/scripts/install-molior-tools.sh)
-deploy-tests:  ## Run the deploy tests (molior-deploy on this host) against a throwaway k3d cluster
+deploy-tests:  ## Run the deploy tests (molior-deploy on this host) against a temporary k3d cluster
 	@$(MAKE) --no-print-directory docker-image-base DOCKERCMD=docker
 	tests/deploy/deploy-tests.sh $(DEPLOY_TEST)
 

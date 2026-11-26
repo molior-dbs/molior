@@ -183,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `testproject` | testproject | v3.0.12 | tests 2, deploy |
+| testproject | `testproject` | testproject | v3.0.13 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -514,13 +514,20 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     screenshots); stdin is `/dev/null`.
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
     does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l
-    $IMG_FILE`); the testproject version is 3.0.12 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
+    $IMG_FILE`); the testproject version is 3.0.13 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
     VMs) with the test results (artifact `tests-deploy`), not the deployments.
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
-    (`utils.boot_vm`: the OVA imported, the ISO in a new VM with an empty 8 GB disk; headless, own `VBOX_USER_HOME`),
-    a screenshot after `BOOT_WAIT` seconds (default 60) and the VM log go next to the deployment
-    (`<deployment>.png`, `<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more.
+    (`utils.boot_vm`: headless, own `VBOX_USER_HOME`); the screenshots and the VM log go next to the deployment
+    (`<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more at a screenshot.
     No login check. The 1.4 test only checked that the file exists.
+    - vbox: the OVA is imported, screenshot `<deployment>.png` after `BOOT_WAIT` seconds (default 60). testproject
+      3.0.13 logs in the user `molior` automatically (lightdm autologin into LXDE).
+    - installer: the ISO in a new VM with an empty 8 GB disk, booting from the disk first and then the ISO.
+      `<deployment>.png` after `BOOT_WAIT` seconds (the hostname question), Enter (the default hostname), Enter
+      (confirm the installation, `keyboardputscancode`). The installer is done when it ejects the ISO (the DVD drive
+      is empty) or the disk did not grow for `INSTALL_IDLE` seconds (default 120); after `INSTALL_WAIT` seconds
+      (default 1200) the test fails with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the
+      installer), Enter (reboot) and `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds.
   - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
     (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
     the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
@@ -529,6 +536,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.
-  - `test-deploy.sh` expects `<project>_<version>_3.0.12<suffix>`: the version of `testproject` (debian/changelog) is
-    fixed in the script, as in 1.4 (there 3.0.11). 3.0.12 sets `INSTALL_PACKAGE` in the deploy files: molior-tools
+  - `test-deploy.sh` expects `<project>_<version>_3.0.13<suffix>`: the version of `testproject` (debian/changelog) is
+    fixed in the script, as in 1.4 (there 3.0.11). 3.0.13 adds the autologin of the vbox deployment. 3.0.12 sets
+    `INSTALL_PACKAGE` in the deploy files: molior-tools
     1.5 has no default for it any more.

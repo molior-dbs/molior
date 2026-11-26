@@ -20,9 +20,12 @@ RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
 # version of the testproject packages in the deployment file names (as fixed in test-deploy.sh)
-TESTPROJECT_VERSION = "3.0.12"
+TESTPROJECT_VERSION = "3.0.13"
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
+# installer: how long the installation may take, and how long the disk does not grow when the installer is done
+INSTALL_WAIT = int(os.environ.get("INSTALL_WAIT", "1200"))
+INSTALL_IDLE = int(os.environ.get("INSTALL_IDLE", "120"))
 # where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
 # the screenshots, artifact "tests-deploy")
 DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
@@ -142,14 +145,62 @@ def vboxmanage(*args, check=True):
     return r.stdout
 
 
+def vm_info(vm):
+    """showvminfo --machinereadable of a VM as a dict."""
+    return {k.strip('"'): v.strip('"') for k, _, v in (line.partition("=") for line in vboxmanage(
+            "showvminfo", vm, "--machinereadable", check=False).splitlines())}
+
+
+def vm_running(vm, path, name, what):
+    """Fails unless the VM runs, else takes the screenshot <path>.<name>png (name "" or "done." ...)."""
+    state = vm_info(vm).get("VMState")
+    assert state == "running", "VM of {} {}: {}".format(os.path.basename(path), what, state)
+    vboxmanage("controlvm", vm, "screenshotpng", path + "." + name + "png")
+    assert os.path.getsize(path + "." + name + "png") > 0, "empty screenshot {}{}png".format(path, name)
+
+
+def press_enter(vm):
+    """Presses and releases Enter on the keyboard of the VM."""
+    vboxmanage("controlvm", vm, "keyboardputscancode", "1c", "9c")
+
+
+def wait_installed(vm, path, disk, dvd):
+    """Waits until the installer in the VM is done: it ejects the ISO (the DVD drive is empty), or the disk did not
+    grow for INSTALL_IDLE seconds after it grew. Fails after INSTALL_WAIT seconds (screenshot <path>.failed.png)."""
+    start, size, idle = time.time(), os.path.getsize(disk), None
+    while time.time() - start < INSTALL_WAIT:
+        time.sleep(10)
+        info = vm_info(vm)
+        assert info.get("VMState") == "running", "VM of {} during the installation: {}".format(
+            os.path.basename(path), info.get("VMState"))
+        if info.get(dvd) in ("emptydrive", "none"):
+            logger.warning("installer done after %d s: the ISO is ejected", time.time() - start)
+            return
+        if os.path.getsize(disk) != size:
+            size, idle = os.path.getsize(disk), time.time()
+        elif idle and time.time() - idle >= INSTALL_IDLE:
+            logger.warning("installer done after %d s: the disk (%d MB) did not grow for %d s",
+                           time.time() - start, size // 2**20, INSTALL_IDLE)
+            return
+    vboxmanage("controlvm", vm, "screenshotpng", path + ".failed.png", check=False)
+    raise AssertionError("installer in the VM of {} not done after {} s (disk {} MB), see {}.failed.png".format(
+        os.path.basename(path), INSTALL_WAIT, size // 2**20, os.path.basename(path)))
+
+
 def boot_vm(deployment):
-    """Starts a VirtualBox VM of a deployment headless (an OVA is imported, an ISO boots in a new VM with an empty
-    disk), takes a screenshot after BOOT_WAIT seconds and removes the VM. The screenshot (<deployment>.png) and the log
-    of the VM (<deployment>.VBox.log) go next to the deployment. Fails if the VM does not start or does not run any
-    more at the screenshot. VirtualBox runs with its own home (VBOX_USER_HOME), the user's VMs are not touched."""
+    """Boots a deployment in a VirtualBox VM (headless) and removes the VM. Screenshots and the log of the VM
+    (<deployment>.VBox.log) go next to the deployment. VirtualBox runs with its own home (VBOX_USER_HOME), the user's
+    VMs are not touched.
+    OVA: imported, screenshot <deployment>.png after BOOT_WAIT seconds.
+    ISO (installer): a new VM with an empty disk, booting from the disk first and then the ISO. Screenshot
+    <deployment>.png after BOOT_WAIT seconds (the hostname question), Enter for the default hostname and Enter to
+    confirm the installation; when the installer is done (wait_installed) <deployment>.done.png, Enter to reboot, and
+    <deployment>.installed.png of the installed system after BOOT_WAIT seconds.
+    Fails if the VM does not start or does not run any more at a screenshot."""
     path = os.path.join(DEPLOY_OUTPUT, deployment)
     vm = "deploy-test-{}".format(os.getpid())
     home = tempfile.mkdtemp(prefix="molior-deploy-vbox-")
+    disk = os.path.join(home, vm + ".vdi")
     os.environ["VBOX_USER_HOME"] = home
     try:
         vboxmanage("setproperty", "machinefolder", home)
@@ -157,29 +208,32 @@ def boot_vm(deployment):
             vboxmanage("import", path, "--vsys", "0", "--vmname", vm)
         else:
             vboxmanage("createvm", "--name", vm, "--ostype", "Debian_64", "--register")
-            vboxmanage("modifyvm", vm, "--memory", "2048", "--graphicscontroller", "vmsvga", "--boot1", "dvd",
-                       "--boot2", "disk", "--boot3", "none", "--boot4", "none")
-            vboxmanage("createmedium", "disk", "--filename", os.path.join(home, vm + ".vdi"), "--size", "8192")
+            vboxmanage("modifyvm", vm, "--memory", "2048", "--graphicscontroller", "vmsvga", "--boot1", "disk",
+                       "--boot2", "dvd", "--boot3", "none", "--boot4", "none")
+            vboxmanage("createmedium", "disk", "--filename", disk, "--size", "8192")
             vboxmanage("storagectl", vm, "--name", "SATA", "--add", "sata", "--portcount", "2")
             vboxmanage("storageattach", vm, "--storagectl", "SATA", "--port", "0", "--device", "0", "--type", "hdd",
-                       "--medium", os.path.join(home, vm + ".vdi"))
+                       "--medium", disk)
             vboxmanage("storageattach", vm, "--storagectl", "SATA", "--port", "1", "--device", "0",
                        "--type", "dvddrive", "--medium", path)
         vboxmanage("startvm", vm, "--type", "headless")
         time.sleep(BOOT_WAIT)
-        info = vboxmanage("showvminfo", vm, "--machinereadable")
-        state = [line.split("=", 1)[1].strip('"') for line in info.splitlines() if line.startswith("VMState=")]
-        if state == ["running"]:
-            vboxmanage("controlvm", vm, "screenshotpng", path + ".png")
-        assert state == ["running"], "VM of {} after {} s: {}".format(deployment, BOOT_WAIT, state)
-        assert os.path.getsize(path + ".png") > 0, "empty screenshot of {}".format(deployment)
+        vm_running(vm, path, "", "after {} s".format(BOOT_WAIT))
+        if deployment.endswith(".iso"):
+            press_enter(vm)     # the hostname question: the default (TARGET_HOSTNAME)
+            time.sleep(10)
+            press_enter(vm)     # "Are you sure to install to /dev/sda ?"
+            wait_installed(vm, path, disk, "SATA-1-0")
+            vm_running(vm, path, "done.", "at the end of the installation")
+            press_enter(vm)     # "press 'Enter' to reboot"
+            time.sleep(BOOT_WAIT)
+            vm_running(vm, path, "installed.", "{} s after the reboot".format(BOOT_WAIT))
     finally:
         vboxmanage("controlvm", vm, "poweroff", check=False)
         time.sleep(3)
-        cfg = [line.split("=", 1)[1].strip('"') for line in vboxmanage("showvminfo", vm, "--machinereadable",
-               check=False).splitlines() if line.startswith("CfgFile=")]
-        if cfg and os.path.exists(os.path.join(os.path.dirname(cfg[0]), "Logs", "VBox.log")):
-            shutil.copy(os.path.join(os.path.dirname(cfg[0]), "Logs", "VBox.log"), path + ".VBox.log")
+        cfg = vm_info(vm).get("CfgFile")
+        if cfg and os.path.exists(os.path.join(os.path.dirname(cfg), "Logs", "VBox.log")):
+            shutil.copy(os.path.join(os.path.dirname(cfg), "Logs", "VBox.log"), path + ".VBox.log")
         vboxmanage("unregistervm", vm, "--delete", check=False)   # also deletes the disks of the VM
         os.environ.pop("VBOX_USER_HOME", None)
         shutil.rmtree(home, ignore_errors=True)

@@ -114,6 +114,7 @@ def test_molior_deploy(
     # 1.5: the top level packages are installed in the deployment
     if build_type in deployment_packages:
         utils.check_packages(deployment, deployment_packages[build_type])
-    # 1.5: the VM deployments boot in VirtualBox, a screenshot goes next to the deployment (artifact "tests-deploy")
+    # 1.5: the VM deployments boot in VirtualBox (the installer installs and the installed system boots), the
+    # screenshots go next to the deployment (artifact "tests-deploy")
     if build_type in ("installer", "vbox"):
         utils.boot_vm(deployment)
