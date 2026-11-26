@@ -83,7 +83,7 @@ def test_molior_deploy(
     Tests molior deploy
     """
     logger.warning("==================================================== test_molior_deploy")
-    # 1.4 ran it in the checkout; here in RESULTS_DIR, where molior-deploy leaves the log of a failed deployment.
+    # 1.4 ran it in the checkout; here in RESULTS_DIR: the deployment and its log (molior-deploy -L) stay there.
     # No stdin: a question of molior-deploy (cleanup after an error) gets the default answer instead of waiting.
     outcome = subprocess.run(
         [

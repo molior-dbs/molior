@@ -504,8 +504,10 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
     In 1.4 the mirror and the build came from the tests before it (`after("test_build_notification")`, now
     `after("test_deploy_testproject")`).
   - The test: same metadata, parameters and arguments; the script path is absolute and the cwd is `RESULTS_DIR`
-    (failed deployment logs are uploaded); stdin is `/dev/null` (the cleanup question of molior-deploy gets the
-    default).
+    (the deployments and their logs are uploaded); stdin is `/dev/null` (the cleanup question of molior-deploy gets
+    the default).
+  - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, and the
+    deployment file is kept (1.4: `rm -f $IMG_FILE`); CI uploads both as the artifact `deployments`.
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.

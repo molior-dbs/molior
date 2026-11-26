@@ -27,5 +27,6 @@ installs all of them on a CI runner (molior-tools is built from its git tag). Al
 (`make deploy-tests` builds it when it is missing). The molior image is the one of the system tests
 (`tests/system/test.Dockerfile`, with server coverage).
 
-Results (junit xml, server logs, server coverage, the logs of failed deployments in `molior-deploy-output/`) go to
-`RESULTS_DIR` (default `./deploy-test-results`). A successful deployment is removed by `test-deploy.sh`.
+Results (junit xml, server logs, server coverage) go to `RESULTS_DIR` (default `./deploy-test-results`), the
+deployments and the log of each `molior-deploy` call (`-L`) to `RESULTS_DIR/molior-deploy-output/` (several GB). CI
+uploads them as the artifact `deployments` (7 days).

@@ -8,7 +8,7 @@
 # and sudo without password for molior-deploy, the only command that runs as root):
 #   tests/deploy/deploy-tests.sh [pytest args, default: test_deploy.py]
 # Environment:
-#   RESULTS_DIR   where junit xml, logs, coverage and the logs of failed deployments go
+#   RESULTS_DIR   where junit xml, logs and coverage go; molior-deploy-output/: the deployments and their logs
 #                 (default: ./deploy-test-results)
 #   KEEP=1        do not remove the cluster at the end (for debugging; remove it later with CLEANUP_ONLY=<id>)
 #   CLEANUP_ONLY=<id>  only remove the cluster and registry of an earlier run (e.g. deploy-12345)
