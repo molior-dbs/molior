@@ -20,19 +20,29 @@ TEST ?= smoke valid-1.4/validation_tests.py
 IMAGE_SOURCE ?=
 IMAGE_LABEL = $(if $(IMAGE_SOURCE),--label org.opencontainers.image.source=$(IMAGE_SOURCE))
 IMAGES := molior molior-postgres aptly molior-nginx
+# lint and unit-tests always run in this image with the source tree mounted, never with a local flake8 or pytest
+# (molior-base plus the python packages the unit tests import, docker/ci.Dockerfile; built if missing)
+TEST_IMAGE ?= molior-ci:dev
 ALL_APPS := molior,aptly
 
 KUBECTL_LOCAL = kubectl --context k3d-$(K3D_CLUSTER) -n $(NAMESPACE)
 HELM_LOCAL = helm --kube-context k3d-$(K3D_CLUSTER) -n $(NAMESPACE)
 
-ifneq ($(shell which podman 2>/dev/null),)
-  DOCKERCMD := podman
+# podman if installed, else docker; DOCKERCMD from the environment or the command line wins (CI sets docker)
+ifndef DOCKERCMD
+  ifneq ($(shell which podman 2>/dev/null),)
+    DOCKERCMD := podman
+  else ifneq ($(shell which docker 2>/dev/null),)
+    DOCKERCMD := docker
+  else
+    # lazy: only fails when a docker target is used (a host without either can still run the other targets)
+    DOCKERCMD = $(error Neither podman nor docker found in PATH)
+  endif
+endif
+ifeq ($(DOCKERCMD),podman)
   PODMAN_K3D_REGISTRY_ARGS := --default-network podman
-else ifneq ($(shell which docker 2>/dev/null),)
-  DOCKERCMD := docker
-else
-  # lazy: only fails when a docker target is used (a host without either can still run the other targets)
-  DOCKERCMD = $(error Neither podman nor docker found in PATH)
+  # rootless podman: files written to the mounted tree belong to the calling user
+  TEST_USER_ARGS := --userns=keep-id
 endif
 
 # tag the local <image>:dev images as $(1)/<image>:$(2) and push them: $(call push-images,<registry>,<tag>,<images>)
@@ -76,9 +86,11 @@ create-cluster:  ## Create the cluster and its registry (web UI http://localhost
 
 docker-images: docker-images-molior docker-images-aptly  ## Build the images (molior, molior-postgres, aptly, molior-nginx)
 
+BUILD_BASE = $(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
+	$(DOCKERCMD) build -f docker/molior/molior-base.Dockerfile -t molior-base:dev .)
+
 docker-image-base:
-	@$(DOCKERCMD) inspect molior-base:dev >/dev/null 2>&1 || (echo Building base docker image...; \
-		$(DOCKERCMD) build -f docker/molior/molior-base.Dockerfile -t molior-base:dev .)
+	@$(BUILD_BASE)
 
 docker-images-molior: docker-image-base
 	$(DOCKERCMD) build $(IMAGE_LABEL) -f docker/molior/molior-dev.Dockerfile -t molior:dev .
@@ -124,11 +136,21 @@ delete-cluster:  ## Delete the cluster (the registry and its images stay)
 
 ##@ Testing
 
-lint:  ## Run flake8
-	flake8 molior tests
+# run a command in TEST_IMAGE: the source tree mounted at the same path, no network, files owned by the caller
+TEST_USER_ARGS ?= -u $$(id -u):$$(id -g)
+TEST_RUN = $(DOCKERCMD) run --rm --init --network none $(TEST_USER_ARGS) -e HOME=/tmp \
+	$(if $(COVERAGE_FILE),-e COVERAGE_FILE=$(COVERAGE_FILE)) -v "$(CURDIR):$(CURDIR)" -w "$(CURDIR)" $(TEST_IMAGE)
 
-unit-tests:  ## Run the unit tests with coverage
-	python3 -m pytest -q -p no:cacheprovider --cov --cov-config=.coveragerc --cov-report= \
+docker-image-ci:
+	@test -n "$(TEST_IMAGE)" || { echo "TEST_IMAGE is empty"; exit 1; }
+	@$(DOCKERCMD) inspect $(TEST_IMAGE) >/dev/null 2>&1 || { $(BUILD_BASE) && \
+		echo Building test image... && $(DOCKERCMD) build -f docker/ci.Dockerfile -t $(TEST_IMAGE) .; }
+
+lint: docker-image-ci  ## Run flake8 (in TEST_IMAGE)
+	$(TEST_RUN) flake8 molior tests
+
+unit-tests: docker-image-ci  ## Run the unit tests with coverage (in TEST_IMAGE)
+	$(TEST_RUN) python3 -m pytest -q -p no:cacheprovider --cov --cov-config=.coveragerc --cov-report= \
 		--junitxml=unit-test-report.xml tests/unit
 
 # tests/system/system-tests.sh uses docker, so the base image is built with docker too
@@ -293,4 +315,4 @@ release-molior:
 	kubectl -n $(NAMESPACE) exec deploy/molior -c molior-server -- rm -f /var/lib/molior/molior-hold
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster lint unit-tests system-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart restart-molior restart-aptly set-passwords hold-molior import-db release-molior
+.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster docker-image-ci lint unit-tests system-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart restart-molior restart-aptly set-passwords hold-molior import-db release-molior

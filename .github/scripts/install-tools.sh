@@ -1,7 +1,9 @@
 #!/bin/sh
 # Install the tools the system tests and the image build need on a CI runner (docker host).
-# Usage: .github/scripts/install-tools.sh <bin dir> [helm]
-#   helm: only helm (the helm chart job), else everything:
+# Usage: .github/scripts/install-tools.sh <bin dir> [helm|docker]
+#   helm: only helm (the helm chart job)
+#   docker: only docker and python3 (lint and unit tests run in the CI image)
+#   else everything:
 #   - docker (docker.io) and python3 when missing (apt, needs sudo)
 #   - qemu user emulation with binfmt handlers (arm builds run on the amd64 node), checked with an arm64 and an armhf
 #     container. The handlers need the F flag: the build containers do not have the qemu binary.
@@ -26,6 +28,17 @@ install_helm() {
     "$BIN/helm" version --short
 }
 
+if [ "$ONLY" = docker ]; then
+    pkgs=""
+    command -v docker >/dev/null || pkgs="$pkgs docker.io"
+    command -v python3 >/dev/null || pkgs="$pkgs python3"    # the summary step
+    if [ -n "$pkgs" ]; then
+        sudo apt-get update -q
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends $pkgs
+    fi
+    docker version --format 'docker {{.Server.Version}}'
+    exit 0
+fi
 : "${HELM_VERSION:?}"
 if [ "$ONLY" = helm ]; then
     install_helm

@@ -39,6 +39,8 @@ permissions:
 # No concurrency group: every push gets a complete run, a new run never cancels or replaces an older one
 
 env:
+  # make uses podman when it is installed (ubuntu-latest has it); CI logs in, pulls and builds with docker
+  DOCKERCMD: docker
   # tools of the system tests and the image job (.github/scripts/install-tools.sh)
   K3D_VERSION: v5.9.0
   HELM_VERSION: v4.2.3
@@ -126,16 +128,27 @@ jobs:
   # Tests
   ##############################################################################
 
+  # lint and unit-tests: make runs them in the CI image (TEST_IMAGE), as on a dev machine; no local flake8 or pytest
   lint:
     name: Lint
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    container:
-      image: ghcr.io/${{ github.repository }}/molior-ci:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      TEST_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install docker
+        run: sh .github/scripts/install-tools.sh "$HOME/.local/bin" docker
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the CI image
+        run: docker pull "$TEST_IMAGE"
 
       - name: flake8
         shell: bash
@@ -150,13 +163,23 @@ jobs:
   tests-unit:
     name: Unit Tests
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    container:
-      image: ghcr.io/${{ github.repository }}/molior-ci:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      TEST_IMAGE: ghcr.io/${{ github.repository }}/molior-ci:latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install docker
+        run: sh .github/scripts/install-tools.sh "$HOME/.local/bin" docker
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the CI image
+        run: docker pull "$TEST_IMAGE"
 
       - name: Run unit tests
         env:
@@ -329,20 +352,20 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          make docker-images DOCKERCMD=docker IMAGE_SOURCE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" 2>&1 \
+          make docker-images IMAGE_SOURCE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" 2>&1 \
             | tee build-images.log
 
       - name: Tag images
-        run: make tag-images DOCKERCMD=docker
+        run: make tag-images
 
       - name: Push images
         if: ${{ !startsWith(github.ref_name, 'dependabot/') }}
-        run: make push REGISTRY="$IMAGE_PREFIX" DOCKERCMD=docker
+        run: make push REGISTRY="$IMAGE_PREFIX"
 
       # the same images as <image>:latest (only the tag is new, the layers are already pushed)
       - name: Push latest tag
         if: ${{ !startsWith(github.ref_name, 'dependabot/') && env.TARGET != 'dev' }}
-        run: make push REGISTRY="$IMAGE_PREFIX" MOLIOR_VERSION=latest DOCKERCMD=docker
+        run: make push REGISTRY="$IMAGE_PREFIX" MOLIOR_VERSION=latest
 
       - name: Summary
         if: always()

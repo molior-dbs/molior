@@ -164,8 +164,8 @@ make psql               # molior database (current context)
 ### Tests
 
 ```sh
-make lint
-make unit-tests
+make lint               # flake8 in the image molior-ci:dev (built if missing), no local flake8 needed
+make unit-tests         # pytest in the same image, the source tree mounted
 make system-tests       # all suites in a throwaway k3d cluster, or TEST=<pytest args>
 ```
 
