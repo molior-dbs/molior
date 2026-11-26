@@ -183,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `testproject` | testproject | v3.0.13 (v3.0.14 tagged, not used yet) | tests 2, deploy |
+| testproject | `testproject` | testproject | v3.0.14 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -515,7 +515,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     screenshots); stdin is `/dev/null`.
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
     does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l
-    $IMG_FILE`); the testproject version is 3.0.13 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
+    $IMG_FILE`); the testproject version is 3.0.14 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
     VMs) with the test results (artifact `tests-deploy`), not the deployments. The deployment of a failed test goes
     to `RESULTS_DIR/failed-deployments/` (`conftest.py`), CI uploads it as the artifact `failed-deployments` (3 days).
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
@@ -539,8 +539,9 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.
-  - `test-deploy.sh` expects `<project>_<version>_3.0.13<suffix>`: the version of `testproject` (debian/changelog) is
-    fixed in the script, as in 1.4 (there 3.0.11). 3.0.13 adds the autologin of the vbox deployment. 3.0.12 sets
+  - `test-deploy.sh` expects `<project>_<version>_3.0.14<suffix>`: the version of `testproject` (debian/changelog) is
+    fixed in the script, as in 1.4 (there 3.0.11). 3.0.14 adds the desktop background of the vbox deployment,
+    3.0.13 its autologin. 3.0.12 sets
     `INSTALL_PACKAGE` in the deploy files: molior-tools
     1.5 has no default for it any more.
   - testproject 3.0.14 (tag `v3.0.14`, commit `d1e4bc0`, pushed 2026-11-26) adds a desktop background to the vbox
@@ -550,8 +551,8 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     `vbox/pcmanfm.conf` (`[desktop]` with `wallpaper=/usr/share/testproject/background.jpg`, `wallpaper_mode=crop`)
     to `/etc/skel/.config/pcmanfm/LXDE/pcmanfm.conf`; the postinst creates the user `molior` with `useradd
     --create-home`, which copies it to `~/.config/pcmanfm/LXDE/` (pcmanfm runs as `--desktop --profile LXDE`, the
-    user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment). Not
-    built or deployed yet: `test-deploy.sh` and `utils.TESTPROJECT_VERSION` still expect 3.0.13.
+    user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment).
+    molior builds the latest tag, so the deploy tests use 3.0.14 since it was pushed.
 
 ### Known problem: the ISO installation fails
 

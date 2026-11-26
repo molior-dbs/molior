@@ -20,7 +20,7 @@ RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
 # version of the testproject packages in the deployment file names (as fixed in test-deploy.sh)
-TESTPROJECT_VERSION = "3.0.13"
+TESTPROJECT_VERSION = "3.0.14"
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
 # installer: how long the installation may take, and how long the disk does not grow when the installer is done
