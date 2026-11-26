@@ -183,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `testproject` | testproject | v3.0.13 | tests 2, deploy |
+| testproject | `testproject` | testproject | v3.0.13 (v3.0.14 tagged, not used yet) | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -498,7 +498,8 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
 ## The deploy suite
 
 **`test_molior_deploy`** (4643c058) is not in the system tests, it is ported to the separate suite `tests/deploy/`.
-It passes in CI for all 6 variants (dir, docker, installer, lxd, vbox, image), job "Deploy Tests". It tests
+It passes in CI for all 6 variants (dir, docker, installer, lxd, vbox, image), job "Deploy Tests", but the installer
+passes by mistake: the installation from the ISO fails (see "Known problem: the ISO installation fails"). It tests
 molior-deploy (molior-tools) against molior, so it runs on the runner host (root, loop devices, nbd, docker,
 virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs the host tools. Changes:
   - `tests/deploy/deploy-tests.sh`: own k3d cluster, NodePorts 30080 (web) and 30088 (repo) mapped to free host
@@ -529,6 +530,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
       is empty) or the disk did not grow for `INSTALL_IDLE` seconds (default 120); after `INSTALL_WAIT` seconds
       (default 1200) the test fails with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the
       installer), Enter (reboot) and `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds.
+      The disk-idle fallback is to be removed (done only when the ISO is ejected, else the test fails), see below.
   - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
     (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
     the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
@@ -541,3 +543,32 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     fixed in the script, as in 1.4 (there 3.0.11). 3.0.13 adds the autologin of the vbox deployment. 3.0.12 sets
     `INSTALL_PACKAGE` in the deploy files: molior-tools
     1.5 has no default for it any more.
+  - testproject 3.0.14 (tag `v3.0.14`, commit `d1e4bc0`, pushed 2026-11-26) adds a desktop background to the vbox
+    deployment (the 3.0.13 screenshot has a black background: `lxde-common` sets the pcmanfm wallpaper to
+    `/etc/alternatives/desktop-background`, which only `desktop-base` provides, and it is not installed, not wanted).
+    `vbox/background.jpg` (git lfs, `.gitattributes`) is installed to `/usr/share/testproject/background.jpg`, and
+    `vbox/pcmanfm.conf` (`[desktop]` with `wallpaper=/usr/share/testproject/background.jpg`, `wallpaper_mode=crop`)
+    to `/etc/skel/.config/pcmanfm/LXDE/pcmanfm.conf`; the postinst creates the user `molior` with `useradd
+    --create-home`, which copies it to `~/.config/pcmanfm/LXDE/` (pcmanfm runs as `--desktop --profile LXDE`, the
+    user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment). Not
+    built or deployed yet: `test-deploy.sh` and `utils.TESTPROJECT_VERSION` still expect 3.0.13.
+
+### Known problem: the ISO installation fails
+
+The installer deployment (`testproject-devel`, `deploy/installer.conf`) boots and asks its questions, but the
+installation into the VM fails. Seen in CI run 45833279920 (molior commit `86d870f`, testproject 3.0.13):
+`installer.iso.done.png` shows `creating partitions on /dev/sda`, `mkswap /dev/sda1`, `mkfs /dev/sda2`, then
+`E: Installation failed` and the BusyBox shell of `log_error`; `installer.iso.installed.png` shows the same shell (the
+reboot Enter went to it). The ISO was not ejected (VBox.log `SCSI-Eject/Insert 0 calls`); the test passed because
+the disk-idle fallback took the error screen as the end of the installation.
+
+- The disk is big enough: 8 GiB (swap 512 MiB, root about 7.5 GiB; `INSTALLER_DISK_MIN` 3).
+- The error message of the failed step goes to `/var/log/installer.log` in the VM, not to the screen, and the VM disk
+  is deleted after the test, so the cause is not known yet.
+- Probably a package change in trixie (the installer worked in 1.4 on older Debian releases): the initrd of the ISO is
+  built by molior-deploy from the packages of the base mirror (`mkfs` and its file system tools in the initrd).
+  Not checked which package or tool changed.
+- Next steps: a serial console for the ISO test (`console=ttyS0` in the installer kernel command line, a VirtualBox
+  UART to `<deployment>.serial.log`), so that the installer output and the error are in the test results; remove the
+  disk-idle fallback, so the test fails on this; then find the failing tool in the initrd (it was extracted to
+  `/tmp/initrd.img` on the agent host for the analysis).
