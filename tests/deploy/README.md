@@ -18,7 +18,7 @@ The tests, in this order:
 |---|---|
 | `test_deploy_basemirror` | setup: base mirror `trixie/13` (amd64), filtered to what the build and the deployments need |
 | `test_deploy_testproject` | setup: project `molior-validation/1` with https://github.com/molior-dbs/testproject.git, waits for its build |
-| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, installer, lxd, vbox and image |
+| `test_molior_deploy` | the 1.4 test (id 4643c058): `molior-deploy` for the variants dir, docker, installer, lxd, vbox and image; 1.5: the installer ISO and the vbox OVA boot in VirtualBox (headless, screenshot after `BOOT_WAIT` seconds, default 60) |
 
 Needs on the host: docker, k3d, helm, kubectl, python3 with pytest, pytest-timeout and requests, sudo without
 password for `molior-deploy` (`<user> ALL=(root) NOPASSWD: /usr/sbin/molior-deploy`),

@@ -508,6 +508,11 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
     the default).
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, and the
     deployment file is kept (1.4: `rm -f $IMG_FILE`); CI uploads both as the artifact `deployments`.
+  - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
+    (`utils.boot_vm`: the OVA imported, the ISO in a new VM with an empty 8 GB disk; headless, own `VBOX_USER_HOME`),
+    a screenshot after `BOOT_WAIT` seconds (default 60) and the VM log go next to the deployment
+    (`<deployment>.png`, `<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more.
+    No login check. The 1.4 test only checked that the file exists.
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.

@@ -4,6 +4,9 @@ that tests/deploy/deploy-tests.sh maps from the test cluster to the host."""
 import json
 import logging
 import os
+import shutil
+import subprocess
+import tempfile
 import time
 
 import requests
@@ -14,6 +17,12 @@ ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
+# version of the testproject packages in the deployment file names (as fixed in test-deploy.sh)
+TESTPROJECT_VERSION = "3.0.12"
+# seconds a VM of a deployment runs before the screenshot (boot_vm)
+BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
+# where test-deploy.sh runs molior-deploy: the deployments and their logs (artifact "deployments" in CI)
+DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
 # build states that do not change any more (molior/model/build.py BUILD_STATES)
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "already_failed", "nothing_done")
 
@@ -120,3 +129,54 @@ def wait_for_build(sourcename):
     states = ["{} {} {}".format(b["id"], b["buildtype"], b["buildstate"]) for b in builds]
     assert builds and all(b["buildstate"] == "successful" for b in builds), \
         "builds of {} after {} s: {}".format(sourcename, round(time.time() - start), ", ".join(states) or "none")
+
+
+def vboxmanage(*args, check=True):
+    """Runs vboxmanage, logs and returns its output; fails with the output if check and the exit code is not 0."""
+    r = subprocess.run(["vboxmanage"] + list(args), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.warning("vboxmanage %s: exit %s\n%s", " ".join(args), r.returncode, r.stdout.strip())
+    assert not check or r.returncode == 0, "vboxmanage {}: exit {}\n{}".format(" ".join(args), r.returncode, r.stdout)
+    return r.stdout
+
+
+def boot_vm(deployment):
+    """Starts a VirtualBox VM of a deployment headless (an OVA is imported, an ISO boots in a new VM with an empty
+    disk), takes a screenshot after BOOT_WAIT seconds and removes the VM. The screenshot (<deployment>.png) and the log
+    of the VM (<deployment>.VBox.log) go next to the deployment. Fails if the VM does not start or does not run any
+    more at the screenshot. VirtualBox runs with its own home (VBOX_USER_HOME), the user's VMs are not touched."""
+    path = os.path.join(DEPLOY_OUTPUT, deployment)
+    vm = "deploy-test-{}".format(os.getpid())
+    home = tempfile.mkdtemp(prefix="molior-deploy-vbox-")
+    os.environ["VBOX_USER_HOME"] = home
+    try:
+        vboxmanage("setproperty", "machinefolder", home)
+        if deployment.endswith(".ova"):
+            vboxmanage("import", path, "--vsys", "0", "--vmname", vm)
+        else:
+            vboxmanage("createvm", "--name", vm, "--ostype", "Debian_64", "--register")
+            vboxmanage("modifyvm", vm, "--memory", "2048", "--graphicscontroller", "vmsvga", "--boot1", "dvd",
+                       "--boot2", "disk", "--boot3", "none", "--boot4", "none")
+            vboxmanage("createmedium", "disk", "--filename", os.path.join(home, vm + ".vdi"), "--size", "8192")
+            vboxmanage("storagectl", vm, "--name", "SATA", "--add", "sata", "--portcount", "2")
+            vboxmanage("storageattach", vm, "--storagectl", "SATA", "--port", "0", "--device", "0", "--type", "hdd",
+                       "--medium", os.path.join(home, vm + ".vdi"))
+            vboxmanage("storageattach", vm, "--storagectl", "SATA", "--port", "1", "--device", "0",
+                       "--type", "dvddrive", "--medium", path)
+        vboxmanage("startvm", vm, "--type", "headless")
+        time.sleep(BOOT_WAIT)
+        info = vboxmanage("showvminfo", vm, "--machinereadable")
+        state = [line.split("=", 1)[1].strip('"') for line in info.splitlines() if line.startswith("VMState=")]
+        if state == ["running"]:
+            vboxmanage("controlvm", vm, "screenshotpng", path + ".png")
+        assert state == ["running"], "VM of {} after {} s: {}".format(deployment, BOOT_WAIT, state)
+        assert os.path.getsize(path + ".png") > 0, "empty screenshot of {}".format(deployment)
+    finally:
+        vboxmanage("controlvm", vm, "poweroff", check=False)
+        time.sleep(3)
+        cfg = [line.split("=", 1)[1].strip('"') for line in vboxmanage("showvminfo", vm, "--machinereadable",
+               check=False).splitlines() if line.startswith("CfgFile=")]
+        if cfg and os.path.exists(os.path.join(os.path.dirname(cfg[0]), "Logs", "VBox.log")):
+            shutil.copy(os.path.join(os.path.dirname(cfg[0]), "Logs", "VBox.log"), path + ".VBox.log")
+        vboxmanage("unregistervm", vm, "--delete", check=False)   # also deletes the disks of the VM
+        os.environ.pop("VBOX_USER_HOME", None)
+        shutil.rmtree(home, ignore_errors=True)

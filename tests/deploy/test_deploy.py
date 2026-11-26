@@ -100,3 +100,6 @@ def test_molior_deploy(
         stdin=subprocess.DEVNULL,
     )
     assert outcome.returncode == 0, "Molior deploy exited with code {}".format(outcome)
+    # 1.5: the VM deployments boot in VirtualBox, a screenshot goes next to the deployment (artifact "deployments")
+    if build_type in ("installer", "vbox"):
+        utils.boot_vm("{}_{}_{}{}".format(project_name, project_version, utils.TESTPROJECT_VERSION, build_type_output))
