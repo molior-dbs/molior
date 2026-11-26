@@ -529,7 +529,7 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     - installer: the ISO in a new VM with an empty 8 GB disk, booting from the disk first and then the ISO.
       `<deployment>.png` after `BOOT_WAIT` seconds (the hostname question), Enter (the default hostname), Enter
       (confirm the installation, `keyboardputscancode`). The installer is done when it ejects the ISO (the DVD drive
-      is empty); a failed installer does not eject it, so after `INSTALL_WAIT` seconds (default 1200) the test fails
+      is empty); a failed installer does not eject it, so after `INSTALL_WAIT` seconds (default 300) the test fails
       with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of the installer), Enter (reboot) and
       `<deployment>.installed.png` of the installed system after `BOOT_WAIT` seconds. No disk monitoring (user
       decision: the size of the VM disk says nothing about success; the disk-idle fallback was removed).
@@ -546,7 +546,8 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     same pattern (`utils.deployments`). 1.4 expected `<project>_<version>_3.0.11<suffix>`, the version of
     `testproject` (debian/changelog) fixed in the script; molior builds the latest tag of testproject, so a new tag
     broke the tests (and the upload of the failed deployments) until the script was changed. testproject versions:
-    3.0.15 installs e2fsprogs in the installer initrd (see the known problem below), 3.0.14 adds the desktop
+    3.0.16 adds `linux-image-amd64` to `testproject-devel` (the installed system of the ISO had no kernel and
+    hung in grub), 3.0.15 installs e2fsprogs in the installer initrd (see the known problem below), 3.0.14 adds the desktop
     background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE` in the deploy files
     (molior-tools 1.5 has no default for it any more).
   - testproject 3.0.14 (tag `v3.0.14`, commit `6dfffcc`; rewritten and force-pushed on 2026-11-26 to replace the

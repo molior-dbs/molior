@@ -23,7 +23,7 @@ BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
 # installer: how long the installation may take (until it ejects the ISO)
-INSTALL_WAIT = int(os.environ.get("INSTALL_WAIT", "1200"))
+INSTALL_WAIT = int(os.environ.get("INSTALL_WAIT", "300"))
 # where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
 # the screenshots, artifact "tests-deploy")
 DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
