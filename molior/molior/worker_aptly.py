@@ -34,6 +34,14 @@ STARTUP_APTLY_ATTEMPTS = 6
 STARTUP_APTLY_WAIT = 10
 
 
+def mirror_components(mirror):
+    '''Return the components of a mirror as a list, an empty list for flat mirrors.
+    NOTE: `"".split(",")` returns `[""]`, which aptly takes as a component named "".
+    '''
+    # FIXME: should be array in db
+    return mirror.mirror_components.split(",") if mirror.mirror_components else []
+
+
 def mirror_architectures(mirror):
     '''Return the mirror architectures to use on aptly for a given mirror.
     Add "source" as architecture when updating mirror on aptly to trigger source downloading/snapshotting/publishing.
@@ -62,11 +70,7 @@ async def create_aptly_mirror(aptly, mirror):
     Returns:
         tuple: (names of the aptly mirrors created, names of the ones that existed already)
     '''
-    # FIXME: should be array in db
-    # NOTE: return empty array when the components are empty, because
-    # the default `.split()` algorythm returns `[""]` when
-    # an empty string is given: https://stackoverflow.com/a/16645307/12356463
-    components = mirror.mirror_components.split(",") if mirror.mirror_components else []
+    components = mirror_components(mirror)
     base_mirror = mirror.basemirror.project.name if mirror.basemirror else ""
     base_mirror_version = mirror.basemirror.name if mirror.basemirror else ""
     created = await aptly.mirror_create(
@@ -187,7 +191,7 @@ async def startup_mirror():
             if not mirror.project.is_basemirror:
                 base_mirror = mirror.basemirror.project.name
                 base_mirror_version = mirror.basemirror.name
-            components = mirror.mirror_components.split(",")
+            components = mirror_components(mirror)
             mirrorname = "{}-{}".format(mirror.project.name, mirror.name)
 
             names = mirror_aptly_names(base_mirror, base_mirror_version, mirror.project.name, mirror.name, components)
@@ -833,7 +837,7 @@ class AptlyWorker:
                         mirror.basemirror.name if mirror.basemirror else "",
                         mirror.project.name,
                         mirror.name,
-                        mirror.mirror_components.split(","),
+                        mirror_components(mirror),
                         mirror_architectures(mirror)
                     )
                 except NotFoundError as exc:
@@ -1530,12 +1534,12 @@ class AptlyWorker:
             mirror_architectures = mirror.mirror_architectures
             mirror_distribution = mirror.mirror_distribution
             mirror_slash_workaround = mirror.mirror_slash_workaround
-            mirror_components = mirror.mirror_components.split(",") if mirror.mirror_components else []
+            components = mirror_components(mirror)
 
         try:
             # FIXME: use altpy queue !
             await aptly.mirror_delete(base_mirror, base_mirror_version, mirror_name,
-                                      mirror_version, mirror_distribution, mirror_components, mirror_slash_workaround)
+                                      mirror_version, mirror_distribution, components, mirror_slash_workaround)
         except Exception as exc:
             # mirror did not exist
             # FIXME: handle mirror has snapshots and cannot be deleted?
