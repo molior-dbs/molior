@@ -514,10 +514,12 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     (`test-deploy.sh` runs molior-deploy in `molior-deploy-output/` there: the deployments, their logs and the
     screenshots); stdin is `/dev/null`.
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
-    does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l
-    $IMG_FILE`); the testproject version is 3.0.14 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
-    VMs) with the test results (artifact `tests-deploy`), not the deployments. The deployment of a failed test goes
-    to `RESULTS_DIR/failed-deployments/` (`conftest.py`), CI uploads it as the artifact `failed-deployments` (3 days).
+    does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l`). CI
+    uploads the logs (and the screenshots of the VMs) with the test results (artifact `tests-deploy`), not the
+    deployments. The deployments of a failed test go to `RESULTS_DIR/failed-deployments/` (`conftest.py`), also when
+    `test-deploy.sh` failed after molior-deploy; CI uploads them as the artifact `failed-deployments` (3 days). The
+    installer ISO is uploaded in every run as the artifact `installer-iso` (3 days, about 320 MB), also when its test
+    passed, to test it outside CI (user, 2026-11-26).
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
     (`utils.boot_vm`: headless, own `VBOX_USER_HOME`); the screenshots and the VM log go next to the deployment
     (`<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more at a screenshot.
@@ -539,11 +541,13 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
   - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
     with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
     from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.
-  - `test-deploy.sh` expects `<project>_<version>_3.0.14<suffix>`: the version of `testproject` (debian/changelog) is
-    fixed in the script, as in 1.4 (there 3.0.11). 3.0.14 adds the desktop background of the vbox deployment,
-    3.0.13 its autologin. 3.0.12 sets
-    `INSTALL_PACKAGE` in the deploy files: molior-tools
-    1.5 has no default for it any more.
+  - The deployment is found by its type (changed from 1.4, user decision): `test-deploy.sh` expects exactly one
+    `*<suffix>` (`*_installer.iso`, `*_vbox.ova`, ...) in `molior-deploy-output/`, the tests and `conftest.py` use the
+    same pattern (`utils.deployments`). 1.4 expected `<project>_<version>_3.0.11<suffix>`, the version of
+    `testproject` (debian/changelog) fixed in the script; molior builds the latest tag of testproject, so a new tag
+    broke the tests (and the upload of the failed deployments) until the script was changed. testproject versions:
+    3.0.14 adds the desktop background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE`
+    in the deploy files (molior-tools 1.5 has no default for it any more).
   - testproject 3.0.14 (tag `v3.0.14`, commit `d1e4bc0`, pushed 2026-11-26) adds a desktop background to the vbox
     deployment (the 3.0.13 screenshot has a black background: `lxde-common` sets the pcmanfm wallpaper to
     `/etc/alternatives/desktop-background`, which only `desktop-base` provides, and it is not installed, not wanted).
@@ -552,7 +556,6 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
     to `/etc/skel/.config/pcmanfm/LXDE/pcmanfm.conf`; the postinst creates the user `molior` with `useradd
     --create-home`, which copies it to `~/.config/pcmanfm/LXDE/` (pcmanfm runs as `--desktop --profile LXDE`, the
     user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment).
-    molior builds the latest tag, so the deploy tests use 3.0.14 since it was pushed.
 
 ### Known problem: the ISO installation fails
 

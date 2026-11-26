@@ -8,8 +8,6 @@ DEPLOYMENT_TYPE=$5
 EXPECTED_SUFFIX=$6
 MOLIOR_TOOLS_VERSION=$7
 
-IMG_FILE=${PROJECT_NAME}_${PROJECT_VERSION}_3.0.14${EXPECTED_SUFFIX}
-
 set -x
 
 mkdir -p molior-deploy-output
@@ -20,13 +18,19 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
-if [ ! -e "$IMG_FILE" ]; then
-    echo Failed: File $IMG_FILE does not exist
+# the deployment by its type (*_installer.iso, *_vbox.ova, ...), not by the version in its name
+set -- *$EXPECTED_SUFFIX
+if [ ! -e "$1" ]; then
+    echo Failed: No deployment \*$EXPECTED_SUFFIX
+    exit 1
+fi
+if [ $# -ne 1 ]; then
+    echo Failed: More than one deployment \*$EXPECTED_SUFFIX: "$@"
     exit 1
 fi
 
 echo
-echo Success: File $IMG_FILE exists
-ls -l $IMG_FILE
+echo Success: File $1 exists
+ls -l "$1"
 
 exit 0

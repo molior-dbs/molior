@@ -38,16 +38,14 @@ def pytest_runtest_logreport(report):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """A deployment whose test failed (molior-deploy succeeded, a check after it failed) is copied to
+    """The deployments of a failed test (by their type, e.g. *_installer.iso; also when test-deploy.sh failed) go to
     RESULTS_DIR/failed-deployments/ to debug it (CI uploads that directory as the artifact failed-deployments)."""
     outcome = yield
     report = outcome.get_result()
     params = getattr(getattr(item, "callspec", None), "params", {})
     if report.when != "call" or not report.failed or "build_type_output" not in params:
         return
-    deployment = "{}_{}_{}{}".format(item.funcargs["project_name"], item.funcargs["project_version"],
-                                     utils.TESTPROJECT_VERSION, params["build_type_output"])
-    if os.path.exists(os.path.join(utils.DEPLOY_OUTPUT, deployment)):
+    for deployment in utils.deployments(params["build_type_output"]):
         os.makedirs(utils.FAILED_DEPLOYMENTS, exist_ok=True)
         shutil.copy(os.path.join(utils.DEPLOY_OUTPUT, deployment), utils.FAILED_DEPLOYMENTS)
 

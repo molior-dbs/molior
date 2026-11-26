@@ -110,7 +110,7 @@ def test_molior_deploy(
         stdin=subprocess.DEVNULL,
     )
     assert outcome.returncode == 0, "Molior deploy exited with code {}".format(outcome)
-    deployment = "{}_{}_{}{}".format(project_name, project_version, utils.TESTPROJECT_VERSION, build_type_output)
+    deployment = utils.deployments(build_type_output)[0]   # test-deploy.sh checked that there is exactly one
     # 1.5: the top level packages are installed in the deployment
     if build_type in deployment_packages:
         utils.check_packages(deployment, deployment_packages[build_type])

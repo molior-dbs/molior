@@ -1,6 +1,7 @@
 """Helpers of the deploy tests: the API calls that create the base mirror and the project, and the waits.
 The tests run on the runner host (molior-deploy needs root, loop devices and docker), so the URLs are the ports
 that tests/deploy/deploy-tests.sh maps from the test cluster to the host."""
+import glob
 import gzip
 import json
 import logging
@@ -19,8 +20,6 @@ ADMIN_PASSWORD = os.environ.get("MOLIOR_ADMIN_PASSWORD", "")
 RESULTS = os.environ.get("RESULTS_DIR", "/tmp/results")
 MIRROR_TIMEOUT = int(os.environ.get("MIRROR_TIMEOUT", "3600"))
 BUILD_TIMEOUT = int(os.environ.get("BUILD_TIMEOUT", "1800"))
-# version of the testproject packages in the deployment file names (as fixed in test-deploy.sh)
-TESTPROJECT_VERSION = "3.0.14"
 # seconds a VM of a deployment runs before the screenshot (boot_vm)
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "60"))
 # installer: how long the installation may take, and how long the disk does not grow when the installer is done
@@ -137,6 +136,12 @@ def wait_for_build(sourcename):
     states = ["{} {} {}".format(b["id"], b["buildtype"], b["buildstate"]) for b in builds]
     assert builds and all(b["buildstate"] == "successful" for b in builds), \
         "builds of {} after {} s: {}".format(sourcename, round(time.time() - start), ", ".join(states) or "none")
+
+
+def deployments(suffix):
+    """File names of the deployments of a type (suffix, e.g. _installer.iso) in DEPLOY_OUTPUT, whatever version is in
+    the name."""
+    return sorted(os.path.basename(f) for f in glob.glob(os.path.join(glob.escape(DEPLOY_OUTPUT), "*" + suffix)))
 
 
 def vboxmanage(*args, check=True):
