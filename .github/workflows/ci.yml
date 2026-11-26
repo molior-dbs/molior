@@ -330,7 +330,19 @@ jobs:
             !deploy-test-results/molior-deploy-output/
             deploy-test-results/molior-deploy-output/*.log
             deploy-test-results/molior-deploy-output/*.png
+            !deploy-test-results/failed-deployments/
           if-no-files-found: error
+
+      # the deployment of each failed test_molior_deploy (tests/deploy/conftest.py), to download and debug it
+      - name: Upload failed deployments
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: failed-deployments
+          path: deploy-test-results/failed-deployments/
+          compression-level: 0  # the deployments are compressed already
+          retention-days: 3
+          if-no-files-found: ignore
 
   coverage:
     name: Combine Coverage

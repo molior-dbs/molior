@@ -1,5 +1,8 @@
 """Fixtures of the deploy tests (tests/deploy/deploy-tests.sh). They run on the runner host, not in the test cluster:
 molior-deploy needs root (sudo), loop devices, nbd, docker and virtualbox."""
+import os
+import shutil
+
 import pytest
 
 import utils
@@ -31,6 +34,22 @@ def pytest_sessionstart(session):
 def pytest_runtest_logreport(report):
     if report.failed and report.nodeid.split("::")[-1] in STOP_ON_FAILURE and _session:
         _session[0].shouldstop = "{} failed, the deployments need it".format(report.nodeid)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """A deployment whose test failed (molior-deploy succeeded, a check after it failed) is copied to
+    RESULTS_DIR/failed-deployments/ to debug it (CI uploads that directory as the artifact failed-deployments)."""
+    outcome = yield
+    report = outcome.get_result()
+    params = getattr(getattr(item, "callspec", None), "params", {})
+    if report.when != "call" or not report.failed or "build_type_output" not in params:
+        return
+    deployment = "{}_{}_{}{}".format(item.funcargs["project_name"], item.funcargs["project_version"],
+                                     utils.TESTPROJECT_VERSION, params["build_type_output"])
+    if os.path.exists(os.path.join(utils.DEPLOY_OUTPUT, deployment)):
+        os.makedirs(utils.FAILED_DEPLOYMENTS, exist_ok=True)
+        shutil.copy(os.path.join(utils.DEPLOY_OUTPUT, deployment), utils.FAILED_DEPLOYMENTS)
 
 
 @pytest.fixture

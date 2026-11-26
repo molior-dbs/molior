@@ -33,6 +33,8 @@ installs all of them on a CI runner (molior-tools is built from its git tag). Al
 Results (junit xml, server logs, server coverage) go to `RESULTS_DIR` (default `./deploy-test-results`), the
 deployments and the log of each `molior-deploy` call (`-L`) to `RESULTS_DIR/molior-deploy-output/` (several GB). CI
 uploads the logs and the screenshots of the VMs with the other results (artifact `tests-deploy`), not the deployments.
+The deployment of a failed `test_molior_deploy` is copied to `RESULTS_DIR/failed-deployments/` (`conftest.py`); CI
+uploads it as the artifact `failed-deployments` (3 days) to download and debug it.
 
 The VM deployments boot in VirtualBox (headless, `utils.boot_vm`), the screenshots go to `molior-deploy-output/`:
 

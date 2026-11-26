@@ -29,6 +29,8 @@ INSTALL_IDLE = int(os.environ.get("INSTALL_IDLE", "120"))
 # where test-deploy.sh runs molior-deploy: the deployments, their logs and screenshots (CI uploads the logs and
 # the screenshots, artifact "tests-deploy")
 DEPLOY_OUTPUT = os.path.join(RESULTS, "molior-deploy-output")
+# the deployments of the failed tests, to debug them (conftest.py; CI artifact "failed-deployments", 3 days)
+FAILED_DEPLOYMENTS = os.path.join(RESULTS, "failed-deployments")
 # build states that do not change any more (molior/model/build.py BUILD_STATES)
 FINAL_STATES = ("successful", "build_failed", "publish_failed", "already_exists", "already_failed", "nothing_done")
 

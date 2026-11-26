@@ -515,7 +515,8 @@ virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs th
   - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
     does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l
     $IMG_FILE`); the testproject version is 3.0.13 (1.4: 3.0.11). CI uploads the logs (and the screenshots of the
-    VMs) with the test results (artifact `tests-deploy`), not the deployments.
+    VMs) with the test results (artifact `tests-deploy`), not the deployments. The deployment of a failed test goes
+    to `RESULTS_DIR/failed-deployments/` (`conftest.py`), CI uploads it as the artifact `failed-deployments` (3 days).
   - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
     (`utils.boot_vm`: headless, own `VBOX_USER_HOME`); the screenshots and the VM log go next to the deployment
     (`<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more at a screenshot.
