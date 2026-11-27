@@ -1,7 +1,7 @@
 # Molior CI
 #
 # Setup:    CI Image (manual), Configure (versions, target)
-# Tests:    Lint, Unit Tests, System Tests and Deploy Tests in parallel, Combine Coverage
+# Tests:    Lint, Unit Tests and System Tests in parallel, Upload Coverage (combined, to Codecov)
 # Build:    Docker Images, Helm Chart (after the tests, all with the CI version), pushed to ghcr.io/<owner>/<target>/
 #           <image>:<version> and ghcr.io/<owner>/<target>/charts/molior:<version>; target dev, test or prod by branch.
 #           The images of test and prod also get the tag latest (the chart not: helm needs semver tags).
@@ -346,10 +346,17 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+  # Combines the coverage of the tests and uploads it to Codecov. Codecov authenticates the upload with the OIDC token of
+  # the run (no CODECOV_TOKEN secret); needs the Codecov GitHub App on the organization with this repository enabled.
+  # The CI image has git, curl and gpg for the uploader. The job runs no project code (only coverage on the test data).
   coverage:
-    name: Combine Coverage
+    name: Upload Coverage
     needs: [tests-unit, tests-system, tests-deploy]
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: read   # the CI image
+      id-token: write  # the OIDC token for Codecov
     container:
       image: ghcr.io/${{ github.repository }}/molior-ci:latest
       credentials:
@@ -357,6 +364,8 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: Download test artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -387,6 +396,15 @@ jobs:
             coverage.xml
             coverage.txt
           if-no-files-found: error
+
+      - name: Upload to Codecov
+        if: github.actor != 'dependabot[bot]'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
 
   ##############################################################################
   # Build (no push yet)
