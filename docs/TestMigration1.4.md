@@ -9,10 +9,11 @@ values that pointed to the old site and the helpers that used the old interfaces
 
 ## Overview
 
-1.4 has 30 tests. 27 are ported, in the 1.4 file order. All 27 pass in the 1.5 system tests except `test_mirror`,
-which is skipped without its environment variables (26 passed, 1 skipped in 912 s, exit 0, after the molior fixes
-in "molior changes the port needed"). Tests 26 and 27 (arm) run the arm builds with qemu on the amd64 node of the
-test cluster.
+1.4 has 30 tests. 28 are ported, 2 are obsolete. 27 are in the 1.5 system tests (`tests/system/valid-1.4/`), in the
+1.4 file order. All 27 pass except `test_mirror`, which is skipped without its environment variables (26 passed, 1
+skipped in 912 s, exit 0, after the molior fixes in "molior changes the port needed"). Tests 26 and 27 (arm) run the
+arm builds with qemu on the amd64 node of the test cluster. `test_molior_deploy` is in the separate deploy suite
+(`tests/deploy/`, see "The deploy suite"), it passes for all 6 variants.
 
 | # | Test | Id | Status | Change in the test function |
 |---|---|---|---|---|
@@ -45,7 +46,7 @@ test cluster.
 | 27 | `test_buildvariant_filter` | a671b2ec | ported | none |
 | - | `test_cleanup` | 4643c05a | obsolete | every run uses a new cluster |
 | - | `test_build_notification` | 1a8ebb57 | obsolete | build notification hooks are removed in 1.5 |
-| - | `test_molior_deploy` | 4643c058 | TODO | not in this suite; to be run in a separate suite `tests/deploy/` on the runner |
+| - | `test_molior_deploy` | 4643c058 | ported to `tests/deploy/` | separate suite, pytest on the runner host; boot and package checks (see "The deploy suite") |
 
 ## Changes that apply to all tests
 
@@ -149,7 +150,8 @@ test cluster.
 - `tests/webserver.py`: a Flask receiver for the notification hooks of the obsolete `test_build_notification`.
 - `tests/websocket-test.py`: a websocket listener that checked the build state sequence; already commented out in
   1.4 (fixture `websocket_server`).
-- `tests/test-deploy.sh`: used by `test_molior_deploy`, which moves to the separate suite `tests/deploy/` (TODO).
+- `tests/test-deploy.sh`: copied to `tests/deploy/test-deploy.sh` (used by `test_molior_deploy`, changes see "The
+  deploy suite").
 - SSH keys for the 1.4 hosts (two directories and a submodule). Not copied (secrets).
 - `README.md`: the 1.4 installation of the test site.
 
@@ -181,7 +183,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 | trick | `test-trick` | trick | v0.0.1-alpha2 | tests 2, 3, 17 |
 | badtrick | `test-badtrick` | badtrick | v0.0.0 | test 2 (must build nothing) |
 | badtrack | `test-badtrack` | badtrack | v0.0.1 | tests 2, 16 |
-| testproject | `test-project` | testproject | v3.0.11 | test 2 |
+| testproject | `testproject` | testproject | v3.0.17 | tests 2, deploy |
 | ci-build | `test-ci-build` | cipackage | v0.0.1 | tests 2, 20; submodule of `test-submodule` (test 23) |
 | build-notifications | `test-build-notifications` | build-notify-package | v0.0.1 | test 2 |
 | multiproject | `test-multiproject` | multiproject | v0.0.1 | test 20 |
@@ -208,7 +210,7 @@ and one annotated tag `v<version>` (`~` becomes `-`) on `main`, with author, com
 - `test-track`, `test-badtrack`: the short test runs with `python3 -m unittest -v tests/unit.py` (1.4: `py.test`
   with `python-pytest`, gone since bullseye). The short test stays for requirement 012 "Short Test Run".
 - `test-tick`: `build_after: ['test-track']` (1.4: `track`).
-- `test-project`: `policykit-1` becomes `polkitd`, `xserver-xorg-video-modesetting` is removed (both not in trixie),
+- `testproject`: `policykit-1` becomes `polkitd`, `xserver-xorg-video-modesetting` is removed (both not in trixie),
   the description and a comment line in `deploy/dir.conf` named internal products; the description is neutral now and
   the comment is removed. `deploy/` is kept.
 - `test-submodule`: `.gitmodules` points to `https://github.com/molior-dbs/test-ci-build.git` (1.4: an SSH URL of
@@ -492,6 +494,96 @@ The yml files of `tests/api-tests/` are not read and not in the test image. `api
 - **`test_cleanup`** (4643c05a): obsolete. It deleted the test data of an earlier run, and every run now uses a new
   cluster.
 - **`test_build_notification`** (1a8ebb57): obsolete. The build notification hooks are removed in 1.5.
-- **`test_molior_deploy`** (4643c058): not in this suite. It tested the 1.4 deploy tools; 1.5 deploys with Helm, and
-  `system-tests.sh` installs the chart for every run. TODO: it will be run in a separate test suite (`tests/deploy/`)
-  on the runner.
+
+## The deploy suite
+
+**`test_molior_deploy`** (4643c058) is not in the system tests, it is ported to the separate suite `tests/deploy/`.
+It passes in CI for all 6 variants (dir, docker, installer, lxd, vbox, image), job "Deploy Tests", but the installer
+passes by mistake: the installation from the ISO fails (see "Known problem: the ISO installation fails"). It tests
+molior-deploy (molior-tools) against molior, so it runs on the runner host (root, loop devices, nbd, docker,
+virtualbox), not in a pod. `.github/scripts/install-molior-tools.sh` installs the host tools. Changes:
+  - `tests/deploy/deploy-tests.sh`: own k3d cluster, NodePorts 30080 (web) and 30088 (repo) mapped to free host
+    ports, `aptly.publicUrl` set to the host repo port (molior-deploy takes the APT sources from `aptsources`, the
+    builds in the cluster use `internalUrl`), pytest on the host.
+  - Two setup tests in front (no 1.4 metadata): `test_deploy_basemirror` (own `trixie/13`, amd64, filter with the
+    Depends of the `testproject-*` packages and the installer initrd packages; the system test mirror is not used,
+    user decision) and `test_deploy_testproject` (`molior-validation/1` with `testproject`, waits for the build).
+    In 1.4 the mirror and the build came from the tests before it (`after("test_build_notification")`, now
+    `after("test_deploy_testproject")`).
+  - The test: same metadata, parameters and arguments; the script path is absolute and the cwd is `RESULTS_DIR`
+    (`test-deploy.sh` runs molior-deploy in `molior-deploy-output/` there: the deployments, their logs and the
+    screenshots); stdin is `/dev/null`.
+  - `test-deploy.sh` (changed from 1.4, user decision): `molior-deploy -L` keeps the log of every deployment, `-c`
+    does not ask the cleanup question, and the deployment file is kept (1.4: `rm -f $IMG_FILE`, now `ls -l`). CI
+    uploads the logs (and the screenshots of the VMs) with the test results (artifact `tests-deploy`), not the
+    deployments. The deployments of a failed test go to `RESULTS_DIR/failed-deployments/` (`conftest.py`), also when
+    `test-deploy.sh` failed after molior-deploy; CI uploads them as the artifact `failed-deployments` (3 days).
+  - `test_molior_deploy` (changed from 1.4, user decision): for installer and vbox the deployment boots in VirtualBox
+    (`utils.boot_vm`: headless, own `VBOX_USER_HOME`); the screenshots and the VM log go next to the deployment
+    (`<deployment>.VBox.log`); the test fails if the VM does not start or does not run any more at a screenshot.
+    No login check. The 1.4 test only checked that the file exists.
+    - vbox: the OVA is imported, screenshot `<deployment>.png` after `BOOT_WAIT` seconds (default 60). testproject
+      3.0.13 logs in the user `molior` automatically (lightdm autologin into LXDE).
+    - installer: the ISO in a new VM with an empty 8 GB disk, booting from the disk first and then the ISO.
+      `<deployment>.png` after `INSTALLER_BOOT_WAIT` seconds (default 10, the hostname question), Enter (the
+      default hostname), 5 s later Enter (confirm the installation, `keyboardputscancode`). The installer is done
+      when it ejects the ISO (the DVD drive is empty); a failed installer does not eject it, so after `INSTALL_WAIT`
+      seconds (default 300) the test fails with `<deployment>.failed.png`. Then `<deployment>.done.png` (the end of
+      the installer), Enter (reboot) and `<deployment>.installed.png` of the installed system after
+      `INSTALLED_BOOT_WAIT` seconds (default 30). No disk monitoring (user decision: the size of the VM disk says
+      nothing about success; the disk-idle fallback was removed).
+  - `test_molior_deploy` (changed from 1.4, user decision): a few top level packages per variant
+    (`deployment_packages`: the `INSTALL_PACKAGE` of the deploy file and some of its Depends) must be installed in
+    the deployment: `utils.check_packages` reads `var/lib/dpkg/status` of its root file system without root (dir and
+    lxd: the tar, docker: the layer in the docker image archive of the deployment (no docker call), image: the disk
+    with `sfdisk` and `debugfs`). Not for installer and vbox: they are tested by booting them.
+  - molior-tools `v1.5.0-alpha9` (newest tag on GitHub; the GitHub "latest release" is `v1.4.1`), built on the runner
+    with `dpkg-buildpackage` (no release packages exist). molior-deploy downloads `/debootstrap/<base>_<version>_<arch>.tar.xz`
+    from molior (1.4: nginx `location /debootstrap`); 1.5: FastAPI, `mount_static_files()` in `molior/fastapi/app.py`.
+  - The deployment is found by its type (changed from 1.4, user decision): `test-deploy.sh` expects exactly one
+    `*<suffix>` (`*_installer.iso`, `*_vbox.ova`, ...) in `molior-deploy-output/`, the tests and `conftest.py` use the
+    same pattern (`utils.deployments`). 1.4 expected `<project>_<version>_3.0.11<suffix>`, the version of
+    `testproject` (debian/changelog) fixed in the script; molior builds the latest tag of testproject, so a new tag
+    broke the tests (and the upload of the failed deployments) until the script was changed. testproject versions:
+    3.0.17 adds `linux-image-amd64` to `testproject-image` (the image had no kernel), 3.0.16 adds `linux-image-amd64` to `testproject-devel` (the installed system of the ISO had no kernel and
+    hung in grub), 3.0.15 installs e2fsprogs in the installer initrd (see the known problem below), 3.0.14 adds the desktop
+    background of the vbox deployment, 3.0.13 its autologin, 3.0.12 sets `INSTALL_PACKAGE` in the deploy files
+    (molior-tools 1.5 has no default for it any more).
+  - testproject 3.0.14 (tag `v3.0.14`, commit `6dfffcc`; rewritten and force-pushed on 2026-11-26 to replace the
+    image, first `d1e4bc0`, then `e506fc5`; the image has no EXIF data) adds a desktop background to the vbox
+    deployment (the 3.0.13 screenshot has a black background: `lxde-common` sets the pcmanfm wallpaper to
+    `/etc/alternatives/desktop-background`, which only `desktop-base` provides, and it is not installed, not wanted).
+    `vbox/background.jpg` (git lfs, `.gitattributes`) is installed to `/usr/share/testproject/background.jpg`, and
+    `vbox/pcmanfm.conf` (`[desktop]` with `wallpaper=/usr/share/testproject/background.jpg`, `wallpaper_mode=crop`)
+    to `/etc/skel/.config/pcmanfm/LXDE/pcmanfm.conf`; the postinst creates the user `molior` with `useradd
+    --create-home`, which copies it to `~/.config/pcmanfm/LXDE/` (pcmanfm runs as `--desktop --profile LXDE`, the
+    user file overrides `/etc/xdg/pcmanfm/LXDE/pcmanfm.conf`). Only a new user gets it (fine for a deployment).
+
+### Known problem: the ISO installation fails (mkfs.ext4 missing in the initrd)
+
+The installer deployment (`testproject-devel`, `deploy/installer.conf`) booted and asked its questions, but the
+installation into the VM failed. Seen in CI run 45833279920 (molior commit `86d870f`, testproject 3.0.13) and run
+45852004798 (`c56fbaa`, testproject 3.0.14): `installer.iso.done.png` shows `creating partitions on /dev/sda`,
+`mkswap /dev/sda1`, `mkfs /dev/sda2`, then `E: Installation failed` and the BusyBox shell of `log_error`. The ISO was
+not ejected (VBox.log `SCSI-Eject/Insert 0 calls`); the test passed because the disk-idle fallback took the error
+screen as the end of the installation.
+
+- Cause: `mkfs.ext4` is not in the initrd. The installer hook of molior-tools
+  (`initrd-installer/hooks/installer`) copies `/usr/sbin/mke2fs` and `/usr/sbin/mkswap` to `/mbin`, and
+  `init-premount/installer` links `mkfs.ext2/3/4` to `mke2fs` there. In the root the initrd is built from
+  (`plugins/installer.plugin`, `apt-get install` of `INSTALLER_EXTRA_PACKAGES`, the kernel, busybox,
+  initramfs-tools, ...) e2fsprogs was not installed, so the copy was skipped: in the initrd of the 3.0.14 ISO
+  `/usr/sbin/mke2fs` and `/usr/sbin/mkswap` are busybox (same inode), `/mbin` has no `mke2fs` and `mkswap`, and
+  there is no `libext2fs`. busybox has `mke2fs` and `mkswap`, but no `mkfs.ext4`, so swap worked and ext4 failed.
+  Found by booting the ISO of CI run 45854001850 (artifact `installer-iso`) in qemu.
+- Fix: testproject 3.0.15 (`deploy/installer.conf`): `INSTALLER_EXTRA_PACKAGES="e2fsprogs"` (user decision: in
+  testproject, not in molior-tools). Other projects with ext file systems in the installer need the same line, or
+  molior-tools should install e2fsprogs itself. Checked in qemu: the 3.0.15 ISO installs.
+- Second problem, found with 3.0.15 in qemu: the installed system hangs in grub. `testproject-devel` depended on
+  `grub-pc` but not on a kernel, so `/boot` had no `vmlinuz` and `initrd.img`, and `update-grub` wrote no Linux
+  menu entry. Fix: testproject 3.0.16 adds `linux-image-amd64` to the Depends of `testproject-devel` (as
+  `testproject-vbox`). Not verified in CI yet.
+- The disk-idle fallback is removed: the test only passes when the installer ejected the ISO.
+- Still to do: a serial
+  console for the ISO test (`console=ttyS0`, a VirtualBox UART to `<deployment>.serial.log`) would put the installer
+  output in the test results.

@@ -16,6 +16,8 @@ K3D_APTLY_PORT ?= 8080
 MOLIOR_DEV ?= true
 # system-tests: pytest args, relative to tests/system (default: all suites)
 TEST ?= smoke valid-1.4/validation_tests.py
+# deploy-tests: pytest args, relative to tests/deploy
+DEPLOY_TEST ?= test_deploy.py
 # IMAGE_SOURCE=<repo url>: label org.opencontainers.image.source (CI: ghcr links a new package to the repo)
 IMAGE_SOURCE ?=
 IMAGE_LABEL = $(if $(IMAGE_SOURCE),--label org.opencontainers.image.source=$(IMAGE_SOURCE))
@@ -154,9 +156,15 @@ unit-tests: docker-image-ci  ## Run the unit tests with coverage (in TEST_IMAGE)
 		--junitxml=unit-test-report.xml tests/unit
 
 # tests/system/system-tests.sh uses docker, so the base image is built with docker too
-system-tests:  ## Run the system tests in a throwaway k3d cluster (TEST=valid-1.4/validation_tests.py::test_build_order)
+system-tests:  ## Run the system tests in a temporary k3d cluster (TEST=valid-1.4/validation_tests.py::test_build_order)
 	@$(MAKE) --no-print-directory docker-image-base DOCKERCMD=docker
 	tests/system/system-tests.sh $(TEST)
+
+# runs pytest on this host: needs molior-deploy (molior-tools), passwordless sudo and the host tools of the variants
+# (CI: .github/scripts/install-molior-tools.sh)
+deploy-tests:  ## Run the deploy tests (molior-deploy on this host) against a temporary k3d cluster
+	@$(MAKE) --no-print-directory docker-image-base DOCKERCMD=docker
+	tests/deploy/deploy-tests.sh $(DEPLOY_TEST)
 
 ##@ Deploying
 
@@ -315,4 +323,4 @@ release-molior:
 	kubectl -n $(NAMESPACE) exec deploy/molior -c molior-server -- rm -f /var/lib/molior/molior-hold
 
 # Update with: echo .PHONY: `grep ^[a-z-]*: Makefile | cut -d: -f1` >> Makefile
-.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster docker-image-ci lint unit-tests system-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart restart-molior restart-aptly set-passwords hold-molior import-db release-molior
+.PHONY: help install-deps create-cluster docker-images docker-image-base docker-images-molior docker-images-aptly deploy deploy-molior install-helmchart reload redeploy uninstall-helmchart delete-cluster docker-image-ci lint unit-tests system-tests deploy-tests set-version tag-images docker-images-prod push chart rsync install-nginx install-registry passwd-registry uninstall-registry install-docker install-containerd-trust configure-cluster install-local-path-provisioner list watch logs shell psql restart restart-molior restart-aptly set-passwords hold-molior import-db release-molior

@@ -32,6 +32,15 @@ from ..molior.worker_notification import NotificationWorker
 from ..version import MOLIOR_VERSION
 
 
+class DebootstrapFiles(StaticFiles):
+    """StaticFiles that answers 404 instead of an error while the directory does not exist (no base mirror yet)."""
+
+    async def check_config(self) -> None:
+        if not os.path.isdir(self.directory):
+            raise HTTPException(status_code=404)
+        await super().check_config()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from .auth import assert_secret_configured
@@ -136,11 +145,26 @@ def create_app() -> FastAPI:
     app.include_router(v2_router)
     app.include_router(ws_router)
 
+    mount_static_files(app)
+
+    return app
+
+
+def mount_static_files(app: FastAPI) -> None:
+    """Files and the web UI, after the API routes (the SPA catch-all would answer them)."""
+    # Root file systems of the base mirrors (mirror hook 02-create-debootstrap), downloaded by molior-deploy, which
+    # runs debootstrap itself when the file is missing (404). Mounted before the SPA catch-all, which answers every
+    # other path with index.html.
+    app.mount("/debootstrap",
+              DebootstrapFiles(directory=os.environ.get("MOLIOR_DEBOOTSTRAP_DIR", "/var/lib/molior/debootstrap"),
+                               check_dir=False),
+              name="debootstrap")
+
     # Serve the React SPA from /usr/lib/molior/web (installed by the Debian package).
     # Strategy:
     #   - /assets/* → StaticFiles (webpack bundle: main.js, main.css, fonts, images)
     #   - / and everything else → index.html so react-router handles client-side routing
-    # API routes registered above always win because FastAPI matches them first.
+    # The API routes (registered by create_app before this) always win because FastAPI matches them first.
     web_dir = os.environ.get("MOLIOR_WEB_DIR", "/usr/lib/molior/web")
     if os.path.isdir(web_dir):
         assets_dir = os.path.join(web_dir, "assets")
@@ -164,5 +188,3 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404)
     else:
         logger.warning("web UI directory not found: %s (web UI will not be served)", web_dir)
-
-    return app
