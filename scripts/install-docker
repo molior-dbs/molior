@@ -9,15 +9,15 @@
 #  - the iptables FORWARD policy is pinned to ACCEPT after dockerd starts, as it is on this node with Cilium and kube-proxy
 #    (dockerd would otherwise set it to DROP)
 #
-#   REGISTRY_HOST  registry name for certs.d, required, no default (the name from install-registry)
+#   MOLIOR_REGISTRY  registry name for certs.d, required, no default (the name from install-registry)
 #   CERT           certificate to trust                   (default /etc/nginx/ssl/molior.crt, from install-nginx)
 set -eu
 
 CERT=${CERT:-/etc/nginx/ssl/molior.crt}
-REGISTRY_HOST=${REGISTRY_HOST:-}
+MOLIOR_REGISTRY=${MOLIOR_REGISTRY:-}
 
-case "$REGISTRY_HOST" in
-    ""|*[!A-Za-z0-9.-]*) echo "REGISTRY_HOST is required and may only contain letters, digits, dots and dashes (got '$REGISTRY_HOST')"; exit 1 ;;
+case "$MOLIOR_REGISTRY" in
+    ""|*[!A-Za-z0-9.-]*) echo "MOLIOR_REGISTRY is required and may only contain letters, digits, dots and dashes (got '$MOLIOR_REGISTRY')"; exit 1 ;;
 esac
 [ -r "$CERT" ] || { echo "$CERT not found, run make install-nginx first"; exit 1; }
 
@@ -31,12 +31,12 @@ cat > /etc/systemd/system/docker.service.d/forward-accept.conf <<'CONF'
 ExecStartPost=/usr/sbin/iptables -P FORWARD ACCEPT
 CONF
 
-mkdir -p "/etc/docker/certs.d/$REGISTRY_HOST"
-cp "$CERT" "/etc/docker/certs.d/$REGISTRY_HOST/ca.crt"
+mkdir -p "/etc/docker/certs.d/$MOLIOR_REGISTRY"
+cp "$CERT" "/etc/docker/certs.d/$MOLIOR_REGISTRY/ca.crt"
 
 systemctl daemon-reload
 systemctl enable docker
 systemctl restart docker
 docker version --format 'docker {{.Server.Version}}'
 iptables -S FORWARD | head -1
-echo "docker installed, registry certificate trusted for $REGISTRY_HOST"
+echo "docker installed, registry certificate trusted for $MOLIOR_REGISTRY"

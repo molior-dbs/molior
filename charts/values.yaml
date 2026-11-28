@@ -2,7 +2,7 @@
 # Secret molior-passwords, which must exist in the namespace before the install (see INSTALL.md).
 registry:
   host: k3d-molior-registry
-  port: 5000
+  port:
   user: ""
 
 molior:

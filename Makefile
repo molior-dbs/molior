@@ -2,16 +2,22 @@
 # Local Development targets work on the local k3d cluster (kubectl context k3d-$(K3D_CLUSTER), not the current context).
 
 MOLIOR_VERSION ?= dev
-NAMESPACE := molior
+export NAMESPACE := molior
+export HELM_NAMESPACE := $(NAMESPACE)
+
 # local k3d cluster (make create-cluster K3D_CLUSTER=local); its registry container is k3d-<cluster>-registry
 K3D_CLUSTER ?= molior
 K3D_VERSION ?= v5.9.0
-K3D_REGISTRY = k3d-$(K3D_CLUSTER)-registry
-# host ports of the local cluster (other values for a second cluster next to an existing one); the registry listens on
-# K3D_REGISTRY_PORT inside the cluster too
 K3D_REGISTRY_PORT ?= 5000
 K3D_WEB_PORT ?= 8000
 K3D_APTLY_PORT ?= 8080
+K3D_REGISTRY = k3d-$(K3D_CLUSTER)-registry
+
+ifndef MOLIOR_REGISTRY
+  export MOLIOR_REGISTRY := $(K3D_REGISTRY)
+  export MOLIOR_REGISTRY_PORT := $(K3D_REGISTRY_PORT)
+endif
+
 # true: plain-HTTP session cookies (no TLS in the local cluster)
 MOLIOR_DEV ?= true
 # system-tests: pytest args, relative to tests/system (default: all suites)
@@ -26,9 +32,6 @@ IMAGES := molior molior-postgres aptly molior-nginx
 # (molior-base plus the python packages the unit tests import, docker/ci.Dockerfile; built if missing)
 TEST_IMAGE ?= molior-ci:dev
 ALL_APPS := molior,aptly
-
-KUBECTL_LOCAL = kubectl --context k3d-$(K3D_CLUSTER) -n $(NAMESPACE)
-HELM_LOCAL = helm --kube-context k3d-$(K3D_CLUSTER) -n $(NAMESPACE)
 
 # podman if installed, else docker; DOCKERCMD from the environment or the command line wins (CI sets docker)
 ifndef DOCKERCMD
@@ -109,29 +112,29 @@ deploy-molior:
 	$(call push-images,localhost:$(K3D_REGISTRY_PORT),$(MOLIOR_VERSION),molior molior-postgres)
 
 # VALUES=<file> adds a values file; registry and molior.dev come from K3D_CLUSTER and MOLIOR_DEV (the later --set wins)
-install-helmchart:  ## Install molior with the helm chart (VALUES=<values file>, after deploy)
+install:  ## Install molior with the helm chart (VALUES=<values file>, after deploy)
 	@test -z "$(VALUES)" || test -f "$(VALUES)" || { echo "VALUES file $(VALUES) not found"; exit 1; }
-	kubectl --context k3d-$(K3D_CLUSTER) create namespace $(NAMESPACE) --dry-run=client -o yaml \
-		| kubectl --context k3d-$(K3D_CLUSTER) apply -f -
-	$(KUBECTL_LOCAL) get secret molior-passwords >/dev/null 2>&1 || $(KUBECTL_LOCAL) create secret generic molior-passwords \
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml \
+		| kubectl apply -f -
+	kubectl get secret molior-passwords >/dev/null 2>&1 || kubectl create secret generic molior-passwords \
 		--from-literal=molior-password=molior-dev --from-literal=aptly-password=molior-dev \
 		--from-literal=registry-password=molior-dev
-	$(HELM_LOCAL) install molior charts/ $(if $(VALUES),-f $(VALUES)) \
-		--set registry.host=$(K3D_REGISTRY) --set registry.port=$(K3D_REGISTRY_PORT) --set molior.dev=$(MOLIOR_DEV) \
+	helm install molior charts/ $(if $(VALUES),-f $(VALUES)) \
+		--set registry.host=$(MOLIOR_REGISTRY) $(if $(MOLIOR_REGISTRY_PORT),--set registry.port=$(MOLIOR_REGISTRY_PORT)) --set molior.dev=$(MOLIOR_DEV) \
 		--set aptly.publicUrl=http://localhost:$(K3D_APTLY_PORT)
 
 reload: docker-images-molior deploy-molior  ## Rebuild molior, push it and restart its pod (dev loop)
-	$(KUBECTL_LOCAL) rollout restart deployment/molior
-	$(KUBECTL_LOCAL) rollout status deployment/molior --timeout=600s
+	kubectl rollout restart deployment/molior
+	kubectl rollout status deployment/molior --timeout=600s
 
 redeploy: docker-images deploy  ## Rebuild and push all images, install molior again
 	@$(MAKE) --no-print-directory uninstall-helmchart install-helmchart
 
 # --cascade foreground: helm waits until the pods are gone (default: background, the old pods still terminate while
 # a new install starts them again, two aptly or postgres on the same volume)
-uninstall-helmchart:  ## Uninstall molior (the volumes stay)
-	$(HELM_LOCAL) uninstall --ignore-not-found --cascade foreground --wait --timeout 300s molior
-	$(KUBECTL_LOCAL) wait --for=delete pod -l 'app in ($(ALL_APPS))' --timeout=300s
+uninstall:  ## Uninstall molior (the volumes stay)
+	helm uninstall --ignore-not-found --cascade foreground --wait --timeout 300s molior
+	kubectl wait --for=delete pod -l 'app in ($(ALL_APPS))' --timeout=300s
 
 delete-cluster:  ## Delete the cluster (the registry and its images stay)
 	k3d cluster delete $(K3D_CLUSTER)
@@ -189,9 +192,9 @@ docker-images-prod:
 	$(DOCKERCMD) build --no-cache -f docker/molior/postgres.Dockerfile -t molior-postgres:prod .
 	$(DOCKERCMD) build --no-cache -f docker/molior/molior.Dockerfile -t molior:prod .
 
-push:  ## Push the images: make push REGISTRY=<registry> [MOLIOR_VERSION=<tag>]
-	@test -n "$(REGISTRY)" || { echo "usage: make push REGISTRY=<registry> [MOLIOR_VERSION=<tag>]"; exit 1; }
-	$(call push-images,$(REGISTRY),$(MOLIOR_VERSION),$(IMAGES))
+push:  ## Push the images: make push MOLIOR_REGISTRY=<registry> [MOLIOR_VERSION=<tag>]
+	@test -n "$(MOLIOR_REGISTRY)" || { echo "usage: make push MOLIOR_REGISTRY=<registry> [MOLIOR_VERSION=<tag>]"; exit 1; }
+	$(call push-images,$(MOLIOR_REGISTRY),$(MOLIOR_VERSION),$(IMAGES))
 
 chart:  ## Package the helm chart (MOLIOR_VERSION=<version> sets the chart version and the image tag)
 ifeq ($(MOLIOR_VERSION),dev)
@@ -207,7 +210,6 @@ endif
 SSH_USER ?= debian
 SSH_OPTS ?= -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
 # name clients use for the registry of the host (no default)
-REGISTRY_HOST ?=
 TRUST_PORT ?= 443
 
 # make rsync IP=<host> [RSYNC_OPTS=--delete]: copy this tree to ~/molior on the host
@@ -216,13 +218,13 @@ rsync:
 	rsync -a $(RSYNC_OPTS) --exclude .git --exclude node_modules --exclude __pycache__ --exclude '*.pyc' --exclude .env \
 		--exclude '*.dump.gz' -e "ssh $(SSH_OPTS)" $(CURDIR)/ $(SSH_USER)@$(IP):molior/
 
-# nginx and a self-signed certificate (CERT_CN, CERT_SAN, REGISTRY_HOST=<name> adds its name, FORCE=1 replaces it)
+# nginx and a self-signed certificate (CERT_CN, CERT_SAN, MOLIOR_REGISTRY=<name> adds its name, FORCE=1 replaces it)
 install-nginx:
-	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" REGISTRY_HOST="$(REGISTRY_HOST)" FORCE="$(FORCE)" sh scripts/install-nginx
+	sudo env CERT_CN="$(CERT_CN)" CERT_SAN="$(CERT_SAN)" MOLIOR_REGISTRY="$(MOLIOR_REGISTRY)" FORCE="$(FORCE)" sh scripts/install-nginx
 
-# docker-registry and its nginx server block for REGISTRY_HOST=<name>, push password on stdin (after install-nginx)
+# docker-registry and its nginx server block for MOLIOR_REGISTRY=<name>, push password on stdin (after install-nginx)
 install-registry:
-	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" sh scripts/install-registry
+	sudo env MOLIOR_REGISTRY="$(MOLIOR_REGISTRY)" sh scripts/install-registry
 
 # new registry push password (needs a terminal: ssh -t <host> 'cd ~/molior && make passwd-registry')
 passwd-registry:
@@ -232,13 +234,13 @@ passwd-registry:
 uninstall-registry:
 	sudo env FORCE="$(FORCE)" sh scripts/uninstall-registry
 
-# docker.io and docker-cli, trusting the registry certificate of REGISTRY_HOST=<name> (after install-nginx)
+# docker.io and docker-cli, trusting the registry certificate of MOLIOR_REGISTRY=<name> (after install-nginx)
 install-docker:
-	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" sh scripts/install-docker
+	sudo env MOLIOR_REGISTRY="$(MOLIOR_REGISTRY)" sh scripts/install-docker
 
-# containerd trusts the registry certificate of REGISTRY_HOST=<name> [TRUST_PORT=443], restarts containerd once
+# containerd trusts the registry certificate of MOLIOR_REGISTRY=<name> [TRUST_PORT=443], restarts containerd once
 install-containerd-trust:
-	sudo env REGISTRY_HOST="$(REGISTRY_HOST)" REGISTRY_PORT="$(TRUST_PORT)" sh scripts/install-containerd-trust
+	sudo env MOLIOR_REGISTRY="$(MOLIOR_REGISTRY)" MOLIOR_REGISTRY="$(TRUST_PORT)" sh scripts/install-containerd-trust
 
 ##@ Molior Maintenance (current kubectl context)
 

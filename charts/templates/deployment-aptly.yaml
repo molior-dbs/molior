@@ -23,7 +23,7 @@ spec:
 {{- end }}
       containers:
         - name: aptly-server
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/aptly:{{ .Values.molior.version }}
+          image: {{ .Values.registry.host }}{{ with .Values.registry.port }}:{{ . }}{{ end }}/aptly:{{ .Values.molior.version }}
           imagePullPolicy: Always
           env:
             - name: REPOSIGN_EMAIL
@@ -47,7 +47,7 @@ spec:
               subPath: aptly.conf
 
         - name: aptly-nginx
-          image: {{ .Values.registry.host }}:{{ .Values.registry.port }}/molior-nginx:{{ .Values.molior.version }}
+          image: {{ .Values.registry.host }}{{ with .Values.registry.port }}:{{ . }}{{ end }}/molior-nginx:{{ .Values.molior.version }}
           imagePullPolicy: Always
           env:
             - name: APTLY_PASSWORD
